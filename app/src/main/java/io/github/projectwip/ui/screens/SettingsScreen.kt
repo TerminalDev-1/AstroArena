@@ -65,6 +65,8 @@ import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.plateShape
 import io.github.projectwip.audio.Sound
 
+const val REPO_URL = "https://github.com/TerminalDev-1/ProjectWIP-Preview"
+
 private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data") }
 
 @Composable
@@ -194,6 +196,11 @@ private fun DataTab(repo: GameRepository) {
     ChunkyButton({ confirm = true }, Modifier.width(260.dp).height(56.dp), ButtonStyle.RED) { GameText("RESET PROGRESS", Type.Heading) }
     Spacer(Modifier.height(10.dp))
     SectionTitle("ABOUT", "Project WIP-Preview ${BuildConfig.VERSION_NAME}. Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
+    val context = androidx.compose.ui.platform.LocalContext.current
+    ChunkyButton({
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(REPO_URL)))
+    }, Modifier.width(380.dp).height(56.dp), ButtonStyle.CYAN) { GameText("SOURCE ON GITHUB", Type.Heading) }
+    PlainText(REPO_URL, Type.Small, color = Palette.Cyan)
     if (confirm) {
         ConfirmDialog("RESET EVERYTHING?", "All progress will be lost.", "RESET", { repo.resetProgress(); confirm = false }, { confirm = false }, ButtonStyle.RED)
     }
