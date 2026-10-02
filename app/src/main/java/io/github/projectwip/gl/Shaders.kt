@@ -86,7 +86,7 @@ void main() {
 
     /**
      * Stylised "toon" lighting: a soft two-band sun term with shadow map, hemisphere ambient, rim light.
-     * uMode: 0 = lit, 1 = flat colour (outlines, decals), 2 = x-ray silhouette.
+     * uMode: 0 = lit, 1 = flat colour (outlines, decals), 2 = x-ray silhouette, 3 = unlit vertex colour (sky).
      */
     const val LIT_FS = """#version 300 es
 precision highp float;
@@ -128,6 +128,7 @@ float shadowAt() {
 void main() {
     if (uMode == 1) { o = uTint; return; }
     if (uMode == 2) { o = vec4(uTint.rgb, uTint.a); return; }
+    if (uMode == 3) { o = vec4(vColor.rgb * uTint.rgb, 1.0); return; }
     vec3 n = normalize(vNormal);
     vec3 base = vColor.rgb * uTint.rgb;
     float ndl = dot(n, -uLightDir);

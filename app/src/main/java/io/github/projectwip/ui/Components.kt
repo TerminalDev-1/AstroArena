@@ -69,6 +69,9 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.findRootCoordinates
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -118,6 +121,8 @@ enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val te
     RED(Palette.Red, Palette.RedDeep, Palette.RedLip),
     PURPLE(Palette.PanelLight, Palette.Panel, Palette.PanelDark),
     GOLD(Color(0xFFFFE066), Palette.Gold, Color(0xFFA8650A)),
+    /** Translucent plate that lets the 3D lobby show through. */
+    GLASS(Color(0xD8392A8C), Color(0xE01A1150), Color(0xFF0E0828)),
 }
 
 private fun DrawScope.plate(shape: Shape, size: Size, brush: Brush, ink: Color, inkWidth: Float, gloss: Boolean) {
@@ -377,6 +382,54 @@ fun ScreenHeader(title: String, onBack: () -> Unit, bolts: Int?, prisms: Int?, m
             if (bolts != null) CurrencyPill(IconKind.BOLT, bolts)
             if (prisms != null) CurrencyPill(IconKind.PRISM, prisms)
         }
+    }
+}
+
+/**
+ * Tells the 3D lobby what this screen wants behind it. [heroCenterX] (0..1 of the screen width) is where the
+ * fighter should stand; measure it with [Modifier.lobbyAnchor].
+ */
+@Composable
+fun LobbyShotEffect(
+    shot: io.github.projectwip.render3d.LobbyShot,
+    fighter: io.github.projectwip.data.FighterId? = null,
+    skin: Int = 0,
+    locked: Boolean = false,
+    celebrateKey: Int = 0,
+) {
+    val lobby = LocalLobby.current
+    androidx.compose.runtime.SideEffect {
+        lobby.shot = shot
+        lobby.showFighter = fighter != null
+        if (fighter != null) { lobby.fighter = fighter; lobby.skin = skin; lobby.locked = locked }
+    }
+    val first = remember { booleanArrayOf(true) }
+    LaunchedEffect(celebrateKey) {
+        if (first[0]) { first[0] = false; return@LaunchedEffect }
+        lobby.celebrateAt = System.currentTimeMillis()
+    }
+}
+
+/** Reports this element's horizontal centre to the lobby so the 3D fighter stands right here. */
+@Composable
+fun Modifier.lobbyAnchor(): Modifier {
+    val lobby = LocalLobby.current
+    return this.onGloballyPositioned { c ->
+        val root = c.findRootCoordinates().size.width.toFloat().coerceAtLeast(1f)
+        val pos = c.positionInRoot().x + c.size.width / 2f
+        lobby.fighterScreenX = (pos / root).coerceIn(0.1f, 0.9f)
+    }
+}
+
+/** Translucent wash over the 3D lobby for content-heavy screens. */
+val SCRIM = Color(0xB0120A2E)
+
+/** Top/bottom darkening so UI over the 3D lobby stays readable. */
+@Composable
+fun LobbyVignette(strength: Float = 1f) {
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(Brush.verticalGradient(listOf(Color(0xCC0B0620).copy(alpha = 0.8f * strength), Color.Transparent), 0f, size.height * 0.22f))
+        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC0B0620).copy(alpha = 0.85f * strength)), size.height * 0.7f, size.height))
     }
 }
 

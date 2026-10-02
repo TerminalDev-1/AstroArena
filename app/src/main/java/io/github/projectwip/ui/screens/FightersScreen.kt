@@ -68,6 +68,7 @@ import io.github.projectwip.ui.ScreenHeader
 import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.plateShape
 import io.github.projectwip.ui.popOnChange
+import io.github.projectwip.ui.lobbyAnchor
 import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
@@ -82,8 +83,9 @@ fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId, go:
     val def = Balance.fighter(focus)
     val prog = save.progress(focus)
 
+    io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.FIGHTER, focus, prog.skin, locked = !prog.unlocked, celebrateKey = upgradeCount)
     Box(Modifier.fillMaxSize()) {
-        GameBackground()
+        io.github.projectwip.ui.LobbyVignette(0.8f)
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("FIGHTERS", { go(Screen.Home) }, save.bolts, save.prisms)
             Row(Modifier.weight(1f).fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
@@ -98,8 +100,8 @@ fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId, go:
                 // ---------------- hero
                 Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(Modifier.weight(1f).aspectRatio(1f), contentAlignment = Alignment.Center) {
-                            FighterView(def, prog.skin, Modifier.fillMaxSize(), rays = true, locked = !prog.unlocked, celebrateKey = upgradeCount)
+                        // The live 3D fighter from the lobby stands here.
+                        Box(Modifier.weight(1f).fillMaxWidth().lobbyAnchor(), contentAlignment = Alignment.Center) {
                             UpgradeBurst(upgradeCount, Color(def.skins[prog.skin].accent))
                             if (!prog.unlocked) GameIcon(IconKind.LOCK, Modifier.size(80.dp))
                         }

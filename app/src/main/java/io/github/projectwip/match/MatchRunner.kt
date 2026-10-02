@@ -72,11 +72,11 @@ class MatchRunner(
         c.aiming = input.aimingAttack || input.aimingSuper
         if (c.aiming) { c.aimX = input.aimX; c.aimY = input.aimY }
         if (input.attack != TouchControls.FireMode.NONE) {
-            setAim(input.attack, input.attackX, input.attackY, p.def.attack.range)
+            setAim(input.attack, input.attackX, input.attackY, p.def.attack.range, p.def.attack.speed)
             c.attack = true
         }
         if (input.superFire != TouchControls.FireMode.NONE && p.superReady) {
-            setAim(input.superFire, input.superX, input.superY, p.def.superSpec.range)
+            setAim(input.superFire, input.superX, input.superY, p.def.superSpec.range, p.def.superSpec.speed)
             c.superAttack = true
         }
 
@@ -91,19 +91,31 @@ class MatchRunner(
         }
         match.world.events.clear()
 
-        if (match.isOver && match.world.phaseTime > 2.8f && !finished) {
+        if (match.isOver && match.overFor > 2.8f && !finished) {
             finished = true
             onFinished(match.report())
         }
     }
 
-    /** Auto = nearest visible enemy. Aimed shots get gentle aim assist if enabled. */
-    private fun setAim(mode: TouchControls.FireMode, ax: Float, ay: Float, range: Float) {
+    private val lead = FloatArray(2)
+
+    /**
+     * Auto = lock onto the nearest visible enemy and lead the shot so it meets them.
+     * Aimed shots get gentle aim assist (also leading) if enabled.
+     */
+    private fun setAim(mode: TouchControls.FireMode, ax: Float, ay: Float, range: Float, speed: Float) {
         val p = match.player
         val c = p.control
+        val w = match.world
         if (mode == TouchControls.FireMode.AUTO || hypot(ax, ay) < 0.01f) {
-            val t = match.world.nearestVisibleEnemy(p, range + 0.5f)
-            if (t != null) { c.aimX = t.x - p.x; c.aimY = t.y - p.y } else { c.aimX = cos(p.facing); c.aimY = sin(p.facing) }
+            // In range first; otherwise still turn toward the nearest visible enemy just beyond it.
+            val t = w.nearestVisibleEnemy(p, range + 0.5f) ?: w.nearestVisibleEnemy(p, range + 3f)
+            if (t != null) {
+                w.leadAim(p, t, speed, lead)
+                c.aimX = lead[0]; c.aimY = lead[1]
+            } else {
+                c.aimX = cos(p.facing); c.aimY = sin(p.facing)
+            }
             return
         }
         c.aimX = ax; c.aimY = ay
@@ -111,15 +123,15 @@ class MatchRunner(
             val want = atan2(ay, ax)
             var best: Fighter? = null
             var bestDiff = Math.toRadians(ASSIST_DEGREES).toFloat()
-            for (e in match.world.fighters) {
-                if (e.team == p.team || !match.world.isVisibleTo(e, p.team)) continue
+            for (e in w.fighters) {
+                if (e.team == p.team || !w.isVisibleTo(e, p.team)) continue
                 if (hypot(e.x - p.x, e.y - p.y) > range + 0.5f) continue
                 var d = atan2(e.y - p.y, e.x - p.x) - want
                 while (d > Math.PI) d -= (2 * Math.PI).toFloat()
                 while (d < -Math.PI) d += (2 * Math.PI).toFloat()
                 if (abs(d) < bestDiff) { bestDiff = abs(d); best = e }
             }
-            best?.let { c.aimX = it.x - p.x; c.aimY = it.y - p.y }
+            best?.let { w.leadAim(p, it, speed, lead); c.aimX = lead[0]; c.aimY = lead[1] }
         }
     }
 
@@ -151,7 +163,7 @@ class MatchRunner(
             is GameEvent.Ko -> {
                 val k = world.fighter(e.killerId)
                 val v = world.fighter(e.victimId)
-                if (v != null) hudEvents += HudEvent.Ko(k?.name ?: "—", k?.team ?: -1, v.name, v.team)
+                if (v != null) hudEvents += HudEvent.Ko(k?.name ?: if (match.freeForAll) "Static Storm" else "—", k?.team ?: -2, v.name, v.team)
                 if (e.killerId == pid) { sfx.play(Sound.KO, 1f); sfx.buzz(60, 220) }
                 else if (e.victimId == pid) { sfx.play(Sound.KO, 0.9f, 0.7f); sfx.buzz(120, 255) }
                 else sfx.play(Sound.KO, 0.35f)
@@ -160,6 +172,11 @@ class MatchRunner(
             is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }
             is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop }
             is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
+            is GameEvent.Eliminated -> if (e.fighterId == pid) sfx.play(Sound.DEFEAT)
+            is GameEvent.StormHit -> if (e.targetId == pid) {
+                sfx.play(Sound.HURT, 0.6f, 0.8f); sfx.buzz(20, 90)
+                if (settings.showDamageNumbers) hudEvents += HudEvent.Damage(e.x, e.y, e.damage, false, false)
+            }
             else -> Unit
         }
     }

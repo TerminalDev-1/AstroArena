@@ -42,6 +42,8 @@ import io.github.projectwip.ui.Type
 data class PlayerLine(
     val name: String, val fighter: FighterId, val skin: Int, val team: Int,
     val kos: Int, val deaths: Int, val damage: Int, val isPlayer: Boolean, val isMvp: Boolean, val isBot: Boolean,
+    /** Free-for-all finishing place; 0 = still fighting when your match ended. */
+    val placement: Int = 0,
 )
 
 data class MatchSummary(val report: MatchReport, val players: List<PlayerLine>, val playerTeam: Int)
@@ -51,7 +53,8 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
     return MatchSummary(
         report,
         match.world.fighters.map {
-            PlayerLine(it.name, it.def.id, it.skin, it.team, it.kos, it.deaths, it.damageDealt, it === match.player, it === mvp, it.isBot)
+            PlayerLine(it.name, it.def.id, it.skin, it.team, it.kos, it.deaths, it.damageDealt, it === match.player, it === mvp, it.isBot,
+                placement = if (it === match.player) match.placement else it.placement)
         },
         match.player.team,
     )

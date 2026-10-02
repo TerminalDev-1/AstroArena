@@ -12,6 +12,8 @@ enum class Tile(val blocksMove: Boolean, val blocksShots: Boolean) {
     THICKET(false, false),
     /** Coolant pool: blocks movement, shots fly over it. */
     WATER(true, false),
+    /** Spark Crate: blocks until destroyed, then becomes floor and drops a Power Cell. */
+    CRATE(true, true),
 }
 
 data class Spawn(val x: Float, val y: Float)
@@ -25,12 +27,23 @@ class Arena(
     val width: Int,
     val height: Int,
     private val tiles: Array<Tile>,
+    /** Team spawns: index 0 = the player's team. */
     val spawns: List<List<Spawn>>,
+    /** Free-for-all spawn points (one per fighter). */
+    val ffaSpawns: List<Spawn> = emptyList(),
 ) {
+    /** A fresh copy (matches mutate tiles when crates break). */
+    fun copy(): Arena = Arena(name, width, height, tiles.copyOf(), spawns, ffaSpawns)
+
     operator fun get(tx: Int, ty: Int): Tile =
         if (tx < 0 || ty < 0 || tx >= width || ty >= height) Tile.WALL else tiles[ty * width + tx]
 
     fun tileAt(x: Float, y: Float): Tile = get(floor(x).toInt(), floor(y).toInt())
+
+    /** Tiles can change at runtime (crates break). */
+    operator fun set(tx: Int, ty: Int, t: Tile) {
+        if (tx in 0 until width && ty in 0 until height) tiles[ty * width + tx] = t
+    }
 
     fun inThicket(x: Float, y: Float) = tileAt(x, y) == Tile.THICKET
 
@@ -149,14 +162,22 @@ class Arena(
 
     fun shotClear(x0: Float, y0: Float, x1: Float, y1: Float) = shotBlockedAt(x0, y0, x1, y1) < 0f
 
+    /** Centre of the nearest tile (searching outward) where a circle of radius r fits. */
+    fun nearestOpen(x: Float, y: Float, r: Float): Spawn {
+        if (!circleBlocked(x, y, r)) return Spawn(x, y)
+        val tx = floor(x).toInt(); val ty = floor(y).toInt()
+        for (ring in 1..8) for (dy in -ring..ring) for (dx in -ring..ring) {
+            if (maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy)) != ring) continue
+            val cx = tx + dx + 0.5f; val cy = ty + dy + 0.5f
+            if (cx < 1 || cy < 1 || cx > width - 1 || cy > height - 1) continue
+            if (!circleBlocked(cx, cy, r)) return Spawn(cx, cy)
+        }
+        return Spawn(width / 2f, height / 2f)
+    }
+
     companion object {
-        /**
-         * Builds a symmetric arena from its top-left quadrant. The quadrant is mirrored left↔right
-         * and top↔bottom, so both teams get exactly the same terrain.
-         *
-         * Legend: `.` floor, `#` wall, `g` thicket (tall grass), `~` coolant pool.
-         */
-        fun fromQuadrant(name: String, quadrant: List<String>, spawnYs: List<Float>, spawnInset: Float): Arena {
+        /** Mirrors a quadrant left-right and top-bottom into a full symmetric tile grid. */
+        private fun mirror(quadrant: List<String>): Triple<Int, Int, Array<Tile>> {
             val qw = quadrant.first().length
             val qh = quadrant.size
             require(quadrant.all { it.length == qw }) { "Quadrant rows must have equal length" }
@@ -170,18 +191,53 @@ class Arena(
                     '#' -> Tile.WALL
                     'g' -> Tile.THICKET
                     '~' -> Tile.WATER
+                    'c' -> Tile.CRATE
                     else -> Tile.FLOOR
                 }
             }
-            val blue = spawnYs.map { Spawn(spawnInset, it) }
-            val red = spawnYs.map { Spawn(w - spawnInset, it) }
-            return Arena(name, w, h, tiles, listOf(blue, red))
+            return Triple(w, h, tiles)
+        }
+
+        /**
+         * Builds a symmetric team arena from its top-left quadrant (mirrored both ways).
+         * With [vertical], the layout is turned so teams face each other top ↔ bottom:
+         * the player's team (index 0) spawns at the bottom.
+         *
+         * Legend: `.` floor, `#` wall, `g` thicket (tall grass), `~` coolant pool.
+         */
+        fun fromQuadrant(name: String, quadrant: List<String>, spawnYs: List<Float>, spawnInset: Float, vertical: Boolean = true): Arena {
+            val (w, h, tiles) = mirror(quadrant)
+            if (!vertical) {
+                val blue = spawnYs.map { Spawn(spawnInset, it) }
+                val red = spawnYs.map { Spawn(w - spawnInset, it) }
+                return Arena(name, w, h, tiles, listOf(blue, red))
+            }
+            // Transpose: (x, y) -> (y, x). Width and height swap.
+            val tw = h; val th = w
+            val t = Array(tw * th) { Tile.FLOOR }
+            for (y in 0 until h) for (x in 0 until w) t[x * tw + y] = tiles[y * w + x]
+            val bottom = spawnYs.map { Spawn(it, th - spawnInset) }
+            val top = spawnYs.map { Spawn(it, spawnInset) }
+            return Arena(name, tw, th, t, listOf(bottom, top))
+        }
+
+        /** A square free-for-all arena with [count] spawns on a ring around the centre. */
+        fun freeForAll(name: String, quadrant: List<String>, count: Int, ringFraction: Float): Arena {
+            val (w, h, tiles) = mirror(quadrant)
+            val tmp = Arena(name, w, h, tiles, emptyList())
+            val cx = w / 2f; val cy = h / 2f
+            val r = minOf(w, h) / 2f * ringFraction
+            val spawns = (0 until count).map { i ->
+                val a = (-Math.PI / 2 + i * 2 * Math.PI / count)
+                tmp.nearestOpen(cx + (kotlin.math.cos(a) * r).toFloat(), cy + (kotlin.math.sin(a) * r).toFloat(), 0.5f)
+            }
+            return Arena(name, w, h, tiles, emptyList(), spawns)
         }
     }
 }
 
 object Arenas {
-    /** "Foundry Yard" — the first arena. Edit the quadrant to reshape the whole map. */
+    /** "Foundry Yard" — 3v3 Knockout Rush. Teams face each other bottom (you) vs top. */
     fun foundryYard(): Arena = Arena.fromQuadrant(
         name = "Foundry Yard",
         quadrant = listOf(
@@ -199,5 +255,37 @@ object Arenas {
         ),
         spawnYs = listOf(6.5f, 10f, 13.5f),
         spawnInset = 1.5f,
+    )
+
+    /** "Static Canyon" — 10-fighter Last Spark. Large and square, lots of cover and grass to ambush from. */
+    fun staticCanyon(): Arena = Arena.freeForAll(
+        name = "Static Canyon",
+        quadrant = listOf(
+            //0123456789ABCDEFGHIJKL
+            "gggg......gg........g.",
+            "gggg.c##..gg..##....g.",
+            "gg....##......##..c...",
+            "gg..........ggg....##.",
+            "....~~~.....ggg....##.",
+            "..##~~~..##.c.........",
+            "..##.....##...##..ggg.",
+            ".c.......gg...##..ggg.",
+            "gg..##...gg...........",
+            "gg..##.......~~...##..",
+            "......ggg..c.~~...##..",
+            "..##..ggg..##.........",
+            "..##.......##..gg..c..",
+            "......##.......gg..##.",
+            "gg....##..gg.......##.",
+            "gg...c....gg..##......",
+            "...ggg........##..gg..",
+            "...ggg..c.........gg..",
+            ".......##..gg.........",
+            "..gg...##..gg...##..c.",
+            "..gg............##....",
+            "...........c..........",
+        ),
+        count = 10,
+        ringFraction = 0.88f,
     )
 }

@@ -29,6 +29,11 @@ class HudSnapshot {
     var autoTargetId = -1
     var matchesPlayed = 0
     var fps = 0
+    var freeForAll = false
+    var aliveCount = 0
+    var placement = 0
+    var stormElapsed = -1f
+    var playerOutsideStorm = false
 
     val count get() = n
     var n = 0
@@ -42,6 +47,7 @@ class HudSnapshot {
     val relation = IntArray(MAX)
     val names = arrayOfNulls<String>(MAX)
     val superReady = BooleanArray(MAX)
+    val cells = IntArray(MAX)
 
     fun copyFrom(o: HudSnapshot) {
         width = o.width; height = o.height
@@ -50,14 +56,16 @@ class HudSnapshot {
         myScore = o.myScore; theirScore = o.theirScore; koTarget = o.koTarget; winningTeam = o.winningTeam; playerTeam = o.playerTeam
         playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; ammo = o.ammo; ammoMax = o.ammoMax; superCharge = o.superCharge
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
+        freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
+        stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm
         n = o.n
         for (i in 0 until n) {
             ids[i] = o.ids[i]; sx[i] = o.sx[i]; sy[i] = o.sy[i]; visible[i] = o.visible[i]
-            hp[i] = o.hp[i]; maxHp[i] = o.maxHp[i]; relation[i] = o.relation[i]; names[i] = o.names[i]; superReady[i] = o.superReady[i]
+            hp[i] = o.hp[i]; maxHp[i] = o.maxHp[i]; relation[i] = o.relation[i]; names[i] = o.names[i]; superReady[i] = o.superReady[i]; cells[i] = o.cells[i]
         }
     }
 
-    companion object { const val MAX = 8 }
+    companion object { const val MAX = 12 }
 }
 
 /** Lock-protected hand-off between render thread (writer) and UI thread (reader). */

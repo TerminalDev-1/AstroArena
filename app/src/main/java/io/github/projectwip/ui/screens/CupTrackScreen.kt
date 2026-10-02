@@ -1,5 +1,6 @@
 package io.github.projectwip.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -71,7 +72,8 @@ fun CupTrackScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, s
     }
 
     Box(Modifier.fillMaxSize()) {
-        GameBackground(tint = Color(0xFF4A1C7A))
+        io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("CUP TRACK", { go(Screen.Home) }, save.bolts, save.prisms) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

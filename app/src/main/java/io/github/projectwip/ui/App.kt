@@ -113,7 +113,14 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
         val density = Density(base.density * scale, 1f)
         val metrics = UiMetrics(maxWidth.value / scale, maxHeight.value / scale, scale)
 
-        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalSfx provides sfx) {
+        val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
+        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalSfx provides sfx, LocalLobby provides lobby) {
+            if (screen !is Screen.Match) {
+                androidx.compose.ui.viewinterop.AndroidView(
+                    factory = { ctx -> io.github.projectwip.render3d.LobbyView(ctx, lobby) },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             AnimatedContent(
                 targetState = screen,
                 contentKey = { it::class },
@@ -152,7 +159,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
 
 fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
     val p = save.progress(save.selectedFighter)
-    return MatchConfig(save.selectedFighter, p.level, p.skin, save.settings.playerName, save.settings.botDifficulty)
+    return MatchConfig(save.selectedFighter, p.level, p.skin, save.settings.playerName, save.settings.botDifficulty, mode = save.selectedMode)
 }
 
 fun rewardLabel(r: Reward): String = when (r) {
@@ -160,6 +167,7 @@ fun rewardLabel(r: Reward): String = when (r) {
     is Reward.Prisms -> "+${r.amount} Prisms"
     is Reward.UnlockFighter -> "${Balance.fighter(r.fighter).name} unlocked!"
     is Reward.SkinReward -> "${Balance.fighter(r.fighter).skins[r.skinIndex].name} colorway"
+    is Reward.Bundle -> r.items.joinToString(", ") { rewardLabel(it) }
 }
 
 @Composable
@@ -169,6 +177,7 @@ fun RewardVisual(r: Reward, modifier: Modifier = Modifier) {
         is Reward.Prisms -> GameIcon(IconKind.PRISM, modifier)
         is Reward.UnlockFighter -> FighterView(Balance.fighter(r.fighter), 0, modifier, pedestal = false)
         is Reward.SkinReward -> FighterView(Balance.fighter(r.fighter), r.skinIndex, modifier, pedestal = false)
+        is Reward.Bundle -> GameIcon(IconKind.GIFT, modifier)
     }
 }
 

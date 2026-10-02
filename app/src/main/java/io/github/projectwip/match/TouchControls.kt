@@ -131,11 +131,13 @@ class TouchControls(private val density: Float) {
         val pr = RectF(pauseRect).apply { inset(-dp(10f), -dp(10f)) }
         if (pr.contains(x, y)) { pendingPause = true; return }
 
-        if (!superStick.active && superReady && hypot(x - superCx, y - superCy) < superRadius * 1.5f) {
-            grab(superStick, id, superCx, superCy, x, y); return
+        // Aim sticks measure from where the thumb lands, so a tap anywhere on them is a clean
+        // auto-aim tap and drags aim relative to the touch point (the stick is still drawn in place).
+        if (!superStick.active && superReady && hypot(x - superCx, y - superCy) < superRadius * 1.6f) {
+            grab(superStick, id, x, y, x, y); return
         }
-        if (!attack.active && hypot(x - attackCx, y - attackCy) < attackRadius * 1.7f) {
-            grab(attack, id, attackCx, attackCy, x, y); return
+        if (!attack.active && hypot(x - attackCx, y - attackCy) < attackRadius * 1.8f) {
+            grab(attack, id, x, y, x, y); return
         }
         if (!move.active && x < width * 0.5f) {
             if (settings.moveStickMode == MoveStickMode.FIXED) {

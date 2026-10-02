@@ -42,18 +42,44 @@ that `HudView` draws on the UI thread; touch goes `HudView → TouchControls` (s
 Fighters are rigged from rounded primitives (body, head, legs, free arm, weapon, floating crystal) and
 animated procedurally (walk, lean, recoil, breathe, hit flash). Meshes are white; skins colour them per draw.
 
-Menus reuse the same models and lighting: a transparent `TextureView` stage for hero spots (drag to spin,
-tap to cheer, celebrates on upgrade) and `Portraits`, which renders every fighter/skin once offscreen
-(MSAA FBO → bitmap) at startup for cards and lists.
+Menus reuse the same models and lighting. One persistent `LobbyView` (a `TextureView` with its own GL thread)
+sits behind every menu screen and renders a 3D lobby — sky dome, glowing floor, neon pillars, emblem, floating
+props — plus the selected fighter on a pedestal. Screens describe what they want with `LobbyShotEffect`
+(HOME / FIGHTER / BACKDROP) and `Modifier.lobbyAnchor()` (where the fighter should stand); the camera glides
+between shots and uses a lens shift so the fighter lands exactly in the layout's hero column. The lobby is
+removed during matches. `Portraits` renders every fighter/skin once offscreen (MSAA FBO → bitmap) for cards.
+
+## Shop & Offer Creator
+
+Fixed catalog items live in `data/Catalog.kt`. Player-made offers are `CustomOffer`s stored in the save:
+contents (Bolts, Prisms, a fighter, a colourway — bundled as `Reward.Bundle`), price currency (free/Bolts/
+Prisms), optional "was" price shown as a discount, expiry, purchase limit and colour theme. Purchases go
+through `Progression.buyOffer`; already-owned items in a bundle are compensated rather than wasted.
 
 Humans and bots drive fighters through the **same `Control` struct** — move vector, aim vector, one-shot
 attack/super triggers — so bots can't cheat on stats or speed, and visibility (thickets) is enforced for
 both via `World.isVisibleTo`.
 
+## Modes
+
+`MatchRules` switches between **teams** (Knockout Rush: two teams, respawns, KO race, vertical map with the
+player's team at the bottom) and **free-for-all** (Last Spark: every fighter is its own team, one life,
+placements). Free-for-all adds:
+
+* **Static Storm** — a circle around the arena centre that waits, then shrinks; damage outside grows over time.
+* **Spark Crates** — `Tile.CRATE` tiles with health (`World.crateHp`); breaking one turns it into floor and drops
+  a **Power Cell** pickup (+10% max health and damage each, stacking). Knocked-out fighters drop their cells.
+
+Bots read the same state: they seek safety from the storm first, loot crates/cells when no fight is near, and
+early in the match only engage enemies close by (otherwise ten fighters stampede into each other). A
+`BalanceReport` test measures match lengths and per-fighter performance headlessly.
+
 ## Auto-aim
 
-Tapping the attack stick fires at `World.nearestVisibleEnemy`; that target is always marked in the arena
-(gold dashed ring + bobbing arrow + HUD reticle) so players see who a tap will hit. With **Aim Assist**
+Aim sticks measure from where the thumb lands, so any tap on them is an auto-aim tap. Auto-aim locks onto
+`World.nearestVisibleEnemy` and **leads** it with `World.leadAim` (solves the projectile/target intercept), so
+shots meet moving targets. That target is always marked in the arena (gold dashed ring + bobbing arrow + HUD
+reticle) so players see who a tap will hit. With **Aim Assist**
 (Settings → Controls), dragged shots within 12° of a visible enemy snap onto it.
 
 ## Bot AI

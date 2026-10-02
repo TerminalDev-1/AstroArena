@@ -6,6 +6,46 @@ sealed interface Reward {
     data class Prisms(val amount: Int) : Reward
     data class UnlockFighter(val fighter: FighterId) : Reward
     data class SkinReward(val fighter: FighterId, val skinIndex: Int) : Reward
+    /** Several rewards at once (custom shop offers). */
+    data class Bundle(val items: List<Reward>) : Reward
+}
+
+enum class Currency { FREE, BOLTS, PRISMS }
+
+/**
+ * A shop offer created in-game with the Offer Creator. Everything about it is chosen by the player:
+ * contents, price, an optional "was" price shown as a discount, expiry, purchase limit and colour theme.
+ */
+data class CustomOffer(
+    val id: Long,
+    val title: String,
+    val bolts: Int = 0,
+    val prisms: Int = 0,
+    val fighter: FighterId? = null,
+    val skinFighter: FighterId? = null,
+    val skinIndex: Int = 0,
+    val currency: Currency = Currency.PRISMS,
+    val price: Int = 0,
+    /** If greater than [price], shown struck-through with a discount badge. 0 = off. */
+    val wasPrice: Int = 0,
+    /** Epoch millis after which the offer disappears. 0 = never. */
+    val expiresAt: Long = 0,
+    /** How many times it can be bought. 0 = unlimited. */
+    val limit: Int = 1,
+    val purchased: Int = 0,
+    /** Index into the creator's colour themes. */
+    val theme: Int = 0,
+) {
+    val contents: List<Reward> get() = buildList {
+        if (bolts > 0) add(Reward.Bolts(bolts))
+        if (prisms > 0) add(Reward.Prisms(prisms))
+        fighter?.let { add(Reward.UnlockFighter(it)) }
+        skinFighter?.let { add(Reward.SkinReward(it, skinIndex)) }
+    }
+    val reward: Reward get() = contents.singleOrNull() ?: Reward.Bundle(contents)
+    fun expired(now: Long) = expiresAt in 1..now
+    val soldOut get() = limit in 1..purchased
+    val discountPercent get() = if (wasPrice > price && wasPrice > 0) ((wasPrice - price) * 100 / wasPrice) else 0
 }
 
 data class Milestone(val cups: Int, val reward: Reward)
@@ -40,6 +80,7 @@ object CupTrack {
     fun duplicateCompensation(reward: Reward): Reward = when (reward) {
         is Reward.UnlockFighter -> Reward.Bolts(300)
         is Reward.SkinReward -> Reward.Prisms(30)
+        is Reward.Bundle -> Reward.Bundle(reward.items.map { duplicateCompensation(it) })
         else -> reward
     }
 }

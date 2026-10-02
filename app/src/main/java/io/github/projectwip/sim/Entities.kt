@@ -36,9 +36,13 @@ class Fighter(
     val isBot: Boolean,
 ) {
     val control = Control()
-    val maxHp = def.health.at(level)
-    val attackDamage = def.attackDamage.at(level)
-    val superDamage = def.superDamage.at(level)
+    val baseMaxHp = def.health.at(level)
+    var maxHp = baseMaxHp
+    /** Power Cells collected (free-for-all). Each adds health and damage. */
+    var cells = 0
+    val damageMultiplier get() = 1f + io.github.projectwip.data.Balance.CELL_DAMAGE_BONUS * cells
+    val attackDamage get() = (def.attackDamage.at(level) * damageMultiplier).toInt()
+    val superDamage get() = (def.superDamage.at(level) * damageMultiplier).toInt()
     val radius = def.radius
 
     var x = 0f
@@ -72,6 +76,12 @@ class Fighter(
 
     var lastAttackerId = -1
     var spawnIndex = 0
+    /** Free-for-all: out for good. */
+    var eliminated = false
+    /** Free-for-all finishing place (1 = winner); 0 while still in the match. */
+    var placement = 0
+    /** Seconds until the next storm damage tick. */
+    var stormTick = 0f
 
     // Stats
     var kos = 0
@@ -106,13 +116,24 @@ class Projectile(
     val hit = HashSet<Int>(2)
 }
 
+/** A Power Cell lying on the ground. */
+class Pickup(val x: Float, val y: Float) {
+    var alive = true
+    var age = 0f
+}
+
 sealed interface GameEvent {
     data class Shot(val fighterId: Int, val isSuper: Boolean, val x: Float, val y: Float, val dirX: Float, val dirY: Float) : GameEvent
     data class Hit(val targetId: Int, val sourceId: Int, val damage: Int, val x: Float, val y: Float, val isSuper: Boolean) : GameEvent
     data class Blocked(val x: Float, val y: Float) : GameEvent
     data class WallHit(val x: Float, val y: Float, val style: ShotStyle) : GameEvent
     data class Ko(val killerId: Int, val victimId: Int, val x: Float, val y: Float) : GameEvent
+    data class Eliminated(val fighterId: Int, val placement: Int) : GameEvent
+    data class StormHit(val targetId: Int, val damage: Int, val x: Float, val y: Float) : GameEvent
     data class Spawned(val fighterId: Int) : GameEvent
+    data class CrateHit(val tx: Int, val ty: Int) : GameEvent
+    data class CrateBroken(val tx: Int, val ty: Int) : GameEvent
+    data class CellPicked(val fighterId: Int, val x: Float, val y: Float) : GameEvent
     data class SuperReady(val fighterId: Int) : GameEvent
     data class Dash(val fighterId: Int) : GameEvent
     data object CountdownTick : GameEvent

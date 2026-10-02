@@ -56,8 +56,11 @@ class ArenaModel(val arena: Arena) {
             var r: Float; var gg: Float; var bb: Float
             if (t == Tile.THICKET) { r = 0.22f; gg = 0.52f; bb = 0.3f }
             else if (checker) { r = 0.9f; gg = 0.79f; bb = 0.58f } else { r = 0.86f; gg = 0.75f; bb = 0.55f }
-            if (x < 3) { r = r * 0.78f + 0.25f * 0.22f; gg = gg * 0.82f + 0.71f * 0.18f; bb = bb * 0.7f + 1f * 0.3f }
-            if (x >= a.width - 3) { r = r * 0.75f + 1f * 0.25f; gg = gg * 0.8f + 0.3f * 0.2f; bb = bb * 0.8f + 0.37f * 0.2f }
+            // Team home zones (vertical team maps: your team at the bottom).
+            if (a.spawns.isNotEmpty()) {
+                if (y >= a.height - 3) { r = r * 0.78f + 0.25f * 0.22f; gg = gg * 0.82f + 0.71f * 0.18f; bb = bb * 0.7f + 1f * 0.3f }
+                if (y < 3) { r = r * 0.75f + 1f * 0.25f; gg = gg * 0.8f + 0.3f * 0.2f; bb = bb * 0.8f + 0.37f * 0.2f }
+            }
             val v = (hash(x, y) % 7) / 100f
             b.color(r - v, gg - v, bb - v)
             tile(b, x.toFloat(), y.toFloat())
@@ -147,7 +150,7 @@ class ArenaModel(val arena: Arena) {
     private fun buildWalls(s: MeshBuilder) {
         val a = arena
         for (y in 0 until a.height) for (x in 0 until a.width) {
-            if (a[x, y] != Tile.WALL) continue
+            if (a[x, y] != Tile.WALL) continue // crates are dynamic; see MatchRenderer
             val h = hash(x, y)
             val hgt = 1.05f + (h % 3) * 0.04f
             s.color(0.43f, 0.38f, 0.78f)
@@ -270,6 +273,12 @@ class ArenaModel(val arena: Arena) {
     }
 
     private fun buildSpawnPads(g: MeshBuilder) {
+        for (sp in arena.ffaSpawns) {
+            g.color(0.98f, 0.78f, 0.25f)
+            g.with { translate(sp.x, 0.02f, sp.y); cylinder(0.5f, 0.05f, 24) }
+            g.color(1f, 1f, 1f)
+            g.with { translate(sp.x, 0.05f, sp.y); ring(0.34f, 0.41f, 24) }
+        }
         arena.spawns.forEachIndexed { team, spawns ->
             for (sp in spawns) {
                 if (team == 0) g.color(0.2f, 0.55f, 0.95f) else g.color(0.9f, 0.25f, 0.33f)

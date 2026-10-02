@@ -17,7 +17,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-enum class IconKind { CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS }
+enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS }
 
 /** Original vector icon set. Each icon is drawn in a 0..1 unit square with an ink outline. */
 @Composable
@@ -54,6 +54,13 @@ private fun hexagon(cx: Float, cy: Float, r: Float, pointy: Boolean): Path = Pat
 
 fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
     when (kind) {
+        IconKind.SPARK -> {
+            // Lightning spark inside a glowing ring: the Last Spark mode icon.
+            drawCircle(INK, 0.48f, Offset(0.5f, 0.5f))
+            drawCircle(Brush.radialGradient(listOf(Color(0xFFFFF3A0), Palette.Gold, Palette.GoldDeep), Offset(0.45f, 0.4f), 0.55f), 0.41f, Offset(0.5f, 0.5f))
+            val bolt = poly(0.58f, 0.12f, 0.3f, 0.55f, 0.48f, 0.55f, 0.4f, 0.9f, 0.72f, 0.42f, 0.53f, 0.42f)
+            drawPath(bolt, Color.White); outline(bolt, 0.05f)
+        }
         IconKind.CUP -> {
             // Hex badge + chalice + spark: the game's original Cup emblem.
             val hex = hexagon(0.5f, 0.5f, 0.47f, pointy = true)

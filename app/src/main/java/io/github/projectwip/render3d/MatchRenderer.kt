@@ -24,7 +24,6 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
-import kotlin.math.tan
 import kotlin.random.Random
 
 /**
@@ -53,6 +52,13 @@ class MatchRenderer(
     private lateinit var dashRing: Mesh
     private lateinit var rect: Mesh
     private lateinit var arrow: Mesh
+    private lateinit var crate: Mesh
+    private lateinit var crateCore: Mesh
+    private lateinit var cell: Mesh
+    private lateinit var cellCaps: Mesh
+    private lateinit var stormWall: Mesh
+    private lateinit var stormFloor: Mesh
+    private val crateHitAt = HashMap<Int, Float>()
     private val sectors = HashMap<Int, Mesh>()
 
     private lateinit var shadow: ShadowMap
@@ -79,8 +85,8 @@ class MatchRenderer(
     private val rng = Random(11)
 
     private val anim = FighterAnim()
-    private val shownFacing = FloatArray(8)
-    private val shownMoving = FloatArray(8)
+    private val shownFacing = FloatArray(16)
+    private val shownMoving = FloatArray(16)
 
     private var fpsFrames = 0
     private var fpsTime = 0f
@@ -106,6 +112,31 @@ class MatchRenderer(
         dashRing = MeshBuilder().apply { for (k in 0 until 8) ring(0.9f, 1f, 6, k * 45f, k * 45f + 28f) }.build()
         rect = MeshBuilder().apply { groundQuad(0f, -0.5f, 1f, 0.5f) }.build()
         arrow = MeshBuilder().apply { with { rotate(180f, 1f, 0f, 0f); cylinder(0.22f, 0.36f, 12, topRadius = 0f) } }.build()
+        // Spark Crate: banded metal box with a glowing energy core showing through the slats.
+        crate = MeshBuilder().apply {
+            color(0.93f, 0.55f, 0.18f); with { translate(0f, 0.42f, 0f); roundedBox(0.86f, 0.84f, 0.86f, 0.1f, 2) }
+            color(0.3f, 0.22f, 0.4f)
+            for (yy in listOf(0.16f, 0.68f)) with { translate(0f, yy, 0f); roundedBox(0.9f, 0.1f, 0.9f, 0.04f, 1) }
+            with { translate(0f, 0.86f, 0f); roundedBox(0.7f, 0.06f, 0.7f, 0.03f, 1) }
+        }.build()
+        crateCore = MeshBuilder().apply {
+            color(1f, 0.92f, 0.35f)
+            for (side in listOf(-1f, 1f)) {
+                with { translate(0.44f * side, 0.42f, 0f); box(0.03f, 0.32f, 0.5f) }
+                with { translate(0f, 0.42f, 0.44f * side); box(0.5f, 0.32f, 0.03f) }
+            }
+        }.build()
+        // Power Cell: a chunky glowing battery.
+        cell = MeshBuilder().apply { color(1f, 0.85f, 0.25f); cylinder(0.16f, 0.36f, 14) }.build()
+        cellCaps = MeshBuilder().apply {
+            color(0.22f, 0.16f, 0.36f)
+            with { translate(0f, 0.2f, 0f); cylinder(0.17f, 0.07f, 14) }
+            with { translate(0f, -0.2f, 0f); cylinder(0.17f, 0.07f, 14) }
+            with { translate(0f, 0.26f, 0f); cylinder(0.06f, 0.06f, 10) }
+        }.build()
+        // Static Storm: an open cylinder wall (unit radius/height) and a ground shadow outside it.
+        stormWall = MeshBuilder().apply { color(1f, 1f, 1f); with { translate(0f, 0.5f, 0f); cylinder(1f, 1f, 72, caps = false) } }.build()
+        stormFloor = MeshBuilder().apply { color(1f, 1f, 1f); ring(1f, 6f, 72) }.build()
         shadow = ShadowMap(SHADOW_SIZE)
         for (f in world.fighters) shownFacing[f.id] = f.facing
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
@@ -148,10 +179,7 @@ class MatchRenderer(
         val inp = runner.input
         if (inp.aimingAttack || inp.aimingSuper) { tx += inp.aimX * 1.5f; tz += inp.aimY * 1.1f }
         val dist = distance()
-        val halfW = dist * tan(Math.toRadians(FOV / 2.0)).toFloat() * aspect
-        val a = world.arena
-        tx = if (halfW * 2 > a.width + 2f) a.width / 2f else tx.coerceIn(halfW - 1.2f, a.width - halfW + 1.2f)
-        tz = tz.coerceIn(4.2f, a.height - 3.2f)
+        // The camera stays centred on you (with a small look-ahead while aiming).
         if (camX.isNaN()) { camX = tx; camZ = tz }
         val k = 1f - exp(-dt * 8f)
         camX += (tx - camX) * k
@@ -190,6 +218,7 @@ class MatchRenderer(
         depth.f("uSway", 1f)
         arena.grass.draw()
         depth.f("uSway", 0f)
+        drawCrates(depth, shadowPass = true)
         forEachVisibleFighter(alpha) { f, x, z, facing -> models.draw(depth, f.def, f.skin, x, z, facing, anim, Pass.SHADOW) }
         shadow.end()
     }
@@ -209,6 +238,8 @@ class MatchRenderer(
         arena.ground.draw()
         lit.f("uRim", 0.25f)
         arena.solids.draw()
+        drawCrates(lit, shadowPass = false)
+        drawCells()
 
         // X-ray silhouettes: allies hidden behind walls still show as a tinted shape.
         GLES30.glEnable(GLES30.GL_BLEND)
@@ -240,6 +271,7 @@ class MatchRenderer(
         lit.f("uOutline", 0.028f)
         lit.mat4("uModel", identity)
         arena.solids.draw()
+        drawCrates(lit, shadowPass = false, outline = true)
         lit.f("uOutline", FighterModels.OUTLINE)
         forEachVisibleFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
         lit.f("uOutline", 0f)
@@ -280,6 +312,9 @@ class MatchRenderer(
         water.v3("uCamPos", eyeX, eyeY, eyeZ)
         water.v3("uLightDir", LIGHT[0], LIGHT[1], LIGHT[2])
         arena.water.draw()
+
+        // Static Storm
+        world.storm?.let { drawStorm(it) }
 
         // Ground decals
         setupLit(lit)
@@ -335,6 +370,79 @@ class MatchRenderer(
             shownMoving[i] += (speed - shownMoving[i]) * km
             if (f.isDashing && rng.nextFloat() < 0.8f) {
                 particles.spawn(f.x - f.dashDirX * 0.4f, 0.15f, f.y - f.dashDirY * 0.4f, -f.dashDirX, 0.6f, -f.dashDirY, 0.5f, 0.3f, 0xFFDCCFB4.toInt(), 0.5f, growth = 0.6f, add = false)
+            }
+        }
+    }
+
+    private fun drawCrates(p: Program, shadowPass: Boolean, outline: Boolean = false) {
+        if (world.crateHp.isEmpty()) return
+        val w = world.arena.width
+        for (key in world.crateHp.keys) {
+            val x = key % w + 0.5f
+            val z = key / w + 0.5f
+            val hitAge = time - (crateHitAt[key] ?: -10f)
+            val wob = if (hitAge < 0.25f) sin(hitAge * 60f) * 0.06f * (1f - hitAge / 0.25f) else 0f
+            Matrix.setIdentityM(model, 0)
+            Matrix.translateM(model, 0, x + wob, 0f, z)
+            Matrix.scaleM(model, 0, 1f + wob, 1f - wob, 1f + wob)
+            p.mat4("uModel", model)
+            if (!shadowPass && !outline) {
+                p.v4("uTint", 1f, 1f, 1f, 1f)
+                p.f("uFlash", if (hitAge < 0.1f) 0.5f else 0f)
+            }
+            crate.draw()
+            if (!shadowPass && !outline) {
+                p.f("uEmissive", 0.8f + 0.2f * sin(time * 4f + key))
+                crateCore.draw()
+                p.f("uEmissive", 0f)
+                p.f("uFlash", 0f)
+            }
+        }
+        p.mat4("uModel", identity)
+    }
+
+    private fun drawCells() {
+        if (world.pickups.isEmpty()) return
+        for (pk in world.pickups) {
+            val y = 0.55f + sin(time * 3f + pk.x) * 0.12f + (0.4f - pk.age).coerceAtLeast(0f) * 2f
+            setModel(pk.x, y, pk.y, 1f, 1f, 1f, time * 90f)
+            lit.v4("uTint", 1f, 1f, 1f, 1f)
+            lit.f("uEmissive", 0.85f)
+            cell.draw()
+            lit.f("uEmissive", 0f)
+            cellCaps.draw()
+        }
+        lit.mat4("uModel", identity)
+    }
+
+    private fun drawStorm(st: io.github.projectwip.sim.Storm) {
+        setupLit(lit)
+        GLES30.glEnable(GLES30.GL_BLEND)
+        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+        GLES30.glDepthMask(false)
+        lit.i("uMode", 1)
+        // Darken everything outside the safe circle.
+        setModel(st.cx, 0.06f, st.cy, st.radius, 1f, st.radius)
+        lit.v4("uTint", 0.28f, 0.1f, 0.55f, 0.42f)
+        stormFloor.draw()
+        // Shimmering wall at the edge.
+        val pulse = 0.22f + 0.06f * sin(time * 5f)
+        setModel(st.cx, 0f, st.cy, st.radius, 3.2f, st.radius, time * 25f)
+        lit.v4("uTint", 0.62f, 0.4f, 1f, pulse)
+        stormWall.draw()
+        setModel(st.cx, 0f, st.cy, st.radius, 0.6f, st.radius)
+        lit.v4("uTint", 0.85f, 0.7f, 1f, 0.5f)
+        stormWall.draw()
+        lit.i("uMode", 0)
+        GLES30.glDepthMask(true)
+        GLES30.glDisable(GLES30.GL_BLEND)
+        // Crackles along the edge near the camera.
+        repeat(3) {
+            val a = rng.nextFloat() * 6.283f
+            val ex = st.cx + cos(a) * st.radius
+            val ez = st.cy + sin(a) * st.radius
+            if (hypot(ex - camX, ez - camZ) < 16f) {
+                particles.spawn(ex, 0.2f + rng.nextFloat() * 2.5f, ez, 0f, 0.8f, 0f, 0.5f, 0.16f, 0xFFC08CFF.toInt(), 0.9f)
             }
         }
     }
@@ -486,6 +594,7 @@ class MatchRenderer(
             val s = if (pr.style == ShotStyle.LANCE) 1.3f else pr.radius * 4.5f
             sprites.add(x, 0.72f, z, s, r(c), g(c), b(c), 0.85f)
         }
+        for (pk in world.pickups) sprites.add(pk.x, 0.6f + sin(time * 3f + pk.x) * 0.12f, pk.y, 0.9f, 1f, 0.85f, 0.3f, 0.6f)
         for (l in arena.lamps) sprites.add(l[0], l[1], l[2], 1.1f + 0.05f * sin(time * 3f + l[0]), 1f, 0.9f, 0.55f, 0.55f)
         // Super-ready shimmer on the player
         val p = match.player
@@ -573,6 +682,28 @@ class MatchRenderer(
                 }
             }
             is GameEvent.Dash -> shake = max(shake, 0.1f)
+            is GameEvent.CrateHit -> crateHitAt[e.ty * world.arena.width + e.tx] = time
+            is GameEvent.CrateBroken -> {
+                val x = e.tx + 0.5f; val z = e.ty + 0.5f
+                particles.spawn(x, 0.6f, z, 0f, 0f, 0f, 0.3f, 2.2f, 0xFFFFE066.toInt(), 0.9f)
+                repeat(22) {
+                    val a = rng.nextFloat() * 6.28f
+                    val sp = 2f + rng.nextFloat() * 4f
+                    particles.spawn(x, 0.6f, z, cos(a) * sp, 3f + rng.nextFloat() * 4f, sin(a) * sp, 0.9f, 0.13f,
+                        if (it % 3 == 0) 0xFFFFE066.toInt() else 0xFFEE8C2E.toInt(), 1f, grav = 14f)
+                }
+            }
+            is GameEvent.CellPicked -> {
+                particles.spawn(e.x, 0.7f, e.y, 0f, 0f, 0f, 0.35f, 1.6f, 0xFFFFE066.toInt(), 0.9f)
+                repeat(14) {
+                    val a = rng.nextFloat() * 6.28f
+                    particles.spawn(e.x + cos(a) * 0.3f, 0.3f, e.y + sin(a) * 0.3f, cos(a) * 1.2f, 3f + rng.nextFloat() * 2f, sin(a) * 1.2f, 0.6f, 0.1f, 0xFFFFE066.toInt(), 1f)
+                }
+            }
+            is GameEvent.StormHit -> {
+                repeat(4) { particles.spawn(e.x + rng.nextFloat() - 0.5f, 0.4f + rng.nextFloat(), e.y + rng.nextFloat() - 0.5f, 0f, 1.5f, 0f, 0.4f, 0.12f, 0xFFC08CFF.toInt(), 1f) }
+                if (e.targetId == pid) shake = max(shake, 0.08f)
+            }
             else -> Unit
         }
     }
@@ -589,7 +720,14 @@ class MatchRenderer(
         s.width = width; s.height = height
         System.arraycopy(viewProj, 0, s.viewProj, 0, 16)
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
-        s.myScore = w.score[p.team]; s.theirScore = w.score[1 - p.team]; s.koTarget = w.rules.koTarget
+        s.freeForAll = w.rules.freeForAll
+        s.aliveCount = w.aliveCount
+        s.placement = if (p.placement > 0) p.placement else if (w.phase == Phase.ENDED && w.rules.freeForAll) 1 else 0
+        s.stormElapsed = w.storm?.elapsed ?: -1f
+        s.playerOutsideStorm = w.storm?.let { p.alive && !it.contains(p.x, p.y) } ?: false
+        s.myScore = if (w.rules.freeForAll) 0 else w.score[p.team]
+        s.theirScore = if (w.rules.freeForAll) 0 else w.score[1 - p.team]
+        s.koTarget = w.rules.koTarget
         s.winningTeam = w.winningTeam; s.playerTeam = p.team
         s.playerAlive = p.alive; s.respawnTimer = p.respawnTimer; s.ammo = p.ammo; s.ammoMax = p.def.ammoMax; s.superCharge = p.superCharge
         s.autoTargetId = runner.autoTarget?.id ?: -1
@@ -615,6 +753,7 @@ class MatchRenderer(
             s.relation[i] = if (f === p) 0 else if (f.team == p.team) 1 else 2
             s.names[i] = f.name
             s.superReady[i] = f.superReady
+            s.cells[i] = f.cells
         }
         hud.publish()
     }

@@ -30,7 +30,7 @@ class BotBrain(
     private val pathfinder: Pathfinder,
     private val rng: Random,
 ) {
-    enum class Intent { ENGAGE, RETREAT, ADVANCE }
+    enum class Intent { ENGAGE, RETREAT, ADVANCE, SEEK_ZONE }
 
     var intent = Intent.ADVANCE
         private set
@@ -64,6 +64,9 @@ class BotBrain(
     private var patrolX = world.arena.width / 2f
     private var patrolY = world.arena.height / 2f
     private var wanderAngle = rng.nextFloat() * 6.28f
+
+    /** Tile index of a crate we're breaking (free-for-all), or -1. */
+    private var crateKey = -1
 
     private var stuckTimer = 0f
     private var stuckCheckX = me.x
@@ -110,7 +113,18 @@ class BotBrain(
     // ------------------------------------------------------------------ decide
 
     private fun think() {
-        val enemies = world.fighters.filter { it.team != me.team && it.alive && world.isVisibleTo(it, me.team) }
+        // Free-for-all: only pick fights near our weapon's reach until the field thins out,
+        // otherwise all ten fighters stampede into each other in the first seconds.
+        val st0 = world.storm
+        val engageRadius = when {
+            st0 == null || world.aliveCount <= 3 -> Float.MAX_VALUE
+            st0.elapsed < 35f -> 6f                           // early game: loot, only fight what's close
+            else -> me.def.attack.range + 4.5f
+        }
+        val enemies = world.fighters.filter {
+            it.team != me.team && it.alive && world.isVisibleTo(it, me.team) &&
+                (dist(it) <= engageRadius || (it.id == me.lastAttackerId && me.sinceDamaged < 3f))
+        }
 
         // Target choice: nearest by default; smarter bots weigh health, line of fire and spawn shields.
         val best = enemies.minByOrNull { e ->
@@ -135,15 +149,92 @@ class BotBrain(
             else -> Intent.ADVANCE
         }
 
+        // The Static Storm overrides everything: get inside before it hurts.
+        val st = world.storm
+        if (st != null) {
+            val margin = 1.6f + if (st.elapsed > io.github.projectwip.data.Balance.STORM_DELAY_SECONDS - 4f) 1.5f else 0f
+            if (st.distanceToEdge(me.x, me.y) < margin) intent = Intent.SEEK_ZONE
+        }
+
+        crateKey = -1
         when (intent) {
             Intent.ENGAGE -> chooseEngageGoal(target!!)
-            Intent.RETREAT -> {
-                val s = arena.spawns[me.team][me.spawnIndex]
-                goalX = s.x; goalY = s.y
+            Intent.RETREAT -> chooseRetreatGoal(enemies)
+            Intent.ADVANCE -> if (!chooseLootGoal()) chooseAdvanceGoal()
+            Intent.SEEK_ZONE -> {
+                val z = st!!
+                val dx = me.x - z.cx
+                val dy = me.y - z.cy
+                val d = hypot(dx, dy).coerceAtLeast(0.01f)
+                val keep = (z.radius * 0.45f).coerceAtMost(d)
+                goalX = z.cx + dx / d * keep
+                goalY = z.cy + dy / d * keep
             }
-            Intent.ADVANCE -> chooseAdvanceGoal()
         }
+        keepGoalInStorm()
         planPath()
+    }
+
+    /** Free-for-all: grab nearby Power Cells, or break a nearby Spark Crate. Returns true if a goal was set. */
+    private fun chooseLootGoal(): Boolean {
+        if (world.storm == null) return false
+        val cell = world.pickups.filter { it.alive }.minByOrNull { hypot(it.x - me.x, it.y - me.y) }
+        if (cell != null && hypot(cell.x - me.x, cell.y - me.y) < 10f) {
+            goalX = cell.x; goalY = cell.y
+            return true
+        }
+        var best = -1
+        var bestD = 11f
+        for (key in world.crateHp.keys) {
+            val cx = key % arena.width + 0.5f
+            val cy = key / arena.width + 0.5f
+            val d = hypot(cx - me.x, cy - me.y)
+            if (d < bestD && world.storm.contains(cx, cy)) { bestD = d; best = key }
+        }
+        if (best < 0) return false
+        crateKey = best
+        val cx = best % arena.width + 0.5f
+        val cy = best / arena.width + 0.5f
+        // Stand at a comfortable shooting distance from the crate.
+        val dx = me.x - cx
+        val dy = me.y - cy
+        val d = hypot(dx, dy).coerceAtLeast(0.01f)
+        val want = (me.def.attack.range * 0.45f).coerceIn(1.3f, 3.5f)
+        goalX = cx + dx / d * want
+        goalY = cy + dy / d * want
+        if (arena.circleBlocked(goalX, goalY, me.radius)) { goalX = me.x; goalY = me.y }
+        return true
+    }
+
+    private fun chooseRetreatGoal(enemies: List<Fighter>) {
+        if (world.storm == null) {
+            val s = arena.spawns[me.team][me.spawnIndex]
+            goalX = s.x; goalY = s.y
+            return
+        }
+        // Free-for-all: back away from the nearest threat.
+        val threat = enemies.minByOrNull { dist(it) }
+        if (threat == null) { chooseAdvanceGoal(); return }
+        val dx = me.x - threat.x
+        val dy = me.y - threat.y
+        val d = hypot(dx, dy).coerceAtLeast(0.01f)
+        goalX = me.x + dx / d * 5f
+        goalY = me.y + dy / d * 5f
+    }
+
+    /** Never plan to stand outside the storm. */
+    private fun keepGoalInStorm() {
+        val z = world.storm ?: return
+        val dx = goalX - z.cx
+        val dy = goalY - z.cy
+        val d = hypot(dx, dy)
+        val limit = (z.radius - 1.5f).coerceAtLeast(0.5f)
+        if (d > limit) {
+            goalX = z.cx + dx / d * limit
+            goalY = z.cy + dy / d * limit
+        }
+        goalX = goalX.coerceIn(1f, arena.width - 1f)
+        goalY = goalY.coerceIn(1f, arena.height - 1f)
     }
 
     private fun preferredRangeFraction() = when (me.def.attack.shape) {
@@ -182,7 +273,7 @@ class BotBrain(
         // Teamwork: tag along with the most advanced living teammate.
         if (rng.nextFloat() < profile.teamwork) {
             val lead = world.fighters.filter { it.team == me.team && it.alive && it !== me }
-                .maxByOrNull { if (me.team == 0) it.x else -it.x }
+                .maxByOrNull { if (me.team == 0) -it.y else it.y }
             if (lead != null && dist(lead) > 2.5f) {
                 goalX = lead.x; goalY = lead.y
                 return
@@ -193,16 +284,25 @@ class BotBrain(
     }
 
     private fun pickPatrolPoint() {
+        world.storm?.let { z ->
+            // Free-for-all: roam a few tiles from where we are, drifting toward the safe centre.
+            val a = rng.nextFloat() * 6.283f
+            val d = 3f + rng.nextFloat() * 4f
+            patrolX = me.x + kotlin.math.cos(a) * d + (z.cx - me.x) * 0.15f
+            patrolY = me.y + kotlin.math.sin(a) * d + (z.cy - me.y) * 0.15f
+            return
+        }
         val w = arena.width.toFloat()
         val h = arena.height.toFloat()
-        val enemySide = if (me.team == 0) 0.68f else 0.32f
+        // Team maps are vertical: the player's team (0) starts at the bottom.
+        val enemySide = if (me.team == 0) 0.32f else 0.68f
         val options = listOf(
             w * 0.5f to h * 0.5f,
-            w * 0.5f to h * 0.22f,
-            w * 0.5f to h * 0.78f,
-            w * enemySide to h * 0.5f,
-            w * enemySide to h * 0.3f,
-            w * enemySide to h * 0.7f,
+            w * 0.22f to h * 0.5f,
+            w * 0.78f to h * 0.5f,
+            w * 0.5f to h * enemySide,
+            w * 0.3f to h * enemySide,
+            w * 0.7f to h * enemySide,
         )
         val (x, y) = options[rng.nextInt(options.size)]
         patrolX = x; patrolY = y
@@ -311,7 +411,8 @@ class BotBrain(
     // ------------------------------------------------------------------ fight
 
     private fun combat(dt: Float) {
-        val t = target ?: return
+        val t = target
+        if (t == null) { shootCrate(); return }
         if (!t.alive || !world.isVisibleTo(t, me.team) || seenTime < profile.reactionTime) return
         val c = me.control
         val d = dist(t)
@@ -340,6 +441,22 @@ class BotBrain(
         aimAt(t, me.def.attack.speed)
         c.attack = true
         fireTimer = 0.3f + rng.nextFloat() * profile.fireHesitation
+    }
+
+    private fun shootCrate() {
+        val key = crateKey
+        if (key < 0 || !world.crateHp.containsKey(key)) return
+        val cx = key % arena.width + 0.5f
+        val cy = key / arena.width + 0.5f
+        val d = hypot(cx - me.x, cy - me.y)
+        if (d > me.def.attack.range * 0.9f || fireTimer > 0f || me.ammo < 1f || me.pending.isNotEmpty()) return
+        // Only a clear line until the crate's own tile.
+        val hit = arena.shotBlockedAt(me.x, me.y, cx, cy)
+        if (hit >= 0f && hit < d - 0.8f) return
+        val c = me.control
+        c.aimX = cx - me.x; c.aimY = cy - me.y; c.aiming = true
+        c.attack = true
+        fireTimer = 0.35f + rng.nextFloat() * profile.fireHesitation
     }
 
     private fun wantsSuper(t: Fighter, d: Float, clear: Boolean): Boolean {

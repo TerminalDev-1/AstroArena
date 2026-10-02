@@ -22,7 +22,8 @@ import org.junit.Test
 class ProgressionTest {
 
     private fun report(outcome: MatchOutcome, kos: Int = 2, d: BotDifficulty = BotDifficulty.NORMAL) =
-        MatchReport(outcome, FighterId.JUNO, kos, 1, 1000, false, d, 10, 5)
+        MatchReport(outcome = outcome, fighter = FighterId.JUNO, kos = kos, deaths = 1, damageDealt = 1000,
+            mvp = false, difficulty = d, blueScore = 10, redScore = 5)
 
     @Test fun statLineIsLinear() {
         val s = StatLine(100, 5)
@@ -99,6 +100,21 @@ class ProgressionTest {
         assertNull(Progression.claimDailyGift(s, 10))
         assertNotNull(Progression.claimDailyGift(s, 11))
         assertFalse(Progression.dailyGiftAvailable(s, 10))
+    }
+
+    @Test fun lastSparkRewardsFollowPlacement() {
+        fun ffa(place: Int) = MatchReport(outcome = if (place == 1) MatchOutcome.VICTORY else MatchOutcome.DEFEAT,
+            mode = io.github.projectwip.data.GameMode.LAST_SPARK, placement = place, players = 10, fighter = FighterId.JUNO,
+            kos = 0, deaths = 1, damageDealt = 0, mvp = false, difficulty = BotDifficulty.NORMAL, blueScore = 0, redScore = 0)
+        val start = SaveData(cups = 200, bestCups = 200)
+        val first = Progression.applyMatch(start, ffa(1), 1).second
+        val fifth = Progression.applyMatch(start, ffa(5), 1).second
+        val last = Progression.applyMatch(start, ffa(10), 1).second
+        assertEquals(Balance.placementCups[0], first.cupDelta)
+        assertTrue(first.cupDelta > fifth.cupDelta && fifth.cupDelta > last.cupDelta)
+        assertTrue(first.bolts > last.bolts)
+        // Beginners never lose Cups.
+        assertEquals(0, Progression.applyMatch(SaveData(cups = 10, bestCups = 10), ffa(10), 1).second.cupDelta)
     }
 
     @Test fun trackIsSortedAndUnique() {

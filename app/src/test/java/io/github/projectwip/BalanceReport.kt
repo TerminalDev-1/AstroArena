@@ -16,7 +16,7 @@ class BalanceReport {
         var totalTime = 0f
         val n = 40
         repeat(n) { i ->
-            val m = Match(MatchConfig(FighterId.entries[i % 3], 5, 0, "P", BotDifficulty.HARD, humanPlayer = false, seed = 1000L + i))
+            val m = Match(MatchConfig(FighterId.entries[i % 3], 5, 0, "P", BotDifficulty.HARD, mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 1000L + i))
             var t = 0f
             while (!m.isOver && t < 400f) { m.step(Match.STEP); t += Match.STEP }
             totalTime += t
@@ -29,6 +29,22 @@ class BalanceReport {
         for (id in FighterId.entries) {
             val c = count[id] ?: continue
             println("$id n=$c  KO/match=${"%.2f".format(kos[id]!!.toFloat() / c)}  deaths=${"%.2f".format(deaths[id]!!.toFloat() / c)}  dmg=${dmg[id]!! / c}")
+        }
+    }
+
+    @Test fun lastSparkLengths() {
+        for (d in listOf(BotDifficulty.EASY, BotDifficulty.NORMAL, BotDifficulty.HARD)) {
+            val times = (0 until 10).map { i ->
+                val m = Match(MatchConfig(FighterId.JUNO, 3, 0, "P", d, mode = io.github.projectwip.data.GameMode.LAST_SPARK, humanPlayer = false, seed = 500L + i))
+                var t = 0f
+                var firstOut = -1f
+                while (m.world.phase != io.github.projectwip.sim.Phase.ENDED && t < 300f) {
+                    m.step(Match.STEP); t += Match.STEP
+                    if (firstOut < 0 && m.world.aliveCount < 10) firstOut = t
+                }
+                "${"%.0f".format(t)}(${"%.0f".format(firstOut)})"
+            }
+            println("LS $d: ${times.joinToString(" ")}")
         }
     }
 }

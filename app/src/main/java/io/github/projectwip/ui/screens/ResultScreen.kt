@@ -1,5 +1,6 @@
 package io.github.projectwip.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -61,10 +62,13 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     val r = summary.report
     val ui = LocalUi.current
     val sfx = LocalSfx.current
-    val (label, color, tint) = when (r.outcome) {
-        MatchOutcome.VICTORY -> Triple("VICTORY!", Palette.Gold, Color(0xFF6A3A12))
-        MatchOutcome.DRAW -> Triple("DRAW", Color.White, Color(0xFF34188A))
-        MatchOutcome.DEFEAT -> Triple("DEFEAT", Palette.Red, Color(0xFF4A1030))
+    val ffa = r.mode == io.github.projectwip.data.GameMode.LAST_SPARK
+    val (label, color) = when {
+        ffa && r.placement == 1 -> Pair("VICTORY! #1", Palette.Gold)
+        ffa -> Pair("#${r.placement} PLACE", if (r.placement <= 4) Palette.Cyan else Palette.Red)
+        r.outcome == MatchOutcome.VICTORY -> Pair("VICTORY!", Palette.Gold)
+        r.outcome == MatchOutcome.DRAW -> Pair("DRAW", Color.White)
+        else -> Pair("DEFEAT", Palette.Red)
     }
     val bannerPop = remember { Animatable(0.3f) }
     val cupsShown = remember { Animatable(rewards.cupsBefore.toFloat()) }
@@ -78,7 +82,8 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     }
 
     Box(Modifier.fillMaxSize()) {
-        GameBackground(tint = tint)
+        io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Row(Modifier.fillMaxSize().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // ---------------- left: banner + scoreboard
             Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -86,16 +91,23 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                     if (r.outcome == MatchOutcome.VICTORY) FighterRays(Modifier.size(360.dp), Palette.Gold)
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { scaleX = bannerPop.value; scaleY = bannerPop.value }) {
                         GameText(label, Type.Display.copy(fontSize = Type.Display.fontSize * if (ui.roomy) 1.7f else 1.35f), color = color, outline = 5.dp)
-                        PlainText("Knockout Rush · Foundry Yard · ${r.difficulty.label} bots", Type.Label, color = Palette.TextDim)
+                        PlainText(if (ffa) "Last Spark · Static Canyon · ${r.difficulty.label} bots" else "Knockout Rush · Foundry Yard · ${r.difficulty.label} bots", Type.Label, color = Palette.TextDim)
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!ffa) Row(verticalAlignment = Alignment.CenterVertically) {
                     GameText(r.blueScore.let { if (summary.playerTeam == 0) it else r.redScore }.toString(), Type.Display, color = Palette.Ally, outline = 4.dp)
                     GameText("  –  ", Type.Title, outline = 3.dp)
                     GameText(r.redScore.let { if (summary.playerTeam == 0) it else r.blueScore }.toString(), Type.Display, color = Palette.Enemy, outline = 4.dp)
                 }
                 Spacer(Modifier.height(8.dp))
-                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (ffa) {
+                    // Standings: still-standing fighters first, then by finishing place.
+                    val order = summary.players.sortedBy { if (it.placement == 0) 0 else it.placement }
+                    Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        TeamPanel("STANDINGS", order.take(5), Palette.Gold, Modifier.weight(1f), ranked = true)
+                        TeamPanel(" ", order.drop(5), Palette.Gold, Modifier.weight(1f), ranked = true)
+                    }
+                } else Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TeamPanel("YOUR TEAM", summary.players.filter { it.team == summary.playerTeam }, Palette.Ally, Modifier.weight(1f))
                     TeamPanel("OPPONENTS", summary.players.filter { it.team != summary.playerTeam }, Palette.Enemy, Modifier.weight(1f))
                 }
@@ -111,7 +123,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
                         RewardRow(IconKind.BOLT, "Bolts", "+${rewards.bolts}", Palette.CyanDeep)
                         if (rewards.firstWinPrisms > 0) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
-                        if (r.mvp) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
+                        if (r.mvp && !ffa) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
 
                         val after = rewards.cupsBefore + rewards.cupDelta
                         val best = save.bestCups
@@ -160,11 +172,11 @@ private fun RewardRow(icon: IconKind, label: String, value: String, chip: Color)
 }
 
 @Composable
-private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, modifier: Modifier) {
+private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, modifier: Modifier, ranked: Boolean = false) {
     Panel(modifier.fillMaxHeight(), cut = 14.dp) {
         Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             GameText(title, Type.Label, color = color, outline = 2.dp)
-            for (p in players.sortedByDescending { it.kos * 1000 + it.damage / 10 }) {
+            for (p in if (ranked) players else players.sortedByDescending { it.kos * 1000 + it.damage / 10 }) {
                 Row(
                     Modifier.fillMaxWidth().weight(1f).drawBehind {
                         val o = plateShape(8.dp, 3.dp).createOutline(size, layoutDirection, this)
@@ -174,6 +186,10 @@ private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, mo
                     }.padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    if (ranked) {
+                        GameText(if (p.placement == 0) "—" else "#${p.placement}", Type.Heading,
+                            color = if (p.placement == 1) Palette.Gold else Color.White, outline = 2.dp, modifier = Modifier.width(44.dp))
+                    }
                     Box(Modifier.fillMaxHeight().width(46.dp)) {
                         FighterView(Balance.fighter(p.fighter), p.skin, Modifier.fillMaxSize(), pedestal = false)
                     }

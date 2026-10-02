@@ -36,6 +36,7 @@ data class SaveData(
     val prisms: Int = Balance.STARTING_PRISMS,
     val fighters: Map<FighterId, FighterProgress> = defaultFighters(),
     val selectedFighter: FighterId = FighterId.JUNO,
+    val selectedMode: GameMode = GameMode.LAST_SPARK,
     /** Cup values of claimed track milestones. */
     val claimedMilestones: Set<Int> = emptySet(),
     val lastDailyGiftDay: Long = -1,
@@ -44,6 +45,8 @@ data class SaveData(
     val victories: Int = 0,
     val totalKos: Int = 0,
     val settings: Settings = Settings(),
+    /** Offers made with the in-game Offer Creator. */
+    val customOffers: List<CustomOffer> = emptyList(),
 ) {
     fun progress(id: FighterId): FighterProgress = fighters[id] ?: FighterProgress()
 

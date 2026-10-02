@@ -1,5 +1,6 @@
 package io.github.projectwip.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,12 +65,14 @@ import java.time.LocalDateTime
 @Composable
 fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showReward: (RewardReveal) -> Unit) {
     var pending by remember { mutableStateOf<ShopItem?>(null) }
+    var creating by remember { mutableStateOf(false) }
     val sfx = LocalSfx.current
     val ui = LocalUi.current
     val cardW = if (ui.roomy) 210.dp else 176.dp
 
     Box(Modifier.fillMaxSize()) {
-        GameBackground(tint = Color(0xFF1C3C8A))
+        io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("SHOP", { go(Screen.Home) }, save.bolts, save.prisms)
             LazyRow(
@@ -78,6 +81,22 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 item { Section("DAILY GIFT") { DailyGiftCard(save, repo, cardW * 1.15f, showReward) } }
+                item {
+                    Section("CUSTOM OFFERS") {
+                        CreateOfferCard(cardW * 0.8f) { creating = true }
+                        val now = System.currentTimeMillis()
+                        save.customOffers.filter { !it.expired(now) }.forEach { o ->
+                            CustomOfferCard(o, cardW, canDelete = true,
+                                onBuy = {
+                                    when (val r = repo.buyOffer(o.id)) {
+                                        is io.github.projectwip.data.Progression.OfferResult.Ok -> showReward(RewardReveal(o.title, r.reward))
+                                        else -> sfx?.play(Sound.DENIED)
+                                    }
+                                },
+                                onDelete = { repo.removeOffer(o.id) })
+                        }
+                    }
+                }
                 item {
                     Section("FIGHTERS") {
                         Shop.fighterOffers.forEach { o ->
@@ -112,6 +131,10 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                     }
                 }
             }
+        }
+
+        if (creating) {
+            OfferCreatorDialog(onCreate = { repo.addOffer(it); creating = false; sfx?.play(Sound.REWARD) }, onDismiss = { creating = false })
         }
 
         pending?.let { item ->

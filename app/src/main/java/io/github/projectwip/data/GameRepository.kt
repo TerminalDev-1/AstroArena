@@ -38,9 +38,21 @@ class GameRepository(private val store: SaveStore) {
         return r
     }
 
+    fun addOffer(offer: CustomOffer) = commit(Progression.addOffer(_save.value, offer))
+
+    fun removeOffer(id: Long) = commit(Progression.removeOffer(_save.value, id))
+
+    fun buyOffer(id: Long): Progression.OfferResult {
+        val (s, r) = Progression.buyOffer(_save.value, id, System.currentTimeMillis())
+        if (r is Progression.OfferResult.Ok) commit(s)
+        return r
+    }
+
     fun claimDailyGift(): Reward? = Progression.claimDailyGift(_save.value, today)?.let { (s, r) -> commit(s); r }
 
     fun selectFighter(id: FighterId) = commit(Progression.selectFighter(_save.value, id))
+
+    fun selectMode(mode: GameMode) = commit(_save.value.copy(selectedMode = mode))
 
     fun selectSkin(id: FighterId, skin: Int) = commit(Progression.selectSkin(_save.value, id, skin))
 

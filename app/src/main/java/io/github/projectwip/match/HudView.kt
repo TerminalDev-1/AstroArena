@@ -47,6 +47,7 @@ class HudView(
     private val floaters = ArrayList<Floater>()
     private val feed = ArrayList<Feed>()
     private var pop = 0f
+    private var bannerStart = -1f
     private var last = 0L
     private var time = 0f
     private val snap = HudSnapshot()
@@ -96,6 +97,17 @@ class HudView(
             val col = when (s.relation[i]) { 0 -> PLAYER; 1 -> ALLY; else -> ENEMY }
             text.textSize = dp(13f)
             outlined(c, s.names[i] ?: "", x, y - bh - dp(5f), if (s.relation[i] == 0) Color.rgb(255, 245, 160) else Color.WHITE, dp(3f))
+            if (s.cells[i] > 0) {
+                // Power Cell count badge to the left of the bar
+                val bx = x - bw / 2 - dp(15f)
+                val by = y - bh / 2
+                fill.color = INK
+                c.drawCircle(bx, by, dp(12f), fill)
+                fill.color = Color.rgb(255, 214, 64)
+                c.drawCircle(bx, by, dp(9.5f), fill)
+                text.textSize = dp(12f)
+                outlined(c, s.cells[i].toString(), bx, by + dp(4.3f), Color.WHITE, dp(2.5f))
+            }
             rect.set(x - bw / 2, y - bh, x + bw / 2, y)
             fill.color = INK
             c.drawRoundRect(rect.left - dp(2.5f), rect.top - dp(2.5f), rect.right + dp(2.5f), rect.bottom + dp(2.5f), bh, bh, fill)
@@ -172,17 +184,47 @@ class HudView(
         val panelW = dp(260f)
         val panelH = dp(58f)
         chamfer(c, cx - panelW / 2, top, cx + panelW / 2, top + panelH, dp(13f), Color.argb(235, 34, 22, 84), INK)
-        val boxW = dp(72f)
-        chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + boxW, top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
-        chamfer(c, cx + panelW / 2 - dp(6f) - boxW, top + dp(6f), cx + panelW / 2 - dp(6f), top + panelH - dp(6f), dp(9f), Color.rgb(200, 40, 64), null)
-        text.textSize = dp(30f)
-        outlined(c, s.myScore.toString(), cx - panelW / 2 + dp(6f) + boxW / 2, top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
-        outlined(c, s.theirScore.toString(), cx + panelW / 2 - dp(6f) - boxW / 2, top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
-        val secs = ceil(s.timeLeft).toInt()
-        text.textSize = dp(23f)
-        outlined(c, "%d:%02d".format(secs / 60, secs % 60), cx, top + dp(29f), if (secs <= 15 && s.phase == Phase.PLAYING) Color.rgb(255, 120, 100) else Color.WHITE, dp(3.5f))
-        text.textSize = dp(11f)
-        outlined(c, "FIRST TO ${s.koTarget}", cx, top + dp(47f), Color.rgb(255, 214, 64), dp(3f))
+        if (s.freeForAll) {
+            // Fighters left + mode name
+            chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(200, 40, 64), null)
+            text.textSize = dp(30f)
+            outlined(c, s.aliveCount.toString(), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
+            text.textSize = dp(19f)
+            outlined(c, "LEFT", cx + dp(30f), top + dp(29f), Color.WHITE, dp(3.5f))
+            text.textSize = dp(11f)
+            outlined(c, "LAST SPARK", cx + dp(30f), top + dp(47f), Color.rgb(255, 214, 64), dp(3f))
+        } else {
+            val boxW = dp(72f)
+            chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + boxW, top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
+            chamfer(c, cx + panelW / 2 - dp(6f) - boxW, top + dp(6f), cx + panelW / 2 - dp(6f), top + panelH - dp(6f), dp(9f), Color.rgb(200, 40, 64), null)
+            text.textSize = dp(30f)
+            outlined(c, s.myScore.toString(), cx - panelW / 2 + dp(6f) + boxW / 2, top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
+            outlined(c, s.theirScore.toString(), cx + panelW / 2 - dp(6f) - boxW / 2, top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
+            val secs = ceil(s.timeLeft).toInt()
+            text.textSize = dp(23f)
+            outlined(c, "%d:%02d".format(secs / 60, secs % 60), cx, top + dp(29f), if (secs <= 15 && s.phase == Phase.PLAYING) Color.rgb(255, 120, 100) else Color.WHITE, dp(3.5f))
+            text.textSize = dp(11f)
+            outlined(c, "FIRST TO ${s.koTarget}", cx, top + dp(47f), Color.rgb(255, 214, 64), dp(3f))
+        }
+
+        // Storm warnings
+        if (s.freeForAll && s.phase == Phase.PLAYING) {
+            val delay = io.github.projectwip.data.Balance.STORM_DELAY_SECONDS
+            if (s.stormElapsed in (delay - 5f)..(delay + 3f)) {
+                text.textSize = dp(20f)
+                val flash = if ((time * 3f).toInt() % 2 == 0) Color.rgb(200, 150, 255) else Color.WHITE
+                outlined(c, "THE STATIC STORM IS CLOSING IN!", cx, top + panelH + dp(32f), flash, dp(4f))
+            }
+            if (s.playerOutsideStorm) {
+                val a = (0.35f + 0.2f * sin(time * 8f))
+                fill.shader = android.graphics.RadialGradient(cx, h / 2, maxOf(w, h) * 0.7f,
+                    intArrayOf(Color.TRANSPARENT, Color.argb((a * 255).toInt(), 120, 40, 200)), floatArrayOf(0.55f, 1f), android.graphics.Shader.TileMode.CLAMP)
+                c.drawRect(0f, 0f, w, h, fill)
+                fill.shader = null
+                text.textSize = dp(19f)
+                outlined(c, "YOU'RE IN THE STORM — GET BACK INSIDE!", cx, h * 0.24f, Color.rgb(230, 190, 255), dp(4f))
+            }
+        }
 
         // Kill feed
         var fy = top + dp(18f)
@@ -197,9 +239,9 @@ class HudView(
             val right = w - dp(20f)
             textStroke.alpha = (a * 255).toInt()
             val vw = text.measureText(e.victim)
-            outlined(c, e.victim, right, fy, withAlpha(if (e.victimTeam == s.playerTeam) ALLY else ENEMY, a), dp(3f))
+            outlined(c, e.victim, right, fy, withAlpha(teamCol(e.victimTeam, s.playerTeam), a), dp(3f))
             outlined(c, " ✕ ", right - vw, fy, withAlpha(Color.WHITE, a), dp(3f))
-            outlined(c, e.killer, right - vw - text.measureText(" ✕ "), fy, withAlpha(if (e.killerTeam == s.playerTeam) ALLY else ENEMY, a), dp(3f))
+            outlined(c, e.killer, right - vw - text.measureText(" ✕ "), fy, withAlpha(teamCol(e.killerTeam, s.playerTeam), a), dp(3f))
             textStroke.alpha = 255
             fy += dp(22f)
         }
@@ -218,18 +260,22 @@ class HudView(
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))
         }
 
-        if (!s.playerAlive && s.phase == Phase.PLAYING) {
+        if (!s.playerAlive && s.phase == Phase.PLAYING && !s.freeForAll) {
             text.textSize = dp(28f)
             outlined(c, "KNOCKED OUT", cx, h * 0.4f, Color.rgb(255, 92, 92), dp(5f))
             text.textSize = dp(19f)
             outlined(c, "Back in ${ceil(s.respawnTimer).toInt().coerceAtLeast(1)}…", cx, h * 0.4f + dp(32f), Color.WHITE, dp(4f))
         }
 
-        if (s.phase == Phase.ENDED) {
-            val slide = (s.phaseTime / 0.35f).coerceIn(0f, 1f)
-            val (label, col) = when (s.winningTeam) {
-                s.playerTeam -> "VICTORY!" to Color.rgb(255, 214, 64)
-                -1 -> "DRAW" to Color.WHITE
+        val ffaOut = s.freeForAll && s.placement > 0
+        if (ffaOut && bannerStart < 0f) bannerStart = time
+        if (s.phase == Phase.ENDED || ffaOut) {
+            val slide = if (ffaOut) ((time - bannerStart) / 0.35f).coerceIn(0f, 1f) else (s.phaseTime / 0.35f).coerceIn(0f, 1f)
+            val (label, col) = when {
+                s.freeForAll && s.placement == 1 -> "VICTORY! #1" to Color.rgb(255, 214, 64)
+                s.freeForAll -> "#${s.placement} PLACE" to if (s.placement <= 4) Color.rgb(120, 230, 255) else Color.rgb(255, 92, 92)
+                s.winningTeam == s.playerTeam -> "VICTORY!" to Color.rgb(255, 214, 64)
+                s.winningTeam == -1 -> "DRAW" to Color.WHITE
                 else -> "DEFEAT" to Color.rgb(255, 92, 92)
             }
             fill.color = Color.argb((170 * slide).toInt(), 10, 5, 30)
@@ -259,6 +305,10 @@ class HudView(
         textStroke.alpha = (a * 255).toInt()
         outlined(c, "TAP = AUTO-AIM", x - dp(10f), y, withAlpha(Color.rgb(255, 214, 64), a), dp(3.5f))
         outlined(c, "DRAG = AIM · RELEASE = FIRE", x - dp(10f), y + dp(20f), withAlpha(Color.WHITE, a), dp(3.5f))
+        if (s.freeForAll) {
+            text.textSize = dp(17f)
+            outlined(c, "BREAK GLOWING CRATES FOR POWER CELLS · LAST ONE STANDING WINS", width / 2f, dp(100f), withAlpha(Color.rgb(255, 214, 64), a), dp(4f))
+        }
         textStroke.alpha = 255
     }
 
@@ -278,6 +328,12 @@ class HudView(
         c.drawText(s, x, y, textStroke)
         text.color = color
         c.drawText(s, x, y, text)
+    }
+
+    private fun teamCol(team: Int, mine: Int) = when (team) {
+        -2 -> Color.rgb(200, 150, 255) // the storm
+        mine -> ALLY
+        else -> ENEMY
     }
 
     private fun withAlpha(c: Int, a: Float) = Color.argb((a * 255).toInt().coerceIn(0, 255), Color.red(c), Color.green(c), Color.blue(c))

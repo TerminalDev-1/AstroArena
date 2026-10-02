@@ -43,6 +43,7 @@ class SaveStore(context: Context) {
             put("bolts", s.bolts)
             put("prisms", s.prisms)
             put("selectedFighter", s.selectedFighter.name)
+            put("selectedMode", s.selectedMode.name)
             put("claimedMilestones", JSONArray(s.claimedMilestones.sorted()))
             put("lastDailyGiftDay", s.lastDailyGiftDay)
             put("lastFirstWinDay", s.lastFirstWinDay)
@@ -56,6 +57,16 @@ class SaveStore(context: Context) {
                         put("level", p.level)
                         put("skin", p.skin)
                         put("ownedSkins", JSONArray(p.ownedSkins.sorted()))
+                    })
+                }
+            })
+            put("customOffers", JSONArray().apply {
+                s.customOffers.forEach { o ->
+                    put(JSONObject().apply {
+                        put("id", o.id); put("title", o.title); put("bolts", o.bolts); put("prisms", o.prisms)
+                        put("fighter", o.fighter?.name ?: ""); put("skinFighter", o.skinFighter?.name ?: ""); put("skinIndex", o.skinIndex)
+                        put("currency", o.currency.name); put("price", o.price); put("wasPrice", o.wasPrice)
+                        put("expiresAt", o.expiresAt); put("limit", o.limit); put("purchased", o.purchased); put("theme", o.theme)
                     })
                 }
             })
@@ -115,6 +126,7 @@ class SaveStore(context: Context) {
                 prisms = o.optInt("prisms", d.prisms).coerceAtLeast(0),
                 fighters = fighters,
                 selectedFighter = if (fighters[selected]?.unlocked == true) selected else FighterId.JUNO,
+                selectedMode = enumOr(o.optString("selectedMode"), d.selectedMode),
                 claimedMilestones = o.optJSONArray("claimedMilestones")?.ints()?.toSet() ?: emptySet(),
                 lastDailyGiftDay = o.optLong("lastDailyGiftDay", -1),
                 lastFirstWinDay = o.optLong("lastFirstWinDay", -1),
@@ -122,6 +134,22 @@ class SaveStore(context: Context) {
                 victories = o.optInt("victories", 0),
                 totalKos = o.optInt("totalKos", 0),
                 settings = settings,
+                customOffers = o.optJSONArray("customOffers")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { i ->
+                        val j = arr.optJSONObject(i) ?: return@mapNotNull null
+                        CustomOffer(
+                            id = j.optLong("id"), title = j.optString("title", "Offer").take(24),
+                            bolts = j.optInt("bolts").coerceAtLeast(0), prisms = j.optInt("prisms").coerceAtLeast(0),
+                            fighter = FighterId.entries.firstOrNull { it.name == j.optString("fighter") },
+                            skinFighter = FighterId.entries.firstOrNull { it.name == j.optString("skinFighter") },
+                            skinIndex = j.optInt("skinIndex"),
+                            currency = enumOr(j.optString("currency"), Currency.PRISMS),
+                            price = j.optInt("price").coerceAtLeast(0), wasPrice = j.optInt("wasPrice").coerceAtLeast(0),
+                            expiresAt = j.optLong("expiresAt"), limit = j.optInt("limit", 1).coerceAtLeast(0),
+                            purchased = j.optInt("purchased"), theme = j.optInt("theme"),
+                        )
+                    }
+                } ?: emptyList(),
             )
         }
 

@@ -3,6 +3,10 @@ package io.github.projectwip.data
 /** What the player brought out of a match. Built by the match, applied by [Progression.applyMatch]. */
 data class MatchReport(
     val outcome: MatchOutcome,
+    val mode: GameMode = GameMode.KNOCKOUT_RUSH,
+    /** 1-based finishing place in free-for-all modes; 0 for team modes. */
+    val placement: Int = 0,
+    val players: Int = 6,
     val fighter: FighterId,
     val kos: Int,
     val deaths: Int,
@@ -37,8 +41,11 @@ sealed interface PurchaseResult {
 object Progression {
 
     fun applyMatch(save: SaveData, report: MatchReport, today: Long): Pair<SaveData, MatchRewards> {
-        val cupDelta = Balance.cupsFor(report.outcome, save.cups, report.difficulty, report.mvp)
-        val bolts = Balance.boltsFor(report.outcome, report.kos, report.difficulty)
+        val ffa = report.mode == GameMode.LAST_SPARK
+        val cupDelta = if (ffa) Balance.cupsForPlacement(report.placement, save.cups, report.difficulty)
+            else Balance.cupsFor(report.outcome, save.cups, report.difficulty, report.mvp)
+        val bolts = if (ffa) Balance.boltsForPlacement(report.placement, report.kos, report.difficulty)
+            else Balance.boltsFor(report.outcome, report.kos, report.difficulty)
         val firstWin = report.outcome == MatchOutcome.VICTORY && save.lastFirstWinDay != today
         val prisms = if (firstWin) Balance.FIRST_WIN_PRISMS else 0
         val newCups = (save.cups + cupDelta).coerceAtLeast(0)
@@ -99,12 +106,15 @@ object Progression {
     }
 
     fun owns(save: SaveData, reward: Reward): Boolean = when (reward) {
+        is Reward.Bundle -> false
         is Reward.UnlockFighter -> save.progress(reward.fighter).unlocked
         is Reward.SkinReward -> reward.skinIndex in save.progress(reward.fighter).ownedSkins
         else -> false
     }
 
     fun grant(save: SaveData, reward: Reward): SaveData = when (reward) {
+        // Items already owned inside a bundle are compensated instead of wasted.
+        is Reward.Bundle -> reward.items.fold(save) { s, r -> grant(s, if (owns(s, r)) CupTrack.duplicateCompensation(r) else r) }
         is Reward.Bolts -> save.copy(bolts = save.bolts + reward.amount)
         is Reward.Prisms -> save.copy(prisms = save.prisms + reward.amount)
         is Reward.UnlockFighter -> {
@@ -128,6 +138,33 @@ object Progression {
         if (owns(save, reward)) return save to PurchaseResult.AlreadyOwned
         if (save.prisms < item.pricePrisms) return save to PurchaseResult.NotEnough
         return grant(save.copy(prisms = save.prisms - item.pricePrisms), reward) to PurchaseResult.Ok
+    }
+
+    // ---------------- Custom offers
+
+    fun addOffer(save: SaveData, offer: CustomOffer): SaveData =
+        save.copy(customOffers = save.customOffers + offer)
+
+    fun removeOffer(save: SaveData, id: Long): SaveData =
+        save.copy(customOffers = save.customOffers.filterNot { it.id == id })
+
+    sealed interface OfferResult {
+        data class Ok(val reward: Reward) : OfferResult
+        data object NotEnough : OfferResult
+        data object Unavailable : OfferResult
+    }
+
+    fun buyOffer(save: SaveData, id: Long, now: Long): Pair<SaveData, OfferResult> {
+        val o = save.customOffers.firstOrNull { it.id == id } ?: return save to OfferResult.Unavailable
+        if (o.expired(now) || o.soldOut || o.contents.isEmpty()) return save to OfferResult.Unavailable
+        val paid = when (o.currency) {
+            Currency.FREE -> save
+            Currency.BOLTS -> if (save.bolts < o.price) return save to OfferResult.NotEnough else save.copy(bolts = save.bolts - o.price)
+            Currency.PRISMS -> if (save.prisms < o.price) return save to OfferResult.NotEnough else save.copy(prisms = save.prisms - o.price)
+        }
+        val granted = grant(paid, o.reward)
+        val updated = granted.copy(customOffers = granted.customOffers.map { if (it.id == id) it.copy(purchased = it.purchased + 1) else it })
+        return updated to OfferResult.Ok(o.reward)
     }
 
     fun dailyGiftAvailable(save: SaveData, today: Long) = save.lastDailyGiftDay != today

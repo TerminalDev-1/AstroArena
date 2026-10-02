@@ -78,6 +78,12 @@ enum class BotDifficulty(val label: String, val blurb: String, val cupBonus: Int
 
 enum class MatchOutcome { VICTORY, DEFEAT, DRAW }
 
+/** Game modes. Names and rules are original to this game. */
+enum class GameMode(val title: String, val tagline: String, val players: Int) {
+    LAST_SPARK("Last Spark", "10-fighter free-for-all · last one standing", 10),
+    KNOCKOUT_RUSH("Knockout Rush", "3v3 · first team to 10 KOs", 6),
+}
+
 object Balance {
     const val MAX_LEVEL = 10
 
@@ -114,6 +120,37 @@ object Balance {
         MatchOutcome.VICTORY -> difficulty.cupBonus + if (mvp) 2 else 0
         MatchOutcome.DRAW -> 1
         MatchOutcome.DEFEAT -> -minOf(6, currentCups / 80).coerceAtMost(currentCups)
+    }
+
+    // ---- Last Spark (free-for-all) ----
+    /** Cups by placement (index 0 = 1st). Positive values scale with bot difficulty. */
+    val placementCups = intArrayOf(10, 8, 6, 4, 2, 0, -1, -2, -3, -4)
+    /** Bolts by placement, before the difficulty multiplier and KO bonus. */
+    val placementBolts = intArrayOf(30, 26, 22, 18, 15, 12, 10, 8, 6, 5)
+
+    /** Spark Crates (free-for-all): health, and what each Power Cell inside grants (stacking). */
+    const val CRATE_HP = 1400
+    const val CELL_HEALTH_BONUS = 0.10f
+    const val CELL_DAMAGE_BONUS = 0.10f
+
+    /** Static Storm: waits, then shrinks to [STORM_FINAL_RADIUS] over [STORM_SHRINK_SECONDS]. */
+    const val STORM_DELAY_SECONDS = 25f
+    const val STORM_SHRINK_SECONDS = 100f
+    const val STORM_FINAL_RADIUS = 2.5f
+    /** Storm damage per second as a fraction of max health; grows with time spent shrinking. */
+    const val STORM_DAMAGE_BASE = 0.10f
+    const val STORM_DAMAGE_GROWTH = 0.002f
+
+    fun cupsForPlacement(placement: Int, currentCups: Int, difficulty: BotDifficulty): Int {
+        val base = placementCups[(placement - 1).coerceIn(0, placementCups.lastIndex)]
+        return if (base > 0) Math.round(base * difficulty.cupBonus / 8f)
+        else if (currentCups < 40) 0 // beginners don't lose Cups
+        else maxOf(base, -currentCups)
+    }
+
+    fun boltsForPlacement(placement: Int, kos: Int, difficulty: BotDifficulty): Int {
+        val base = placementBolts[(placement - 1).coerceIn(0, placementBolts.lastIndex)]
+        return Math.round((base + 2 * kos.coerceAtMost(6)) * difficulty.boltMultiplier)
     }
 
     /** Prisms for the first victory each calendar day. */

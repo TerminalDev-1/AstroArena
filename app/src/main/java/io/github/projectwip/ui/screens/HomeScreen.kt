@@ -1,11 +1,15 @@
 package io.github.projectwip.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -22,33 +26,40 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.projectwip.data.Balance
 import io.github.projectwip.data.BotDifficulty
 import io.github.projectwip.data.CupTrack
+import io.github.projectwip.data.GameMode
 import io.github.projectwip.data.GameRepository
 import io.github.projectwip.data.Progression
 import io.github.projectwip.data.SaveData
+import io.github.projectwip.render3d.LobbyShot
+import io.github.projectwip.sim.Arena
 import io.github.projectwip.sim.Arenas
 import io.github.projectwip.sim.Tile
 import io.github.projectwip.ui.Badge
 import io.github.projectwip.ui.ButtonStyle
 import io.github.projectwip.ui.ChunkyButton
 import io.github.projectwip.ui.CurrencyPill
-import io.github.projectwip.ui.FighterView
-import io.github.projectwip.ui.GameBackground
 import io.github.projectwip.ui.GameIcon
 import io.github.projectwip.ui.GameText
 import io.github.projectwip.ui.IconKind
+import io.github.projectwip.ui.LobbyShotEffect
+import io.github.projectwip.ui.LobbyVignette
 import io.github.projectwip.ui.LocalUi
 import io.github.projectwip.ui.Palette
 import io.github.projectwip.ui.Panel
@@ -57,100 +68,91 @@ import io.github.projectwip.ui.ProgressBar
 import io.github.projectwip.ui.RewardReveal
 import io.github.projectwip.ui.Screen
 import io.github.projectwip.ui.Type
+import io.github.projectwip.ui.lobbyAnchor
 import io.github.projectwip.ui.startMatchConfig
 
 @Composable
-fun HomeScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showReward: (RewardReveal) -> Unit) {
+fun HomeScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, @Suppress("UNUSED_PARAMETER") showReward: (RewardReveal) -> Unit) {
     val ui = LocalUi.current
-    val def = Balance.fighter(save.selectedFighter)
     val prog = save.progress(save.selectedFighter)
     val canUpgradeAny = Balance.fighters.any { Progression.canUpgrade(save, it.id) }
     val claimable = Progression.claimable(save).size
     val giftReady = Progression.dailyGiftAvailable(save, repo.today)
+    var picking by remember { mutableStateOf(false) }
+
+    LobbyShotEffect(LobbyShot.HOME, save.selectedFighter, prog.skin)
 
     Box(Modifier.fillMaxSize()) {
-        GameBackground()
+        LobbyVignette()
         Column(Modifier.fillMaxSize()) {
             // ---------------- top bar
             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                ProfileChip(save)
-                Spacer(Modifier.width(14.dp))
-                CupButton(save, claimable) { go(Screen.CupTrack) }
+                ProfileAndCups(save, claimable) { go(Screen.CupTrack) }
                 Spacer(Modifier.weight(1f))
                 CurrencyPill(IconKind.BOLT, save.bolts)
                 Spacer(Modifier.width(10.dp))
                 CurrencyPill(IconKind.PRISM, save.prisms, onClick = { go(Screen.Shop) })
                 Spacer(Modifier.width(12.dp))
-                ChunkyButton({ go(Screen.Settings) }, Modifier.size(52.dp, 50.dp), ButtonStyle.PURPLE) {
+                ChunkyButton({ go(Screen.Settings) }, Modifier.size(52.dp, 50.dp), ButtonStyle.GLASS) {
                     GameIcon(IconKind.GEAR, Modifier.size(28.dp))
                 }
             }
 
             Row(Modifier.weight(1f).fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 16.dp)) {
-                // ---------------- left navigation
+                // ---------------- left rail
                 Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
                     NavTile("SHOP", IconKind.SHOP, if (giftReady) "FREE" else null, Palette.Green) { go(Screen.Shop) }
                     NavTile("FIGHTERS", IconKind.FIGHTERS, if (canUpgradeAny) "UP" else null, Palette.Green) { go(Screen.Fighters()) }
                     NavTile("CUP TRACK", IconKind.TRACK, if (claimable > 0) claimable.toString() else null, Palette.Red) { go(Screen.CupTrack) }
                 }
 
-                // ---------------- hero
-                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        FighterView(
-                            def, prog.skin,
-                            Modifier.weight(1f, fill = false).aspectRatio(1f).fillMaxHeight()
-                                .clickable(remember { MutableInteractionSource() }, null) { go(Screen.Fighters(save.selectedFighter)) },
-                            rays = true,
-                        )
-                        NamePlate(save) { go(Screen.Fighters(save.selectedFighter)) }
-                    }
+                // ---------------- hero (the 3D fighter stands here; this column is see-through)
+                Box(Modifier.weight(1f).fillMaxHeight().lobbyAnchor(), contentAlignment = Alignment.BottomCenter) {
+                    NamePlate(save) { go(Screen.Fighters(save.selectedFighter)) }
                 }
 
-                // ---------------- play column
+                // ---------------- mode + play
                 Column(
-                    Modifier.width(if (ui.wide) 320.dp else 270.dp).fillMaxHeight(),
+                    Modifier.width(if (ui.wide) 330.dp else 280.dp).fillMaxHeight(),
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.End,
                 ) {
-                    ModeCard(save, repo, showMap = ui.roomy)
-                    Spacer(Modifier.height(14.dp))
+                    ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
+                    Spacer(Modifier.height(12.dp))
                     PlayButton { go(Screen.Match(startMatchConfig(save))) }
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun ProfileChip(save: SaveData) {
-    Panel(Modifier.height(52.dp), cut = 12.dp) {
-        Row(Modifier.padding(horizontal = 12.dp).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) { GameIcon(IconKind.STAR, Modifier.fillMaxSize()) }
-            Spacer(Modifier.width(8.dp))
-            Column {
-                GameText(save.settings.playerName, Type.Label, outline = 2.dp)
-                PlainText("${save.victories} wins · ${save.matchesPlayed} played", Type.Small)
-            }
+        AnimatedVisibility(picking, enter = fadeIn(tween(160)), exit = fadeOut(tween(140))) {
+            ModePicker(save, repo) { picking = false }
         }
     }
 }
 
+// ---------------------------------------------------------------------------------------------- top bar
+
 @Composable
-private fun CupButton(save: SaveData, claimable: Int, onClick: () -> Unit) {
+private fun ProfileAndCups(save: SaveData, claimable: Int, onCups: () -> Unit) {
     val next = CupTrack.nextMilestone(save.bestCups)
     val prev = CupTrack.previousMilestoneCups(save.bestCups)
     val frac = if (next == null) 1f else (save.bestCups - prev).toFloat() / (next.cups - prev)
     Box {
-        ChunkyButton(onClick, Modifier.size(210.dp, 56.dp), ButtonStyle.PURPLE, lip = 4.dp) {
-            Row(Modifier.fillMaxSize().padding(start = 58.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    GameText("%,d".format(save.cups), Type.Title, color = Palette.Gold, outline = 3.dp)
+        ChunkyButton(onCups, Modifier.height(58.dp).widthIn(min = 300.dp), ButtonStyle.GLASS, lip = 4.dp) {
+            Row(Modifier.padding(start = 66.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.width(110.dp)) {
+                    GameText(save.settings.playerName, Type.Label, outline = 2.dp)
+                    PlainText("${save.victories} wins", Type.Small)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.width(130.dp)) {
+                    GameText("%,d".format(save.cups), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
                     ProgressBar(frac, Modifier.fillMaxWidth().height(9.dp))
+                    PlainText(next?.let { "Next reward: ${it.cups}" } ?: "Track complete!", Type.Small)
                 }
             }
         }
-        GameIcon(IconKind.CUP, Modifier.size(62.dp).offset(x = (-6).dp, y = (-4).dp))
+        GameIcon(IconKind.CUP, Modifier.size(66.dp).offset(x = (-6).dp, y = (-4).dp))
         if (claimable > 0) Badge(claimable.toString(), Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-6).dp))
     }
 }
@@ -158,12 +160,12 @@ private fun CupButton(save: SaveData, claimable: Int, onClick: () -> Unit) {
 @Composable
 private fun NavTile(label: String, icon: IconKind, badge: String?, badgeColor: Color, onClick: () -> Unit) {
     val ui = LocalUi.current
-    val w = if (ui.roomy) 124.dp else 104.dp
-    val h = if (ui.roomy) 104.dp else 84.dp
+    val w = if (ui.roomy) 118.dp else 100.dp
+    val h = if (ui.roomy) 100.dp else 80.dp
     Box {
-        ChunkyButton(onClick, Modifier.size(w, h), ButtonStyle.CYAN) {
+        ChunkyButton(onClick, Modifier.size(w, h), ButtonStyle.GLASS) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                GameIcon(icon, Modifier.size(if (ui.roomy) 48.dp else 38.dp))
+                GameIcon(icon, Modifier.size(if (ui.roomy) 46.dp else 36.dp))
                 Spacer(Modifier.height(4.dp))
                 GameText(label, Type.Label, outline = 2.5.dp)
             }
@@ -181,7 +183,7 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
     val p = save.progress(save.selectedFighter)
     val canUp = Progression.canUpgrade(save, def.id)
     Box(Modifier.clickable(remember { MutableInteractionSource() }, null, onClick = onClick)) {
-        Panel(Modifier.padding(top = 6.dp), cut = 14.dp) {
+        Panel(color = Color(0xD8392A8C), colorBottom = Color(0xE01A1150), cut = 14.dp) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
                     Canvas(Modifier.fillMaxSize()) {
@@ -204,41 +206,93 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------- mode
+
+fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS }
+
+fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard() }
+
 @Composable
-private fun ModeCard(save: SaveData, repo: GameRepository, showMap: Boolean) {
-    val d = save.settings.botDifficulty
-    Panel(Modifier.fillMaxWidth(), cut = 18.dp) {
-        Column(Modifier.padding(14.dp)) {
+private fun ModeChip(mode: GameMode, d: BotDifficulty, onClick: () -> Unit) {
+    ChunkyButton(onClick, Modifier.fillMaxWidth().height(84.dp), ButtonStyle.GLASS, cut = 16.dp) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            GameIcon(modeIcon(mode), Modifier.size(42.dp))
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
+                PlainText(mode.tagline, Type.Small, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PlainText("Bots: ", Type.Small)
+                    PlainText(d.label, Type.Label, color = difficultyColor(d))
+                }
+            }
+            GameText("›", Type.Display, outline = 3.dp)
+        }
+    }
+}
+
+@Composable
+private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit) {
+    val ui = LocalUi.current
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
+            .clickable(remember { MutableInteractionSource() }, null, onClick = onClose),
+        contentAlignment = Alignment.Center,
+    ) {
+        Panel(Modifier.widthIn(max = 900.dp).padding(24.dp).clickable(remember { MutableInteractionSource() }, null) { }, cut = 22.dp) {
+            Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                GameText("CHOOSE A MODE", Type.Title, outline = 3.5.dp)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    for (m in GameMode.entries) {
+                        ModeCard(m, m == save.selectedMode, Modifier.weight(1f), showMap = ui.roomy) { repo.selectMode(m) }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GameText("BOTS", Type.Heading, outline = 2.5.dp)
+                    Spacer(Modifier.width(6.dp))
+                    for (d in BotDifficulty.entries) {
+                        val sel = d == save.settings.botDifficulty
+                        ChunkyButton({ repo.updateSettings { it.copy(botDifficulty = d) } }, Modifier.size(118.dp, 50.dp),
+                            if (sel) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp) {
+                            GameText(d.label.uppercase(), Type.Label, color = if (sel) Color.White else difficultyColor(d), outline = 2.dp)
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    ChunkyButton(onClose, Modifier.size(130.dp, 54.dp), ButtonStyle.GREEN) { GameText("DONE", Type.Heading) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap: Boolean, onClick: () -> Unit) {
+    val arena = remember(m) { arenaFor(m) }
+    ChunkyButton(onClick, modifier.height(if (showMap) 330.dp else 190.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, cut = 18.dp) {
+        Column(Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                GameIcon(IconKind.SWORDS, Modifier.size(30.dp))
+                GameIcon(modeIcon(m), Modifier.size(34.dp))
                 Spacer(Modifier.width(8.dp))
-                Column {
-                    GameText("KNOCKOUT RUSH", Type.Heading, color = Palette.Gold, outline = 2.5.dp)
-                    PlainText("3v3 · first to ${Balance.KO_TARGET} KOs · Foundry Yard", Type.Small)
-                }
+                GameText(m.title.uppercase(), Type.Title, outline = 3.dp)
             }
+            PlainText(m.tagline, Type.Label, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center)
+            Spacer(Modifier.height(6.dp))
             if (showMap) {
-                Spacer(Modifier.height(10.dp))
-                Minimap(Modifier.fillMaxWidth().aspectRatio(34f / 20f))
-            }
-            Spacer(Modifier.height(10.dp))
-            // Quick bot-difficulty switch — bots are a first-class way to play.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ChunkyButton({ repo.updateSettings { it.copy(botDifficulty = BotDifficulty.entries[(d.ordinal + 3) % 4]) } },
-                    Modifier.size(40.dp, 40.dp), ButtonStyle.PURPLE, lip = 3.dp) { GameText("‹", Type.Title) }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    PlainText("BOTS", Type.Small)
-                    GameText(d.label.uppercase(), Type.Heading, color = difficultyColor(d), outline = 2.5.dp)
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Minimap(arena, Modifier.fillMaxHeight().aspectRatio(arena.width.toFloat() / arena.height))
                 }
-                ChunkyButton({ repo.updateSettings { it.copy(botDifficulty = BotDifficulty.entries[(d.ordinal + 1) % 4]) } },
-                    Modifier.size(40.dp, 40.dp), ButtonStyle.PURPLE, lip = 3.dp) { GameText("›", Type.Title) }
+                Spacer(Modifier.height(6.dp))
             }
-            Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                PlainText("Win: +${d.cupBonus}", Type.Small, color = Palette.Gold)
-                GameIcon(IconKind.CUP, Modifier.size(16.dp).padding(start = 2.dp))
-                PlainText("  ·  Bolts ×${d.boltMultiplier}", Type.Small, color = Palette.Bolt)
-            }
+            PlainText("${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
+            PlainText(
+                when (m) {
+                    GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. 1st place: +${Balance.placementCups[0]} Cups"
+                    GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win: +${io.github.projectwip.data.BotDifficulty.NORMAL.cupBonus} Cups (Normal)"
+                },
+                Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center,
+            )
         }
     }
 }
@@ -257,35 +311,39 @@ private fun PlayButton(onClick: () -> Unit) {
         Canvas(Modifier.size(300.dp, 110.dp)) {
             drawOval(Palette.Orange.copy(alpha = 0.18f + glow * 0.2f), Offset(0f, 0f), Size(size.width, size.height))
         }
-        ChunkyButton(onClick, Modifier.fillMaxWidth().height(86.dp), ButtonStyle.ORANGE, cut = 20.dp, lip = 7.dp) {
+        ChunkyButton(onClick, Modifier.fillMaxWidth().height(90.dp), ButtonStyle.ORANGE, cut = 20.dp, lip = 7.dp) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                GameIcon(IconKind.PLAY, Modifier.size(34.dp))
+                GameIcon(IconKind.PLAY, Modifier.size(36.dp))
                 Spacer(Modifier.width(10.dp))
-                GameText("PLAY", Type.Display.copy(fontSize = Type.Display.fontSize * 1.15f), outline = 4.dp)
+                GameText("PLAY", Type.Display.copy(fontSize = Type.Display.fontSize * 1.2f), outline = 4.dp)
             }
         }
     }
 }
 
-/** A live thumbnail of the actual arena layout. */
+/** A live thumbnail of an arena layout. */
 @Composable
-fun Minimap(modifier: Modifier = Modifier) {
-    val arena = remember { Arenas.foundryYard() }
+fun Minimap(arena: Arena, modifier: Modifier = Modifier) {
     Canvas(modifier) {
-        val t = size.width / arena.width
+        val t = minOf(size.width / arena.width, size.height / arena.height)
         drawRect(Palette.Ink)
         for (y in 0 until arena.height) for (x in 0 until arena.width) {
             val c = when (arena[x, y]) {
                 Tile.WALL -> Color(0xFF7870C4)
                 Tile.THICKET -> Color(0xFF3FAE5C)
                 Tile.WATER -> Color(0xFF2CA0DE)
-                Tile.FLOOR -> if (x < 3) Color(0xFFB9C8E0) else if (x >= arena.width - 3) Color(0xFFE6B9B0) else Color(0xFFDEC492)
+                Tile.CRATE -> Color(0xFFE08A2E)
+                Tile.FLOOR -> Color(0xFFDEC492)
             }
             drawRect(c, Offset(x * t, y * t), Size(t + 0.5f, t + 0.5f))
         }
         for ((team, spawns) in arena.spawns.withIndex()) for (s in spawns) {
-            drawCircle(Palette.Ink, t * 0.75f, Offset(s.x * t, s.y * t))
-            drawCircle(if (team == 0) Palette.Ally else Palette.Enemy, t * 0.55f, Offset(s.x * t, s.y * t))
+            drawCircle(Palette.Ink, t * 0.8f, Offset(s.x * t, s.y * t))
+            drawCircle(if (team == 0) Palette.Ally else Palette.Enemy, t * 0.6f, Offset(s.x * t, s.y * t))
+        }
+        for (s in arena.ffaSpawns) {
+            drawCircle(Palette.Ink, t * 0.8f, Offset(s.x * t, s.y * t))
+            drawCircle(Palette.Gold, t * 0.6f, Offset(s.x * t, s.y * t))
         }
     }
 }
