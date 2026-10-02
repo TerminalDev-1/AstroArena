@@ -83,7 +83,7 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                         Shop.fighterOffers.forEach { o ->
                             val owned = save.progress(o.fighter).unlocked
                             OfferCard(cardW, o.pricePrisms, owned, tag = if (!owned) Balance.fighter(o.fighter).role.uppercase() else null, onBuy = { pending = o }) {
-                                FighterView(Balance.fighter(o.fighter), 0, Modifier.fillMaxSize(), rays = !owned)
+                                FighterView(Balance.fighter(o.fighter), 0, Modifier.fillMaxSize(), pedestal = false, rays = !owned)
                                 Title(o.title, Balance.fighter(o.fighter).title)
                             }
                         }

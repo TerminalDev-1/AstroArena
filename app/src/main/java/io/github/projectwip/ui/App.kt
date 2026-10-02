@@ -134,7 +134,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
                     Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
-                    is Screen.Match -> MatchScreen(s.config, save.settings, sfx,
+                    is Screen.Match -> MatchScreen(s.config, save.settings, sfx, save.matchesPlayed,
                         onFinish = { summary ->
                             val rewards = repo.applyMatch(summary.report)
                             screen = Screen.Result(summary, rewards)

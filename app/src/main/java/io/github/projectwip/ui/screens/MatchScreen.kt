@@ -29,7 +29,7 @@ import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.MatchOutcome
 import io.github.projectwip.data.MatchReport
 import io.github.projectwip.data.Settings
-import io.github.projectwip.match.GameView
+import io.github.projectwip.match.MatchView
 import io.github.projectwip.sim.Match
 import io.github.projectwip.sim.MatchConfig
 import io.github.projectwip.ui.ButtonStyle
@@ -58,10 +58,10 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
 }
 
 @Composable
-fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, onFinish: (MatchSummary) -> Unit) {
+fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed: Int, onFinish: (MatchSummary) -> Unit) {
     val match = remember { Match(config) }
     var paused by remember { mutableStateOf(false) }
-    var view by remember { mutableStateOf<GameView?>(null) }
+    var view by remember { mutableStateOf<MatchView?>(null) }
     var done by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -82,7 +82,7 @@ fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, onFinish: (Ma
     Box(Modifier.fillMaxSize().background(Color(0xFF1C143A))) {
         AndroidView(
             factory = { ctx ->
-                GameView(ctx, match, settings, sfx,
+                MatchView(ctx, match, settings, sfx, matchesPlayed,
                     onPauseRequested = { if (!done) { paused = true; view?.paused = true } },
                     onFinished = { report -> finish(report) },
                 ).also { view = it }

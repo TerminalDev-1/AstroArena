@@ -14,6 +14,8 @@ data class Settings(
     val moveStickMode: MoveStickMode = MoveStickMode.FLOATING,
     /** Tapping the attack stick fires at the nearest visible enemy. */
     val tapToAutoAim: Boolean = true,
+    /** Manually aimed shots snap onto an enemy within a few degrees. */
+    val aimAssist: Boolean = true,
     val showDamageNumbers: Boolean = true,
     val highFrameRate: Boolean = true,
     val showFps: Boolean = false,

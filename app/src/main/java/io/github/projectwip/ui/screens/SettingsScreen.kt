@@ -163,7 +163,8 @@ private fun ControlsTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
     }
     SliderRow("CONTROL SIZE", "${(s.controlScale * 100).toInt()}%", s.controlScale, 0.7f, 1.4f) { v -> set { it.copy(controlScale = v) } }
     SliderRow("CONTROL OPACITY", "${(s.controlOpacity * 100).toInt()}%", s.controlOpacity, 0.3f, 1f) { v -> set { it.copy(controlOpacity = v) } }
-    ToggleRow("TAP TO AUTO-AIM", "A quick tap on the attack stick fires at the nearest visible enemy. Drag to aim manually; drag back to the centre to cancel.", s.tapToAutoAim) { v -> set { it.copy(tapToAutoAim = v) } }
+    ToggleRow("AIM ASSIST", "When you drag to aim, shots within ${io.github.projectwip.match.MatchRunner.ASSIST_DEGREES.toInt()}° of a visible enemy snap onto them.", s.aimAssist) { v -> set { it.copy(aimAssist = v) } }
+    ToggleRow("TAP TO AUTO-AIM", "A quick tap on the attack stick fires at the nearest visible enemy (marked with a gold ring and arrow). Drag to aim manually; drag back to the centre to cancel.", s.tapToAutoAim) { v -> set { it.copy(tapToAutoAim = v) } }
     PlainText("Coming later: drag-to-reposition layout editor.", Type.Small, color = Palette.TextDim.copy(alpha = 0.7f))
 }
 

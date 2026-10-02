@@ -69,6 +69,7 @@ class SaveStore(context: Context) {
                 put("controlOpacity", st.controlOpacity.toDouble())
                 put("moveStickMode", st.moveStickMode.name)
                 put("tapToAutoAim", st.tapToAutoAim)
+                put("aimAssist", st.aimAssist)
                 put("showDamageNumbers", st.showDamageNumbers)
                 put("highFrameRate", st.highFrameRate)
                 put("showFps", st.showFps)
@@ -100,6 +101,7 @@ class SaveStore(context: Context) {
                 controlOpacity = so.optDouble("controlOpacity", sd.controlOpacity.toDouble()).toFloat().coerceIn(0.3f, 1f),
                 moveStickMode = enumOr(so.optString("moveStickMode"), sd.moveStickMode),
                 tapToAutoAim = so.optBoolean("tapToAutoAim", sd.tapToAutoAim),
+                aimAssist = so.optBoolean("aimAssist", sd.aimAssist),
                 showDamageNumbers = so.optBoolean("showDamageNumbers", sd.showDamageNumbers),
                 highFrameRate = so.optBoolean("highFrameRate", sd.highFrameRate),
                 showFps = so.optBoolean("showFps", sd.showFps),

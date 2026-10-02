@@ -2,9 +2,10 @@
 
 ## Why this stack
 
-* **Kotlin + native Android, no engine.** The game is 2D, top-down and vector-styled. A custom loop on a
-  `SurfaceView` gives full control over timing, touch latency and rendering with a tiny APK and no engine
-  licensing or export pipeline. The JDK/SDK toolchain is all command-line.
+* **Kotlin + native Android + a small custom OpenGL ES 3.0 renderer, no engine.** Gameplay is top-down on a
+  2D ground plane; presentation is stylised 3D (tilted perspective camera, toon lighting, real-time shadows,
+  inked outlines). A purpose-built renderer keeps the APK tiny, needs no engine export pipeline or asset
+  store, and gives full control over timing and touch latency. All meshes are generated in code.
 * **Jetpack Compose for menus**, fully re-skinned (no Material components). Compose makes chunky animated
   game UI (pressable plates, counting numbers, bursts) cheap to build and adapts well to phones vs tablets.
 * **A pure-Kotlin simulation** (`sim/`, `ai/`, `data/` minus `SaveStore`) with no Android imports. It runs in
@@ -19,22 +20,41 @@ sim/      Arena (tiles, collision, raycasts), Entities (Fighter, Projectile, Con
           World (fixed-step simulation + match rules), Match (world + bots + report)
 ai/       BotProfile (difficulty knobs), BotBrain (perception → intent → path/steer → dodge → aim),
           Pathfinder (A* + smoothing)
-match/    GameView (SurfaceView + game thread), TouchControls (twin-stick input + drawing)
-render/   GameRenderer (arena, effects, HUD), FighterArt (shared character art)
+gl/       Mesh/MeshBuilder (procedural primitives), Shaders (toon lit, depth, water, sprites), GlThread/Egl
+render3d/ FighterModels (rigged 3D fighters), ArenaModel (3D arena + surroundings), MatchRenderer (match),
+          Stage (menu 3D stage, offscreen portraits), Toon (shadow map + shared lighting), Effects (particles)
+match/    MatchView (SurfaceView + HUD), MatchRunner (fixed-step sim, input, aim assist, feedback),
+          HudView/HudSnapshot (2D overlay fed by the render thread), TouchControls (twin-stick input)
 audio/    Sfx (runtime-synthesised effects + haptics)
 ui/       Theme, Components, Icons, App (navigation), screens/*
 ```
 
-## Game loop
+## Game loop & rendering
 
-`GameView` owns a thread: input is polled, the `Match` is stepped at a **fixed 60 Hz**, then a frame is
-rendered with **interpolation** (`prev → current` by the leftover accumulator), so motion is smooth on
-90/120/144 Hz panels. Touch events arrive on the UI thread and are handed over through a synchronized
-`TouchControls`; everything else (world, renderer) is touched only by the game thread.
+`MatchView` stacks a `SurfaceView` (3D) and a `HudView` (2D). A `GlThread` owns the EGL context; each frame
+`MatchRunner` polls touch input and steps the `Match` at a **fixed 60 Hz**, then `MatchRenderer` draws with
+**interpolation** (`prev → current`), so motion is smooth at 90/120/144 Hz. Passes: shadow map → ground &
+walls → x-ray silhouettes (allies behind walls) → fighters → inverted-hull outlines → projectiles → bushes
+(sway + fade near friendlies) → coolant → ground decals (team rings, aim indicator, auto-aim marker) →
+additive particles. After drawing, the renderer publishes a `HudSnapshot` (screen positions, health, score…)
+that `HudView` draws on the UI thread; touch goes `HudView → TouchControls` (synchronized).
+
+Fighters are rigged from rounded primitives (body, head, legs, free arm, weapon, floating crystal) and
+animated procedurally (walk, lean, recoil, breathe, hit flash). Meshes are white; skins colour them per draw.
+
+Menus reuse the same models and lighting: a transparent `TextureView` stage for hero spots (drag to spin,
+tap to cheer, celebrates on upgrade) and `Portraits`, which renders every fighter/skin once offscreen
+(MSAA FBO → bitmap) at startup for cards and lists.
 
 Humans and bots drive fighters through the **same `Control` struct** — move vector, aim vector, one-shot
 attack/super triggers — so bots can't cheat on stats or speed, and visibility (thickets) is enforced for
 both via `World.isVisibleTo`.
+
+## Auto-aim
+
+Tapping the attack stick fires at `World.nearestVisibleEnemy`; that target is always marked in the arena
+(gold dashed ring + bobbing arrow + HUD reticle) so players see who a tap will hit. With **Aim Assist**
+(Settings → Controls), dragged shots within 12° of a visible enemy snap onto it.
 
 ## Bot AI
 
@@ -61,5 +81,5 @@ never takes away a reached reward; owned duplicates are compensated (`CupTrack.d
 
 `App` scales Compose density by screen height (`0.92×–1.4×`) so controls stay thumb-sized and legible, and
 exposes `UiMetrics.roomy`/`wide` so tablets get *more content* (arena minimap, fighter lore, larger
-cards) rather than a stretched phone layout. In matches the camera always shows at least
-22×13.5 tiles; wider phones see more horizontally. Touch controls are sized in dp and scaled by a setting.
+cards) rather than a stretched phone layout. In matches the camera sits at a fixed distance and pitch, so
+every device sees the same depth of field; wider phones see more horizontally. Touch controls are sized in dp and scaled by a setting.

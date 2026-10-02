@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
 
         val repo = (application as? GameApp)?.repository ?: GameRepository(SaveStore(this))
         sfx = Sfx(this).also { it.load() }
+        io.github.projectwip.render3d.Portraits.start()
         applyRefreshRate(repo.save.value.settings.highFrameRate)
 
         // Debug builds accept `--es screen match|fighters|shop|track|settings` for automated testing.

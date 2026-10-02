@@ -99,7 +99,7 @@ fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId, go:
                 Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.weight(1f).aspectRatio(1f), contentAlignment = Alignment.Center) {
-                            FighterView(def, prog.skin, Modifier.fillMaxSize(), rays = true, locked = !prog.unlocked)
+                            FighterView(def, prog.skin, Modifier.fillMaxSize(), rays = true, locked = !prog.unlocked, celebrateKey = upgradeCount)
                             UpgradeBurst(upgradeCount, Color(def.skins[prog.skin].accent))
                             if (!prog.unlocked) GameIcon(IconKind.LOCK, Modifier.size(80.dp))
                         }

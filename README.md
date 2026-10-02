@@ -1,6 +1,6 @@
 # Project WIP-Preview
 
-A mobile-first, landscape, top-down **arena brawler for Android phones and tablets** — quick 3v3 matches,
+A mobile-first, landscape, **3D arena brawler for Android phones and tablets** — quick 3v3 matches,
 twin-stick touch controls, fighters you level up, Cups, a Cup Track, a Shop — and **bots as a first-class
 way to play**. Launch it, pick a fighter, press PLAY, and you're in a match against bots in seconds. No
 account, no server, no matchmaking.
@@ -8,8 +8,8 @@ account, no server, no matchmaking.
 > **Preview software.** This is an experiment. Anything — rules, balance, saves, code — may change without
 > notice. There is no promise of maintenance.
 
-Everything in the game is original: characters, arena, icons, the Cup emblem, sounds (synthesised at
-runtime), UI and rules. No third-party game assets are used.
+Everything in the game is original: 3D characters and arena (all meshes generated in code), icons, the
+Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game assets are used.
 
 ## What's in the first vertical slice
 
@@ -18,7 +18,8 @@ runtime), UI and rules. No third-party game assets are used.
 | **Mode** | *Knockout Rush* — 3v3, first team to 10 KOs (or most KOs after 2:30) |
 | **Arena** | *Foundry Yard* — walls, tall-grass thickets (hide inside), coolant pools (block movement, not shots) |
 | **Fighters** | **Juno Flint** (burst skirmisher, starter) · **Brakk** (shotgun tank, ram super) · **Mira Vale** (sniper, piercing super) |
-| **Controls** | Floating/fixed move stick · drag-to-aim attack stick (tap = auto-aim, drag back to centre = cancel) · super stick |
+| **Graphics** | Custom OpenGL ES 3.0: toon lighting, real-time shadows, inked outlines, 4× MSAA, up to 120 Hz |
+| **Controls** | Floating/fixed move stick · drag-to-aim attack stick (tap = auto-aim with visible target marker, drag back to centre = cancel) · super stick · optional aim assist |
 | **Bots** | Easy / Normal / Hard / Elite — behaviour only (reaction, aim, leading, dodging, spacing, targeting, supers) |
 | **Progression** | Levels 1–10 with linear, fully visible stat gains · Bolts (upgrades) · Prisms (shop) · Cups · Cup Track rewards |
 | **Shop** | Daily free gift · fighter unlocks · Bolt supplies · colourways |

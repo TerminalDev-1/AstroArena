@@ -1,0 +1,77 @@
+package io.github.projectwip.match
+
+import io.github.projectwip.sim.Phase
+
+/**
+ * Everything the 2D HUD draws, captured on the render thread after each frame and handed to the
+ * UI thread. Double-buffered: the renderer fills [back], then [publish] swaps it with the front.
+ */
+class HudSnapshot {
+    var width = 1
+    var height = 1
+    val viewProj = FloatArray(16)
+
+    var phase = Phase.COUNTDOWN
+    var phaseTime = 0f
+    var countdownSeconds = 3f
+    var timeLeft = 0f
+    var myScore = 0
+    var theirScore = 0
+    var koTarget = 10
+    var winningTeam = -1
+    var playerTeam = 0
+
+    var playerAlive = true
+    var respawnTimer = 0f
+    var ammo = 0f
+    var ammoMax = 3
+    var superCharge = 0f
+    var autoTargetId = -1
+    var matchesPlayed = 0
+    var fps = 0
+
+    val count get() = n
+    var n = 0
+    val ids = IntArray(MAX)
+    val sx = FloatArray(MAX)
+    val sy = FloatArray(MAX)
+    val visible = BooleanArray(MAX)
+    val hp = IntArray(MAX)
+    val maxHp = IntArray(MAX)
+    /** 0 = you, 1 = ally, 2 = enemy */
+    val relation = IntArray(MAX)
+    val names = arrayOfNulls<String>(MAX)
+    val superReady = BooleanArray(MAX)
+
+    fun copyFrom(o: HudSnapshot) {
+        width = o.width; height = o.height
+        System.arraycopy(o.viewProj, 0, viewProj, 0, 16)
+        phase = o.phase; phaseTime = o.phaseTime; countdownSeconds = o.countdownSeconds; timeLeft = o.timeLeft
+        myScore = o.myScore; theirScore = o.theirScore; koTarget = o.koTarget; winningTeam = o.winningTeam; playerTeam = o.playerTeam
+        playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; ammo = o.ammo; ammoMax = o.ammoMax; superCharge = o.superCharge
+        autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
+        n = o.n
+        for (i in 0 until n) {
+            ids[i] = o.ids[i]; sx[i] = o.sx[i]; sy[i] = o.sy[i]; visible[i] = o.visible[i]
+            hp[i] = o.hp[i]; maxHp[i] = o.maxHp[i]; relation[i] = o.relation[i]; names[i] = o.names[i]; superReady[i] = o.superReady[i]
+        }
+    }
+
+    companion object { const val MAX = 8 }
+}
+
+/** Lock-protected hand-off between render thread (writer) and UI thread (reader). */
+class HudChannel {
+    val back = HudSnapshot()
+    private val front = HudSnapshot()
+    private val lock = Any()
+    @Volatile var hasFrame = false
+        private set
+
+    fun publish() {
+        synchronized(lock) { front.copyFrom(back) }
+        hasFrame = true
+    }
+
+    fun <T> read(block: (HudSnapshot) -> T): T = synchronized(lock) { block(front) }
+}

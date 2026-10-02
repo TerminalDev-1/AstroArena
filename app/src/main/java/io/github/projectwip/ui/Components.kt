@@ -58,7 +58,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.FighterDef
-import io.github.projectwip.render.FighterArt
+import io.github.projectwip.render3d.FighterStageView
+import io.github.projectwip.render3d.Portraits
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.viewinterop.AndroidView
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -270,7 +280,10 @@ fun GameBackground(modifier: Modifier = Modifier, tint: Color = Palette.BgTop) {
 
 // ---------------------------------------------------------------------------------------------- fighters
 
-/** Renders the shared [FighterArt] inside Compose, idling on a pedestal. */
+/**
+ * A fighter in 3D. With [pedestal] it's a live, lit 3D stage (drag to spin, tap to cheer, celebrates when
+ * [celebrateKey] changes). Without, it shows a pre-rendered 3D portrait (cheap enough for lists).
+ */
 @Composable
 fun FighterView(
     def: FighterDef,
@@ -279,49 +292,52 @@ fun FighterView(
     pedestal: Boolean = true,
     rays: Boolean = false,
     locked: Boolean = false,
-    facingLeft: Boolean = false,
+    celebrateKey: Int = 0,
 ) {
-    val art = remember { FighterArt() }
-    val time by rememberAnimTime()
     val accent = Color(def.skins[skin.coerceIn(0, def.skins.lastIndex)].secondary)
-    Canvas(modifier) {
-        val unit = size.minDimension / 3.4f
-        val cx = size.width / 2
-        val cy = size.height * 0.6f
+    Box(modifier) {
         if (rays) {
-            rotate(time * 12f, Offset(cx, cy - unit * 0.6f)) {
-                for (i in 0 until 12) {
-                    val a0 = i * (2 * PI / 12)
-                    val a1 = a0 + 0.16
-                    val r = size.maxDimension
-                    val p = Path().apply {
-                        moveTo(cx, cy - unit * 0.6f)
-                        lineTo(cx + (cos(a0) * r).toFloat(), cy - unit * 0.6f + (sin(a0) * r).toFloat())
-                        lineTo(cx + (cos(a1) * r).toFloat(), cy - unit * 0.6f + (sin(a1) * r).toFloat())
-                        close()
+            val time by rememberAnimTime()
+            Canvas(Modifier.fillMaxSize()) {
+                val c = Offset(size.width / 2, size.height * 0.45f)
+                rotate(time * 12f, c) {
+                    for (i in 0 until 12) {
+                        val a0 = i * (2 * PI / 12)
+                        val a1 = a0 + 0.16
+                        val r = size.maxDimension
+                        val p = Path().apply {
+                            moveTo(c.x, c.y)
+                            lineTo(c.x + (cos(a0) * r).toFloat(), c.y + (sin(a0) * r).toFloat())
+                            lineTo(c.x + (cos(a1) * r).toFloat(), c.y + (sin(a1) * r).toFloat())
+                            close()
+                        }
+                        drawPath(p, accent.copy(alpha = 0.10f))
                     }
-                    drawPath(p, accent.copy(alpha = 0.10f))
                 }
+                drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.35f), Color.Transparent), c, size.minDimension * 0.6f), size.minDimension * 0.6f, c)
             }
-            drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.35f), Color.Transparent), center = Offset(cx, cy - unit * 0.6f), radius = unit * 2.2f), unit * 2.2f, Offset(cx, cy - unit * 0.6f))
         }
         if (pedestal) {
-            val pw = unit * 1.55f
-            val ph = unit * 0.5f
-            val top = cy + unit * 0.78f
-            drawOval(Palette.Ink, Offset(cx - pw - 3, top - ph / 2 + unit * 0.16f), Size(pw * 2 + 6, ph + 6))
-            drawOval(Brush.verticalGradient(listOf(Palette.PanelLight, Palette.PanelDark), startY = top - ph / 2, endY = top + ph / 2 + unit * 0.16f),
-                Offset(cx - pw, top - ph / 2 + unit * 0.16f), Size(pw * 2, ph))
-            drawOval(Brush.verticalGradient(listOf(Color(0xFF6A56D8), Palette.Panel), startY = top - ph / 2, endY = top + ph / 2),
-                Offset(cx - pw, top - ph / 2), Size(pw * 2, ph))
-            drawOval(accent.copy(alpha = 0.55f + 0.25f * sin(time * 2.5f)), Offset(cx - pw * 0.8f, top - ph * 0.4f), Size(pw * 1.6f, ph * 0.8f), style = Stroke(3.dp.toPx()))
-        }
-        drawIntoCanvas { c ->
-            art.draw(c.nativeCanvas, cx, cy, unit, def, skin, if (facingLeft) PI.toFloat() * 0.85f else -0.35f, 0f, time,
-                alpha = if (locked) 255 else 255)
-        }
-        if (locked) {
-            drawCircle(Palette.BgBottom.copy(alpha = 0.55f), unit * 1.9f, Offset(cx, cy - unit * 0.3f))
+            var view by remember { mutableStateOf<FighterStageView?>(null) }
+            AndroidView(
+                factory = { ctx -> FighterStageView(ctx).also { view = it } },
+                update = { v -> v.params.fighter = def.id; v.params.skin = skin; v.params.locked = locked },
+                modifier = Modifier.fillMaxSize(),
+            )
+            val first = remember { booleanArrayOf(true) }
+            LaunchedEffect(celebrateKey) {
+                if (first[0]) { first[0] = false; return@LaunchedEffect }
+                view?.params?.celebrateAt = System.currentTimeMillis()
+            }
+        } else {
+            val images by Portraits.images.collectAsState()
+            images[def.id to skin.coerceIn(0, def.skins.lastIndex)]?.let { bmp ->
+                Image(
+                    bmp.asImageBitmap(), contentDescription = def.name, modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    colorFilter = if (locked) ColorFilter.tint(Color(0xFF221545), BlendMode.SrcIn) else null,
+                )
+            }
         }
     }
 }

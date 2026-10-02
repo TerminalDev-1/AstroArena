@@ -1,0 +1,171 @@
+package io.github.projectwip.match
+
+import io.github.projectwip.audio.Sfx
+import io.github.projectwip.audio.Sound
+import io.github.projectwip.data.AttackShape
+import io.github.projectwip.data.MatchReport
+import io.github.projectwip.data.Settings
+import io.github.projectwip.sim.Fighter
+import io.github.projectwip.sim.GameEvent
+import io.github.projectwip.sim.Match
+import io.github.projectwip.sim.Phase
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.sin
+
+/** Things the 2D HUD needs to animate that happen at a moment in time. */
+sealed interface HudEvent {
+    data class Damage(val x: Float, val y: Float, val amount: Int, val mine: Boolean, val big: Boolean) : HudEvent
+    data class Ko(val killer: String, val killerTeam: Int, val victim: String, val victimTeam: Int) : HudEvent
+    data object Pop : HudEvent
+}
+
+/**
+ * Runs a [Match] on the render thread: fixed 60 Hz steps, touch → [io.github.projectwip.sim.Control],
+ * aim assist, sound/haptic feedback. Renderer-agnostic.
+ */
+class MatchRunner(
+    val match: Match,
+    val settings: Settings,
+    private val sfx: Sfx,
+    val controls: TouchControls,
+    private val onPause: () -> Unit,
+    private val onFinished: (MatchReport) -> Unit,
+) {
+    val input = TouchControls.Input()
+    /** Events produced during the last [update] — consumed by the renderer for effects. */
+    val frameEvents = ArrayList<GameEvent>()
+    val hudEvents = ConcurrentLinkedQueue<HudEvent>()
+    @Volatile var paused = false
+    private var acc = 0f
+    private var finished = false
+    /** Who a tap on the attack stick would hit right now (drawn as a marker). */
+    var autoTarget: Fighter? = null
+        private set
+
+    /** Advances the simulation. Returns the interpolation alpha for rendering. */
+    fun update(dt: Float): Float {
+        frameEvents.clear()
+        if (paused) { controls.poll(input); return 1f }
+        acc += dt
+        while (acc >= Match.STEP) {
+            tick()
+            acc -= Match.STEP
+        }
+        val p = match.player
+        autoTarget = if (p.alive && match.world.phase == Phase.PLAYING) match.world.nearestVisibleEnemy(p, p.def.attack.range + 0.5f) else null
+        return acc / Match.STEP
+    }
+
+    private fun tick() {
+        val p = match.player
+        controls.superReady = p.superReady && p.alive
+        controls.poll(input)
+        if (input.pause) onPause()
+
+        val c = p.control
+        c.moveX = input.moveX
+        c.moveY = input.moveY
+        c.aiming = input.aimingAttack || input.aimingSuper
+        if (c.aiming) { c.aimX = input.aimX; c.aimY = input.aimY }
+        if (input.attack != TouchControls.FireMode.NONE) {
+            setAim(input.attack, input.attackX, input.attackY, p.def.attack.range)
+            c.attack = true
+        }
+        if (input.superFire != TouchControls.FireMode.NONE && p.superReady) {
+            setAim(input.superFire, input.superX, input.superY, p.def.superSpec.range)
+            c.superAttack = true
+        }
+
+        val ammoBefore = p.ammo
+        val tried = c.attack
+        match.step(Match.STEP)
+        if (tried && ammoBefore < 1f && p.alive && match.world.phase == Phase.PLAYING) sfx.play(Sound.DENIED, 0.4f)
+
+        for (e in match.world.events) {
+            frameEvents += e
+            feedback(e)
+        }
+        match.world.events.clear()
+
+        if (match.isOver && match.world.phaseTime > 2.8f && !finished) {
+            finished = true
+            onFinished(match.report())
+        }
+    }
+
+    /** Auto = nearest visible enemy. Aimed shots get gentle aim assist if enabled. */
+    private fun setAim(mode: TouchControls.FireMode, ax: Float, ay: Float, range: Float) {
+        val p = match.player
+        val c = p.control
+        if (mode == TouchControls.FireMode.AUTO || hypot(ax, ay) < 0.01f) {
+            val t = match.world.nearestVisibleEnemy(p, range + 0.5f)
+            if (t != null) { c.aimX = t.x - p.x; c.aimY = t.y - p.y } else { c.aimX = cos(p.facing); c.aimY = sin(p.facing) }
+            return
+        }
+        c.aimX = ax; c.aimY = ay
+        if (settings.aimAssist) {
+            val want = atan2(ay, ax)
+            var best: Fighter? = null
+            var bestDiff = Math.toRadians(ASSIST_DEGREES).toFloat()
+            for (e in match.world.fighters) {
+                if (e.team == p.team || !match.world.isVisibleTo(e, p.team)) continue
+                if (hypot(e.x - p.x, e.y - p.y) > range + 0.5f) continue
+                var d = atan2(e.y - p.y, e.x - p.x) - want
+                while (d > Math.PI) d -= (2 * Math.PI).toFloat()
+                while (d < -Math.PI) d += (2 * Math.PI).toFloat()
+                if (abs(d) < bestDiff) { bestDiff = abs(d); best = e }
+            }
+            best?.let { c.aimX = it.x - p.x; c.aimY = it.y - p.y }
+        }
+    }
+
+    private fun feedback(e: GameEvent) {
+        val pid = match.player.id
+        val world = match.world
+        when (e) {
+            is GameEvent.Shot -> {
+                val f = world.fighter(e.fighterId) ?: return
+                val near = 1f / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
+                val gain = if (e.fighterId == pid) 1f else near * 0.6f
+                if (e.isSuper) sfx.play(Sound.SUPER, gain)
+                else sfx.play(when (f.def.attack.shape) {
+                    AttackShape.BURST -> Sound.SHOOT_SPARK
+                    AttackShape.SPREAD -> Sound.SHOOT_HEAVY
+                    AttackShape.LANCE -> Sound.SHOOT_PRISM
+                }, gain, 0.95f + (e.x % 0.1f))
+                if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
+            }
+            is GameEvent.Hit -> {
+                if (settings.showDamageNumbers && (e.sourceId == pid || e.targetId == pid)) {
+                    hudEvents += HudEvent.Damage(e.x, e.y, e.damage, e.sourceId == pid, e.isSuper)
+                }
+                when {
+                    e.targetId == pid -> { sfx.play(Sound.HURT, 0.9f); sfx.buzz(30, 140) }
+                    e.sourceId == pid -> sfx.play(Sound.HIT, 0.8f, if (e.isSuper) 0.8f else 1.1f)
+                }
+            }
+            is GameEvent.Ko -> {
+                val k = world.fighter(e.killerId)
+                val v = world.fighter(e.victimId)
+                if (v != null) hudEvents += HudEvent.Ko(k?.name ?: "—", k?.team ?: -1, v.name, v.team)
+                if (e.killerId == pid) { sfx.play(Sound.KO, 1f); sfx.buzz(60, 220) }
+                else if (e.victimId == pid) { sfx.play(Sound.KO, 0.9f, 0.7f); sfx.buzz(120, 255) }
+                else sfx.play(Sound.KO, 0.35f)
+            }
+            is GameEvent.SuperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY); sfx.buzz(25, 120) }
+            is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }
+            is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop }
+            is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
+            else -> Unit
+        }
+    }
+
+    companion object {
+        /** Aimed shots within this many degrees of a visible enemy snap onto it (when Aim Assist is on). */
+        const val ASSIST_DEGREES = 12.0
+    }
+}
