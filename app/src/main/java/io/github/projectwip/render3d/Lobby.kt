@@ -34,6 +34,8 @@ class LobbyParams {
     @Volatile var shot = LobbyShot.HOME
     /** Where on screen (0..1 of the width) the fighter should stand. */
     @Volatile var fighterScreenX = 0.5f
+    /** Where on screen (0..1 from the top) the fighter should be centred (FIGHTER shot). */
+    @Volatile var fighterScreenY = 0.5f
     @Volatile var dragYaw = 0f
     @Volatile var celebrateAt = 0L
     @Volatile var cheerAt = 0L
@@ -79,6 +81,7 @@ class LobbyScene {
     private val eye = floatArrayOf(0f, 2.2f, 7.8f)
     private val target = floatArrayOf(0f, 1.15f, 0f)
     private var shift = 0f
+    private var shiftY = 0f
     private var fighterAlpha = 1f
     private val anim = FighterAnim()
     private var shownYaw = 0f
@@ -179,13 +182,13 @@ class LobbyScene {
 
     private fun shotEye(s: LobbyShot): FloatArray = when (s) {
         LobbyShot.HOME -> floatArrayOf(0f, 2.3f, 7.6f)
-        LobbyShot.FIGHTER -> floatArrayOf(0.4f, 2.0f, 6.2f)
+        LobbyShot.FIGHTER -> floatArrayOf(0.4f, 2.4f, 8.0f)
         LobbyShot.BACKDROP -> floatArrayOf(0f, 3.4f, 9.5f)
     }
 
     private fun shotTarget(s: LobbyShot): FloatArray = when (s) {
         LobbyShot.HOME -> floatArrayOf(0f, 1.2f, 0f)
-        LobbyShot.FIGHTER -> floatArrayOf(0f, 1.05f, 0f)
+        LobbyShot.FIGHTER -> floatArrayOf(0f, 0.95f, 0f)
         LobbyShot.BACKDROP -> floatArrayOf(0f, 3.6f, -8f)
     }
 
@@ -200,12 +203,15 @@ class LobbyScene {
         for (i in 0..2) { eye[i] += (e[i] - eye[i]) * k; target[i] += (t[i] - target[i]) * k }
         val wantShift = if (p.shot == LobbyShot.BACKDROP) 0f else (p.fighterScreenX * 2f - 1f)
         shift += (wantShift - shift) * k
+        val wantShiftY = if (p.shot == LobbyShot.FIGHTER) (1f - 2f * p.fighterScreenY) * 0.9f else 0f
+        shiftY += (wantShiftY - shiftY) * k
         val wantAlpha = if (p.showFighter && p.shot != LobbyShot.BACKDROP) 1f else 0f
         fighterAlpha += (wantAlpha - fighterAlpha) * (1f - exp(-dt * 6f))
         val sway = sin(time * 0.25f) * 0.25f
 
         Matrix.perspectiveM(proj, 0, 32f, aspect, 0.3f, 200f)
         proj[8] = -shift // lens shift: puts the fighter where the layout wants it
+        proj[9] = -shiftY
         Matrix.setLookAtM(view, 0, eye[0] + sway, eye[1], eye[2], target[0] + sway * 0.3f, target[1], target[2], 0f, 1f, 0f)
         Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
 

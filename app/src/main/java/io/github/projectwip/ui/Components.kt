@@ -418,6 +418,8 @@ fun Modifier.lobbyAnchor(): Modifier {
         val root = c.findRootCoordinates().size.width.toFloat().coerceAtLeast(1f)
         val pos = c.positionInRoot().x + c.size.width / 2f
         lobby.fighterScreenX = (pos / root).coerceIn(0.1f, 0.9f)
+        val rootH = c.findRootCoordinates().size.height.toFloat().coerceAtLeast(1f)
+        lobby.fighterScreenY = ((c.positionInRoot().y + c.size.height / 2f) / rootH).coerceIn(0.25f, 0.75f)
     }
 }
 
