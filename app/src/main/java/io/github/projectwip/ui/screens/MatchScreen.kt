@@ -49,7 +49,8 @@ data class PlayerLine(
 data class MatchSummary(val report: MatchReport, val players: List<PlayerLine>, val playerTeam: Int)
 
 fun summarize(match: Match, report: MatchReport): MatchSummary {
-    val mvp = match.world.mvp()
+    // Free-for-all: the star goes to the last fighter standing; team modes use the contribution score.
+    val mvp = if (match.freeForAll) match.world.fighters.firstOrNull { it.placement == 1 } else match.world.mvp()
     return MatchSummary(
         report,
         match.world.fighters.map {
