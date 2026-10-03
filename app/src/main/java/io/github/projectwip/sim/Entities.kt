@@ -63,6 +63,10 @@ class Fighter(
     var sinceAttack = 99f
     /** While > 0 the fighter is visible even inside a thicket. */
     var revealTimer = 0f
+    /** Seconds spent continuously inside a thicket; hidden only once this passes the conceal delay. */
+    var concealTime = 0f
+    /** Per team: seconds that team keeps seeing this fighter after spotting it up close in a thicket. */
+    var spottedBy = FloatArray(0)
     var hitFlash = 0f
     var attackCooldown = 0f
     var walkCycle = 0f

@@ -106,6 +106,7 @@ uniform float uShadowTexel;
 uniform int uMode;
 uniform vec3 uReveal[3];
 uniform float uRevealOn;
+uniform float uDissolve;
 in vec3 vNormal;
 in vec4 vColor;
 in vec4 vLightPos;
@@ -126,6 +127,8 @@ float shadowAt() {
 }
 
 void main() {
+    // Screen-door fade (fighters slipping into / out of cover): no blending, so outlines and depth stay clean.
+    if (uDissolve > 0.0 && fract(dot(floor(gl_FragCoord.xy * 0.5), vec2(0.7548777, 0.5698403))) < uDissolve) discard;
     if (uMode == 1) { o = uTint; return; }
     if (uMode == 2) { o = vec4(uTint.rgb, uTint.a); return; }
     if (uMode == 3) { o = vec4(vColor.rgb * uTint.rgb, 1.0); return; }
@@ -155,9 +158,13 @@ void main() {
 """
 
     const val DEPTH_FS = """#version 300 es
-precision mediump float;
+precision highp float;
+uniform float uDissolve;
 out vec4 o;
-void main() { o = vec4(1.0); }
+void main() {
+    if (uDissolve > 0.0 && fract(dot(floor(gl_FragCoord.xy * 0.5), vec2(0.7548777, 0.5698403))) < uDissolve) discard;
+    o = vec4(1.0);
+}
 """
 
     /** Animated coolant: scrolling caustic bands + sun glint. */

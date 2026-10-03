@@ -94,6 +94,8 @@ class World(
     val aliveCount get() = fighters.count { !it.eliminated }
 
     init {
+        val teams = (fighters.maxOfOrNull { it.team } ?: 0) + 1
+        for (f in fighters) f.spottedBy = FloatArray(teams)
         for (y in 0 until arena.height) for (x in 0 until arena.width) {
             if (arena[x, y] == Tile.CRATE) crateHp[y * arena.width + x] = Balance.CRATE_HP
         }
@@ -138,6 +140,7 @@ class World(
         }
 
         for (f in fighters) stepFighter(f, dt)
+        stepConcealment(dt)
         stepProjectiles(dt)
         stepPickups(dt)
         storm?.let { stepStorm(it, dt) }
@@ -252,6 +255,26 @@ class World(
         // --- regeneration when out of combat
         if (f.sinceDamaged > Balance.REGEN_DELAY_SECONDS && f.sinceAttack > Balance.REGEN_DELAY_SECONDS && f.hp < f.maxHp) {
             f.hp = (f.hp + (f.maxHp * Balance.REGEN_FRACTION_PER_SECOND * dt).toInt().coerceAtLeast(1)).coerceAtMost(f.maxHp)
+        }
+    }
+
+    /** Tracks who is tucked away in a thicket and which teams have spotted them up close. */
+    private fun stepConcealment(dt: Float) {
+        for (f in fighters) {
+            // Leaving the grass, attacking or getting hit all break cover: the fighter has to settle in again.
+            if (!f.alive || !arena.inThicket(f.x, f.y)) {
+                f.concealTime = 0f
+                f.spottedBy.fill(0f)
+                continue
+            }
+            if (f.revealTimer > 0f) { f.concealTime = 0f; continue }
+            f.concealTime += dt
+            val spotted = f.spottedBy
+            for (t in spotted.indices) spotted[t] = (spotted[t] - dt).coerceAtLeast(0f)
+            for (o in fighters) {
+                if (o.team == f.team || !o.alive) continue
+                if (hypot(o.x - f.x, o.y - f.y) < Balance.THICKET_SPOT_RADIUS) spotted[o.team] = Balance.THICKET_SPOT_LINGER_SECONDS
+            }
         }
     }
 
@@ -501,6 +524,7 @@ class World(
         f.ammo = f.def.ammoMax.toFloat()
         f.shield = Balance.SPAWN_SHIELD_SECONDS
         f.sinceDamaged = 99f
+        f.concealTime = 0f
         events += GameEvent.Spawned(f.id)
     }
 
@@ -518,11 +542,8 @@ class World(
     fun isVisibleTo(target: Fighter, team: Int): Boolean {
         if (!target.alive) return false
         if (target.team == team) return true
-        if (!arena.inThicket(target.x, target.y) || target.revealTimer > 0f) return true
-        for (o in fighters) {
-            if (o.team == team && o.alive && hypot(o.x - target.x, o.y - target.y) < 2.2f) return true
-        }
-        return false
+        if (target.concealTime < Balance.THICKET_CONCEAL_SECONDS || target.revealTimer > 0f) return true
+        return team in target.spottedBy.indices && target.spottedBy[team] > 0f
     }
 
     /**

@@ -129,6 +129,13 @@ object Balance {
     val placementBolts = intArrayOf(30, 26, 22, 18, 15, 12, 10, 8, 6, 5)
 
     /** Spark Crates (free-for-all): health, and what each Power Cell inside grants (stacking). */
+    /** A fighter has to stay in a thicket this long before it is hidden, so brushing past grass doesn't blink it out. */
+    const val THICKET_CONCEAL_SECONDS = 0.8f
+    /** Enemies this close see into a thicket... */
+    const val THICKET_SPOT_RADIUS = 2.2f
+    /** ...and keep seeing the fighter for this long after losing contact. */
+    const val THICKET_SPOT_LINGER_SECONDS = 0.5f
+
     const val CRATE_HP = 1400
     const val CELL_HEALTH_BONUS = 0.10f
     const val CELL_DAMAGE_BONUS = 0.10f

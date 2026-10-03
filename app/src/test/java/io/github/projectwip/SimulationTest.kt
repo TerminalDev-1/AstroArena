@@ -70,6 +70,69 @@ class SimulationTest {
         assertTrue("lead must aim ahead of a target moving right", out[0] > 0.5f)
     }
 
+    /** Thickets hide a fighter only after it settles in, and a spotter doesn't lose it the instant it backs off. */
+    @Test fun thicketConcealmentIsStable() {
+        val a = Arenas.staticCanyon()
+        val def = Balance.fighter(FighterId.JUNO)
+        val hider = Fighter(0, def, 1, 0, 0, "H", true)
+        val seeker = Fighter(1, def, 1, 0, 1, "S", true)
+        val w = World(a, listOf(hider, seeker), io.github.projectwip.sim.MatchRules.lastSpark())
+        fun run(seconds: Float) = repeat((seconds / Match.STEP).toInt()) { w.step(Match.STEP) }
+        run(3.1f) // past countdown
+        assertEquals(Tile.THICKET, a.tileAt(2f, 1f))
+        hider.x = 2f; hider.y = 1f
+        seeker.x = 12.5f; seeker.y = 12.5f
+        run(Balance.THICKET_CONCEAL_SECONDS - 0.2f)
+        assertTrue("brushing through grass must not hide a fighter", w.isVisibleTo(hider, seeker.team))
+        run(0.4f)
+        assertFalse("settled in the thicket: hidden", w.isVisibleTo(hider, seeker.team))
+        assertTrue("always visible to its own team", w.isVisibleTo(hider, hider.team))
+
+        seeker.x = 3.5f; seeker.y = 1f
+        run(0.05f)
+        assertTrue("spotted up close", w.isVisibleTo(hider, seeker.team))
+        seeker.x = 12.5f; seeker.y = 12.5f
+        run(Balance.THICKET_SPOT_LINGER_SECONDS - 0.2f)
+        assertTrue("still seen right after losing contact", w.isVisibleTo(hider, seeker.team))
+        run(0.4f)
+        assertFalse("hidden again once the spotter is gone", w.isVisibleTo(hider, seeker.team))
+
+        hider.revealTimer = 1f // as if it had just attacked
+        run(1.05f)
+        assertTrue("attacking breaks cover until the fighter settles again", w.isVisibleTo(hider, seeker.team))
+        run(Balance.THICKET_CONCEAL_SECONDS)
+        assertFalse(w.isVisibleTo(hider, seeker.team))
+    }
+
+    /** Regression: enemies used to blink out for a few frames whenever they clipped a thicket tile. */
+    @Test fun enemiesDoNotFlickerInAndOutOfView() {
+        var shortHides = 0
+        var shortShows = 0
+        for (mode in GameMode.entries) repeat(3) { seed ->
+            val m = Match(MatchConfig(FighterId.JUNO, 3, 0, "T", BotDifficulty.NORMAL, mode = mode, humanPlayer = false, seed = 100L + seed))
+            val seen = HashMap<Int, Boolean>()
+            val since = HashMap<Int, Float>()
+            var t = 0f
+            while (!m.isOver && t < 200f) {
+                m.step(Match.STEP); t += Match.STEP
+                for (f in m.world.fighters) {
+                    if (f.team == m.player.team) continue
+                    if (!f.alive) { seen.remove(f.id); continue }
+                    val v = m.world.isVisibleTo(f, m.player.team)
+                    val prev = seen[f.id]
+                    if (prev == null) { seen[f.id] = v; since[f.id] = -1f; continue }
+                    if (prev == v) continue
+                    val start = since.getValue(f.id)
+                    if (start >= 0f && t - start < 0.3f) { if (prev) shortShows++ else shortHides++ }
+                    seen[f.id] = v; since[f.id] = t
+                }
+            }
+        }
+        println("visibility blips over 6 matches: hides=$shortHides shows=$shortShows")
+        assertEquals("an enemy that reappears must stay visible for a moment", 0, shortShows)
+        assertTrue("too many sub-0.3s disappearances ($shortHides)", shortHides <= 30)
+    }
+
     @Test fun circleNeverEntersWalls() {
         val a = Arenas.foundryYard()
         val out = FloatArray(2)

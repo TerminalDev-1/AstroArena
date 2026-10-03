@@ -87,6 +87,8 @@ class MatchRenderer(
     private val anim = FighterAnim()
     private val shownFacing = FloatArray(16)
     private val shownMoving = FloatArray(16)
+    /** 0..1 how solid each fighter is drawn: eases toward what the player's team can see, so cover fades rather than pops. */
+    private val shownVis = FloatArray(16)
 
     private var fpsFrames = 0
     private var fpsTime = 0f
@@ -138,7 +140,7 @@ class MatchRenderer(
         stormWall = MeshBuilder().apply { color(1f, 1f, 1f); with { translate(0f, 0.5f, 0f); cylinder(1f, 1f, 72, caps = false) } }.build()
         stormFloor = MeshBuilder().apply { color(1f, 1f, 1f); ring(1f, 6f, 72) }.build()
         shadow = ShadowMap(SHADOW_SIZE)
-        for (f in world.fighters) shownFacing[f.id] = f.facing
+        for (f in world.fighters) { shownFacing[f.id] = f.facing; shownVis[f.id] = 1f }
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
         GLES30.glDepthFunc(GLES30.GL_LEQUAL)
     }
@@ -219,7 +221,7 @@ class MatchRenderer(
         arena.grass.draw()
         depth.f("uSway", 0f)
         drawCrates(depth, shadowPass = true)
-        forEachVisibleFighter(alpha) { f, x, z, facing -> models.draw(depth, f.def, f.skin, x, z, facing, anim, Pass.SHADOW) }
+        forEachVisibleFighter(depth, alpha) { f, x, z, facing -> models.draw(depth, f.def, f.skin, x, z, facing, anim, Pass.SHADOW) }
         shadow.end()
     }
 
@@ -247,7 +249,7 @@ class MatchRenderer(
         GLES30.glDepthFunc(GLES30.GL_GREATER)
         GLES30.glDepthMask(false)
         lit.i("uMode", 2)
-        forEachVisibleFighter(alpha) { f, x, z, facing ->
+        forEachVisibleFighter(lit, alpha) { f, x, z, facing ->
             if (f.team != match.player.team) return@forEachVisibleFighter
             if (f === match.player) lit.v4("uTint", 0.36f, 1f, 0.48f, 0.55f) else lit.v4("uTint", 0.25f, 0.7f, 1f, 0.45f)
             models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.SILHOUETTE)
@@ -259,7 +261,7 @@ class MatchRenderer(
 
         // Fighters
         lit.f("uRim", 0.45f)
-        forEachVisibleFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR) }
+        forEachVisibleFighter(lit, alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR) }
         lit.f("uFlash", 0f)
         lit.f("uEmissive", 0f)
 
@@ -273,7 +275,7 @@ class MatchRenderer(
         arena.solids.draw()
         drawCrates(lit, shadowPass = false, outline = true)
         lit.f("uOutline", FighterModels.OUTLINE)
-        forEachVisibleFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
+        forEachVisibleFighter(lit, alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
         lit.f("uOutline", 0f)
         lit.i("uMode", 0)
         GLES30.glDisable(GLES30.GL_CULL_FACE)
@@ -328,7 +330,7 @@ class MatchRenderer(
         // Shields
         lit.f("uEmissive", 0.6f)
         for (f in world.fighters) {
-            if (!f.alive || f.shield <= 0f || !world.isVisibleTo(f, match.player.team)) continue
+            if (f.shield <= 0f || !shown(f)) continue
             setModel(lerp(f.prevX, f.x, alpha), 0.7f, lerp(f.prevY, f.y, alpha), 0.95f, 0.95f, 0.95f)
             lit.v4("uTint", 0.55f, 0.9f, 1f, 0.22f + 0.06f * sin(time * 6f))
             sphere.draw()
@@ -341,10 +343,14 @@ class MatchRenderer(
         GLES30.glDisable(GLES30.GL_BLEND)
     }
 
-    private inline fun forEachVisibleFighter(alpha: Float, block: (Fighter, Float, Float, Float) -> Unit) {
+    /** Solid enough to carry HUD markers (rings, bars, shields). */
+    private fun shown(f: Fighter) = f.alive && shownVis[f.id] > 0.5f
+
+    private inline fun forEachVisibleFighter(p: Program, alpha: Float, block: (Fighter, Float, Float, Float) -> Unit) {
         for (f in world.fighters) {
-            if (!f.alive || !world.isVisibleTo(f, match.player.team)) continue
             val i = f.id
+            if (!f.alive || shownVis[i] <= 0.02f) continue
+            p.f("uDissolve", 1f - shownVis[i])
             anim.walk = f.walkCycle * 0.9f
             anim.moving = shownMoving[i]
             anim.recoil = (1f - f.sinceAttack / 0.16f).coerceIn(0f, 1f)
@@ -354,6 +360,7 @@ class MatchRenderer(
             anim.scale = FIGHTER_SCALE
             block(f, lerp(f.prevX, f.x, alpha), lerp(f.prevY, f.y, alpha), shownFacing[i])
         }
+        p.f("uDissolve", 0f)
     }
 
     /** Smooth facing and movement amount once per frame (frame-rate independent). */
@@ -368,6 +375,10 @@ class MatchRenderer(
             shownFacing[i] += d * k
             val speed = if (f.alive) (hypot(f.vx, f.vy) / f.def.moveSpeed).coerceIn(0f, 1f) else 0f
             shownMoving[i] += (speed - shownMoving[i]) * km
+            // Appear quickly, slip away a little slower; a respawn starts solid.
+            val vis = f.alive && world.isVisibleTo(f, match.player.team)
+            shownVis[i] = if (!f.alive) 1f
+                else if (vis) min(1f, shownVis[i] + dt / VIS_FADE_IN) else max(0f, shownVis[i] - dt / VIS_FADE_OUT)
             if (f.isDashing && rng.nextFloat() < 0.8f) {
                 particles.spawn(f.x - f.dashDirX * 0.4f, 0.15f, f.y - f.dashDirY * 0.4f, -f.dashDirX, 0.6f, -f.dashDirY, 0.5f, 0.3f, 0xFFDCCFB4.toInt(), 0.5f, growth = 0.6f, add = false)
             }
@@ -458,7 +469,7 @@ class MatchRenderer(
     private fun drawDecals(alpha: Float) {
         val p = match.player
         for (f in world.fighters) {
-            if (!f.alive || !world.isVisibleTo(f, p.team)) continue
+            if (!shown(f)) continue
             val x = lerp(f.prevX, f.x, alpha)
             val z = lerp(f.prevY, f.y, alpha)
             val r = f.radius * 1.3f
@@ -737,7 +748,7 @@ class MatchRenderer(
         for (i in 0 until s.n) {
             val f = w.fighters[i]
             s.ids[i] = f.id
-            val vis = f.alive && w.isVisibleTo(f, p.team)
+            val vis = shown(f)
             var onScreen = false
             if (vis) {
                 v4[0] = lerp(f.prevX, f.x, alpha); v4[1] = headHeight(f.def.id); v4[2] = lerp(f.prevY, f.y, alpha); v4[3] = 1f
@@ -773,6 +784,8 @@ class MatchRenderer(
         const val FIGHTER_SCALE = 1.25f
         const val PITCH = 57f
         const val SHADOW_SIZE = 2048
+        const val VIS_FADE_IN = 0.12f
+        const val VIS_FADE_OUT = 0.3f
         val LIGHT = Toon.LIGHT
         val INK = Toon.INK
     }
