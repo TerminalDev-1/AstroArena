@@ -48,11 +48,13 @@ import androidx.compose.ui.unit.dp
 import io.github.projectwip.audio.Sfx
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
+import io.github.projectwip.data.CapsuleResult
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.GameRepository
 import io.github.projectwip.data.MatchRewards
 import io.github.projectwip.data.Reward
 import io.github.projectwip.sim.MatchConfig
+import io.github.projectwip.ui.screens.CapsuleOpenOverlay
 import io.github.projectwip.ui.screens.CupTrackScreen
 import io.github.projectwip.ui.screens.FightersScreen
 import io.github.projectwip.ui.screens.HomeScreen
@@ -92,6 +94,8 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
         )
     }
     var reveal by remember { mutableStateOf<RewardReveal?>(null) }
+    /** The Spark Capsule being opened, if any. Its reward is already saved by the time this is set. */
+    var capsule by remember { mutableStateOf<CapsuleResult?>(null) }
 
     LaunchedEffect(save.settings) {
         sfx.volume = if (save.settings.muted) 0f else save.settings.sfxVolume
@@ -101,9 +105,12 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
     val go: (Screen) -> Unit = { screen = it }
     val showReward: (RewardReveal) -> Unit = { reveal = it; sfx.play(Sound.REWARD) }
 
+    val openCapsule: () -> Unit = { repo.openCapsule()?.let { capsule = it } }
+
     BackHandler(enabled = screen !is Screen.Home && screen !is Screen.Match) {
         screen = Screen.Home
     }
+    BackHandler(enabled = capsule != null) { capsule = null }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Palette.BgBottom)) {
         // Uniform UI scale so tablets get bigger, more legible UI — layouts then use the extra room
@@ -136,7 +143,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
                 label = "screens",
             ) { s ->
                 when (s) {
-                    Screen.Home -> HomeScreen(save, repo, go, showReward)
+                    Screen.Home -> HomeScreen(save, repo, go, showReward, openCapsule)
                     is Screen.Fighters -> FightersScreen(save, repo, s.focus ?: save.selectedFighter, go)
                     Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
@@ -152,6 +159,9 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
 
             AnimatedVisibility(reveal != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
                 reveal?.let { RewardRevealOverlay(it) { reveal = null } }
+            }
+            AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
+                capsule?.let { CapsuleOpenOverlay(it, save.capsules, onNext = openCapsule, onDone = { capsule = null }) }
             }
         }
     }

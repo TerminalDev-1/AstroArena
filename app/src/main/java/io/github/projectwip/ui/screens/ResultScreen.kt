@@ -123,6 +123,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
                         RewardRow(IconKind.BOLT, "Bolts", "+${rewards.bolts}", Palette.CyanDeep)
                         if (rewards.firstWinPrisms > 0) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
+                        if (rewards.capsuleEarned) RewardRow(IconKind.CAPSULE, "Spark Capsule", "+1", Palette.CyanDeep)
                         if (r.mvp && !ffa) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
 
                         val after = rewards.cupsBefore + rewards.cupDelta
@@ -139,6 +140,9 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             ProgressBar((best - prev).toFloat() / (next.cups - prev), Modifier.fillMaxWidth().height(16.dp))
                         }
                         PlainText("Cups now: $after", Type.Small)
+                        if (!rewards.capsuleEarned && rewards.capsulesLeftToday > 0) {
+                            PlainText("${if (ffa) "Finish top 4" else "Win"} to earn a Spark Capsule · ${rewards.capsulesLeftToday} left today", Type.Small)
+                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))

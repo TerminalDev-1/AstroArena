@@ -36,6 +36,8 @@ Test output printed with `println` lands in `app/build/test-results/testDebugUni
 - Phone-size check on a tablet: `adb shell wm size 1080x2400 && adb shell wm density 420`, then **always**
   `wm size reset` / `wm density reset`.
 - Verify UI changes with `adb exec-out screencap -p > file.png` and `adb logcat -b crash -d`; compiling is not enough.
+- The tablet is also the user's everyday device. Never send `adb shell input ...` blind: check
+  `dumpsys window | grep mCurrentFocus` shows `io.github.projectwip` immediately before every tap, and skip it otherwise.
 
 ## Architecture (big picture)
 
@@ -54,6 +56,8 @@ authoritative server):**
 - `ai/` — `BotBrain` layers: `think()` (target, intent incl. `SEEK_ZONE`, goal, A* path via `Pathfinder`) →
   `steer()` → `dodge()` → `combat()`. Difficulty = `BotProfile` behaviour knobs only, never health/damage
   (a test asserts Elite beats Easy with identical stats).
+- `audio/SfxSynth.kt` — all sound design as pure-Kotlin synthesis (also runs in JVM tests). `Sfx` caches the rendered
+  WAVs; bump its `CACHE` name whenever a sound changes or devices keep playing the old files.
 - `data/` — **all balance numbers** in `Balance.kt` (linear `StatLine(base, perLevel)` stats so upgrades show
   exact deltas), Cup Track & shop catalog in `Catalog.kt`, `Progression` = pure functions `(SaveData) -> SaveData`.
   `GameRepository` (StateFlow) applies them and persists via `SaveStore` (JSON + `AtomicFile`). When adding a

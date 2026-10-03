@@ -72,7 +72,10 @@ import io.github.projectwip.ui.lobbyAnchor
 import io.github.projectwip.ui.startMatchConfig
 
 @Composable
-fun HomeScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, @Suppress("UNUSED_PARAMETER") showReward: (RewardReveal) -> Unit) {
+fun HomeScreen(
+    save: SaveData, repo: GameRepository, go: (Screen) -> Unit,
+    @Suppress("UNUSED_PARAMETER") showReward: (RewardReveal) -> Unit, openCapsule: () -> Unit,
+) {
     val ui = LocalUi.current
     val prog = save.progress(save.selectedFighter)
     val canUpgradeAny = Balance.fighters.any { Progression.canUpgrade(save, it.id) }
@@ -117,6 +120,8 @@ fun HomeScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, @Supp
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.End,
                 ) {
+                    CapsuleButton(save.capsules, Progression.capsulesLeftToday(save, repo.today), openCapsule)
+                    Spacer(Modifier.height(10.dp))
                     ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
                     Spacer(Modifier.height(12.dp))
                     PlayButton { go(Screen.Match(startMatchConfig(save))) }
@@ -202,6 +207,34 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
                     Badge("UPGRADE!", color = Palette.GreenDeep)
                 }
             }
+        }
+    }
+}
+
+/** Spark Capsules waiting to be opened, or how to earn the next one. */
+@Composable
+private fun CapsuleButton(count: Int, leftToday: Int, onOpen: () -> Unit) {
+    Box {
+        ChunkyButton(onOpen, Modifier.fillMaxWidth().height(62.dp), ButtonStyle.CYAN, enabled = count > 0, cut = 14.dp, lip = 4.dp) {
+            Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                GameIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = if (count > 0) Palette.Gold else Palette.Grey)
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    GameText(if (count > 0) "OPEN CAPSULE" else "SPARK CAPSULES", Type.Heading, outline = 2.5.dp)
+                    PlainText(
+                        when {
+                            count > 0 -> "Tap it to charge it up"
+                            leftToday > 0 -> "Win or top 4 earns one · $leftToday left today"
+                            else -> "Today's are all earned · more tomorrow"
+                        },
+                        Type.Small, color = Color.White, maxLines = 1,
+                    )
+                }
+            }
+        }
+        if (count > 0) {
+            val pulse by rememberInfiniteTransition(label = "capsules").animateFloat(1f, 1.15f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
+            Badge(count.toString(), Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).graphicsLayer { scaleX = pulse; scaleY = pulse })
         }
     }
 }

@@ -12,12 +12,14 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.withTransform
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS }
+enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE }
 
 /** Original vector icon set. Each icon is drawn in a 0..1 unit square with an ink outline. */
 @Composable
@@ -211,11 +213,49 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             drawPath(head, Color.White); outline(head)
             drawCircle(INK, 0.1f, Offset(0.36f, 0.48f)); drawCircle(INK, 0.1f, Offset(0.64f, 0.48f))
         }
+        IconKind.CAPSULE -> drawCapsuleUnit(tint ?: Palette.Cyan)
         IconKind.PLUS -> {
             drawLine(INK, Offset(0.5f, 0.15f), Offset(0.5f, 0.85f), 0.3f, cap = StrokeCap.Round)
             drawLine(INK, Offset(0.15f, 0.5f), Offset(0.85f, 0.5f), 0.3f, cap = StrokeCap.Round)
             drawLine(tint ?: Palette.Green, Offset(0.5f, 0.15f), Offset(0.5f, 0.85f), 0.17f, cap = StrokeCap.Round)
             drawLine(tint ?: Palette.Green, Offset(0.15f, 0.5f), Offset(0.85f, 0.5f), 0.17f, cap = StrokeCap.Round)
         }
+    }
+}
+
+/**
+ * A Spark Capsule in a unit square: a coloured shell over a dark base, joined by a collar with a glowing core.
+ * [split] (0..1) pulls the halves apart as it opens; [glow] (0..1) is how much light leaks out around it.
+ */
+fun DrawScope.drawCapsuleUnit(color: Color, split: Float = 0f, glow: Float = 0f) {
+    val c = Offset(0.5f, 0.5f)
+    val gap = split * 0.17f
+    if (glow > 0f) {
+        val g = glow.coerceAtMost(1f)
+        drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.85f * g), color.copy(alpha = 0.55f * g), Color.Transparent), c, 0.62f), 0.62f, c)
+    }
+    if (split > 0f) drawCircle(Brush.radialGradient(listOf(Color.White, color, Color.Transparent), c, 0.2f + split * 0.35f), 0.2f + split * 0.35f, c)
+
+    translate(top = gap) {
+        val base = Path().apply { moveTo(0.24f, 0.52f); lineTo(0.24f, 0.66f); cubicTo(0.24f, 1.0f, 0.76f, 1.0f, 0.76f, 0.66f); lineTo(0.76f, 0.52f); close() }
+        drawPath(base, Brush.verticalGradient(listOf(Color(0xFF5444B0), Color(0xFF231650)), 0.52f, 0.95f)); outline(base)
+        val collar = poly(0.19f, 0.51f, 0.81f, 0.51f, 0.81f, 0.6f, 0.19f, 0.6f)
+        drawPath(collar, Color(0xFFB9ADEB)); outline(collar, 0.05f)
+        drawCircle(INK, 0.02f, Offset(0.28f, 0.555f)); drawCircle(INK, 0.02f, Offset(0.72f, 0.555f))
+    }
+    translate(top = -gap) {
+        val shell = Path().apply { moveTo(0.24f, 0.48f); lineTo(0.24f, 0.34f); cubicTo(0.24f, 0.0f, 0.76f, 0.0f, 0.76f, 0.34f); lineTo(0.76f, 0.48f); close() }
+        drawPath(shell, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.6f), color, lerp(color, INK, 0.25f)), 0.06f, 0.5f)); outline(shell)
+        drawLine(Color.White.copy(alpha = 0.6f), Offset(0.335f, 0.36f), Offset(0.345f, 0.24f), 0.05f, cap = StrokeCap.Round)
+        val collar = poly(0.19f, 0.4f, 0.81f, 0.4f, 0.81f, 0.49f, 0.19f, 0.49f)
+        drawPath(collar, Color(0xFFEDE8FF)); outline(collar, 0.05f)
+        drawCircle(INK, 0.02f, Offset(0.28f, 0.445f)); drawCircle(INK, 0.02f, Offset(0.72f, 0.445f))
+    }
+    if (split < 0.5f) {
+        drawCircle(INK, 0.13f, c)
+        drawCircle(Brush.radialGradient(listOf(Color.White, lerp(color, Color.White, 0.3f), color), c, 0.1f), 0.1f, c)
+        fun at(u: Float) = 0.5f + (u - 0.5f) * 0.21f
+        val bolt = poly(at(0.58f), at(0.12f), at(0.3f), at(0.55f), at(0.48f), at(0.55f), at(0.4f), at(0.9f), at(0.72f), at(0.42f), at(0.53f), at(0.42f))
+        drawPath(bolt, INK)
     }
 }
