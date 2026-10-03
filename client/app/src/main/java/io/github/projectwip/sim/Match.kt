@@ -90,7 +90,11 @@ class Match(val config: MatchConfig) {
         return Fighter(id, def, config.playerLevel, skin, team, name, isBot = true)
     }
 
+    /** What the player's control held on every tick so far: the record the server replays to judge the match. */
+    val inputs = InputLog()
+
     fun step(dt: Float) {
+        if (config.humanPlayer) inputs.record(player.control)
         pathfinder.budget = 1
         // Rotate who goes first so the same bot doesn't always get the tick's one path search.
         turn++

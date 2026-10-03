@@ -1,9 +1,12 @@
 """Run with:  python -m unittest  (from the server directory)"""
 
+import base64
+import gzip
 import json
 import os
 import random
 import shutil
+import struct
 import tempfile
 import threading
 import unittest
@@ -12,11 +15,12 @@ import urllib.request
 
 from astro import economy, rules
 from astro.economy import Refused
+from astro.referee import Referee, count_ticks, decode_inputs
 from astro.app import serve
 from astro.config import matches, parse_version
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-VERSION = "10"
+VERSION = "11"
 
 
 class VersionRules(unittest.TestCase):
@@ -179,11 +183,14 @@ class Economy(unittest.TestCase):
 
 
 class Api(unittest.TestCase):
+    # These tests are about the rules around a result; they run without the referee, so a result is what the device says.
+    referee = None
+
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         for name in ("versions_not_supported.cfg", "notices.cfg", "bots.cfg", "game.cfg", "shop.cfg"):
             shutil.copy(os.path.join(HERE, name), self.dir)
-        self.httpd = serve(self.dir, "127.0.0.1", 0, quiet=True)
+        self.httpd = serve(self.dir, "127.0.0.1", 0, quiet=True, referee=self.referee)
         self.base = "http://127.0.0.1:%d" % self.httpd.server_address[1]
         self.store = self.httpd.game.store
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
@@ -231,24 +238,24 @@ class Api(unittest.TestCase):
         status, body = self.call("GET", "/v1/health")
         self.assertEqual(status, 200)
         self.assertTrue(body["ok"])
-        _, old = self.call("GET", "/v1/status?version=9")
+        _, old = self.call("GET", "/v1/status?version=10")
         self.assertFalse(old["supported"])
         self.assertIn("no longer supported", old["message"])
-        _, new = self.call("GET", "/v1/status?version=10")
+        _, new = self.call("GET", "/v1/status?version=11")
         self.assertTrue(new["supported"])
         self.assertEqual(new["notice"], "Welcome to the AstroArena servers!")
 
     def test_cfg_edits_apply_without_restart(self):
-        self.assertTrue(self.call("GET", "/v1/status?version=10")[1]["supported"])
-        self.write_cfg("versions_not_supported.cfg", "<=10 | Time to move on.\n")
-        _, body = self.call("GET", "/v1/status?version=10")
+        self.assertTrue(self.call("GET", "/v1/status?version=11")[1]["supported"])
+        self.write_cfg("versions_not_supported.cfg", "<=11 | Time to move on.\n")
+        _, body = self.call("GET", "/v1/status?version=11")
         self.assertFalse(body["supported"])
         self.assertEqual(body["message"], "Time to move on.")
 
     def test_unsupported_and_unnamed_versions_are_refused_everywhere(self):
         me = self.player()
         self.assertEqual(self.call("GET", "/v1/me", token=me["token"])[0], 200)
-        status, body = self.call("GET", "/v1/me", token=me["token"], version="9")
+        status, body = self.call("GET", "/v1/me", token=me["token"], version="10")
         self.assertEqual(status, 426)
         self.assertIn("no longer supported", body["error"])
         self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, me["token"], version="0.5.1-preview")[0], 426)
@@ -309,6 +316,10 @@ class Api(unittest.TestCase):
         # An ordinary player asks for Elite bots and gets the server's difficulty.
         status, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "fighter": "JUNO", "level": 3, "difficulty": "ELITE"}, me["token"])
         self.assertEqual((status, plan["difficulty"]), (201, "EASY"))
+        # The level is the server's (1 here), not the 3 the device asked for, and a locked fighter can't be played.
+        self.assertEqual((plan["fighter"], plan["level"], plan["refereed"]), ("JUNO", 1, False))
+        self.assertEqual(plan["bots"]["reactiontime"], 0.9)
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "fighter": "KITO"}, me["token"])[0], 409)
         self.assertEqual(len(plan["botNames"]), 9)
         self.assertEqual(len(set(plan["botNames"])), 9)
         self.assertGreater(plan["seed"], 0)
@@ -571,6 +582,102 @@ class Api(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(request, timeout=5)
         self.assertEqual(caught.exception.code, 400)
+
+
+REFEREE = Referee(os.path.join(HERE, "referee", "referee.jar"))
+
+
+def log(*runs):
+    """An input log as the game sends it. Each run is (ticks, flags, moveX, moveY, aimX, aimY)."""
+    raw = b"".join(struct.pack(">HBffff", *run) for run in runs)
+    return base64.b64encode(gzip.compress(raw)).decode("ascii")
+
+
+class InputLogs(unittest.TestCase):
+    def test_reading(self):
+        raw = decode_inputs(log((600, 0, 0, 0, 0, 0), (65535, 3, 1.0, -1.0, 0.5, 0.5)))
+        self.assertEqual((len(raw), count_ticks(raw)), (38, 600 + 65535))
+        self.assertEqual(count_ticks(raw[:-3]), 600)  # a record cut short doesn't count
+        for bad in (None, "", 5, "not base64!", base64.b64encode(b"not gzip").decode()):
+            with self.assertRaises(Refused):
+                decode_inputs(bad)
+
+
+@unittest.skipUnless(REFEREE.available, "needs Java and server/referee/referee.jar")
+class Refereed(Api):
+    """The same server with the referee on: results come from replaying the match, not from the device."""
+    referee = REFEREE
+
+    def run_match(self, token, mode, inputs, claim=None, age=600):
+        _, plan = self.call("POST", "/v1/matches", {"mode": mode}, token)
+        self.assertTrue(plan["refereed"])
+        self.age_matches(age)
+        body = dict(claim or {})
+        if inputs is not None:
+            body["inputs"] = inputs
+        return plan, self.call("POST", "/v1/matches/%d/result" % plan["matchId"], body, token)
+
+    # The inherited tests that hand in bare results don't apply here: with a referee a bare result is refused (see below).
+    def test_the_server_awards_cups_and_drops(self):
+        pass
+
+    def test_a_claimed_instant_win_is_refused(self):
+        pass
+
+    def test_the_referee_decides_the_result(self):
+        me = self.player()
+        lie = {"outcome": "VICTORY", "placement": 1, "kos": 9, "deaths": 0, "damage": 99999, "mvp": True}
+        # The player stood still for three minutes of Last Spark. The device says they won.
+        still = log((60 * 180, 0, 0, 0, 0, 0))
+        plan, (status, body) = self.run_match(me["token"], "LAST_SPARK", still, lie)
+        self.assertEqual(status, 200)
+        self.assertTrue(body["verified"])
+        report = body["report"]
+        # The server's result is its own replay of the match, the same as running the referee by hand...
+        mine = REFEREE.judge("LAST_SPARK", "JUNO", 1, "EASY", plan["seed"], plan["botNames"], plan["bots"], decode_inputs(still))
+        self.assertEqual(report, {k: mine[k] for k in ("outcome", "placement", "kos", "deaths", "damage", "mvp")})
+        # ...and nothing like what the device claimed.
+        self.assertEqual((report["kos"], report["damage"]), (0, 0))
+        self.assertNotEqual((report["outcome"], report["placement"]), ("VICTORY", 1))
+        self.assertEqual(body["cupDelta"], rules.cup_delta("LAST_SPARK", report["outcome"], report["placement"], 0, "EASY", False))
+        self.assertEqual(body["bolts"], economy.match_bolts("LAST_SPARK", report["outcome"], report["placement"], 0, "EASY"))
+        row = self.store._db.execute("SELECT outcome, placement, verified, ticks FROM matches WHERE id = ?", (plan["matchId"],)).fetchone()
+        self.assertEqual((row["outcome"], row["placement"], row["verified"]), (report["outcome"], report["placement"], 1))
+        self.assertGreater(row["ticks"], 0)
+
+    def test_walking_out_is_a_defeat_whatever_is_claimed(self):
+        me = self.player()
+        win = {"outcome": "VICTORY", "placement": 1, "kos": 5, "deaths": 0, "damage": 20000}
+        # Two seconds of inputs and then nothing: the match never finished.
+        _, (status, body) = self.run_match(me["token"], "LAST_SPARK", log((120, 0, 0, 0, 0, 0)), win)
+        self.assertEqual((status, body["report"]["outcome"], body["report"]["placement"]), (200, "DEFEAT", 10))
+        self.assertEqual((body["cupDelta"], body["drop"]), (0, False))
+        _, (status, body) = self.run_match(me["token"], "KNOCKOUT_RUSH", log((120, 0, 0, 0, 0, 0)), win)
+        self.assertEqual((status, body["report"]["outcome"]), (200, "DEFEAT"))
+        self.assertEqual(body["account"]["cups"], 0)
+
+    def test_results_without_a_playable_match_are_refused(self):
+        me = self.player()
+        win = {"outcome": "VICTORY", "placement": 1, "kos": 5, "deaths": 0, "damage": 20000}
+        # No inputs at all.
+        plan, (status, body) = self.run_match(me["token"], "LAST_SPARK", None, win)
+        self.assertEqual(status, 422)
+        self.assertIn("inputs are missing", body["error"])
+        self.assertEqual(self.call("POST", "/v1/matches/%d/result" % plan["matchId"], win, me["token"])[0], 409)  # and the match is closed
+        # Inputs that aren't a log.
+        self.assertEqual(self.run_match(me["token"], "LAST_SPARK", "garbage", win)[1][0], 400)
+        # Three minutes of match handed in two seconds after it was set up.
+        _, (status, body) = self.run_match(me["token"], "LAST_SPARK", log((60 * 180, 0, 0, 0, 0, 0)), win, age=2)
+        self.assertEqual(status, 422)
+        self.assertIn("more match than time", body["error"])
+        account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]
+        self.assertEqual((account["cups"], account["drops"], account["profile"]["bolts"]), (0, 1, 60))
+        self.assertEqual(self.store.player(me["id"])["flags"], 3)
+
+    def test_the_training_area_needs_no_referee(self):
+        me = self.player()
+        _, (status, body) = self.run_match(me["token"], "TRAINING", None, {"outcome": "DEFEAT"})
+        self.assertEqual((status, body["verified"], body["cupDelta"], body["bolts"]), (200, False, 0, 0))
 
 
 if __name__ == "__main__":

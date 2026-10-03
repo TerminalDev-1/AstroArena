@@ -84,6 +84,13 @@ PLAYER_COLUMNS = [
     ("difficulty", "TEXT"),                        # the bot difficulty this player picked (and the server approved); NULL = the default
 ]
 
+MATCH_COLUMNS = [
+    ("names", "TEXT"),                        # the bots' names the server handed out (JSON list)
+    ("bots", "TEXT"),                         # the bot settings the match was played with (JSON)
+    ("ticks", "INTEGER"),                     # how long the match ran, as the referee counted it
+    ("verified", "INTEGER NOT NULL DEFAULT 0"),  # 1 = the referee replayed it and this is its result; 0 = the device's claim
+]
+
 BOT_NAMES = [
     "Rivet", "Cobalt", "Fennick", "Quill", "Tamsin", "Brisk", "Moss", "Pixel", "Juniper",
     "Sprocket", "Vesper", "Nimbus", "Pepper", "Ziggy", "Onyx", "Marlow", "Kestrel", "Fizz",
@@ -123,6 +130,10 @@ class Store:
             for name, definition in PLAYER_COLUMNS:
                 if name not in have:
                     self._db.execute("ALTER TABLE players ADD COLUMN %s %s" % (name, definition))
+            have = {row["name"] for row in self._db.execute("PRAGMA table_info(matches)")}
+            for name, definition in MATCH_COLUMNS:
+                if name not in have:
+                    self._db.execute("ALTER TABLE matches ADD COLUMN %s %s" % (name, definition))
 
     def close(self) -> None:
         with self._lock:
@@ -328,19 +339,49 @@ class Store:
 
     # ------------------------------------------------------------------ matches
 
-    def plan_match(self, player_id: str, mode: str, fighter: str, level: int, difficulty: str, bots: int) -> dict:
-        """The server decides the match: its seed (which fixes the bots' fighters and behaviour), the bots' names and the difficulty."""
+    def plan_match(self, player_id: str, mode: str, fighter: str, difficulty: str, bots: int, bot_settings: dict | None = None) -> dict:
+        """The server decides the match: its seed (which fixes the bots' fighters and behaviour), the bots' names,
+        the difficulty and how the bots behave. The fighter has to be one the player has unlocked, and it plays at
+        the level the server holds for it. All of this is kept, so the referee can replay the match later."""
         seed = secrets.randbits(62)
         names = random.Random(seed).sample(BOT_NAMES, k=min(max(bots, 0), len(BOT_NAMES)))
+        bot_settings = bot_settings or {}
         with self._lock, self._db:
+            entry = self._profile(player_id)["fighters"].get(fighter)
+            if not entry or not entry.get("unlocked"):
+                raise Refused(409, "that fighter isn't unlocked")
+            level = int(entry["level"])
             cur = self._db.execute(
-                "INSERT INTO matches (player_id, mode, fighter, level, difficulty, seed, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (player_id, mode[:24], fighter[:16], int(level), difficulty[:12], seed, time.time()),
+                "INSERT INTO matches (player_id, mode, fighter, level, difficulty, seed, started_at, names, bots) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (player_id, mode[:24], fighter, level, difficulty[:12], seed, time.time(), json.dumps(names), json.dumps(bot_settings)),
             )
             match_id = cur.lastrowid
-        return {"matchId": match_id, "seed": seed, "botNames": names, "difficulty": difficulty}
+        return {"matchId": match_id, "seed": seed, "botNames": names, "difficulty": difficulty, "fighter": fighter, "level": level, "bots": bot_settings}
 
-    def finish_match(self, player_id: str, match_id: int, result: dict, now: float | None = None) -> dict | None:
+    def open_match(self, player_id: str, match_id: int) -> dict | None:
+        """A match this player was given that hasn't been reported yet, with everything needed to replay it."""
+        with self._lock:
+            row = self._db.execute(
+                "SELECT * FROM matches WHERE id = ? AND player_id = ? AND finished_at IS NULL", (match_id, player_id)
+            ).fetchone()
+        if row is None:
+            return None
+        match = dict(row)
+        match["names"] = json.loads(row["names"] or "[]")
+        match["bots"] = json.loads(row["bots"] or "{}")
+        return match
+
+    def refuse_match(self, player_id: str, match_id: int) -> None:
+        """Closes a match whose result was refused, and notes it against the player."""
+        with self._lock, self._db:
+            done = self._db.execute(
+                "UPDATE matches SET finished_at = ?, outcome = 'REJECTED' WHERE id = ? AND player_id = ? AND finished_at IS NULL",
+                (time.time(), match_id, player_id),
+            ).rowcount
+            if done:
+                self._db.execute("UPDATE players SET flags = flags + 1 WHERE id = ?", (player_id,))
+
+    def finish_match(self, player_id: str, match_id: int, result: dict, now: float | None = None, verified: bool = False) -> dict | None:
         """Closes a match the server planned and settles what it was worth.
 
         None if there is no open match with that id for this player. Otherwise a dict: either
@@ -367,8 +408,8 @@ class Store:
                 self._db.execute("UPDATE players SET flags = flags + 1 WHERE id = ?", (player_id,))
                 return {"rejected": reason}
             self._db.execute(
-                "UPDATE matches SET finished_at = ?, outcome = ?, placement = ?, kos = ?, deaths = ?, damage = ? WHERE id = ?",
-                (now, outcome, placement, kos, deaths, damage, match_id),
+                "UPDATE matches SET finished_at = ?, outcome = ?, placement = ?, kos = ?, deaths = ?, damage = ?, ticks = ?, verified = ? WHERE id = ?",
+                (now, outcome, placement, kos, deaths, damage, result.get("ticks"), 1 if verified else 0, match_id),
             )
             player = self._db.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
             cups = max(0, player["cups"] + rules.cup_delta(mode, outcome, placement, player["cups"], difficulty, mvp))

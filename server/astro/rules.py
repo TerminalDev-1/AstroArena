@@ -66,8 +66,9 @@ _MAX_DAMAGE = 3_000_000
 def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: int, deaths: int, damage: int) -> str | None:
     """Why this result can't be real, or None if it could be.
 
-    This catches a client that simply claims a win. It can't catch one that plays the match with cheats: the
-    fight runs on the device, so the server only sees the summary.
+    When the referee has replayed the match these are the referee's own numbers, and the check is a formality.
+    It matters when there is no referee (no Java on the server): then it is all that stands between the server
+    and a device that simply claims a win.
     """
     if outcome not in OUTCOMES:
         return "unknown outcome"

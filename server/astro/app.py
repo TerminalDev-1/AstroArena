@@ -10,7 +10,8 @@ Only the Python standard library is used, so there is nothing to install.
     GET  /v1/save                       the stored save                                       (token)
     PUT  /v1/save           {save}      store the save -> {revision, account}                 (token)
     POST /v1/matches        {...}       plan a match -> {matchId, seed, botNames, difficulty} (token)
-    POST /v1/matches/<id>/result {...}  report how it went -> the Cups and drop it earned     (token)
+    POST /v1/matches/<id>/result {inputs}  hand in the match's inputs; the server replays it and
+                                        answers with the result and what it earned            (token)
     POST /v1/drops/open     {...}       open a Spark Drop -> {tier, pieces, reward, account}  (token)
     POST /v1/fighters/upgrade {fighter} level a fighter up with Bolts                         (token)
     POST /v1/shop/buy       {item}      buy a standing shop item with Prisms -> {reward}      (token)
@@ -29,9 +30,9 @@ A token goes in the `Authorization: Bearer <token>` header, and every request wi
 version of the game is asking (`X-Client-Version`); versions listed in versions_not_supported.cfg are refused.
 
 The server owns each player's Cups, Spark Drops, Bolts, Prisms, fighters and claimed rewards: it works out what a
-match is worth, refuses results that can't be real, rolls what comes out of a drop, and is the only place
-anything is bought, upgraded or claimed. Every reply to a signed-in request carries the `account`, which is
-what the game shows. The fight itself still runs on the device.
+match is worth, rolls what comes out of a drop, and is the only place anything is bought, upgraded or claimed.
+Matches are played on the device and then replayed here from the player's inputs (referee.py): the result is
+the server's own. Every reply to a signed-in request carries the `account`, which is what the game shows.
 """
 
 from __future__ import annotations
@@ -48,10 +49,11 @@ from urllib.parse import parse_qs, urlparse
 from . import economy, rules
 from .config import Config, parse_version
 from .economy import Refused
+from .referee import Referee, TICKS_PER_SECOND, count_ticks, decode_inputs
 from .store import Store, clock, today
 
 API = 2
-MAX_BODY = 512 * 1024
+MAX_BODY = 2 * 1024 * 1024  # a match's input log rides along with its result
 _MATCH_RESULT = re.compile(r"^/v1/matches/(\d+)/result$")
 _DEAL_BUY = re.compile(r"^/v1/shop/deals/(\d+)/buy$")
 _DEAL_DELETE = re.compile(r"^/v1/dev/deals/(\d+)/delete$")
@@ -61,8 +63,10 @@ _DAILY_BUY = re.compile(r"^/v1/shop/daily/(\d+)/buy$")
 class Game:
     """What the HTTP layer talks to: the config files plus the database."""
 
-    def __init__(self, directory: str, db_path: str | None = None):
+    def __init__(self, directory: str, db_path: str | None = None, referee: Referee | None = None):
         self.config = Config(directory)
+        # The server's own run of each match. Without one (no Java, no jar) results are only checked for being believable.
+        self.referee = referee if referee is not None and referee.available else None
         self.store = Store(db_path or os.path.join(directory, "astroarena.db"))
         self.store.import_progress = self.config.import_saves
         self.started = time.time()
@@ -309,15 +313,16 @@ def make_handler(game: Game, quiet: bool = False):
             mode = str(data.get("mode") or "")
             if mode not in rules.MODES:
                 return self._error(400, "unknown mode")
-            try:
-                level = int(data.get("level") or 1)
-            except (TypeError, ValueError):
-                return self._error(400, "level must be a number")
-            # The difficulty is the one the player picked earlier and the server approved, not whatever this request says.
+            # The difficulty is the one the player picked earlier and the server approved, not whatever this request says;
+            # the fighter's level is the server's; and the bots behave as bots.cfg says right now.
             difficulty = game.difficulty(player)
-            return self._send(201, game.store.plan_match(
-                player["id"], mode, str(data.get("fighter") or "JUNO"), level, difficulty, rules.MODES[mode]
-            ))
+            try:
+                plan = game.store.plan_match(
+                    player["id"], mode, str(data.get("fighter") or "JUNO"), difficulty, rules.MODES[mode], game.config.bots().get(difficulty, {})
+                )
+            except Refused as refused:
+                return self._error(refused.status, refused.message)
+            return self._send(201, {**plan, "refereed": game.referee is not None})
 
         def _finish_match(self, match_id: int):
             player = self._player()
@@ -326,15 +331,36 @@ def make_handler(game: Game, quiet: bool = False):
             data = self._body()
             if data is None:
                 return None
+            match = game.store.open_match(player["id"], match_id)
+            if match is None:
+                return self._error(409, "no open match with that id")
+            result, judged = data, None
+            if game.referee is not None and match["mode"] != "TRAINING":
+                # The server plays the match again itself. What the device says the result was is not used.
+                try:
+                    raw = decode_inputs(data.get("inputs"))
+                    # Nobody can have played more of a match than the time that has passed since it was set up.
+                    if count_ticks(raw) / TICKS_PER_SECOND > time.time() - match["started_at"] + 5:
+                        raise Refused(422, "result refused: more match than time")
+                    judged = game.referee.judge(
+                        match["mode"], match["fighter"], match["level"], match["difficulty"], match["seed"], match["names"], match["bots"], raw
+                    )
+                except Refused as refused:
+                    if refused.status != 503:  # 503: the referee itself broke; that isn't the player's doing
+                        game.store.refuse_match(player["id"], match_id)
+                    return self._error(refused.status, refused.message)
+                result = judged
             try:
-                verdict = game.store.finish_match(player["id"], match_id, data)
+                verdict = game.store.finish_match(player["id"], match_id, result, verified=judged is not None)
             except (TypeError, ValueError):
                 return self._error(400, "result fields must be numbers")
             if verdict is None:
                 return self._error(409, "no open match with that id")
             if "rejected" in verdict:
                 return self._error(422, "result refused: " + verdict["rejected"])
-            return self._send(200, {"ok": True, **verdict, "account": game.account(player["id"])})
+            if judged is not None:
+                verdict["report"] = {k: judged[k] for k in ("outcome", "placement", "kos", "deaths", "damage", "mvp")}
+            return self._send(200, {"ok": True, "verified": judged is not None, **verdict, "account": game.account(player["id"])})
 
         def _open_drop(self):
             player = self._player()
@@ -376,9 +402,15 @@ def make_handler(game: Game, quiet: bool = False):
     return Handler
 
 
-def serve(directory: str, host: str = "0.0.0.0", port: int = 8765, db_path: str | None = None, quiet: bool = False) -> ThreadingHTTPServer:
-    """Builds the server (call .serve_forever() on the result)."""
-    game = Game(directory, db_path)
+def serve(
+    directory: str, host: str = "0.0.0.0", port: int = 8765, db_path: str | None = None, quiet: bool = False,
+    referee: Referee | None | bool = True,
+) -> ThreadingHTTPServer:
+    """Builds the server (call .serve_forever() on the result). `referee`: True uses referee/referee.jar next to
+    the config files, None or False runs without one, or pass a Referee."""
+    if referee is True:
+        referee = Referee(os.path.join(directory, "referee", "referee.jar"))
+    game = Game(directory, db_path, referee or None)
     httpd = ThreadingHTTPServer((host, port), make_handler(game, quiet))
     httpd.daemon_threads = True
     httpd.game = game  # type: ignore[attr-defined]

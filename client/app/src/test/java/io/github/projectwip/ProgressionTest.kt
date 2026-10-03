@@ -205,6 +205,55 @@ class ProgressionTest {
         assertEquals(0, team.placement)
     }
 
+    /** Plays a match with made-up but lively inputs, as the device would, and returns it. */
+    private fun played(config: io.github.projectwip.sim.MatchConfig, ticks: Int, script: Long): io.github.projectwip.sim.Match {
+        val match = io.github.projectwip.sim.Match(config)
+        val hands = kotlin.random.Random(script)
+        val c = match.player.control
+        var t = 0
+        while (t < ticks && !(match.isOver && match.overFor > io.github.projectwip.sim.Referee.END_SECONDS)) {
+            if (t % 7 == 0) { c.moveX = hands.nextFloat() * 2 - 1; c.moveY = hands.nextFloat() * 2 - 1 }
+            c.aiming = hands.nextInt(5) == 0
+            if (c.aiming) { c.aimX = hands.nextFloat() - 0.5f; c.aimY = hands.nextFloat() - 0.5f }
+            c.attack = hands.nextInt(9) == 0
+            c.superAttack = hands.nextInt(40) == 0
+            match.step(io.github.projectwip.sim.Match.STEP)
+            match.world.events.clear()
+            t++
+        }
+        return match
+    }
+
+    @Test fun theRefereeReplaysAMatchExactly() {
+        for ((mode, seed) in listOf(GameMode.LAST_SPARK to 11L, GameMode.KNOCKOUT_RUSH to 12L, GameMode.BOSS to 13L, GameMode.LAST_SPARK to 14L)) {
+            val config = io.github.projectwip.sim.MatchConfig(FighterId.KITO, 6, 0, "Me", BotDifficulty.HARD, mode = mode, seed = seed, botNames = listOf("A", "B", "C"))
+            val live = played(config, 60 * 200, script = seed * 31)
+            val verdict = io.github.projectwip.sim.Referee.judge(config, live.inputs.toBytes())
+            assertEquals("$mode: same number of ticks", live.inputs.ticks, verdict.ticks)
+            assertEquals("$mode: everything ends up in the same place", io.github.projectwip.sim.Referee.fingerprint(live), verdict.fingerprint)
+            assertEquals("$mode: and the result is the same", if (live.isOver) live.report() else live.forfeit(), verdict.report)
+            println("referee $mode: ${verdict.ticks} ticks, ${live.inputs.toBytes().size} bytes of input, finished=${verdict.finished}, ${verdict.report.outcome} place ${verdict.report.placement} kos ${verdict.report.kos}")
+        }
+    }
+
+    @Test fun theRefereeIgnoresWhatTheDeviceClaims() {
+        val config = io.github.projectwip.sim.MatchConfig(FighterId.JUNO, 1, 0, "Me", BotDifficulty.EASY, mode = GameMode.LAST_SPARK, seed = 5L)
+        // No inputs at all: the player never showed up, which is walking out, in last place.
+        val nothing = io.github.projectwip.sim.Referee.judge(config, ByteArray(0))
+        assertFalse(nothing.finished)
+        assertEquals(MatchOutcome.DEFEAT, nothing.report.outcome)
+        assertEquals(GameMode.LAST_SPARK.players, nothing.report.placement)
+        // A log cut off in the middle of a record is read up to the last whole one.
+        val live = played(config, 600, script = 9)
+        val whole = live.inputs.toBytes()
+        assertEquals(0, whole.size % 19)
+        val cut = io.github.projectwip.sim.Referee.judge(config, whole.copyOf(whole.size - 5))
+        assertTrue(cut.ticks < live.inputs.ticks)
+        // A different seed is a different match: the same inputs don't lead to the same place.
+        val other = io.github.projectwip.sim.Referee.judge(config.copy(seed = 6L), whole)
+        assertTrue(other.fingerprint != io.github.projectwip.sim.Referee.fingerprint(live))
+    }
+
     @Test fun versionsCompareByNumber() {
         val v = io.github.projectwip.data.Versions
         assertTrue(v.isNewer("v0.4.2-preview", "0.4.1-preview"))

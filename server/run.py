@@ -30,6 +30,12 @@ def main() -> None:
     print(f"  In the game: Settings > Data > Server address:  http://{lan_address()}:{args.port}")
     print(f"  Database: {os.path.join(here, 'astroarena.db')}")
     print("  Edit the .cfg files (versions_not_supported, notices, bots, game, shop) while it runs; changes apply at once.")
+    referee = httpd.game.referee
+    if referee is not None:
+        print("  Referee: on. Every match is replayed here to decide its result.")
+    else:
+        from astro.referee import Referee
+        print("  Referee: OFF, results are only checked for being believable: " + Referee(os.path.join(here, "referee", "referee.jar")).why_not())
     print("  Ctrl+C to stop.")
     try:
         httpd.serve_forever()
