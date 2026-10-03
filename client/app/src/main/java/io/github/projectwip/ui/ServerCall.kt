@@ -12,12 +12,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Takes on what the server holds for this player: Cups, drops, currencies, fighters, claims and shop deals. */
-fun GameRepository.sync(account: Account) = syncAccount(account.cups, account.drops, account.dropsLeftToday, account.profile, account.deals)
+fun GameRepository.sync(account: Account) =
+    syncAccount(account.cups, account.drops, account.dropsLeftToday, account.profile, account.deals, account.difficulty, account.day.takeIf { it >= 0 })
 
 /**
  * How the menus ask the game server to do something (buy, upgrade, claim...). The request runs off the main
  * thread; the account the server sends back is taken on; and [then] runs with the answer if the server agreed.
- * If it didn't, or there is no server, the player hears the "no" sound and, when offline, is told why.
+ * If it didn't, or there is no server, the player hears the "no" sound and is told why.
  *
  *     ask({ buy(item.key) }) { reward -> showReward(reward) }
  */
@@ -43,6 +44,7 @@ class ServerCall(
             } else {
                 sfx?.play(Sound.DENIED)
                 if (!server.status.value.online) say("Couldn't reach the server. Try again in a moment.")
+                else server.lastError.takeIf { it.isNotBlank() }?.let { say("The server said no: $it.") }
             }
         }
     }

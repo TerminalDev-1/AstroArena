@@ -106,9 +106,10 @@ object Progression {
      */
     fun syncAccount(
         save: SaveData, cups: Int, drops: Int, dropsLeftToday: Int, today: Long,
-        profile: ServerProfile? = null, deals: List<CustomOffer>? = null,
+        profile: ServerProfile? = null, deals: List<CustomOffer>? = null, difficulty: BotDifficulty? = null,
     ): SaveData {
         val base = save.copy(
+            settings = if (difficulty != null) save.settings.copy(botDifficulty = difficulty) else save.settings,
             cups = cups.coerceAtLeast(0), bestCups = maxOf(save.bestCups, cups),
             capsules = drops.coerceAtLeast(0), capsuleDay = today, capsulesEarnedToday = SparkCapsules.PER_DAY - dropsLeftToday,
             customOffers = deals ?: save.customOffers,
@@ -145,7 +146,7 @@ object Progression {
 
     /** Puts the debug menu's cheats back to normal (for players the server doesn't list as developers). */
     fun withoutCheats(settings: Settings): Settings =
-        settings.copy(debugLuck = 0f, debugInfiniteCapsules = false, debugNoLevelCap = false, debugUpgradeCost = 1f)
+        settings.copy(debugLuck = 0f, debugInfiniteCapsules = false, debugNoLevelCap = false, debugUpgradeCost = 1f, devMenu = false)
 
     // ---------------- Upgrades ----------------
 

@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -70,6 +73,12 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
     val cardW = if (ui.roomy) 210.dp else 176.dp
     val dev = io.github.projectwip.ui.LocalDev.current
     val ask = io.github.projectwip.ui.LocalServerCall.current
+    // Today's offers and the clock they run on come from the server; offline there are none to show.
+    val status = io.github.projectwip.ui.LocalServer.current?.status?.collectAsState()?.value
+    val account = status?.account?.takeIf { status.online }
+    val untilRefresh = account?.let { secondsUntil(it.dayEndsAt) }
+    // The server's day has ended: ask it for the new one (new offers, a new gift).
+    LaunchedEffect(untilRefresh == 0L) { if (untilRefresh == 0L) ask({ refreshAccount().takeIf { it } }) }
 
     Box(Modifier.fillMaxSize()) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
@@ -81,7 +90,17 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 18.dp, top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                item { Section("DAILY GIFT") { DailyGiftCard(save, repo, cardW * 1.15f, showReward) } }
+                item { Section("DAILY GIFT") { DailyGiftCard(save, repo, cardW * 1.15f, account?.giftAvailable, untilRefresh, showReward) } }
+                if (account != null && untilRefresh != null && account.dailyOffers.isNotEmpty()) item {
+                    Section("DAILY OFFERS") {
+                        RefreshCard(cardW * 0.8f, untilRefresh)
+                        account.dailyOffers.forEach { o ->
+                            // The clock card says when these end, so the cards themselves don't repeat it.
+                            CustomOfferCard(o.copy(expiresAt = 0), cardW, canDelete = false,
+                                onBuy = { ask({ buyDaily(o.id, account.day) }) { showReward(RewardReveal(o.title, it)) } }, onDelete = {})
+                        }
+                    }
+                }
                 // Deals come from the server: developers make them, and every player sees them.
                 val now = System.currentTimeMillis()
                 val deals = save.customOffers.filter { !it.expired(now) }
@@ -147,6 +166,66 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                 },
             ) { RewardVisual(rewardOf(item), Modifier.size(120.dp)) }
         }
+    }
+}
+
+/** Seconds until [atMs] (on this device's clock), ticking once a second. The server says when; the device only counts. */
+@Composable
+private fun secondsUntil(atMs: Long): Long {
+    val left by produceState(((atMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0), atMs) {
+        while (true) {
+            value = ((atMs - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+            delay(500)
+        }
+    }
+    return left
+}
+
+private fun clockText(seconds: Long) = "%02d:%02d:%02d".format(seconds / 3600, (seconds / 60) % 60, seconds % 60)
+
+/** The first card of the daily offers: a ticking clock and how long until the server changes the shop. */
+@Composable
+private fun RefreshCard(width: androidx.compose.ui.unit.Dp, seconds: Long) {
+    Panel(Modifier.width(width).fillMaxHeight().padding(top = 8.dp), color = Color(0xFF244B8F), colorBottom = Color(0xFF14245A), cut = 16.dp) {
+        Column(Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Clock(Modifier.size(104.dp), seconds)
+            Spacer(Modifier.height(12.dp))
+            PlainText("NEW OFFERS IN", Type.Label, color = Color.White)
+            GameText(clockText(seconds), Type.Title, color = Palette.Gold, outline = 3.dp)
+            Spacer(Modifier.height(4.dp))
+            PlainText("Three offers a day, one of each per player", Type.Small, align = TextAlign.Center, maxLines = 2)
+        }
+    }
+}
+
+/** A little clock: the long hand sweeps round once a minute, and the whole thing gives a tick-kick each second. */
+@Composable
+private fun Clock(modifier: Modifier, seconds: Long) {
+    val time by io.github.projectwip.ui.rememberAnimTime()
+    val kick = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(seconds) { kick.snapTo(1.08f); kick.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.4f)) }
+    androidx.compose.foundation.Canvas(modifier.graphicsLayer { scaleX = kick.value; scaleY = kick.value }) {
+        val r = size.minDimension / 2
+        val c = center
+        drawCircle(Palette.Ink, r)
+        drawCircle(Palette.Gold, r - 3.dp.toPx())
+        drawCircle(Color(0xFFFFF6DC), r - 9.dp.toPx())
+        for (i in 0 until 12) {
+            val a = i * Math.PI / 6
+            val dir = androidx.compose.ui.geometry.Offset(kotlin.math.sin(a).toFloat(), -kotlin.math.cos(a).toFloat())
+            drawLine(Palette.Ink, c + dir * (r - 13.dp.toPx()), c + dir * (r - (if (i % 3 == 0) 22 else 18).dp.toPx()), strokeWidth = (if (i % 3 == 0) 3.5f else 2f).dp.toPx(),
+                cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        }
+        fun hand(turns: Float, length: Float, width: Float, color: Color) {
+            val a = turns * 2 * Math.PI
+            val tip = c + androidx.compose.ui.geometry.Offset(kotlin.math.sin(a).toFloat(), -kotlin.math.cos(a).toFloat()) * length
+            drawLine(color, c, tip, strokeWidth = width, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        }
+        // The short hand creeps, the long hand sweeps smoothly, and the thin red one jumps with each second.
+        hand(time / 60f, r * 0.42f, 5.dp.toPx(), Palette.Ink)
+        hand(time / 6f, r * 0.62f, 3.5.dp.toPx(), Palette.Ink)
+        hand((59 - seconds % 60) / 60f, r * 0.7f, 2.dp.toPx(), Palette.Red)
+        drawCircle(Palette.Ink, 4.5.dp.toPx())
     }
 }
 
@@ -241,19 +320,15 @@ private fun BoltPile(size: Int) {
 }
 
 @Composable
-private fun DailyGiftCard(save: SaveData, repo: GameRepository, width: androidx.compose.ui.unit.Dp, showReward: (RewardReveal) -> Unit) {
-    val available = Progression.dailyGiftAvailable(save, repo.today)
+private fun DailyGiftCard(
+    save: SaveData, repo: GameRepository, width: androidx.compose.ui.unit.Dp,
+    /** Whether the server says today's gift is still there (null when offline: the last known day is used). */
+    serverSaysAvailable: Boolean?, untilRefresh: Long?, showReward: (RewardReveal) -> Unit,
+) {
+    val available = serverSaysAvailable ?: Progression.dailyGiftAvailable(save, repo.today)
     val ask = io.github.projectwip.ui.LocalServerCall.current
     val reward = Shop.dailyGift(repo.today)
-    val countdown by produceState("") {
-        while (true) {
-            val now = LocalDateTime.now()
-            val d = Duration.between(now, LocalDate.now().plusDays(1).atStartOfDay())
-            val s = d.seconds
-            value = "%02d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60)
-            delay(1000)
-        }
-    }
+    val countdown = untilRefresh?.let { clockText(it) } ?: "--:--:--"
     Box(Modifier.width(width).fillMaxHeight()) {
         Panel(Modifier.fillMaxSize().padding(top = 8.dp), color = Color(0xFF7A2BB8), colorBottom = Color(0xFF3A1470), cut = 16.dp) {
             Column(Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {

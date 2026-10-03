@@ -70,7 +70,7 @@ import androidx.compose.runtime.collectAsState
 
 const val REPO_URL = "https://github.com/TerminalDev-1/AstroArena"
 
-private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), DEBUG("Debug") }
+private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), DEVELOPER("Developer") }
 
 @Composable
 fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
@@ -88,7 +88,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
             ScreenHeader("SETTINGS", { go(Screen.Home) }, null, null)
             Row(Modifier.weight(1f).padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
                 Column(Modifier.width(if (ui.roomy) 200.dp else 170.dp), verticalArrangement = Arrangement.spacedBy(if (ui.roomy) 10.dp else 7.dp)) {
-                    for (t in Tab.entries.filter { it != Tab.DEBUG || dev }) {
+                    for (t in Tab.entries.filter { it != Tab.DEVELOPER || dev }) {
                         ChunkyButton({ tab = t }, Modifier.fillMaxWidth().height(if (ui.roomy) 58.dp else 42.dp),
                             if (t == tab) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
                             GameText(t.label.uppercase(), Type.Label, outline = 2.dp)
@@ -103,8 +103,8 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                             Tab.CONTROLS -> ControlsTab(s, set) { editingLayout = true }
                             Tab.AUDIO -> AudioTab(s, set)
                             Tab.DISPLAY -> DisplayTab(s, set)
-                            Tab.DATA -> DataTab(repo)
-                            Tab.DEBUG -> if (dev) DebugControls(save, repo)
+                            Tab.DATA -> DataTab(repo, dev)
+                            Tab.DEVELOPER -> if (dev) DeveloperTab(s, set)
                         }
                     }
                 }
@@ -116,14 +116,14 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
 
 @Composable
 private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
-    // Only developers choose the difficulty; everyone else plays at the one the server sets.
-    val dev = io.github.projectwip.ui.LocalDev.current
-    if (dev) SectionTitle("BOT DIFFICULTY", "Changes how bots think — reaction time, aim, dodging, positioning, target choice and super timing. Never their health or damage.")
-    if (dev) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    // The server has to approve the choice: tapping one asks it, and what it approves is what shows as selected.
+    val ask = io.github.projectwip.ui.LocalServerCall.current
+    SectionTitle("BOT DIFFICULTY", "Changes how bots think — reaction time, aim, dodging, positioning, target choice and super timing. Never their health or damage. The server confirms your choice.")
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         for (d in BotDifficulty.entries) {
             val selected = d == s.botDifficulty
             Box(Modifier.weight(1f)) {
-                ChunkyButton({ set { it.copy(botDifficulty = d) } }, Modifier.fillMaxWidth().height(150.dp),
+                ChunkyButton({ ask({ setDifficulty(d) }) }, Modifier.fillMaxWidth().height(150.dp),
                     if (selected) ButtonStyle.ORANGE else ButtonStyle.PURPLE, cut = 14.dp, sound = Sound.UI_SELECT) {
                     Column(Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         GameText(d.label.uppercase(), Type.Heading, color = if (selected) Color.White else difficultyColor(d), outline = 2.5.dp)
@@ -238,12 +238,15 @@ private fun DisplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
 }
 
 @Composable
-private fun DataTab(repo: GameRepository) {
+private fun DataTab(repo: GameRepository, dev: Boolean) {
     var confirm by remember { mutableStateOf(false) }
     val ask = io.github.projectwip.ui.LocalServerCall.current
+    // Starting an account over is for developers; the server refuses anyone else.
+    if (dev) {
     SectionTitle("RESET PROGRESS", "Erase Cups, levels, currencies and claimed rewards on the server. Your name and settings are kept. This cannot be undone.")
     ChunkyButton({ confirm = true }, Modifier.width(260.dp).height(56.dp), ButtonStyle.RED) { GameText("RESET PROGRESS", Type.Heading) }
     Spacer(Modifier.height(10.dp))
+    }
     // ---- game server
     val server = io.github.projectwip.ui.LocalServer.current
     val status = server?.status?.collectAsState()?.value
@@ -276,6 +279,18 @@ private fun DataTab(repo: GameRepository) {
     if (confirm) {
         ConfirmDialog("RESET EVERYTHING?", "All progress will be lost.", "RESET", { confirm = false; ask({ reset() }) { repo.resetProgress() } }, { confirm = false }, ButtonStyle.RED)
     }
+}
+
+/** Developers only: whether the "D" button (the debug menu) is on the menu screens. It is off until switched on here. */
+@Composable
+private fun DeveloperTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
+    val server = io.github.projectwip.ui.LocalServer.current
+    val listed = server?.status?.collectAsState()?.value?.account?.developer == true
+    SectionTitle("DEVELOPER", if (listed) "The server lists you as a developer." else "This is a dev build. The server doesn't list you as a developer, so it will ignore the debug menu's cheats.")
+    ToggleRow("DEVELOPER MENU", "Shows a small D button in the corner of the menu screens. It opens the debug menu: drop luck, upgrade cost, hand-outs.", s.devMenu) { v ->
+        set { it.copy(devMenu = v) }
+    }
+    server?.playerId?.let { PlainText("Player ID: $it", Type.Body, color = Color.White) }
 }
 
 // ---------------------------------------------------------------------------------------------- controls

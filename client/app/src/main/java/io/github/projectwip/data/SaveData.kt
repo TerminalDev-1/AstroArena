@@ -16,7 +16,7 @@ data class ControlLayout(
 }
 
 data class Settings(
-    /** Developers only; everyone else plays at the difficulty the server sets (Easy when offline). */
+    /** The difficulty the server last approved for this player. Picking another one asks the server first. */
     val botDifficulty: BotDifficulty = BotDifficulty.NORMAL,
     val sfxVolume: Float = 0.8f,
     val musicVolume: Float = 0.5f,
@@ -50,6 +50,8 @@ data class Settings(
     val debugNoLevelCap: Boolean = false,
     /** Debug menu: multiplies what every upgrade costs (1 = normal, 0 = free). */
     val debugUpgradeCost: Float = 1f,
+    /** Developers: show the "D" button that opens the debug menu. Off unless they switch it on in Settings. */
+    val devMenu: Boolean = false,
 )
 
 data class FighterProgress(

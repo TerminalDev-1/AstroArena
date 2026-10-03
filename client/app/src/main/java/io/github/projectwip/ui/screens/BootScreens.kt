@@ -79,10 +79,10 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
             Spacer(Modifier.height(8.dp))
             PlainText(status, Type.Label, color = Palette.TextDim)
         }
-        if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
+        if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
             GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
         }
-        if (onSkip == null) PlainText(TIPS[(time / 4f).toInt() % TIPS.size], Type.Body, Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp), color = Color.White, align = TextAlign.Center)
+        PlainText(TIPS[(time / 4f).toInt() % TIPS.size], Type.Body, Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp), color = Color.White, align = TextAlign.Center)
         PlainText("v${BuildConfig.VERSION_NAME.removePrefix("v")}", Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
     }
 }

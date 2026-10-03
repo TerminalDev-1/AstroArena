@@ -79,8 +79,8 @@ fun HomeScreen(
     @Suppress("UNUSED_PARAMETER") showReward: (RewardReveal) -> Unit, openCapsule: () -> Unit,
 ) {
     val ui = LocalUi.current
-    val dev = io.github.projectwip.ui.LocalDev.current
-    val online = io.github.projectwip.ui.LocalServer.current?.status?.collectAsState()?.value?.online == true
+    val serverStatus = io.github.projectwip.ui.LocalServer.current?.status?.collectAsState()?.value
+    val online = serverStatus?.online == true
     val prog = save.progress(save.selectedFighter)
     val canUpgradeAny = Balance.fighters.any { Progression.canUpgrade(save, it.id) }
     val claimable = Progression.claimable(save).size
@@ -136,11 +136,17 @@ fun HomeScreen(
                 ) {
                     CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online, openCapsule)
                     Spacer(Modifier.height(10.dp))
-                    ModeChip(save.selectedMode, save.settings.botDifficulty.takeIf { dev }) { picking = true }
+                    ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
                     Spacer(Modifier.height(12.dp))
                     PlayButton { go(Screen.Match(startMatchConfig(save))) }
                 }
             }
+        }
+
+        // The server's notice, across the top. It steps aside for the mode picker.
+        val notice = serverStatus?.notice.orEmpty()
+        if (online && notice.isNotBlank() && !picking) {
+            Badge(notice.take(90), Modifier.align(Alignment.TopCenter).padding(top = 74.dp), color = Palette.CyanDeep)
         }
 
         androidx.activity.compose.BackHandler(enabled = picking) { picking = false }
@@ -270,7 +276,6 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty?, onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
                 PlainText(mode.tagline, Type.Small, maxLines = 1)
-                // Only developers choose the bots' difficulty, so only they are shown it.
                 if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
                     PlainText("Bots: ", Type.Small)
                     PlainText(d.label, Type.Label, color = difficultyColor(d))
@@ -284,7 +289,7 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty?, onClick: () -> Unit) {
 @Composable
 private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit) {
     val ui = LocalUi.current
-    val dev = io.github.projectwip.ui.LocalDev.current
+    val ask = io.github.projectwip.ui.LocalServerCall.current
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
             .clickable(remember { MutableInteractionSource() }, null, onClick = onClose),
@@ -301,11 +306,12 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (dev) GameText("BOTS", Type.Heading, outline = 2.5.dp)
-                    if (dev) Spacer(Modifier.width(6.dp))
-                    if (dev) for (d in BotDifficulty.entries) {
+                    GameText("BOTS", Type.Heading, outline = 2.5.dp)
+                    Spacer(Modifier.width(6.dp))
+                    for (d in BotDifficulty.entries) {
                         val sel = d == save.settings.botDifficulty
-                        ChunkyButton({ repo.updateSettings { it.copy(botDifficulty = d) } }, Modifier.size(118.dp, 50.dp),
+                        // The server has to agree; its answer (the approved difficulty) is what gets shown.
+                        ChunkyButton({ ask({ setDifficulty(d) }) }, Modifier.size(118.dp, 50.dp),
                             if (sel) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
                             GameText(d.label.uppercase(), Type.Label, color = if (sel) Color.White else difficultyColor(d), outline = 2.dp)
                         }

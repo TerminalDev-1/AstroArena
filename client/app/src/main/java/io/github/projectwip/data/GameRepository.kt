@@ -15,7 +15,11 @@ class GameRepository(private val store: SaveStore) {
     private val _save = MutableStateFlow(store.load())
     val save: StateFlow<SaveData> = _save.asStateFlow()
 
-    val today: Long get() = LocalDate.now().toEpochDay()
+    /** The day the server says it is, once it has said so. Days (the daily gift, the day's drops) are the server's. */
+    @Volatile var serverDay: Long? = null
+
+    /** Today's number: the server's when known, this device's otherwise. */
+    val today: Long get() = serverDay ?: LocalDate.now().toEpochDay()
 
     /** Called with every new save (the server connection uses it to upload a copy). */
     var onCommit: ((SaveData) -> Unit)? = null
@@ -40,8 +44,12 @@ class GameRepository(private val store: SaveStore) {
     fun dropOpened() = commit(Progression.dropOpened(_save.value))
 
     /** Takes on what the server holds for this player (Cups, drops, and when given the profile and shop deals). */
-    fun syncAccount(cups: Int, drops: Int, dropsLeftToday: Int, profile: ServerProfile? = null, deals: List<CustomOffer>? = null) {
-        val next = Progression.syncAccount(_save.value, cups, drops, dropsLeftToday, today, profile, deals)
+    fun syncAccount(
+        cups: Int, drops: Int, dropsLeftToday: Int, profile: ServerProfile? = null, deals: List<CustomOffer>? = null,
+        difficulty: BotDifficulty? = null, day: Long? = null,
+    ) {
+        if (day != null) serverDay = day
+        val next = Progression.syncAccount(_save.value, cups, drops, dropsLeftToday, today, profile, deals, difficulty)
         if (next != _save.value) commit(next)
     }
 

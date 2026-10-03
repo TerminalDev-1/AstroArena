@@ -121,8 +121,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // ---- start-up: connect to the game server, ask GitHub whether a newer release exists, load sounds and music
     val serverStatus by server.status.collectAsState()
     val account = serverStatus.account
-    // The debug menu, the difficulty choice and the drop cheats belong to developers: dev builds, and the players
-    // the server lists as developers.
+    // The debug menu and its cheats belong to developers: dev builds, and the players the server lists as developers.
     val dev = io.github.projectwip.BuildConfig.DEBUG || account?.developer == true
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var unsupportedSkipped by remember { mutableStateOf(false) }
@@ -293,8 +292,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
                     is Screen.Match -> MatchScreen(
-                        // Only developers choose how tough the bots are. Everyone else gets the server's setting (Easy when offline).
-                        s.config.copy(difficulty = if (dev) s.config.difficulty else account?.difficulty ?: io.github.projectwip.data.BotDifficulty.EASY),
+                        // The difficulty is the one the server last approved (it is kept in the settings), and the
+                        // server's match plan has the final word.
+                        s.config,
                         save.settings, sfx, save.matchesPlayed, server,
                         onCancel = { screen = Screen.Home },
                         onFinish = { summary ->
@@ -315,21 +315,20 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 reveal?.let { RewardRevealOverlay(it, save.bolts, save.prisms) { reveal = null } }
             }
             // The debug menu hides behind a small "D" in the corner of every menu screen.
-            if (dev && screen !is Screen.Match && capsule == null && reveal == null) {
+            // Developers only, and only if they switched it on in Settings > Developer.
+            val devMenu = dev && save.settings.devMenu
+            if (devMenu && screen !is Screen.Match && capsule == null && reveal == null) {
                 io.github.projectwip.ui.screens.DebugButton(Modifier.align(Alignment.BottomStart)) { debugMenu = true }
             }
-            if (debugMenu && dev) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
+            if (debugMenu && devMenu) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
             // On top of everything: the loading screen, then (if a newer release exists) the update screen.
-            // Server status in the corner, and its notice across the top of the home screen.
+            // Server status in the corner. (Its notice is part of the home screen.)
             if (screen !is Screen.Match && capsule == null && reveal == null) {
                 PlainText(
                     if (serverStatus.online) "● ONLINE" else "● OFFLINE MODE · practice only", Type.Small,
-                    Modifier.align(Alignment.BottomStart).padding(start = if (dev) 48.dp else 14.dp, bottom = 12.dp),
+                    Modifier.align(Alignment.BottomStart).padding(start = if (devMenu) 48.dp else 14.dp, bottom = 12.dp),
                     color = if (serverStatus.online) Palette.Positive else Palette.TextDim,
                 )
-                if (screen is Screen.Home && serverStatus.online && serverStatus.notice.isNotBlank()) {
-                    Badge(serverStatus.notice.take(90), Modifier.align(Alignment.TopCenter).padding(top = 74.dp), color = Palette.CyanDeep)
-                }
             }
             if (!booting) update?.let { io.github.projectwip.ui.screens.UpdateScreen(it) { update = null } }
             if (!booting && update == null && !serverStatus.supported && !unsupportedSkipped) {

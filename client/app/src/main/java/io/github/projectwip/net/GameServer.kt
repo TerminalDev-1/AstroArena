@@ -42,6 +42,15 @@ data class Account(
     val profile: ServerProfile? = null,
     /** The shop deals running right now, with how many times this player has bought each. */
     val deals: List<CustomOffer> = emptyList(),
+    /** The difficulties the server lets this player pick. */
+    val difficulties: List<BotDifficulty> = BotDifficulty.entries,
+    /** Today's offers, picked by the server; their [CustomOffer.id] is their place in the list. */
+    val dailyOffers: List<CustomOffer> = emptyList(),
+    /** The server's day number (days since 1970 on the server's clock). */
+    val day: Long = -1,
+    /** When the server's day ends and the shop changes, on this device's clock (ms). */
+    val dayEndsAt: Long = 0,
+    val giftAvailable: Boolean = true,
 )
 
 /** What the game knows about the server right now. */
@@ -91,6 +100,10 @@ class GameServer(context: Context) {
     private val token: String? get() = prefs.getString("token@$baseUrl", null)
     private val usable get() = _status.value.online && _status.value.supported
 
+    /** Why the server refused the last request, in its own words ("" if it didn't). */
+    @Volatile var lastError = ""
+        private set
+
     /** Has this install already got an account on the server at [url]? */
     fun hasAccount(url: String): Boolean = prefs.contains("token@" + url.trim().trimEnd('/'))
 
@@ -127,12 +140,25 @@ class GameServer(context: Context) {
     }
 
     private fun noteAccount(o: JSONObject) {
+        // Times are the server's. Its clock and this device's differ by `ahead`; everything it sends is moved onto
+        // the device's clock so countdowns can simply compare with System.currentTimeMillis().
+        val time = o.optJSONObject("time")
+        val ahead = if (time != null) time.optLong("now") - System.currentTimeMillis() else 0L
+        fun local(serverMs: Long) = if (serverMs > 0) serverMs - ahead else serverMs
+        fun offers(key: String) = o.optJSONArray(key)?.let { a ->
+            (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { deal(it) } }.map { it.copy(expiresAt = local(it.expiresAt)) }
+        } ?: emptyList()
         val account = Account(
             id = o.optString("id"), developer = o.optBoolean("developer"), cups = o.optInt("cups"), rank = o.optInt("rank"), players = o.optInt("players"), drops = o.optInt("drops"),
             dropsLeftToday = o.optInt("dropsLeftToday"),
             difficulty = BotDifficulty.entries.firstOrNull { it.name == o.optString("difficulty") } ?: BotDifficulty.EASY,
             profile = o.optJSONObject("profile")?.let { profile(it) },
-            deals = o.optJSONArray("deals")?.let { a -> (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { deal(it) } } } ?: emptyList(),
+            deals = offers("deals"),
+            difficulties = o.optJSONArray("difficulties")?.let { a -> (0 until a.length()).mapNotNull { i -> BotDifficulty.entries.firstOrNull { it.name == a.optString(i) } } }
+                ?: BotDifficulty.entries,
+            dailyOffers = offers("dailyOffers"),
+            day = time?.optLong("day", -1) ?: -1, dayEndsAt = local(time?.optLong("dayEndsAt") ?: 0L),
+            giftAvailable = o.optBoolean("giftAvailable", true),
         )
         _status.value = _status.value.copy(account = account)
     }
@@ -169,11 +195,19 @@ class GameServer(context: Context) {
 
     /** A request that changes this player's account. The reply (which carries the new account) or null if it was refused or never arrived. */
     private fun act(path: String, body: JSONObject = JSONObject()): JSONObject? {
+        lastError = ""
         if (!usable) return null
         val r = call("POST", path, body, auth = true)
         if (r == null) lost()
+        if (r != null && r.code != 200) lastError = r.body?.optString("error").orEmpty()
         return if (r?.code == 200) r.body else null
     }
+
+    /** Asks the server to let this player fight bots of [difficulty]. Null if it says no (see [lastError]). */
+    fun setDifficulty(difficulty: BotDifficulty): Boolean? = act("/v1/settings/difficulty", JSONObject().put("difficulty", difficulty.name))?.let { true }
+
+    /** Buys one of today's offers ([index] in [Account.dailyOffers]) as shown on [day]; after the server's midnight it no longer counts. */
+    fun buyDaily(index: Long, day: Long): Reward? = act("/v1/shop/daily/$index/buy", JSONObject().put("day", day))?.optJSONObject("reward")?.let { reward(it) }
 
     /** Levels a fighter up. Returns what it cost, or null if the server said no. [costFactor] and [noCap] count for developers only. */
     fun upgrade(fighter: FighterId, costFactor: Float = 1f, noCap: Boolean = false): Int? =

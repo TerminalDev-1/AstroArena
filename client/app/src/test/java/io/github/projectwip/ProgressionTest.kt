@@ -145,6 +145,9 @@ class ProgressionTest {
         assertEquals(listOf(deal), synced.customOffers)
         assertEquals("applying the same account twice changes nothing", synced, Progression.syncAccount(synced, 200, 2, 3, 7, profile, listOf(deal)))
         assertEquals(1, Progression.dropOpened(synced).capsulesOpened)
+        // The difficulty shown is the one the server approved.
+        assertEquals(BotDifficulty.NORMAL, synced.settings.botDifficulty)
+        assertEquals(BotDifficulty.HARD, Progression.syncAccount(synced, 200, 2, 3, 7, difficulty = BotDifficulty.HARD).settings.botDifficulty)
     }
 
     @Test fun dropOddsShownInTheDebugMenu() {
@@ -161,7 +164,7 @@ class ProgressionTest {
     }
 
     @Test fun cheatsCanBeSwitchedOff() {
-        val cheating = io.github.projectwip.data.Settings(debugLuck = 9f, debugInfiniteCapsules = true, debugNoLevelCap = true, debugUpgradeCost = 0f, playerName = "Ace")
+        val cheating = io.github.projectwip.data.Settings(debugLuck = 9f, debugInfiniteCapsules = true, debugNoLevelCap = true, debugUpgradeCost = 0f, devMenu = true, playerName = "Ace")
         assertEquals(io.github.projectwip.data.Settings(playerName = "Ace"), Progression.withoutCheats(cheating))
     }
 

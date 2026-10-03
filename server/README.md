@@ -24,8 +24,10 @@ server never locks anyone out.
 |---|---|
 | **Version gate** | `versions_not_supported.cfg` lists client versions that are refused, with the message they see |
 | **Notices** | `notices.cfg` holds short messages shown on the home screen |
-| **Bots** | `bots.cfg` sets how bots behave at each difficulty; `game.cfg` sets which difficulty players get |
-| **Developers** | `game.cfg` lists the players who get the debug menu and the difficulty choice |
+| **Bots** | `bots.cfg` sets how bots behave at each difficulty; `game.cfg` sets which difficulties players may pick. The game asks, the server approves |
+| **Daily offers** | `shop.cfg` is the pool; the server picks a few each day, the same for everyone, and says when the day ends |
+| **Time** | the day, when it ends, and every countdown come from the server's clock |
+| **Developers** | `game.cfg` lists the players who can switch on the debug menu, make shop deals and reset an account |
 | **Accounts** | a new player picks a name, then the install registers once and gets an id and a secret token |
 | **Cups** | the server works out what each match is worth and keeps the total |
 | **Bolts and Prisms** | kept by the server: match pay, upgrades, shop purchases, the daily gift and Cup Track rewards all happen there |
@@ -47,9 +49,10 @@ everyone = no
 ids = f5c75a1aa787e6e1, another-id
 ```
 
-The debug menu appears for them the next time the game talks to the server, and disappears again when the id is
-removed. `everyone = yes` turns it on for all players. Debug builds of the game always show the menu, but the
-server still ignores its drop luck, free drops, difficulty choice and hand-outs unless the id is listed.
+Settings > Developer appears for them the next time the game talks to the server, and disappears again when
+the id is removed. That is where they switch the debug menu on; it is off by default. `everyone = yes` makes
+every player a developer. Debug builds of the game always show the Developer tab, but the server still ignores
+the debug menu's cheats unless the id is listed.
 
 ### What the server can and can't stop
 
@@ -91,7 +94,7 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | | |
 |---|---|
 | `GET /v1/health` | `{ok, api, players, matches, finished}` |
-| `GET /v1/status?version=9` | `{supported, message, notice}` |
+| `GET /v1/status?version=10` | `{supported, message, notice}` |
 | `GET /v1/config` | `{bots: {EASY: {...}, ...}}` |
 | `POST /v1/players` `{name, version}` | `{id, token}` |
 | `GET /v1/me` * | `{account}` |
@@ -105,13 +108,16 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `POST /v1/shop/gift` * | `{reward, account}`; 409 once claimed today |
 | `POST /v1/shop/deals/<id>/buy` * | `{reward, account}` |
 | `POST /v1/track/claim` * `{cups}` | `{reward, account}` |
-| `POST /v1/reset` * | `{account}`: starts this account's progress over |
+| `POST /v1/shop/daily/<n>/buy` * `{day}` | `{reward, account}`: one of today's offers; 409 if bought already or the day has changed |
+| `POST /v1/settings/difficulty` * `{difficulty}` | `{ok, account}`, or 403 if the server doesn't allow it |
+| `POST /v1/reset` * | `{account}`: starts this account's progress over (developers only) |
 | `POST /v1/dev/grant` * `{cups, drops, bolts, prisms}` | `{account}` (developers only) |
 | `POST /v1/dev/deals` * `{title, bolts, prisms, fighter, skinFighter, skinIndex, currency, price, wasPrice, expiresAt, limit, theme}` | `{id, account}` (developers only) |
 | `POST /v1/dev/deals/<id>/delete` * | `{deleted, account}` (developers only) |
 | `GET /v1/leaderboard?limit=50` | `{players: [{id, name, cups, fighter}]}` |
 
-`account` is `{id, name, developer, cups, rank, players, drops, dropsLeftToday, difficulty, profile, deals}`.
+`account` is `{id, name, developer, cups, rank, players, drops, dropsLeftToday, difficulty, difficulties, profile,
+deals, dailyOffers, giftAvailable, time}`; `time` is `{now, day, dayEndsAt}` on the server's clock.
 `profile` is `{bolts, prisms, bestCups, fighters, claimedMilestones, lastDailyGiftDay, lastFirstWinDay}`.
 
 Traffic is plain HTTP, which is fine on a home network and not fine on the open internet. Put it behind HTTPS

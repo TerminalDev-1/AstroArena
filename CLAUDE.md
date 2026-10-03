@@ -51,10 +51,14 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   upgraded, claimed or opened. The loading screen tries the server for 60 seconds, then offers Retry or Offline mode.
 - Prices and tables shown by the client (`Balance.kt`, `Catalog.kt`) are copies for display; the server's are
   the ones that count. Change both.
-- Developers = debug builds, plus the player ids in `server/game.cfg`. Only they see the debug menu and the
-  difficulty choice, and only they can make shop deals (the in-game Offer Creator); the server ignores luck,
-  free drops, free upgrades, difficulty and hand-outs from anyone else. The tablet's
-  id is listed there. Everyone else plays on the difficulty in `game.cfg` (Easy).
+- Developers = debug builds, plus the player ids in `server/game.cfg` (the tablet's is listed). Only they get
+  Settings > Developer, where the debug menu's D button is switched on (it is off by default); only they can
+  make shop deals (the in-game Offer Creator) or reset an account. The server ignores luck, free drops, free
+  upgrades and hand-outs from anyone else.
+- Bot difficulty: every player may pick, but the pick is a request (`POST /v1/settings/difficulty`); the server
+  approves it against `allowed` in `game.cfg`, stores it, and uses its own copy when it plans a match.
+- Days and times are the server's: the day number, when it ends, the daily gift and the daily offers
+  (`server/shop.cfg`). The client moves server times onto its own clock on receipt and only counts down.
 - The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
   is asked for a name before their account is made (`NameScreen`).
 - A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`.
