@@ -10,12 +10,13 @@ import unittest
 import urllib.error
 import urllib.request
 
-from astro import rules
+from astro import economy, rules
+from astro.economy import Refused
 from astro.app import serve
 from astro.config import matches, parse_version
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-VERSION = "7"
+VERSION = "9"
 
 
 class VersionRules(unittest.TestCase):
@@ -99,6 +100,84 @@ class Rules(unittest.TestCase):
         self.assertNotIn("SCRAP", tiers)
 
 
+class Economy(unittest.TestCase):
+    def test_prices_match_the_client(self):
+        self.assertEqual([economy.upgrade_cost(level) for level in (1, 5, 9, 10, 11)], [10, 95, 400, 450, 500])
+        self.assertEqual(economy.upgrade_cost(3, 0.0), 0)
+        self.assertEqual(economy.upgrade_cost(3, 99), 105)  # the factor is capped at x3
+        self.assertEqual(economy.shop_item("crate_l"), ({"type": "bolts", "amount": 3000}, 50))
+        self.assertEqual(economy.shop_item("fighter_KITO"), ({"type": "fighter", "fighter": "KITO"}, 90))
+        self.assertEqual(economy.shop_item("skin_MIRA_2"), ({"type": "skin", "fighter": "MIRA", "skin": 2}, 20))
+        for missing in ("fighter_JUNO", "skin_MIRA_0", "skin_MIRA_3", "skin_NOBODY_1", "crate_xl", ""):
+            self.assertIsNone(economy.shop_item(missing))
+        self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "VICTORY", 0, 2, "NORMAL"), 28)
+        self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "DEFEAT", 0, 9, "ELITE"), 33)
+        self.assertEqual(economy.match_bolts("LAST_SPARK", "DEFEAT", 10, 0, "EASY"), 4)
+        self.assertEqual(economy.match_bolts("TRAINING", "VICTORY", 0, 5, "NORMAL"), 0)
+        self.assertEqual(sorted(economy.CUP_TRACK), list(economy.CUP_TRACK))
+
+    def test_upgrades(self):
+        p = economy.new_profile()
+        self.assertEqual(economy.upgrade(p, "JUNO"), 10)
+        self.assertEqual((p["bolts"], p["fighters"]["JUNO"]["level"]), (50, 2))
+        with self.assertRaises(Refused) as caught:
+            economy.upgrade(p, "BRAKK")  # locked
+        self.assertEqual(caught.exception.status, 409)
+        p["bolts"] = 5
+        with self.assertRaises(Refused) as caught:
+            economy.upgrade(p, "JUNO")
+        self.assertEqual(caught.exception.status, 402)
+        self.assertEqual((p["bolts"], p["fighters"]["JUNO"]["level"]), (5, 2))
+        p["bolts"], p["fighters"]["JUNO"]["level"] = 99999, economy.MAX_LEVEL
+        with self.assertRaises(Refused):
+            economy.upgrade(p, "JUNO")
+        self.assertEqual(economy.upgrade(p, "JUNO", no_cap=True), 450)
+
+    def test_shop_gift_and_track(self):
+        p = economy.new_profile()
+        p["prisms"] = 100
+        with self.assertRaises(Refused):
+            economy.buy(p, "skin_BRAKK_1")  # the fighter comes first
+        self.assertEqual(economy.buy(p, "fighter_BRAKK"), {"type": "fighter", "fighter": "BRAKK"})
+        self.assertEqual(p["prisms"], 60)
+        with self.assertRaises(Refused):
+            economy.buy(p, "fighter_BRAKK")  # already owned, and not charged again
+        self.assertEqual(p["prisms"], 60)
+        economy.buy(p, "skin_BRAKK_1")
+        self.assertEqual((p["prisms"], p["fighters"]["BRAKK"]["ownedSkins"]), (40, [0, 1]))
+        with self.assertRaises(Refused) as caught:
+            economy.buy(p, "fighter_KITO")
+        self.assertEqual(caught.exception.status, 402)
+        economy.buy(p, "crate_s")
+        self.assertEqual((p["prisms"], p["bolts"]), (30, 460))
+
+        self.assertEqual(economy.claim_gift(p, 20000), {"type": "bolts", "amount": 40})
+        with self.assertRaises(Refused):
+            economy.claim_gift(p, 20000)
+        self.assertEqual(economy.claim_gift(p, 20001), {"type": "prisms", "amount": 8})
+
+        with self.assertRaises(Refused):
+            economy.claim_milestone(p, 100)  # not reached
+        p["bestCups"] = 120
+        # Brakk is already owned, so the track pays out instead.
+        self.assertEqual(economy.claim_milestone(p, 100), {"type": "bolts", "amount": 300})
+        with self.assertRaises(Refused):
+            economy.claim_milestone(p, 100)
+        with self.assertRaises(Refused):
+            economy.claim_milestone(p, 55)  # no such reward
+        self.assertEqual(p["claimedMilestones"], [100])
+
+    def test_profiles_start_from_a_save(self):
+        save = {"bolts": 900, "prisms": "lots", "bestCups": 77, "claimedMilestones": [10, 11, 25], "lastDailyGiftDay": 5,
+                "fighters": {"MIRA": {"unlocked": True, "level": 4, "ownedSkins": [0, 2, 9]}, "JUNO": {"unlocked": False, "level": -3}}}
+        p = economy.profile_from_save(save)
+        self.assertEqual((p["bolts"], p["prisms"], p["bestCups"], p["claimedMilestones"], p["lastDailyGiftDay"]), (900, 0, 77, [10, 25], 5))
+        self.assertEqual(p["fighters"]["MIRA"], {"unlocked": True, "level": 4, "ownedSkins": [0, 2]})
+        self.assertEqual(p["fighters"]["JUNO"], {"unlocked": True, "level": 1, "ownedSkins": [0]})
+        self.assertFalse(p["fighters"]["KITO"]["unlocked"])
+        self.assertEqual(economy.profile_from_save({}), economy.new_profile())
+
+
 class Api(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
@@ -152,24 +231,24 @@ class Api(unittest.TestCase):
         status, body = self.call("GET", "/v1/health")
         self.assertEqual(status, 200)
         self.assertTrue(body["ok"])
-        _, old = self.call("GET", "/v1/status?version=6")
+        _, old = self.call("GET", "/v1/status?version=8")
         self.assertFalse(old["supported"])
         self.assertIn("no longer supported", old["message"])
-        _, new = self.call("GET", "/v1/status?version=7")
+        _, new = self.call("GET", "/v1/status?version=9")
         self.assertTrue(new["supported"])
         self.assertEqual(new["notice"], "Welcome to the AstroArena servers!")
 
     def test_cfg_edits_apply_without_restart(self):
-        self.assertTrue(self.call("GET", "/v1/status?version=7")[1]["supported"])
-        self.write_cfg("versions_not_supported.cfg", "<=7 | Time to move on.\n")
-        _, body = self.call("GET", "/v1/status?version=7")
+        self.assertTrue(self.call("GET", "/v1/status?version=9")[1]["supported"])
+        self.write_cfg("versions_not_supported.cfg", "<=9 | Time to move on.\n")
+        _, body = self.call("GET", "/v1/status?version=9")
         self.assertFalse(body["supported"])
         self.assertEqual(body["message"], "Time to move on.")
 
     def test_unsupported_and_unnamed_versions_are_refused_everywhere(self):
         me = self.player()
         self.assertEqual(self.call("GET", "/v1/me", token=me["token"])[0], 200)
-        status, body = self.call("GET", "/v1/me", token=me["token"], version="6")
+        status, body = self.call("GET", "/v1/me", token=me["token"], version="8")
         self.assertEqual(status, 426)
         self.assertIn("no longer supported", body["error"])
         self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, me["token"], version="0.5.1-preview")[0], 426)
@@ -240,6 +319,10 @@ class Api(unittest.TestCase):
         status, body = self.call("POST", path, win, me["token"])
         self.assertEqual(status, 200)
         self.assertEqual((body["cupDelta"], body["cups"], body["drop"]), (8, 8, True))  # 1st place on Easy
+        # Bolts and the first-win Prisms are the server's to give too: (30 + 2 x 4 KOs) x 0.75 on Easy.
+        self.assertEqual((body["bolts"], body["firstWinPrisms"]), (29, 10))
+        self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (60 + 29, 10))
+        self.assertEqual(body["account"]["profile"]["bestCups"], 8)
         self.assertEqual((body["account"]["drops"], body["account"]["dropsLeftToday"]), (2, 2))
         self.assertEqual(self.call("POST", path, win, me["token"])[0], 409)  # only once
         # Three drops a day: the fourth good finish earns Cups but no drop.
@@ -249,6 +332,7 @@ class Api(unittest.TestCase):
             self.age_matches()
             _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], {**win, "placement": 0, "mvp": True}, me["token"])
             self.assertEqual((body["cupDelta"], body["drop"]), (8, expected_drop))
+            self.assertEqual(body["firstWinPrisms"], 0)  # only the first win of the day
         self.assertEqual((body["account"]["cups"], body["account"]["drops"], body["account"]["dropsLeftToday"]), (32, 4, 0))
         _, board = self.call("GET", "/v1/leaderboard")
         self.assertEqual((board["players"][0]["name"], board["players"][0]["cups"]), ("Player", 32))
@@ -282,11 +366,11 @@ class Api(unittest.TestCase):
         self.assertIn(first["pieces"], (1, 2, 4, 8))
         # `free` was ignored: this player is no developer, so the drop was used up.
         self.assertEqual(first["account"]["drops"], 2 - 1 + first["pieces"] - 1)
-        # The reward went into the save the server holds.
-        stored = self.call("GET", "/v1/save", token=me["token"])[1]["save"]
-        expected = dict(save)
-        rules.apply_reward(expected, first["reward"])
-        self.assertEqual(stored, expected)
+        # The reward went into the profile the server keeps; the uploaded save is left as it was.
+        expected = economy.profile_from_save(save)
+        economy.grant(expected, first["reward"])
+        self.assertEqual(first["account"]["profile"], expected)
+        self.assertEqual(self.call("GET", "/v1/save", token=me["token"])[1]["save"], save)
         # Open until there are none left; then the server says no.
         left = first["account"]["drops"]
         while left > 0:
@@ -311,6 +395,81 @@ class Api(unittest.TestCase):
         # Someone else is still an ordinary player.
         other = self.player("Other")
         self.assertFalse(self.call("GET", "/v1/me", token=other["token"])[1]["account"]["developer"])
+
+    def test_the_server_keeps_the_economy(self):
+        me = self.player(save={"cups": 0, "capsules": 0, "bolts": 500, "prisms": 100, "bestCups": 30})
+        token = me["token"]
+        profile = self.call("GET", "/v1/me", token=token)[1]["account"]["profile"]
+        self.assertEqual((profile["bolts"], profile["prisms"], profile["bestCups"]), (500, 100, 30))
+        # A later save can't change any of it.
+        body = self.call("PUT", "/v1/save", {"save": {"bolts": 999999, "prisms": 999999, "fighters": {"KITO": {"unlocked": True, "level": 50}}}}, token)[1]
+        self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (500, 100))
+        self.assertFalse(body["account"]["profile"]["fighters"]["KITO"]["unlocked"])
+
+        status, body = self.call("POST", "/v1/fighters/upgrade", {"fighter": "JUNO", "costFactor": 0, "noCap": True}, token)
+        self.assertEqual((status, body["cost"]), (200, 10))  # an ordinary player's cost factor is ignored
+        self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["fighters"]["JUNO"]["level"]), (490, 2))
+        self.assertEqual(self.call("POST", "/v1/fighters/upgrade", {"fighter": "KITO"}, token)[0], 409)
+
+        status, body = self.call("POST", "/v1/shop/buy", {"item": "fighter_MIRA"}, token)
+        self.assertEqual((status, body["reward"], body["account"]["profile"]["prisms"]), (200, {"type": "fighter", "fighter": "MIRA"}, 30))
+        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "fighter_KITO"}, token)[0], 402)
+        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "fighter_MIRA"}, token)[0], 409)
+        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "everything"}, token)[0], 404)
+
+        status, body = self.call("POST", "/v1/shop/gift", {}, token)
+        self.assertEqual(status, 200)
+        self.assertIn(body["reward"]["type"], ("bolts", "prisms"))
+        self.assertEqual(self.call("POST", "/v1/shop/gift", {}, token)[0], 409)
+
+        status, body = self.call("POST", "/v1/track/claim", {"cups": 25}, token)
+        self.assertEqual((status, body["reward"]), (200, {"type": "prisms", "amount": 10}))
+        self.assertEqual(body["account"]["profile"]["claimedMilestones"], [25])
+        self.assertEqual(self.call("POST", "/v1/track/claim", {"cups": 25}, token)[0], 409)
+        self.assertEqual(self.call("POST", "/v1/track/claim", {"cups": 40}, token)[0], 409)  # best is 30
+
+        # Hand-outs are for developers.
+        self.assertEqual(self.call("POST", "/v1/dev/grant", {"bolts": 1000}, token)[0], 403)
+        self.make_developer(me["id"])
+        body = self.call("POST", "/v1/dev/grant", {"bolts": 1000, "prisms": 5}, token)[1]
+        before = body["account"]["profile"]["bolts"]
+        body = self.call("POST", "/v1/fighters/upgrade", {"fighter": "JUNO", "costFactor": 0}, token)[1]
+        self.assertEqual((body["cost"], body["account"]["profile"]["bolts"]), (0, before))  # a developer's free upgrade
+
+        # Starting over wipes progress and keeps the account.
+        body = self.call("POST", "/v1/reset", {}, token)[1]
+        self.assertEqual(body["account"]["profile"], economy.new_profile())
+        self.assertEqual((body["account"]["cups"], body["account"]["drops"], body["account"]["name"]), (0, rules.STARTING_DROPS, "Player"))
+
+    def test_deals_are_made_by_developers_and_bought_by_everyone(self):
+        dev = self.player("Dev")
+        buyer = self.player("Buyer", save={"cups": 0, "capsules": 0, "bolts": 100, "prisms": 50})
+        deal = {"title": "Starter pack", "bolts": 500, "fighter": "BRAKK", "currency": "PRISMS", "price": 30, "wasPrice": 60, "limit": 1}
+        self.assertEqual(self.call("POST", "/v1/dev/deals", deal, buyer["token"])[0], 403)
+        self.make_developer(dev["id"])
+        self.assertEqual(self.call("POST", "/v1/dev/deals", {"title": "Nothing"}, dev["token"])[0], 400)
+        status, body = self.call("POST", "/v1/dev/deals", deal, dev["token"])
+        self.assertEqual(status, 200)
+        deal_id = body["id"]
+        # Everyone sees it, each with their own purchase count.
+        shown = self.call("GET", "/v1/me", token=buyer["token"])[1]["account"]["deals"]
+        self.assertEqual([(d["id"], d["title"], d["price"], d["purchased"]) for d in shown], [(deal_id, "Starter pack", 30, 0)])
+        status, body = self.call("POST", "/v1/shop/deals/%d/buy" % deal_id, {}, buyer["token"])
+        self.assertEqual(status, 200)
+        self.assertEqual(body["reward"], {"type": "bundle", "items": [{"type": "bolts", "amount": 500}, {"type": "fighter", "fighter": "BRAKK"}]})
+        profile = body["account"]["profile"]
+        self.assertEqual((profile["bolts"], profile["prisms"], profile["fighters"]["BRAKK"]["unlocked"]), (600, 20, True))
+        self.assertEqual(body["account"]["deals"][0]["purchased"], 1)
+        self.assertEqual(self.call("POST", "/v1/shop/deals/%d/buy" % deal_id, {}, buyer["token"])[0], 409)  # limit 1
+        self.assertEqual(self.call("GET", "/v1/me", token=dev["token"])[1]["account"]["deals"][0]["purchased"], 0)
+        # Too dear, ended, and gone.
+        dear = self.call("POST", "/v1/dev/deals", {"prisms": 5, "currency": "BOLTS", "price": 100000}, dev["token"])[1]["id"]
+        self.assertEqual(self.call("POST", "/v1/shop/deals/%d/buy" % dear, {}, buyer["token"])[0], 402)
+        self.call("POST", "/v1/dev/deals", {"bolts": 5, "currency": "FREE", "expiresAt": 1000}, dev["token"])
+        self.assertEqual(len(self.call("GET", "/v1/me", token=buyer["token"])[1]["account"]["deals"]), 2)  # the ended one isn't shown
+        self.assertEqual(self.call("POST", "/v1/dev/deals/%d/delete" % deal_id, {}, buyer["token"])[0], 403)
+        self.assertTrue(self.call("POST", "/v1/dev/deals/%d/delete" % deal_id, {}, dev["token"])[1]["deleted"])
+        self.assertEqual(self.call("POST", "/v1/shop/deals/%d/buy" % deal_id, {}, buyer["token"])[0], 404)
 
     def test_old_databases_are_upgraded(self):
         import sqlite3

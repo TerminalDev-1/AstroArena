@@ -1,10 +1,13 @@
 """Everything the server remembers, in one SQLite file.
 
 Tables
-  players   one row per installed game: an id, a secret token, its name, and what the server keeps for it:
-            Cups, unopened Spark Drops, and how many drops it has earned today
-  saves     the latest copy of each player's save file (the JSON the client writes), with a revision counter
-  matches   every match the server planned: who, which mode, the seed it handed out, and the reported result
+  players         one row per installed game: an id, a secret token, its name, and what the server keeps for it:
+                  Cups, unopened Spark Drops, how many drops it has earned today, and its profile (Bolts, Prisms,
+                  fighters, claimed rewards: see economy.py) as JSON
+  saves           the latest copy of each player's save file (the JSON the client writes), with a revision counter
+  matches         every match the server planned: who, which mode, the seed it handed out, and the reported result
+  deals           shop offers made by developers, shown to every player
+  deal_purchases  how many times each player has bought each deal
 """
 
 from __future__ import annotations
@@ -17,7 +20,8 @@ import sqlite3
 import threading
 import time
 
-from . import rules
+from . import economy, rules
+from .economy import Refused
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS players (
@@ -52,6 +56,18 @@ CREATE TABLE IF NOT EXISTS matches (
     deaths      INTEGER,
     damage      INTEGER
 );
+CREATE TABLE IF NOT EXISTS deals (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_by  TEXT NOT NULL REFERENCES players(id),
+    created_at  REAL NOT NULL,
+    json        TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS deal_purchases (
+    player_id   TEXT NOT NULL REFERENCES players(id),
+    deal_id     INTEGER NOT NULL,
+    count       INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (player_id, deal_id)
+);
 CREATE INDEX IF NOT EXISTS players_by_cups ON players(cups DESC);
 CREATE INDEX IF NOT EXISTS matches_by_player ON matches(player_id);
 """
@@ -64,6 +80,7 @@ PLAYER_COLUMNS = [
     ("drops_today", "INTEGER NOT NULL DEFAULT 0"),
     ("imported", "INTEGER NOT NULL DEFAULT 0"),    # 1 once the starting Cups and drops have been settled
     ("flags", "INTEGER NOT NULL DEFAULT 0"),       # results the server refused to believe
+    ("profile", "TEXT"),                           # Bolts, Prisms, fighters, claimed rewards (economy.py); NULL until started
 ]
 
 BOT_NAMES = [
@@ -71,6 +88,8 @@ BOT_NAMES = [
     "Sprocket", "Vesper", "Nimbus", "Pepper", "Ziggy", "Onyx", "Marlow", "Kestrel", "Fizz",
     "Dynamo", "Wren", "Solder", "Halcyon", "Bramble", "Gizmo",
 ]
+
+_EPOCH = datetime.date(1970, 1, 1)
 
 
 def clean_name(name: object) -> str:
@@ -80,8 +99,8 @@ def clean_name(name: object) -> str:
 
 
 def today() -> int:
-    """The server's calendar day, as a number that goes up by one at midnight."""
-    return datetime.date.today().toordinal()
+    """The server's calendar day, counted from 1970 (the same number the game uses for its own day)."""
+    return (datetime.date.today() - _EPOCH).days
 
 
 class Store:
@@ -89,6 +108,8 @@ class Store:
         self._db = sqlite3.connect(path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._lock = threading.Lock()
+        # Whether a new account's first save sets its starting progress (the operator's choice; see game.cfg).
+        self.import_progress = lambda: True
         with self._lock, self._db:
             self._db.executescript(SCHEMA)
             have = {row["name"] for row in self._db.execute("PRAGMA table_info(players)")}
@@ -129,12 +150,25 @@ class Store:
         with self._lock:
             return self._db.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
 
-    def grant(self, player_id: str, cups: int = 0, drops: int = 0) -> None:
+    def grant(self, player_id: str, cups: int = 0, drops: int = 0, bolts: int = 0, prisms: int = 0) -> None:
         """Developer hand-outs."""
         with self._lock, self._db:
             self._db.execute(
                 "UPDATE players SET cups = MAX(0, cups + ?), drops = MAX(0, drops + ?) WHERE id = ?", (int(cups), int(drops), player_id)
             )
+            profile = self._profile(player_id)
+            profile["bolts"] = max(0, profile["bolts"] + int(bolts))
+            profile["prisms"] = max(0, profile["prisms"] + int(prisms))
+            self._keep(player_id, profile)
+
+    def reset(self, player_id: str) -> None:
+        """Starts a player's progress over: Cups, drops and profile. Their name and account stay."""
+        with self._lock, self._db:
+            self._db.execute(
+                "UPDATE players SET cups = 0, drops = ?, boosted = 0, drops_day = -1, drops_today = 0, profile = ? WHERE id = ?",
+                (rules.STARTING_DROPS, json.dumps(economy.new_profile()), player_id),
+            )
+            self._db.execute("DELETE FROM deal_purchases WHERE player_id = ?", (player_id,))
 
     def rank(self, player_id: str) -> tuple[int, int]:
         """Where a player stands by Cups (1 = top; ties go to the older account), and how many players there are."""
@@ -149,14 +183,99 @@ class Store:
     def drops_left_today(self, player: sqlite3.Row) -> int:
         return rules.DROPS_PER_DAY - (player["drops_today"] if player["drops_day"] == today() else 0)
 
+    # ------------------------------------------------------------------ profiles (callers hold the lock)
+
+    def _profile(self, player_id: str) -> dict:
+        """The player's profile. One that hasn't been started yet begins from their stored save, or from scratch."""
+        row = self._db.execute("SELECT profile FROM players WHERE id = ?", (player_id,)).fetchone()
+        if row["profile"]:
+            return json.loads(row["profile"])
+        saved = self._db.execute("SELECT json FROM saves WHERE player_id = ?", (player_id,)).fetchone()
+        if saved is not None and self.import_progress():
+            return economy.profile_from_save(json.loads(saved["json"]))
+        return economy.new_profile()
+
+    def _keep(self, player_id: str, profile: dict) -> None:
+        self._db.execute("UPDATE players SET profile = ? WHERE id = ?", (json.dumps(profile, separators=(",", ":")), player_id))
+
+    def profile(self, player_id: str) -> dict:
+        with self._lock:
+            return self._profile(player_id)
+
+    def _change(self, player_id: str, action):
+        """Runs `action(profile)` and stores the profile if it didn't refuse. Returns what the action returned."""
+        with self._lock, self._db:
+            profile = self._profile(player_id)
+            result = action(profile)
+            self._keep(player_id, profile)
+            return result
+
+    def upgrade(self, player_id: str, fighter: str, factor: float = 1.0, no_cap: bool = False) -> int:
+        return self._change(player_id, lambda p: economy.upgrade(p, fighter, factor, no_cap))
+
+    def buy(self, player_id: str, key: str) -> dict:
+        return self._change(player_id, lambda p: economy.buy(p, key))
+
+    def claim_gift(self, player_id: str) -> dict:
+        return self._change(player_id, lambda p: economy.claim_gift(p, today()))
+
+    def claim_milestone(self, player_id: str, cups: int) -> dict:
+        return self._change(player_id, lambda p: economy.claim_milestone(p, cups))
+
+    # ------------------------------------------------------------------ deals
+
+    def create_deal(self, player_id: str, data: dict) -> int:
+        deal = economy.clean_deal(data)
+        with self._lock, self._db:
+            cur = self._db.execute(
+                "INSERT INTO deals (created_by, created_at, json) VALUES (?, ?, ?)", (player_id, time.time(), json.dumps(deal))
+            )
+            return cur.lastrowid
+
+    def delete_deal(self, deal_id: int) -> bool:
+        with self._lock, self._db:
+            self._db.execute("DELETE FROM deal_purchases WHERE deal_id = ?", (deal_id,))
+            return self._db.execute("DELETE FROM deals WHERE id = ?", (deal_id,)).rowcount == 1
+
+    def deals(self, player_id: str) -> list[dict]:
+        """Every deal still running, with how many times this player has bought each."""
+        now_ms = int(time.time() * 1000)
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT d.id, d.json, COALESCE(p.count, 0) AS purchased FROM deals d "
+                "LEFT JOIN deal_purchases p ON p.deal_id = d.id AND p.player_id = ? ORDER BY d.id", (player_id,)
+            ).fetchall()
+        out = []
+        for row in rows:
+            deal = json.loads(row["json"])
+            if 0 < deal["expiresAt"] <= now_ms:
+                continue
+            out.append({"id": row["id"], **deal, "purchased": row["purchased"]})
+        return out
+
+    def buy_deal(self, player_id: str, deal_id: int) -> dict:
+        with self._lock, self._db:
+            row = self._db.execute("SELECT json FROM deals WHERE id = ?", (deal_id,)).fetchone()
+            if row is None:
+                raise Refused(404, "no such deal")
+            bought = self._db.execute("SELECT count FROM deal_purchases WHERE player_id = ? AND deal_id = ?", (player_id, deal_id)).fetchone()
+            profile = self._profile(player_id)
+            reward = economy.buy_deal(profile, json.loads(row["json"]), bought["count"] if bought else 0, int(time.time() * 1000))
+            self._keep(player_id, profile)
+            self._db.execute(
+                "INSERT INTO deal_purchases (player_id, deal_id, count) VALUES (?, ?, 1) "
+                "ON CONFLICT(player_id, deal_id) DO UPDATE SET count = count + 1", (player_id, deal_id),
+            )
+            return reward
+
     # ------------------------------------------------------------------ saves
 
     def put_save(self, player_id: str, save: dict, import_progress: bool = True) -> int:
         """Stores the player's save and returns its new revision.
 
-        The name and fighter are copied out for the leaderboard. Cups and Spark Drops are the server's own:
-        they are read from a save only once, the first time an account uploads one (and only if
-        `import_progress` allows it), so that progress made before the server kept them carries over.
+        The name and fighter are copied out for the leaderboard. Cups, Spark Drops, Bolts, Prisms and everything
+        else in the profile are the server's own: they are read from a save only once, the first time an account
+        uploads one (and only if `import_progress` allows it), so that earlier progress carries over.
         """
         text = json.dumps(save, separators=(",", ":"))
         name = clean_name((save.get("settings") or {}).get("playerName"))
@@ -173,13 +292,13 @@ class Store:
                 (player_id, revision, time.time(), text),
             )
             self._db.execute("UPDATE players SET name = ?, fighter = ? WHERE id = ?", (name, fighter, player_id))
-            if import_progress:
-                self._db.execute(
-                    "UPDATE players SET cups = ?, drops = ?, boosted = ?, imported = 1 WHERE id = ? AND imported = 0",
-                    (cups, drops, boosted, player_id),
-                )
-            else:
-                self._db.execute("UPDATE players SET imported = 1 WHERE id = ? AND imported = 0", (player_id,))
+            player = self._db.execute("SELECT imported, profile FROM players WHERE id = ?", (player_id,)).fetchone()
+            if not player["profile"]:
+                self._keep(player_id, economy.profile_from_save(save) if import_progress else economy.new_profile())
+            if not player["imported"]:
+                if import_progress:
+                    self._db.execute("UPDATE players SET cups = ?, drops = ?, boosted = ? WHERE id = ?", (cups, drops, boosted, player_id))
+                self._db.execute("UPDATE players SET imported = 1 WHERE id = ?", (player_id,))
         return revision
 
     def get_save(self, player_id: str) -> dict | None:
@@ -208,7 +327,7 @@ class Store:
 
         None if there is no open match with that id for this player. Otherwise a dict: either
         {"rejected": reason} when the result isn't believable (the match is closed and the player flagged), or
-        {"cupDelta", "cups", "drop"} with the Cups and Spark Drop the server awarded.
+        {"cupDelta", "cups", "drop", "bolts", "firstWinPrisms"} with what the server awarded.
         """
         outcome = str(result.get("outcome") or "")[:12]
         placement = int(result.get("placement") or 0)
@@ -223,7 +342,8 @@ class Store:
             ).fetchone()
             if match is None:
                 return None
-            reason = rules.check_result(match["mode"], now - match["started_at"], outcome, placement, kos, deaths, damage)
+            mode, difficulty = match["mode"], match["difficulty"]
+            reason = rules.check_result(mode, now - match["started_at"], outcome, placement, kos, deaths, damage)
             if reason is not None:
                 self._db.execute("UPDATE matches SET finished_at = ?, outcome = 'REJECTED' WHERE id = ?", (now, match_id))
                 self._db.execute("UPDATE players SET flags = flags + 1 WHERE id = ?", (player_id,))
@@ -233,20 +353,29 @@ class Store:
                 (now, outcome, placement, kos, deaths, damage, match_id),
             )
             player = self._db.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
-            cups = max(0, player["cups"] + rules.cup_delta(match["mode"], outcome, placement, player["cups"], match["difficulty"], mvp))
+            cups = max(0, player["cups"] + rules.cup_delta(mode, outcome, placement, player["cups"], difficulty, mvp))
             day = today()
             earned = player["drops_today"] if player["drops_day"] == day else 0
-            drop = rules.earns_drop(match["mode"], outcome, placement) and earned < rules.DROPS_PER_DAY
+            drop = rules.earns_drop(mode, outcome, placement) and earned < rules.DROPS_PER_DAY
             self._db.execute(
                 "UPDATE players SET cups = ?, drops = drops + ?, drops_day = ?, drops_today = ? WHERE id = ?",
                 (cups, 1 if drop else 0, day, earned + (1 if drop else 0), player_id),
             )
-            return {"cupDelta": cups - player["cups"], "cups": cups, "drop": drop}
+            profile = self._profile(player_id)
+            bolts = economy.match_bolts(mode, outcome, placement, kos, difficulty)
+            prisms = economy.first_win_prisms(mode, outcome, profile, day)
+            profile["bolts"] += bolts
+            profile["prisms"] += prisms
+            if prisms:
+                profile["lastFirstWinDay"] = day
+            profile["bestCups"] = max(profile["bestCups"], cups)
+            self._keep(player_id, profile)
+            return {"cupDelta": cups - player["cups"], "cups": cups, "drop": drop, "bolts": bolts, "firstWinPrisms": prisms}
 
     # ------------------------------------------------------------------ Spark Drops
 
     def open_drop(self, player_id: str, luck: float = 0.0, free: bool = False) -> dict | None:
-        """Opens one of the player's Spark Drops: the server rolls it and adds the reward to the stored save.
+        """Opens one of the player's Spark Drops: the server rolls it and adds the reward to their profile.
 
         None if they have none to open. `luck` and `free` (the drop isn't used up) are for developers; the
         caller decides whether this player may use them.
@@ -255,11 +384,12 @@ class Store:
             player = self._db.execute("SELECT drops, boosted FROM players WHERE id = ?", (player_id,)).fetchone()
             if player is None or (player["drops"] <= 0 and not free):
                 return None
-            row = self._db.execute("SELECT revision, json FROM saves WHERE player_id = ?", (player_id,)).fetchone()
-            save = json.loads(row["json"]) if row else {}
+            profile = self._profile(player_id)
             # Pieces from an earlier split are opened first, and roll better than a plain one.
             boosted = player["boosted"] > 0
-            result = rules.open_drop(save, boosted, luck, secrets.SystemRandom())
+            result = rules.open_drop(profile, boosted, luck, secrets.SystemRandom())
+            result["reward"] = economy.grant(profile, result["reward"])
+            self._keep(player_id, profile)
             extra = result["pieces"] - 1
             self._db.execute(
                 "UPDATE players SET drops = ?, boosted = ? WHERE id = ?",
@@ -269,12 +399,6 @@ class Store:
                     player_id,
                 ),
             )
-            if row:
-                rules.apply_reward(save, result["reward"])
-                self._db.execute(
-                    "UPDATE saves SET revision = ?, updated_at = ?, json = ? WHERE player_id = ?",
-                    (row["revision"] + 1, time.time(), json.dumps(save, separators=(",", ":")), player_id),
-                )
         return result
 
     # ------------------------------------------------------------------ leaderboard & stats

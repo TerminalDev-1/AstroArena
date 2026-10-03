@@ -12,14 +12,24 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/matches        {...}       plan a match -> {matchId, seed, botNames, difficulty} (token)
     POST /v1/matches/<id>/result {...}  report how it went -> the Cups and drop it earned     (token)
     POST /v1/drops/open     {...}       open a Spark Drop -> {tier, pieces, reward, account}  (token)
+    POST /v1/fighters/upgrade {fighter} level a fighter up with Bolts                         (token)
+    POST /v1/shop/buy       {item}      buy a standing shop item with Prisms -> {reward}      (token)
+    POST /v1/shop/gift                  claim the daily gift -> {reward}                      (token)
+    POST /v1/shop/deals/<id>/buy        buy a deal -> {reward}                                (token)
+    POST /v1/track/claim    {cups}      claim a Cup Track reward -> {reward}                  (token)
+    POST /v1/reset                      start this account's progress over                    (token)
     POST /v1/dev/grant      {...}       developer hand-outs                                   (token, developer)
+    POST /v1/dev/deals      {...}       put a deal in everyone's shop -> {id}                 (token, developer)
+    POST /v1/dev/deals/<id>/delete      take a deal out of the shop                           (token, developer)
     GET  /v1/leaderboard?limit=50       players by Cups
 
 A token goes in the `Authorization: Bearer <token>` header, and every request with a token must also say which
 version of the game is asking (`X-Client-Version`); versions listed in versions_not_supported.cfg are refused.
 
-The server owns each player's Cups and Spark Drops: it works out what a match is worth, refuses results that
-can't be real, and rolls what comes out of a drop. The fight itself still runs on the device.
+The server owns each player's Cups, Spark Drops, Bolts, Prisms, fighters and claimed rewards: it works out what a
+match is worth, refuses results that can't be real, rolls what comes out of a drop, and is the only place
+anything is bought, upgraded or claimed. Every reply to a signed-in request carries the `account`, which is
+what the game shows. The fight itself still runs on the device.
 """
 
 from __future__ import annotations
@@ -35,11 +45,14 @@ from urllib.parse import parse_qs, urlparse
 
 from . import rules
 from .config import Config, parse_version
+from .economy import Refused
 from .store import Store
 
 API = 2
 MAX_BODY = 512 * 1024
 _MATCH_RESULT = re.compile(r"^/v1/matches/(\d+)/result$")
+_DEAL_BUY = re.compile(r"^/v1/shop/deals/(\d+)/buy$")
+_DEAL_DELETE = re.compile(r"^/v1/dev/deals/(\d+)/delete$")
 
 
 class Game:
@@ -48,6 +61,7 @@ class Game:
     def __init__(self, directory: str, db_path: str | None = None):
         self.config = Config(directory)
         self.store = Store(db_path or os.path.join(directory, "astroarena.db"))
+        self.store.import_progress = self.config.import_saves
         self.started = time.time()
         self._signups: dict[str, list[float]] = {}
         self._signup_lock = threading.Lock()
@@ -77,6 +91,8 @@ class Game:
             "drops": player["drops"],
             "dropsLeftToday": self.store.drops_left_today(player),
             "difficulty": self.config.default_difficulty(),
+            "profile": self.store.profile(player_id),
+            "deals": self.store.deals(player_id),
         }
 
 
@@ -191,8 +207,57 @@ def make_handler(game: Game, quiet: bool = False):
             if url.path == "/v1/drops/open":
                 return self._open_drop()
             if url.path == "/v1/dev/grant":
-                return self._dev_grant()
+                return self._act(lambda p, d: game.store.grant(
+                    p["id"], int(d.get("cups") or 0), int(d.get("drops") or 0), int(d.get("bolts") or 0), int(d.get("prisms") or 0)
+                ), developer=True)
+            if url.path == "/v1/fighters/upgrade":
+                return self._act(self._upgrade)
+            if url.path == "/v1/shop/buy":
+                return self._act(lambda p, d: {"reward": game.store.buy(p["id"], str(d.get("item") or ""))})
+            if url.path == "/v1/shop/gift":
+                return self._act(lambda p, d: {"reward": game.store.claim_gift(p["id"])})
+            if url.path == "/v1/track/claim":
+                return self._act(lambda p, d: {"reward": game.store.claim_milestone(p["id"], int(d.get("cups") or 0))})
+            if url.path == "/v1/reset":
+                return self._act(lambda p, d: game.store.reset(p["id"]))
+            if url.path == "/v1/dev/deals":
+                return self._act(lambda p, d: {"id": game.store.create_deal(p["id"], d)}, developer=True)
+            m = _DEAL_BUY.match(url.path)
+            if m:
+                deal_id = int(m.group(1))
+                return self._act(lambda p, d: {"reward": game.store.buy_deal(p["id"], deal_id)})
+            m = _DEAL_DELETE.match(url.path)
+            if m:
+                deal_id = int(m.group(1))
+                return self._act(lambda p, d: {"deleted": game.store.delete_deal(deal_id)}, developer=True)
             return self._error(404, "no such endpoint")
+
+        def _act(self, action, developer: bool = False):
+            """A signed-in request that changes the player's account. `action(player, body)` returns extra reply
+            fields (or None) or raises Refused; the reply always carries the account as it now stands."""
+            data = self._body()
+            if data is None:
+                return None
+            player = self._player()
+            if player is None:
+                return None
+            if developer and not game.config.is_developer(player["id"]):
+                return self._error(403, "developers only")
+            try:
+                extra = action(player, data) or {}
+            except Refused as refused:
+                return self._error(refused.status, refused.message)
+            except (TypeError, ValueError):
+                return self._error(400, "a field has the wrong type")
+            return self._send(200, {**extra, "account": game.account(player["id"])})
+
+        def _upgrade(self, player, data):
+            # The cost slider and the level cap switch in the debug menu are for developers only.
+            factor, no_cap = 1.0, False
+            if game.config.is_developer(player["id"]):
+                factor = float(data["costFactor"]) if "costFactor" in data else 1.0
+                no_cap = data.get("noCap") is True
+            return {"cost": game.store.upgrade(player["id"], str(data.get("fighter") or ""), factor, no_cap)}
 
         def _plan_match(self):
             player = self._player()
@@ -252,21 +317,6 @@ def make_handler(game: Game, quiet: bool = False):
             if result is None:
                 return self._error(409, "no Spark Drops to open")
             return self._send(200, {**result, "account": game.account(player["id"])})
-
-        def _dev_grant(self):
-            player = self._player()
-            if player is None:
-                return None
-            data = self._body()
-            if data is None:
-                return None
-            if not game.config.is_developer(player["id"]):
-                return self._error(403, "developers only")
-            try:
-                game.store.grant(player["id"], int(data.get("cups") or 0), int(data.get("drops") or 0))
-            except (TypeError, ValueError):
-                return self._error(400, "cups and drops must be numbers")
-            return self._send(200, {"account": game.account(player["id"])})
 
         def do_PUT(self):  # noqa: N802
             if urlparse(self.path).path != "/v1/save":
