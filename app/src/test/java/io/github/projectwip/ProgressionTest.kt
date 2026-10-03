@@ -33,7 +33,7 @@ class ProgressionTest {
         assertEquals(100, s.at(1))
         assertEquals(120, s.at(5))
         assertEquals(125, s.at(6))
-        assertEquals(s.at(Balance.MAX_LEVEL), s.at(99))
+        assertEquals("no level cap", 100 + 5 * 98, s.at(99))
     }
 
     @Test fun upgradePreviewShowsExactDelta() {
@@ -42,7 +42,7 @@ class ProgressionTest {
         val dmg = rows[1]
         assertEquals(juno.attackDamage.at(4), dmg.current)
         assertEquals(juno.attackDamage.perLevel, dmg.delta)
-        assertNull(Progression.statPreview(juno, Balance.MAX_LEVEL)[0].next)
+        assertNotNull("there is always a next level", Progression.statPreview(juno, 250)[0].next)
     }
 
     @Test fun upgradeSpendsBoltsAndLevelsUp() {
@@ -239,5 +239,18 @@ class ProgressionTest {
         assertTrue("more Cups, better rank", mid < low.first { it.isPlayer }.rank)
         assertEquals("enough Cups tops the ladder", 1, io.github.projectwip.data.Leaderboard.rank(5000, day))
         assertEquals("same day, same ladder", low, io.github.projectwip.data.Leaderboard.standings("Me", 0, FighterId.JUNO, day))
+    }
+
+    @Test fun levelsNeverRunOut() {
+        // The price follows the table, then keeps climbing by a fixed step, and never drops.
+        assertEquals(Balance.upgradeCost[0], Balance.upgradeCostFrom(1))
+        assertEquals(Balance.upgradeCost.last(), Balance.upgradeCostFrom(Balance.upgradeCost.size))
+        assertEquals(Balance.upgradeCost.last() + Balance.UPGRADE_COST_STEP, Balance.upgradeCostFrom(Balance.upgradeCost.size + 1))
+        assertTrue((1..300).zipWithNext().all { (a, b) -> Balance.upgradeCostFrom(b) >= Balance.upgradeCostFrom(a) })
+        var save = SaveData(bolts = 10_000_000)
+        repeat(60) { save = Progression.upgrade(save, FighterId.JUNO)!! }
+        assertEquals(61, save.progress(FighterId.JUNO).level)
+        val juno = Balance.fighter(FighterId.JUNO)
+        assertEquals(juno.health.base + juno.health.perLevel * 60, juno.health.at(61))
     }
 }

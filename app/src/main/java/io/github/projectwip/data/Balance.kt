@@ -10,7 +10,7 @@ package io.github.projectwip.data
 
 /** A stat that grows by a fixed amount every level. */
 data class StatLine(val base: Int, val perLevel: Int) {
-    fun at(level: Int): Int = base + perLevel * (level.coerceIn(1, Balance.MAX_LEVEL) - 1)
+    fun at(level: Int): Int = base + perLevel * (level.coerceAtLeast(1) - 1)
 }
 
 enum class FighterId { JUNO, BRAKK, MIRA }
@@ -85,12 +85,20 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
 }
 
 object Balance {
-    const val MAX_LEVEL = 10
+    /** There is no level cap; this only stops a damaged save from loading a nonsense level. */
+    const val LEVEL_LIMIT = 9999
 
-    /** Bolts needed to go FROM level (index+1) TO level (index+2). */
-    val upgradeCost = intArrayOf(25, 50, 90, 150, 240, 360, 520, 720, 1000)
+    /** Bolts needed to go FROM level (index+1) TO level (index+2). Past the end of the table see [upgradeCostFrom]. */
+    val upgradeCost = intArrayOf(10, 20, 35, 60, 95, 145, 210, 290, 400)
 
-    fun upgradeCostFrom(level: Int): Int? = if (level in 1 until MAX_LEVEL) upgradeCost[level - 1] else null
+    /** Each level past the table costs this much more than the one before. */
+    const val UPGRADE_COST_STEP = 50
+
+    /** Levels never run out: the table covers the early ones, then the price climbs by a fixed step. */
+    fun upgradeCostFrom(level: Int): Int {
+        val l = level.coerceAtLeast(1)
+        return if (l <= upgradeCost.size) upgradeCost[l - 1] else upgradeCost.last() + UPGRADE_COST_STEP * (l - upgradeCost.size)
+    }
 
     // ---- Match format ----
     const val KO_TARGET = 10
@@ -182,8 +190,8 @@ object Balance {
             superChargePerHit = 0.075f,
             skins = listOf(
                 Skin("Courier", 0xFFFF8A1F, 0xFF2EC4F1, 0xFFFFE066, 0),
-                Skin("Night Shift", 0xFF5B5BD6, 0xFFFF4FA3, 0xFFB8F2FF, 40),
-                Skin("Mint Rush", 0xFF2ED8A3, 0xFFFFD23F, 0xFFFFFFFF, 40),
+                Skin("Night Shift", 0xFF5B5BD6, 0xFFFF4FA3, 0xFFB8F2FF, 20),
+                Skin("Mint Rush", 0xFF2ED8A3, 0xFFFFD23F, 0xFFFFFFFF, 20),
             ),
         ),
         FighterDef(
@@ -205,8 +213,8 @@ object Balance {
             radius = 0.48f,
             skins = listOf(
                 Skin("Rustbucket", 0xFF8C9A5B, 0xFFE0702A, 0xFFFFD166, 0),
-                Skin("Chrome", 0xFFB9C6D6, 0xFF3A86FF, 0xFFE9F5FF, 40),
-                Skin("Lava Core", 0xFF3B2F2F, 0xFFFF5A1F, 0xFFFFC145, 40),
+                Skin("Chrome", 0xFFB9C6D6, 0xFF3A86FF, 0xFFE9F5FF, 20),
+                Skin("Lava Core", 0xFF3B2F2F, 0xFFFF5A1F, 0xFFFFC145, 20),
             ),
         ),
         FighterDef(
@@ -228,8 +236,8 @@ object Balance {
             radius = 0.4f,
             skins = listOf(
                 Skin("Starlight", 0xFF8E5CF7, 0xFF2EE6D6, 0xFFFFF3B0, 0),
-                Skin("Ruby Cut", 0xFFE0314F, 0xFFFFC145, 0xFFFFE4EC, 40),
-                Skin("Glacier", 0xFF4CC9F0, 0xFFFFFFFF, 0xFFB5F2FF, 40),
+                Skin("Ruby Cut", 0xFFE0314F, 0xFFFFC145, 0xFFFFE4EC, 20),
+                Skin("Glacier", 0xFF4CC9F0, 0xFFFFFFFF, 0xFFB5F2FF, 20),
             ),
         ),
     )
@@ -239,7 +247,7 @@ object Balance {
     /** How a locked fighter can be obtained. */
     fun unlockPrismPrice(id: FighterId): Int? = when (id) {
         FighterId.JUNO -> null
-        FighterId.BRAKK -> 90
-        FighterId.MIRA -> 150
+        FighterId.BRAKK -> 40
+        FighterId.MIRA -> 70
     }
 }

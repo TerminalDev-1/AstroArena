@@ -101,14 +101,14 @@ object Progression {
 
     fun canUpgrade(save: SaveData, id: FighterId): Boolean {
         val p = save.progress(id)
-        val cost = Balance.upgradeCostFrom(p.level) ?: return false
+        val cost = Balance.upgradeCostFrom(p.level)
         return p.unlocked && save.bolts >= cost
     }
 
     fun upgrade(save: SaveData, id: FighterId): SaveData? {
         if (!canUpgrade(save, id)) return null
         val p = save.progress(id)
-        val cost = Balance.upgradeCostFrom(p.level)!!
+        val cost = Balance.upgradeCostFrom(p.level)
         return save.copy(
             bolts = save.bolts - cost,
             fighters = save.fighters + (id to p.copy(level = p.level + 1)),
@@ -116,7 +116,7 @@ object Progression {
     }
 
     fun statPreview(def: FighterDef, level: Int): List<StatPreview> {
-        val next = if (level < Balance.MAX_LEVEL) level + 1 else null
+        val next: Int? = level + 1
         fun line(label: String, s: StatLine, suffix: String = "") = StatPreview(label, s.at(level), next?.let { s.at(it) }, suffix)
         val shots = def.attack.projectiles
         return listOf(

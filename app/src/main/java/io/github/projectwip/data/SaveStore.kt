@@ -107,7 +107,7 @@ class SaveStore(context: Context) {
                 val f = fightersJson?.optJSONObject(id.name) ?: return@associateWith def
                 FighterProgress(
                     unlocked = f.optBoolean("unlocked", def.unlocked),
-                    level = f.optInt("level", 1).coerceIn(1, Balance.MAX_LEVEL),
+                    level = f.optInt("level", 1).coerceIn(1, Balance.LEVEL_LIMIT),
                     skin = f.optInt("skin", 0),
                     ownedSkins = f.optJSONArray("ownedSkins")?.ints()?.toSet()?.plus(0) ?: setOf(0),
                 )

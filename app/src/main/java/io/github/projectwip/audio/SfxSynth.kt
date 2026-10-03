@@ -453,20 +453,22 @@ object SfxSynth {
         reverb(0.15f, 0.6f)
     }
 
-    /** The result banner landing: a rush, a thump with a brass stab, then a spray of chimes. */
+    /**
+     * The result banner landing: a drum hit under a bright brass chord, then chimes running up. Deliberately no
+     * rush of air before it: that made it sound like an automatic door sliding open.
+     */
     private fun banner() = Clip(1.5f).apply {
-        val hit = 0.13f
-        noise(203, 0f, 0.17f, Band.BAND, { glide(it, hit, 500f, 5000f) }, 2.5f, { swell(it, hit) * 0.45f })
-        osc(Wave.SINE, hit, 0.5f, { glide(it, 0.18f, 160f, 45f) }, { perc(it, 0.002f, 0.14f) })
-        noise(204, hit, 0.3f, Band.LOW, { glide(it, 0.2f, 7000f, 500f) }, 0.9f, { perc(it, 0.001f, 0.06f) * 0.6f })
+        osc(Wave.SINE, 0f, 0.45f, { glide(it, 0.14f, 150f, 48f) }, { perc(it, 0.002f, 0.12f) })
+        noise(203, 0f, 0.09f, Band.BAND, { 2200f }, 0.9f, { perc(it, 0.001f, 0.022f) * 0.55f })
         val horn = Clip(1.5f).apply {
-            for (n in intArrayOf(60, 67, 72)) brass(hit, 0.2f, n, 0.3f)
-            filter(Band.LOW, 1f) { 700f + 3000f * perc((it - hit).coerceAtLeast(0f), 0.02f, 0.2f) }
+            for (n in intArrayOf(60, 64, 67, 72)) brass(0f, 0.32f, n, 0.28f)
+            brass(0f, 0.06f, 71, 0.2f)
+            filter(Band.LOW, 1f) { 900f + 3400f * perc(it, 0.015f, 0.22f) }
         }
         mix(horn)
-        drive(1.3f)
-        for ((i, n) in intArrayOf(84, 88, 91, 96, 100).withIndex()) bell(hit + 0.1f + i * 0.05f, n, 0.16f, 0.09f)
-        reverb(0.22f, 0.72f)
+        drive(1.25f)
+        for ((i, n) in intArrayOf(84, 88, 91, 96, 100).withIndex()) bell(0.12f + i * 0.055f, n, 0.18f, 0.09f)
+        reverb(0.2f, 0.7f)
     }
 
     /** Ch-ching: two thin, tinny metal pings in quick succession, like coins dropping into a tin. */

@@ -35,7 +35,7 @@ class Sfx(private val context: Context) {
 
     fun load() {
         Thread({
-            for (old in listOf("sfx-v1", "sfx-v2", "sfx-v3", "sfx-v4")) File(context.cacheDir, old).deleteRecursively()
+            for (old in listOf("sfx-v1", "sfx-v2", "sfx-v3", "sfx-v4", "sfx-v5")) File(context.cacheDir, old).deleteRecursively()
             val dir = File(context.cacheDir, CACHE).apply { mkdirs() }
             for (s in Sound.entries) {
                 val f = File(dir, "${s.name.lowercase()}.wav")
@@ -87,6 +87,6 @@ class Sfx(private val context: Context) {
     }
 
     private companion object {
-        const val CACHE = "sfx-v5"
+        const val CACHE = "sfx-v6"
     }
 }

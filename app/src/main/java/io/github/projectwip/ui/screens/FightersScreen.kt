@@ -181,19 +181,14 @@ private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int) {
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            if (level < Balance.MAX_LEVEL) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    GameText("LEVEL $level", Type.Heading, outline = 2.5.dp)
-                    if (unlocked) {
-                        GameText("  →  ${level + 1}", Type.Heading, color = Palette.Positive, outline = 2.5.dp)
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                GameText("LEVEL $level", Type.Heading, outline = 2.5.dp)
+                if (unlocked) {
+                    GameText("  →  ${level + 1}", Type.Heading, color = Palette.Positive, outline = 2.5.dp)
                 }
-            } else {
-                GameText("MAX LEVEL", Type.Heading, color = Palette.Gold, outline = 2.5.dp)
             }
             Spacer(Modifier.height(6.dp))
-            ProgressBar(level.toFloat() / Balance.MAX_LEVEL, Modifier.fillMaxWidth().height(14.dp), Palette.Orange, Palette.OrangeDeep)
-            PlainText("Level $level of ${Balance.MAX_LEVEL}", Type.Small)
+            PlainText("No level cap · the next level costs ${"%,d".format(Balance.upgradeCostFrom(level))} Bolts", Type.Small)
         }
     }
 }
@@ -290,9 +285,7 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
         if (save.selectedFighter != id) {
             ChunkyButton({ repo.selectFighter(id) }, Modifier.width(110.dp).height(68.dp), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }
         }
-        if (cost == null) {
-            ChunkyButton({}, Modifier.weight(1f).height(68.dp), ButtonStyle.GOLD, enabled = true) { GameText("MAXED OUT", Type.Heading) }
-        } else {
+        run {
             val afford = save.bolts >= cost
             ChunkyButton(
                 { if (repo.upgrade(id)) onUpgraded() },
