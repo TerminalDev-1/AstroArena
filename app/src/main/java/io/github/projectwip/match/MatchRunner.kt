@@ -168,6 +168,11 @@ class MatchRunner(
                 else if (e.victimId == pid) { sfx.play(Sound.KO, 0.9f, 0.7f); sfx.buzz(120, 255) }
                 else sfx.play(Sound.KO, 0.35f)
             }
+            is GameEvent.CellPicked -> if (e.fighterId == pid) { sfx.play(Sound.PICKUP); sfx.buzz(18, 110) }
+            is GameEvent.CrateBroken -> {
+                val p = match.player
+                sfx.play(Sound.CRATE_BREAK, 1f / (1f + hypot(e.tx + 0.5f - p.x, e.ty + 0.5f - p.y) * 0.2f))
+            }
             is GameEvent.SuperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY); sfx.buzz(25, 120) }
             is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }
             is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop }
