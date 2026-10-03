@@ -66,6 +66,10 @@ class TouchControls(private val density: Float) {
     var superRadius = 0f; private set
     private var fixedMoveX = 0f
     private var fixedMoveY = 0f
+    /** The player placed the move stick themselves: it stays put and is grabbed only near where it sits. */
+    private var moveCustom = false
+    val moveCx get() = fixedMoveX
+    val moveCy get() = fixedMoveY
     var attackCx = 0f; private set
     var attackCy = 0f; private set
     var superCx = 0f; private set
@@ -102,8 +106,14 @@ class TouchControls(private val density: Float) {
         fixedMoveY = height - dp(36f) - moveRadius * 1.15f
         attackCx = width - safeRight - dp(48f) - attackRadius * 1.25f
         attackCy = height - dp(36f) - attackRadius * 1.25f
+        // Player-chosen spots override the defaults; an unmoved super button keeps following the attack stick.
+        val l = s.controlLayout
+        moveCustom = l.moveX >= 0f
+        if (moveCustom) { fixedMoveX = l.moveX * width; fixedMoveY = l.moveY * height }
+        if (l.attackX >= 0f) { attackCx = l.attackX * width; attackCy = l.attackY * height }
         superCx = attackCx - attackRadius * 1.9f
         superCy = attackCy - attackRadius * 1.05f
+        if (l.superX >= 0f) { superCx = l.superX * width; superCy = l.superY * height }
         val ps = dp(46f)
         pauseRect.set(safeLeft + dp(16f), dp(14f), safeLeft + dp(16f) + ps, dp(14f) + ps)
     }
@@ -139,7 +149,10 @@ class TouchControls(private val density: Float) {
         if (!attack.active && hypot(x - attackCx, y - attackCy) < attackRadius * 1.8f) {
             grab(attack, id, x, y, x, y); return
         }
-        if (!move.active && x < width * 0.5f) {
+        if (move.active) return
+        if (moveCustom) {
+            if (hypot(x - fixedMoveX, y - fixedMoveY) < moveRadius * 1.8f) grab(move, id, fixedMoveX, fixedMoveY, x, y)
+        } else if (x < width * 0.5f) {
             if (settings.moveStickMode == MoveStickMode.FIXED) {
                 grab(move, id, fixedMoveX, fixedMoveY, x, y)
             } else {
@@ -154,12 +167,12 @@ class TouchControls(private val density: Float) {
         s.pointerId = id
         s.baseX = bx; s.baseY = by
         s.maxDrag = 0f
-        setKnob(s, x, y, s === move)
+        setKnob(s, x, y, s === move && !moveCustom)
     }
 
     private fun drag(id: Int, x: Float, y: Float) {
         when (id) {
-            move.pointerId -> setKnob(move, x, y, follow = settings.moveStickMode == MoveStickMode.FLOATING)
+            move.pointerId -> setKnob(move, x, y, follow = settings.moveStickMode == MoveStickMode.FLOATING && !moveCustom)
             attack.pointerId -> setKnob(attack, x, y, false)
             superStick.pointerId -> setKnob(superStick, x, y, false)
         }
@@ -260,7 +273,7 @@ class TouchControls(private val density: Float) {
         // ---- Move stick
         val mx = if (move.active) move.baseX else fixedMoveX
         val my = if (move.active) move.baseY else fixedMoveY
-        val showMove = move.active || settings.moveStickMode == MoveStickMode.FIXED
+        val showMove = move.active || moveCustom || settings.moveStickMode == MoveStickMode.FIXED
         if (showMove) {
             ring(c, mx, my, moveRadius, Color.argb(a * 45 / 255, 20, 10, 50), Color.argb(a * 140 / 255, 255, 255, 255))
             fill.color = Color.argb(a * 230 / 255, 46, 196, 241)

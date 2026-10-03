@@ -73,6 +73,7 @@ private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Cont
 @Composable
 fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
     var tab by remember { mutableStateOf(Tab.GAMEPLAY) }
+    var editingLayout by remember { mutableStateOf(false) }
     val s = save.settings
     val set: ((Settings) -> Settings) -> Unit = { repo.updateSettings(it) }
     val ui = LocalUi.current
@@ -96,7 +97,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         when (tab) {
                             Tab.GAMEPLAY -> GameplayTab(s, set)
-                            Tab.CONTROLS -> ControlsTab(s, set)
+                            Tab.CONTROLS -> ControlsTab(s, set) { editingLayout = true }
                             Tab.AUDIO -> AudioTab(s, set)
                             Tab.DISPLAY -> DisplayTab(s, set)
                             Tab.DATA -> DataTab(repo)
@@ -105,6 +106,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                 }
             }
         }
+        if (editingLayout) ControlLayoutEditor(s, onChange = { l -> set { it.copy(controlLayout = l) } }, onClose = { editingLayout = false })
     }
 }
 
@@ -160,7 +162,10 @@ private fun NameField(value: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun ControlsTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
+private fun ControlsTab(s: Settings, set: ((Settings) -> Settings) -> Unit, onEditLayout: () -> Unit) {
+    SectionTitle("CONTROL LAYOUT", "Drag the move stick, attack and super buttons anywhere on screen — for example all on one side, to play one-handed." +
+        if (s.controlLayout.isDefault) "" else " You are using a custom layout.")
+    ChunkyButton(onEditLayout, Modifier.width(260.dp).height(56.dp), ButtonStyle.CYAN) { GameText("EDIT LAYOUT", Type.Heading) }
     SectionTitle("MOVE STICK", "Floating appears wherever your left thumb lands. Fixed always sits in the corner.")
     Segmented(listOf("FLOATING", "FIXED"), if (s.moveStickMode == MoveStickMode.FLOATING) 0 else 1) { i ->
         set { it.copy(moveStickMode = if (i == 0) MoveStickMode.FLOATING else MoveStickMode.FIXED) }
@@ -169,7 +174,6 @@ private fun ControlsTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
     SliderRow("CONTROL OPACITY", "${(s.controlOpacity * 100).toInt()}%", s.controlOpacity, 0.3f, 1f) { v -> set { it.copy(controlOpacity = v) } }
     ToggleRow("AIM ASSIST", "When you drag to aim, shots within ${io.github.projectwip.match.MatchRunner.ASSIST_DEGREES.toInt()}° of a visible enemy snap onto them.", s.aimAssist) { v -> set { it.copy(aimAssist = v) } }
     ToggleRow("TAP TO AUTO-AIM", "A quick tap on the attack stick fires at the nearest visible enemy (marked with a gold ring and arrow). Drag to aim manually; drag back to the centre to cancel.", s.tapToAutoAim) { v -> set { it.copy(tapToAutoAim = v) } }
-    PlainText("Coming later: drag-to-reposition layout editor.", Type.Small, color = Palette.TextDim.copy(alpha = 0.7f))
 }
 
 @Composable

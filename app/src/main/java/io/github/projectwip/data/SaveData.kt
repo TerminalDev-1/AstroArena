@@ -2,6 +2,18 @@ package io.github.projectwip.data
 
 enum class MoveStickMode { FLOATING, FIXED }
 
+/**
+ * Where the player put the on-screen controls: the centre of each as a fraction of the screen.
+ * Negative = the default spot. A moved move-stick always stays where it was put (it no longer floats).
+ */
+data class ControlLayout(
+    val moveX: Float = -1f, val moveY: Float = -1f,
+    val attackX: Float = -1f, val attackY: Float = -1f,
+    val superX: Float = -1f, val superY: Float = -1f,
+) {
+    val isDefault get() = moveX < 0f && attackX < 0f && superX < 0f
+}
+
 data class Settings(
     val botDifficulty: BotDifficulty = BotDifficulty.NORMAL,
     val sfxVolume: Float = 0.8f,
@@ -20,6 +32,7 @@ data class Settings(
     val highFrameRate: Boolean = true,
     val showFps: Boolean = false,
     val playerName: String = "Player",
+    val controlLayout: ControlLayout = ControlLayout(),
 )
 
 data class FighterProgress(
