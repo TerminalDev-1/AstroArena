@@ -59,7 +59,8 @@ import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.rewardLabel
 
 @Composable
-fun CupTrackScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showReward: (RewardReveal) -> Unit) {
+fun CupTrackScreen(save: SaveData, @Suppress("UNUSED_PARAMETER") repo: GameRepository, go: (Screen) -> Unit, showReward: (RewardReveal) -> Unit) {
+    val ask = io.github.projectwip.ui.LocalServerCall.current
     val ui = LocalUi.current
     val nodes = listOf<Milestone?>(null) + CupTrack.milestones // null = START
     val claimable = Progression.claimable(save)
@@ -89,8 +90,8 @@ fun CupTrackScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, s
                 PlainText("Win matches to earn Cups. Rewards unlock at your best Cup count and stay unlocked — claim them any time.", Type.Body, modifier = Modifier.weight(1f))
                 if (claimable.size > 1) {
                     ChunkyButton({
-                        claimable.forEach { m -> repo.claimMilestone(m) }
-                        showReward(RewardReveal("Claimed ${claimable.size} rewards", claimable.last().reward))
+                        val count = claimable.size
+                        ask({ claimable.mapNotNull { m -> claimMilestone(m.cups) }.lastOrNull() }) { showReward(RewardReveal("Claimed $count rewards", it)) }
                     }, Modifier.size(160.dp, 52.dp), ButtonStyle.GREEN) { GameText("CLAIM ALL", Type.Heading) }
                 }
             }
@@ -107,7 +108,7 @@ fun CupTrackScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, s
                         m, cups, prevCups, nextCups, save, isFirst = i == 0,
                         width = if (ui.roomy) 190.dp else 160.dp,
                     ) {
-                        repo.claimMilestone(m!!)?.let { r -> showReward(RewardReveal("Cup Track · $cups", r)) }
+                        ask({ claimMilestone(m!!.cups) }) { r -> showReward(RewardReveal("Cup Track · $cups", r)) }
                     }
                 }
             }

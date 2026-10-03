@@ -36,32 +36,12 @@ class GameRepository(private val store: SaveStore) {
         return rewards
     }
 
-    fun upgrade(id: FighterId): Boolean = Progression.upgrade(_save.value, id)?.also(::commit) != null
+    /** Counts a Spark Drop the server opened. */
+    fun dropOpened() = commit(Progression.dropOpened(_save.value))
 
-    fun claimMilestone(m: Milestone): Reward? = Progression.claimMilestone(_save.value, m)?.let { (s, r) -> commit(s); r }
-
-    fun buy(item: ShopItem): PurchaseResult {
-        val (s, r) = Progression.buy(_save.value, item)
-        if (r == PurchaseResult.Ok) commit(s)
-        return r
-    }
-
-    fun addOffer(offer: CustomOffer) = commit(Progression.addOffer(_save.value, offer))
-
-    fun removeOffer(id: Long) = commit(Progression.removeOffer(_save.value, id))
-
-    fun buyOffer(id: Long): Progression.OfferResult {
-        val (s, r) = Progression.buyOffer(_save.value, id, System.currentTimeMillis())
-        if (r is Progression.OfferResult.Ok) commit(s)
-        return r
-    }
-
-    /** Adds the reward of a Spark Drop the server opened. */
-    fun grantDrop(result: CapsuleResult) = commit(Progression.grantDrop(_save.value, result))
-
-    /** Takes on the Cups and Spark Drops the server holds for this player. */
-    fun syncAccount(cups: Int, drops: Int, dropsLeftToday: Int) {
-        val next = Progression.syncAccount(_save.value, cups, drops, dropsLeftToday, today)
+    /** Takes on what the server holds for this player (Cups, drops, and when given the profile and shop deals). */
+    fun syncAccount(cups: Int, drops: Int, dropsLeftToday: Int, profile: ServerProfile? = null, deals: List<CustomOffer>? = null) {
+        val next = Progression.syncAccount(_save.value, cups, drops, dropsLeftToday, today, profile, deals)
         if (next != _save.value) commit(next)
     }
 
@@ -71,12 +51,7 @@ class GameRepository(private val store: SaveStore) {
         if (clean != _save.value.settings) commit(_save.value.copy(settings = clean))
     }
 
-    /** Debug menu hand-outs. (Cups and Spark Drops are handed out by the server.) */
-    fun debugGrant(bolts: Int = 0, prisms: Int = 0) = commit(_save.value.let { it.copy(bolts = it.bolts + bolts, prisms = it.prisms + prisms) })
-
     val capsulesLeftToday: Int get() = Progression.capsulesLeftToday(_save.value, today)
-
-    fun claimDailyGift(): Reward? = Progression.claimDailyGift(_save.value, today)?.let { (s, r) -> commit(s); r }
 
     fun selectFighter(id: FighterId) = commit(Progression.selectFighter(_save.value, id))
 
@@ -86,6 +61,6 @@ class GameRepository(private val store: SaveStore) {
 
     fun updateSettings(transform: (Settings) -> Settings) = commit(_save.value.copy(settings = transform(_save.value.settings)))
 
-    /** Wipes progress but keeps settings. */
+    /** Wipes what is kept on this device (after the server has started the account over), keeping settings. */
     fun resetProgress() = commit(SaveData(settings = _save.value.settings, capsuleSeed = System.nanoTime()))
 }

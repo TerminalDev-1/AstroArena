@@ -39,11 +39,11 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 | [`client/`](client) | The Android game: Kotlin, Jetpack Compose menus, a custom OpenGL ES 3.0 renderer |
 | [`server/`](server) | The game server: Python (standard library only) with a SQLite database. See [server/README.md](server/README.md) |
 
-The server is in charge of what matters: it keeps each player's Cups and Spark Drops, works out what a match
-is worth, rolls what comes out of a drop, sets how tough the bots are, decides who gets the debug menu, backs up
-saves, and turns away versions that are no longer supported. If it can't be reached, the game offers offline
-mode after a minute of trying: every mode still plays against bots and pays Bolts, but Cups and Spark Drops
-wait until you are back online.
+The server is in charge of what matters: it keeps each player's Cups, Spark Drops, Bolts, Prisms and fighters,
+works out what a match is worth, rolls what comes out of a drop, runs the shop and its deals, sets how tough the
+bots are, decides who gets the debug menu, and turns away versions that are no longer supported. If it can't be
+reached, the game offers offline mode after a minute of trying: every mode still plays against bots, as
+practice, and nothing is earned or spent until you are back online.
 
 ## Build & run
 

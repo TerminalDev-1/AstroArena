@@ -76,7 +76,7 @@ fun CreateOfferCard(width: Dp, onClick: () -> Unit) {
             GameIcon(IconKind.PLUS, Modifier.size(64.dp))
             Spacer(Modifier.height(10.dp))
             GameText("CREATE OFFER", Type.Heading, outline = 2.5.dp)
-            PlainText("Design your own shop deal", Type.Small, align = TextAlign.Center)
+            PlainText("Put a deal in every player's shop", Type.Small, align = TextAlign.Center)
         }
     }
 }

@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +57,7 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
         report,
         match.world.fighters.map {
             PlayerLine(it.name, it.def.id, it.skin, it.team, it.kos, it.deaths, it.damageDealt, it === match.player, it === mvp, it.isBot,
-                placement = if (it === match.player) match.placement else it.placement)
+                placement = if (it === match.player) report.placement else it.placement)
         },
         match.player.team,
         match.config.serverMatchId,
@@ -65,31 +67,125 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
 /**
  * Starts a match. The game server is asked to set it up first (its seed, which fixes the bots, their names
  * and how tough they are); if there is no server, or it doesn't answer quickly, the match is set up on the
- * device instead and counts as an offline match.
+ * device instead and counts as an offline match. While that happens, and for a few seconds after, the
+ * matchmaking screen shows the line-up filling in; [onCancel] backs out of it.
  */
 @Composable
 fun MatchScreen(
     config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed: Int,
-    server: io.github.projectwip.net.GameServer?, onFinish: (MatchSummary) -> Unit,
+    server: io.github.projectwip.net.GameServer?, onCancel: () -> Unit, onFinish: (MatchSummary) -> Unit,
 ) {
-    var planned by remember { mutableStateOf<MatchConfig?>(null) }
+    var match by remember { mutableStateOf<Match?>(null) }
+    var started by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         val plan = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             server?.planMatch(config.mode, config.playerFighter, config.playerLevel, config.difficulty)
         }
-        planned = if (plan == null) config else config.copy(seed = plan.seed, botNames = plan.botNames, serverMatchId = plan.matchId, difficulty = plan.difficulty ?: config.difficulty)
+        val planned = if (plan == null) config
+            else config.copy(seed = plan.seed, botNames = plan.botNames, serverMatchId = plan.matchId, difficulty = plan.difficulty ?: config.difficulty)
+        match = Match(planned)
     }
-    val ready = planned
-    if (ready == null) {
-        Box(Modifier.fillMaxSize().background(Color(0xFF1C143A)), contentAlignment = Alignment.Center) {
-            GameText("FINDING A MATCH…", Type.Title, outline = 3.5.dp)
+    val ready = match
+    // Boss Mode and the Training Area have nobody to find: they go straight in.
+    val matchmade = config.mode == io.github.projectwip.data.GameMode.LAST_SPARK || config.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH
+    if (ready != null && (started || !matchmade)) MatchBody(ready, settings, sfx, matchesPlayed, onFinish)
+    else if (matchmade) Matchmaking(config, ready, onCancel) { started = true }
+    else Box(Modifier.fillMaxSize().background(Color(0xFF1C143A)), contentAlignment = Alignment.Center) {
+        GameText("LOADING THE ARENA…", Type.Title, outline = 3.5.dp)
+    }
+}
+
+/**
+ * The wait before a match: your fighter, the mode, and the line-up filling in one opponent at a time until the
+ * match is found. The opponents are bots, and the screen says so. [match] is null until the match is set up.
+ */
+@Composable
+private fun Matchmaking(config: MatchConfig, match: Match?, onCancel: () -> Unit, onFound: () -> Unit) {
+    val sfx = io.github.projectwip.ui.LocalSfx.current
+    val time by io.github.projectwip.ui.rememberAnimTime()
+    val total = config.mode.players
+    /** How many of the line-up are in, counting you. */
+    var found by remember { androidx.compose.runtime.mutableIntStateOf(1) }
+    var done by remember { mutableStateOf(false) }
+    val tip = remember { TIPS.random() }
+    BackHandler(enabled = !done, onBack = onCancel)
+    LaunchedEffect(match) {
+        if (match == null) return@LaunchedEffect
+        val pace = kotlin.random.Random(match.config.seed)
+        kotlinx.coroutines.delay(500)
+        while (found < total) {
+            kotlinx.coroutines.delay(180L + pace.nextInt(320))
+            found++
+            sfx?.play(io.github.projectwip.audio.Sound.POP, 0.6f, 0.8f + 0.5f * found / total)
         }
-    } else MatchBody(ready, settings, sfx, matchesPlayed, onFinish)
+        kotlinx.coroutines.delay(250)
+        done = true
+        sfx?.play(io.github.projectwip.audio.Sound.UI_OPEN)
+        sfx?.buzz(40, 200)
+        kotlinx.coroutines.delay(750)
+        onFound()
+    }
+    val me = io.github.projectwip.data.Balance.fighter(config.playerFighter)
+    Box(Modifier.fillMaxSize()) {
+        io.github.projectwip.ui.GameBackground(Modifier.fillMaxSize())
+        androidx.compose.foundation.layout.Row(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            // ---- you
+            Column(Modifier.weight(0.9f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(250.dp), contentAlignment = Alignment.Center) {
+                    io.github.projectwip.ui.FighterRays(Modifier.fillMaxSize(), Color(me.skins[config.playerSkin.coerceIn(0, me.skins.lastIndex)].secondary))
+                    io.github.projectwip.ui.FighterView(me, config.playerSkin, Modifier.fillMaxSize(), pedestal = false)
+                }
+                GameText(config.playerName, Type.Title, color = io.github.projectwip.ui.Palette.Gold, outline = 3.5.dp)
+                PlainText("${me.name} · level ${config.playerLevel}", Type.Body, color = Color.White)
+            }
+            // ---- the search
+            Column(Modifier.weight(1.6f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                PlainText(config.mode.title.uppercase() + " · " + config.mode.tagline, Type.Label, color = io.github.projectwip.ui.Palette.TextDim)
+                GameText(
+                    if (done) "MATCH FOUND!" else "FINDING A MATCH" + ".".repeat(1 + (time * 2.5f).toInt() % 3),
+                    Type.Display, color = if (done) io.github.projectwip.ui.Palette.Green else Color.White, outline = 4.dp,
+                    modifier = Modifier.width(440.dp),
+                )
+                // The line-up: your slot is first, the rest fill in as opponents are found.
+                val others = match?.world?.fighters?.filter { it !== match.player }.orEmpty()
+                val perRow = if (total > 6) 5 else 3
+                for (row in (0 until total).chunked(perRow)) {
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+                        for (i in row) {
+                            val fighter = if (i == 0) match?.player else others.getOrNull(i - 1)
+                            Slot(if (i < found) fighter else null, i == 0, time + i, Modifier.weight(1f, fill = false).width(112.dp))
+                        }
+                    }
+                }
+                GameText("$found / $total FIGHTERS", Type.Heading, color = io.github.projectwip.ui.Palette.Gold, outline = 2.5.dp)
+                PlainText(if (match != null && match.config.serverMatchId <= 0L) "Offline match against bots · practice, nothing is earned" else "Your opponents are bots, picked by the server", Type.Small)
+                Spacer(Modifier.height(2.dp))
+                PlainText(tip, Type.Body, color = Color.White, align = TextAlign.Center)
+                if (!done) ChunkyButton(onCancel, Modifier.size(200.dp, 52.dp), ButtonStyle.RED, lip = 4.dp, sound = io.github.projectwip.audio.Sound.UI_BACK) { GameText("CANCEL", Type.Heading) }
+                else Spacer(Modifier.height(52.dp))
+            }
+        }
+    }
+}
+
+/** One place in the matchmaking line-up: empty and pulsing until its fighter is found. */
+@Composable
+private fun Slot(fighter: io.github.projectwip.sim.Fighter?, you: Boolean, phase: Float, modifier: Modifier = Modifier) {
+    Panel(modifier.height(112.dp), color = if (you) Color(0xFF3E6A2E) else io.github.projectwip.ui.Palette.PanelInset, cut = 10.dp) {
+        Column(Modifier.fillMaxSize().padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            if (fighter == null) {
+                val pulse = 0.35f + 0.25f * kotlin.math.sin(phase * 4f)
+                GameText("?", Type.Display, color = Color.White.copy(alpha = pulse), outline = 3.dp)
+            } else {
+                io.github.projectwip.ui.FighterView(fighter.def, fighter.skin, Modifier.size(70.dp), pedestal = false)
+                PlainText(if (you) "YOU" else fighter.name, Type.Small, color = if (you) io.github.projectwip.ui.Palette.Gold else Color.White, maxLines = 1)
+            }
+        }
+    }
 }
 
 @Composable
-private fun MatchBody(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed: Int, onFinish: (MatchSummary) -> Unit) {
-    val match = remember { Match(config) }
+private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed: Int, onFinish: (MatchSummary) -> Unit) {
     var paused by remember { mutableStateOf(false) }
     var view by remember { mutableStateOf<MatchView?>(null) }
     var done by remember { mutableStateOf(false) }
@@ -131,7 +227,7 @@ private fun MatchBody(config: MatchConfig, settings: Settings, sfx: Sfx, matches
                         PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
                         ChunkyButton({ paused = false; view?.resumeGame() }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN) { GameText("RESUME", Type.Title) }
-                        ChunkyButton({ finish(match.report().copy(outcome = MatchOutcome.DEFEAT)) }, Modifier.size(260.dp, 54.dp), ButtonStyle.RED) {
+                        ChunkyButton({ finish(match.forfeit()) }, Modifier.size(260.dp, 54.dp), ButtonStyle.RED) {
                             GameText("LEAVE MATCH", Type.Heading)
                         }
                     }

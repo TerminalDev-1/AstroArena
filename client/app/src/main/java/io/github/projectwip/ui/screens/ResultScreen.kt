@@ -176,8 +176,8 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         }
                         PlainText("Cups now: $after", Type.Small)
                         val dropsHere = r.mode != io.github.projectwip.data.GameMode.BOSS && rewards.online
-                        // The server awards Cups and Spark Drops; without it a match pays Bolts only.
-                        if (!rewards.online) PlainText("Offline match · Cups and Spark Drops are only earned online", Type.Small, color = Palette.Gold)
+                        // Everything a match is worth is awarded by the server; without it a match is practice.
+                        if (!rewards.online) PlainText("Offline match · rewards are only earned online", Type.Small, color = Palette.Gold)
                         if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
                             PlainText("All of today's Spark Drops are earned · more tomorrow", Type.Small)
                         }

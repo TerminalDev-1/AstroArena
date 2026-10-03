@@ -41,19 +41,23 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - `client/` is the whole Android game. `server/` is the game server: Python, standard library only, SQLite.
   `python run.py` (or `run.bat`) starts it on port 8765; `python -m unittest` in `server/` runs its tests.
-- The server is in charge, by the user's decision: it owns each player's Cups and Spark Drops (it works out what
-  a match is worth, refuses results that can't be real, and rolls what comes out of a drop), sets the bot
-  difficulty, and says who is a developer. Those rules live in `server/astro/rules.py`. Don't add client-side
-  ways to earn Cups or drops, or to roll a drop.
-- Offline mode still has to work: every mode plays against bots and pays Bolts, with no Cups, no new drops and
-  no opening drops. The loading screen tries the server for 60 seconds, then offers Retry or Offline mode.
+- The server is in charge, by the user's decision. It owns each player's Cups, Spark Drops, Bolts, Prisms,
+  fighters (unlocked, level, colourways), Cup Track claims, the daily gift and the shop deals. It works out what
+  a match is worth, refuses results that can't be real, rolls drops, and is the only place anything is bought,
+  upgraded or claimed (`server/astro/rules.py`, `economy.py`). The client's save is a copy of what the server
+  sent (`Progression.syncAccount`). Don't add client-side ways to earn, spend, grant or roll anything.
+- Menus ask the server through `LocalServerCall` (`ui/ServerCall.kt`): `ask({ buy(key) }) { reward -> ... }`.
+- Offline mode still has to work, as practice: every mode plays against bots, but nothing is earned, bought,
+  upgraded, claimed or opened. The loading screen tries the server for 60 seconds, then offers Retry or Offline mode.
+- Prices and tables shown by the client (`Balance.kt`, `Catalog.kt`) are copies for display; the server's are
+  the ones that count. Change both.
 - Developers = debug builds, plus the player ids in `server/game.cfg`. Only they see the debug menu and the
-  difficulty choice; the server ignores luck, free drops, difficulty and hand-outs from anyone else. The tablet's
+  difficulty choice, and only they can make shop deals (the in-game Offer Creator); the server ignores luck,
+  free drops, free upgrades, difficulty and hand-outs from anyone else. The tablet's
   id is listed there. Everyone else plays on the difficulty in `game.cfg` (Easy).
 - The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
   is asked for a name before their account is made (`NameScreen`).
-- A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py`. A change to the Cup table goes in
-  `rules.py` (the client has no copy).
+- A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`.
 - The match itself runs on the device, so the server can't catch a client that plays with cheats, only one that
   claims results. Don't describe it as cheat-proof.
 - Testing against the server on this PC: start it and launch the game; the built-in address is this PC's LAN

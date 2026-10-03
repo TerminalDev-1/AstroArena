@@ -31,7 +31,6 @@ import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
 import io.github.projectwip.data.GameRepository
 import io.github.projectwip.data.Progression
-import io.github.projectwip.data.PurchaseResult
 import io.github.projectwip.data.Reward
 import io.github.projectwip.data.SaveData
 import io.github.projectwip.data.Shop
@@ -69,6 +68,8 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
     val sfx = LocalSfx.current
     val ui = LocalUi.current
     val cardW = if (ui.roomy) 210.dp else 176.dp
+    val dev = io.github.projectwip.ui.LocalDev.current
+    val ask = io.github.projectwip.ui.LocalServerCall.current
 
     Box(Modifier.fillMaxSize()) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
@@ -81,19 +82,16 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 item { Section("DAILY GIFT") { DailyGiftCard(save, repo, cardW * 1.15f, showReward) } }
-                item {
-                    Section("CUSTOM OFFERS") {
-                        CreateOfferCard(cardW * 0.8f) { creating = true }
-                        val now = System.currentTimeMillis()
-                        save.customOffers.filter { !it.expired(now) }.forEach { o ->
-                            CustomOfferCard(o, cardW, canDelete = true,
-                                onBuy = {
-                                    when (val r = repo.buyOffer(o.id)) {
-                                        is io.github.projectwip.data.Progression.OfferResult.Ok -> showReward(RewardReveal(o.title, r.reward))
-                                        else -> sfx?.play(Sound.DENIED)
-                                    }
-                                },
-                                onDelete = { repo.removeOffer(o.id) })
+                // Deals come from the server: developers make them, and every player sees them.
+                val now = System.currentTimeMillis()
+                val deals = save.customOffers.filter { !it.expired(now) }
+                if (dev || deals.isNotEmpty()) item {
+                    Section("DEALS") {
+                        if (dev) CreateOfferCard(cardW * 0.8f) { creating = true }
+                        deals.forEach { o ->
+                            CustomOfferCard(o, cardW, canDelete = dev,
+                                onBuy = { ask({ buyDeal(o.id) }) { showReward(RewardReveal(o.title, it)) } },
+                                onDelete = { ask({ deleteDeal(o.id) }) })
                         }
                     }
                 }
@@ -134,7 +132,7 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
         }
 
         if (creating) {
-            OfferCreatorDialog(onCreate = { repo.addOffer(it); creating = false; sfx?.play(Sound.REWARD) }, onDismiss = { creating = false })
+            OfferCreatorDialog(onCreate = { offer -> creating = false; ask({ createDeal(offer) }) { sfx?.play(Sound.REWARD) } }, onDismiss = { creating = false })
         }
 
         pending?.let { item ->
@@ -145,11 +143,7 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                 onDismiss = { pending = null },
                 onConfirm = {
                     pending = null
-                    when (repo.buy(item)) {
-                        PurchaseResult.Ok -> showReward(RewardReveal("Purchased!", rewardOf(item)))
-                        PurchaseResult.NotEnough -> sfx?.play(Sound.DENIED)
-                        PurchaseResult.AlreadyOwned -> sfx?.play(Sound.DENIED)
-                    }
+                    ask({ buy(item.key) }) { showReward(RewardReveal("Purchased!", it)) }
                 },
             ) { RewardVisual(rewardOf(item), Modifier.size(120.dp)) }
         }
@@ -249,6 +243,7 @@ private fun BoltPile(size: Int) {
 @Composable
 private fun DailyGiftCard(save: SaveData, repo: GameRepository, width: androidx.compose.ui.unit.Dp, showReward: (RewardReveal) -> Unit) {
     val available = Progression.dailyGiftAvailable(save, repo.today)
+    val ask = io.github.projectwip.ui.LocalServerCall.current
     val reward = Shop.dailyGift(repo.today)
     val countdown by produceState("") {
         while (true) {
@@ -270,7 +265,7 @@ private fun DailyGiftCard(save: SaveData, repo: GameRepository, width: androidx.
                 PlainText(if (available) "Free, once a day" else "Next gift in $countdown", Type.Small, align = TextAlign.Center)
                 Spacer(Modifier.height(8.dp))
                 ChunkyButton(
-                    { repo.claimDailyGift()?.let { showReward(RewardReveal("Daily gift", it)) } },
+                    { ask({ claimGift() }) { showReward(RewardReveal("Daily gift", it)) } },
                     Modifier.fillMaxWidth().height(52.dp), ButtonStyle.GOLD, enabled = available,
                 ) { GameText(if (available) "FREE!" else countdown, Type.Heading) }
             }

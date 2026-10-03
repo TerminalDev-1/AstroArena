@@ -10,7 +10,6 @@ import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.MatchOutcome
 import io.github.projectwip.data.MatchReport
 import io.github.projectwip.data.Progression
-import io.github.projectwip.data.PurchaseResult
 import io.github.projectwip.data.Reward
 import io.github.projectwip.data.SaveData
 import io.github.projectwip.data.ServerVerdict
@@ -48,27 +47,18 @@ class ProgressionTest {
         assertNotNull("with the cap off there is always a next level", Progression.statPreview(juno, 250)[0].next)
     }
 
-    @Test fun upgradeSpendsBoltsAndLevelsUp() {
-        val s = SaveData(bolts = 100)
-        val up = Progression.upgrade(s, FighterId.JUNO)!!
-        assertEquals(2, up.progress(FighterId.JUNO).level)
-        assertEquals(100 - Balance.upgradeCost[0], up.bolts)
-        assertNull("can't upgrade a locked fighter", Progression.upgrade(s, FighterId.MIRA))
-        assertNull("can't afford", Progression.upgrade(SaveData(bolts = 0), FighterId.JUNO))
-    }
-
-    @Test fun theServerAwardsCupsAndTheGameAwardsBoltsAndTheFirstWinBonusOnce() {
-        val (a, r1) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = ServerVerdict(8, 8, false, 1, 3))
+    @Test fun theServerDecidesWhatAMatchIsWorth() {
+        val verdict = ServerVerdict(8, 8, false, 1, 3, bolts = 28, firstWinPrisms = 10)
+        val (a, r1) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = verdict)
         assertEquals(8, a.cups)
         assertEquals(8, a.bestCups)
         assertEquals(0, r1.cupsBefore)
         assertEquals(8, r1.cupDelta)
         assertTrue(r1.online)
-        assertTrue(r1.bolts > 0)
-        assertEquals(Balance.FIRST_WIN_PRISMS, r1.firstWinPrisms)
-        val (_, r2) = Progression.applyMatch(a, report(MatchOutcome.VICTORY), today = 100, verdict = ServerVerdict(8, 16, false, 1, 3))
-        assertEquals(0, r2.firstWinPrisms)
-        assertEquals(8, r2.cupsBefore)
+        assertEquals(28, r1.bolts)
+        assertEquals(10, r1.firstWinPrisms)
+        assertEquals("Bolts arrive with the server's profile, not by adding them up here", SaveData().bolts, a.bolts)
+        assertEquals(1, a.victories)
     }
 
     @Test fun theServersTotalsAreAdoptedNotAddedUp() {
@@ -85,7 +75,7 @@ class ProgressionTest {
         assertEquals(1, Progression.capsulesLeftToday(after, 7))
     }
 
-    @Test fun offlineMatchesPayBoltsButNoCupsOrDrops() {
+    @Test fun offlineMatchesEarnNothing() {
         val save = SaveData(cups = 120, bestCups = 120, capsules = 2)
         val (after, rewards) = Progression.applyMatch(save, report(MatchOutcome.VICTORY), today = 3, verdict = null)
         assertFalse(rewards.online)
@@ -93,55 +83,23 @@ class ProgressionTest {
         assertEquals(120, after.cups)
         assertFalse(rewards.capsuleEarned)
         assertEquals(2, after.capsules)
-        assertTrue(rewards.bolts > 0)
-        assertEquals(save.bolts + rewards.bolts, after.bolts)
+        assertEquals(0, rewards.bolts)
+        assertEquals(0, rewards.firstWinPrisms)
+        assertEquals(save.bolts, after.bolts)
         assertEquals(1, after.matchesPlayed)
     }
 
-    @Test fun cupTrackClaimsOnceAndKeepsBestCups() {
-        var s = SaveData(cups = 30, bestCups = 30)
-        val claimable = Progression.claimable(s)
-        assertEquals(listOf(10, 25), claimable.map { it.cups })
-        val (s2, reward) = Progression.claimMilestone(s, claimable[0])!!
-        assertEquals(Reward.Bolts(40), reward)
-        assertNull(Progression.claimMilestone(s2, claimable[0]))
-        // Losing cups doesn't revoke reached milestones.
-        s = s2.copy(cups = 5)
-        assertEquals(listOf(25), Progression.claimable(s).map { it.cups })
-    }
-
-    @Test fun duplicateFighterRewardIsCompensated() {
-        val owned = Progression.grant(SaveData(cups = 100, bestCups = 100), Reward.UnlockFighter(FighterId.BRAKK))
-        val m = CupTrack.milestones.first { it.reward == Reward.UnlockFighter(FighterId.BRAKK) }
-        val (_, r) = Progression.claimMilestone(owned, m)!!
-        assertEquals(CupTrack.duplicateCompensation(m.reward), r)
-    }
-
-    @Test fun shopPurchases() {
-        val mira = Shop.fighterOffers.first { it.fighter == FighterId.MIRA }
-        assertEquals(PurchaseResult.NotEnough, Progression.buy(SaveData(prisms = 0), mira).second)
-        val (s, r) = Progression.buy(SaveData(prisms = 500), mira)
-        assertEquals(PurchaseResult.Ok, r)
-        assertTrue(s.progress(FighterId.MIRA).unlocked)
-        assertEquals(PurchaseResult.AlreadyOwned, Progression.buy(s, mira).second)
+    @Test fun cupTrackRewardsStayClaimableAfterLosingCups() {
+        val s = SaveData(cups = 30, bestCups = 30)
+        assertEquals(listOf(10, 25), Progression.claimable(s).map { it.cups })
+        // The server records a claim; losing Cups doesn't revoke what was reached.
+        assertEquals(listOf(25), Progression.claimable(s.copy(cups = 5, claimedMilestones = setOf(10))).map { it.cups })
     }
 
     @Test fun dailyGiftOncePerDay() {
-        val (s, _) = Progression.claimDailyGift(SaveData(), 10)!!
-        assertNull(Progression.claimDailyGift(s, 10))
-        assertNotNull(Progression.claimDailyGift(s, 11))
-        assertFalse(Progression.dailyGiftAvailable(s, 10))
-    }
-
-    @Test fun lastSparkBoltsFollowPlacement() {
-        fun ffa(place: Int) = MatchReport(outcome = if (place == 1) MatchOutcome.VICTORY else MatchOutcome.DEFEAT,
-            mode = io.github.projectwip.data.GameMode.LAST_SPARK, placement = place, players = 10, fighter = FighterId.JUNO,
-            kos = 0, deaths = 1, damageDealt = 0, mvp = false, difficulty = BotDifficulty.NORMAL, blueScore = 0, redScore = 0)
-        val start = SaveData(cups = 200, bestCups = 200)
-        val first = Progression.applyMatch(start, ffa(1), 1, null).second
-        val fifth = Progression.applyMatch(start, ffa(5), 1, null).second
-        val last = Progression.applyMatch(start, ffa(10), 1, null).second
-        assertTrue(first.bolts > fifth.bolts && fifth.bolts > last.bolts)
+        assertTrue(Progression.dailyGiftAvailable(SaveData(), 10))
+        assertFalse(Progression.dailyGiftAvailable(SaveData(lastDailyGiftDay = 10), 10))
+        assertTrue(Progression.dailyGiftAvailable(SaveData(lastDailyGiftDay = 10), 11))
     }
 
     @Test fun trackIsSortedAndUnique() {
@@ -158,19 +116,35 @@ class ProgressionTest {
         assertEquals("best Cups never go down", 30, Progression.syncAccount(save, 10, 5, 3, 6).bestCups)
     }
 
-    @Test fun aDropTheServerOpenedIsGranted() {
-        val save = SaveData(capsules = 2)
-        val bolts = Progression.grantDrop(save, CapsuleResult(CapsuleTier.SCRAP, Reward.Bolts(100)))
-        assertEquals(save.bolts + 100, bolts.bolts)
-        assertEquals(1, bolts.capsulesOpened)
-        assertEquals("the count of unopened drops is the server's to change", 2, bolts.capsules)
-        val bundle = Reward.Bundle(listOf(Reward.UnlockFighter(FighterId.MIRA), Reward.Prisms(400), Reward.Bolts(2000)))
-        val ultra = Progression.grantDrop(save, CapsuleResult(CapsuleTier.ULTRA, bundle, pieces = 8))
-        assertTrue(ultra.progress(FighterId.MIRA).unlocked)
-        assertEquals(save.prisms + 400, ultra.prisms)
-        // A fighter that is somehow already owned is paid out instead of wasted.
-        val again = Progression.grantDrop(ultra, CapsuleResult(CapsuleTier.PRISMATIC, Reward.UnlockFighter(FighterId.MIRA)))
-        assertEquals(ultra.bolts + 300, again.bolts)
+    @Test fun theServersProfileIsShownAsItIs() {
+        val local = SaveData(
+            bolts = 5, prisms = 5, selectedFighter = FighterId.MIRA,
+            fighters = SaveData.defaultFighters() + (FighterId.MIRA to io.github.projectwip.data.FighterProgress(true, 3, skin = 2, ownedSkins = setOf(0, 2))) +
+                (FighterId.JUNO to io.github.projectwip.data.FighterProgress(true, 9, skin = 1, ownedSkins = setOf(0, 1))),
+        )
+        val profile = io.github.projectwip.data.ServerProfile(
+            bolts = 900, prisms = 40, bestCups = 250,
+            fighters = mapOf(
+                FighterId.JUNO to io.github.projectwip.data.FighterProgress(true, 4, ownedSkins = setOf(0, 1)),
+                FighterId.BRAKK to io.github.projectwip.data.FighterProgress(true, 2, ownedSkins = setOf(0)),
+            ),
+            claimedMilestones = setOf(10, 25), lastDailyGiftDay = 7, lastFirstWinDay = 6,
+        )
+        val deal = io.github.projectwip.data.CustomOffer(id = 3, title = "Deal", bolts = 100, price = 5, purchased = 1)
+        val synced = Progression.syncAccount(local, cups = 200, drops = 2, dropsLeftToday = 3, today = 7, profile = profile, deals = listOf(deal))
+        assertEquals(900, synced.bolts)
+        assertEquals(40, synced.prisms)
+        assertEquals(250, synced.bestCups)
+        assertEquals("the server's level wins", 4, synced.progress(FighterId.JUNO).level)
+        assertEquals("the colourway being worn is kept", 1, synced.progress(FighterId.JUNO).skin)
+        assertTrue(synced.progress(FighterId.BRAKK).unlocked)
+        assertFalse("a fighter the server doesn't list as unlocked is locked", synced.progress(FighterId.MIRA).unlocked)
+        assertEquals("and can't stay selected", FighterId.JUNO, synced.selectedFighter)
+        assertEquals(setOf(10, 25), synced.claimedMilestones)
+        assertFalse(Progression.dailyGiftAvailable(synced, 7))
+        assertEquals(listOf(deal), synced.customOffers)
+        assertEquals("applying the same account twice changes nothing", synced, Progression.syncAccount(synced, 200, 2, 3, 7, profile, listOf(deal)))
+        assertEquals(1, Progression.dropOpened(synced).capsulesOpened)
     }
 
     @Test fun dropOddsShownInTheDebugMenu() {
@@ -197,41 +171,35 @@ class ProgressionTest {
         assertEquals(Balance.upgradeCost.last(), Balance.upgradeCostFrom(Balance.upgradeCost.size))
         assertEquals(Balance.upgradeCost.last() + Balance.UPGRADE_COST_STEP, Balance.upgradeCostFrom(Balance.upgradeCost.size + 1))
         assertTrue((1..300).zipWithNext().all { (a, b) -> Balance.upgradeCostFrom(b) >= Balance.upgradeCostFrom(a) })
-        // Normally the cap holds at MAX_LEVEL...
-        var capped = SaveData(bolts = 10_000_000)
-        repeat(Balance.MAX_LEVEL - 1) { capped = Progression.upgrade(capped, FighterId.JUNO)!! }
-        assertEquals(Balance.MAX_LEVEL, capped.progress(FighterId.JUNO).level)
+        // Normally the cap holds at MAX_LEVEL, and the dev toggle lifts it.
+        val top = SaveData.defaultFighters() + (FighterId.JUNO to io.github.projectwip.data.FighterProgress(true, Balance.MAX_LEVEL))
+        val capped = SaveData(bolts = 10_000_000, fighters = top)
         assertTrue(Progression.levelCapped(capped, FighterId.JUNO))
-        assertNull("the cap stops further upgrades", Progression.upgrade(capped, FighterId.JUNO))
-        // ...and the dev toggle lifts it.
-        var save = SaveData(bolts = 10_000_000, settings = io.github.projectwip.data.Settings(debugNoLevelCap = true))
-        repeat(60) { save = Progression.upgrade(save, FighterId.JUNO)!! }
-        assertEquals(61, save.progress(FighterId.JUNO).level)
+        assertFalse(Progression.canUpgrade(capped, FighterId.JUNO))
+        assertTrue(Progression.canUpgrade(capped.copy(settings = io.github.projectwip.data.Settings(debugNoLevelCap = true)), FighterId.JUNO))
         val juno = Balance.fighter(FighterId.JUNO)
         assertEquals(juno.health.base + juno.health.perLevel * 60, juno.health.at(61))
     }
 
-    @Test fun debugUpgradeCostScalesThePrice() {
+    @Test fun debugUpgradeCostScalesThePriceShown() {
         val normal = SaveData(bolts = 1000)
         assertEquals(Balance.upgradeCost[0], Progression.upgradeCost(normal, FighterId.JUNO))
         val free = normal.copy(bolts = 0, settings = io.github.projectwip.data.Settings(debugUpgradeCost = 0f))
         assertEquals(0, Progression.upgradeCost(free, FighterId.JUNO))
-        assertEquals("free upgrades need no Bolts", 2, Progression.upgrade(free, FighterId.JUNO)!!.progress(FighterId.JUNO).level)
-        val triple = normal.copy(settings = io.github.projectwip.data.Settings(debugUpgradeCost = 3f))
-        val up = Progression.upgrade(triple, FighterId.JUNO)!!
-        assertEquals(1000 - Balance.upgradeCost[0] * 3, up.bolts)
+        assertTrue(Progression.canUpgrade(free, FighterId.JUNO))
+        assertEquals(Balance.upgradeCost[0] * 3, Progression.upgradeCost(normal.copy(settings = io.github.projectwip.data.Settings(debugUpgradeCost = 3f)), FighterId.JUNO))
     }
 
-    @Test fun bossModePaysBoltsOnly() {
-        val save = SaveData(cups = 100, bestCups = 100, capsules = 0)
-        val win = report(MatchOutcome.VICTORY).copy(mode = GameMode.BOSS, players = 2)
-        val (after, rewards) = Progression.applyMatch(save, win, today = 9, verdict = ServerVerdict(0, 100, false, 0, 3))
-        assertEquals("no Cups from a boss that never gets tougher", 0, rewards.cupDelta)
-        assertEquals(100, after.cups)
-        assertTrue(rewards.bolts > 0)
-        assertEquals(0, rewards.firstWinPrisms)
-        assertFalse(rewards.capsuleEarned)
-        assertEquals(0, after.capsules)
+    @Test fun walkingOutOfAFreeForAllIsLastPlaceNotFirst() {
+        val config = io.github.projectwip.sim.MatchConfig(FighterId.JUNO, 1, 0, "Me", BotDifficulty.EASY, mode = GameMode.LAST_SPARK)
+        val match = io.github.projectwip.sim.Match(config)
+        assertEquals("still standing reads as first...", 1, match.report().placement)
+        val left = match.forfeit()
+        assertEquals("...but leaving puts you behind everyone still in", GameMode.LAST_SPARK.players, left.placement)
+        assertEquals(MatchOutcome.DEFEAT, left.outcome)
+        val team = io.github.projectwip.sim.Match(config.copy(mode = GameMode.KNOCKOUT_RUSH)).forfeit()
+        assertEquals(MatchOutcome.DEFEAT, team.outcome)
+        assertEquals(0, team.placement)
     }
 
     @Test fun versionsCompareByNumber() {

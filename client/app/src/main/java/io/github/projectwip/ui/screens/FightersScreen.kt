@@ -266,6 +266,7 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
 
 @Composable
 private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, go: (Screen) -> Unit, onUpgraded: () -> Unit) {
+    val ask = io.github.projectwip.ui.LocalServerCall.current
     val p = save.progress(id)
     if (!p.unlocked) {
         val track = CupTrack.milestones.firstOrNull { it.reward == Reward.UnlockFighter(id) }
@@ -290,7 +291,7 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
         } else {
             val afford = save.bolts >= cost
             ChunkyButton(
-                { if (repo.upgrade(id)) onUpgraded() },
+                { ask({ upgrade(id, save.settings.debugUpgradeCost, save.settings.debugNoLevelCap) }) { onUpgraded() } },
                 Modifier.weight(1f).height(68.dp), ButtonStyle.GREEN, enabled = afford, sound = Sound.UPGRADE,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {

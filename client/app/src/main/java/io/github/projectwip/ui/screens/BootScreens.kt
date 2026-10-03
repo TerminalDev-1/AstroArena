@@ -56,8 +56,13 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            GameIcon(IconKind.CUP, Modifier.size(96.dp).graphicsLayer { val s = 1f + 0.05f * sin(time * 3f); scaleX = s; scaleY = s })
-            Spacer(Modifier.height(8.dp))
+            // The roster, bobbing out of step with each other.
+            Row(horizontalArrangement = Arrangement.spacedBy((-70).dp), verticalAlignment = Alignment.Bottom) {
+                io.github.projectwip.data.Balance.fighters.forEachIndexed { i, def ->
+                    io.github.projectwip.ui.FighterView(def, 0, Modifier.size(if (i == 1 || i == 2) 230.dp else 200.dp)
+                        .graphicsLayer { translationY = 7.dp.toPx() * sin(time * 2.6f + i * 1.3f) }, pedestal = false)
+                }
+            }
             GameText("ASTROARENA", Type.Display.copy(fontSize = Type.Display.fontSize * 1.5f), color = Palette.Gold, outline = 5.dp)
             Spacer(Modifier.height(18.dp))
             // One, two, three dots, repeating.
@@ -77,9 +82,22 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
         if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
             GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
         }
+        if (onSkip == null) PlainText(TIPS[(time / 4f).toInt() % TIPS.size], Type.Body, Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp), color = Color.White, align = TextAlign.Center)
         PlainText("v${BuildConfig.VERSION_NAME.removePrefix("v")}", Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
     }
 }
+
+/** Shown one at a time on the loading and matchmaking screens. */
+val TIPS = listOf(
+    "Tip: tap the attack stick to fire at the nearest enemy.",
+    "Tip: tall grass hides you until an enemy gets close.",
+    "Tip: your super charges as you land hits.",
+    "Tip: stay out of the fight for a few seconds and you start to heal.",
+    "Tip: in Last Spark, break crates for Power Cells before the storm closes in.",
+    "Tip: a top-four finish or a win earns a Spark Drop, up to three a day.",
+    "Tip: upgrades raise a fighter's health and damage. Bolts pay for them.",
+    "Tip: you can move every control in Settings > Controls.",
+)
 
 /**
  * A new player's first screen: choose the name other players will see. Their account is made on the server
@@ -107,7 +125,7 @@ fun NameScreen(onDone: (String) -> Unit) {
 
 /**
  * The server didn't answer for a whole minute. The player chooses: keep trying, or play in offline mode, where
- * matches against bots still work and pay Bolts but Cups and Spark Drops stand still.
+ * matches against bots still work but nothing is earned or spent.
  */
 @Composable
 fun ConnectFailedScreen(url: String, onRetry: () -> Unit, onOffline: () -> Unit) {
@@ -123,7 +141,7 @@ fun ConnectFailedScreen(url: String, onRetry: () -> Unit, onOffline: () -> Unit)
                     Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 4,
                 )
                 PlainText(
-                    "In offline mode you can still play every mode against bots and earn Bolts. Cups and Spark Drops are only earned online, and drops can't be opened until you are back.",
+                    "In offline mode you can still play every mode against bots, for practice. Cups, Bolts, Prisms and Spark Drops are only earned online, and the shop, upgrades and drops wait until you are back.",
                     Type.Small, align = TextAlign.Center, maxLines = 4,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {

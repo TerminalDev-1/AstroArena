@@ -240,7 +240,8 @@ private fun DisplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
 @Composable
 private fun DataTab(repo: GameRepository) {
     var confirm by remember { mutableStateOf(false) }
-    SectionTitle("RESET PROGRESS", "Erase Cups, levels, currencies and claimed rewards. Settings are kept. This cannot be undone.")
+    val ask = io.github.projectwip.ui.LocalServerCall.current
+    SectionTitle("RESET PROGRESS", "Erase Cups, levels, currencies and claimed rewards on the server. Your name and settings are kept. This cannot be undone.")
     ChunkyButton({ confirm = true }, Modifier.width(260.dp).height(56.dp), ButtonStyle.RED) { GameText("RESET PROGRESS", Type.Heading) }
     Spacer(Modifier.height(10.dp))
     // ---- game server
@@ -251,8 +252,8 @@ private fun DataTab(repo: GameRepository) {
     SectionTitle("SERVER", when {
         status == null -> "No server connection in this build."
         !status.supported -> "The server at ${status.url} doesn't support this version."
-        status.online -> "Online: connected to ${status.url}. The server keeps your Cups and Spark Drops, sets matches up and backs up your save."
-        else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. Matches still pay Bolts; Cups and Spark Drops wait until you're back online."
+        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Spark Drops, Bolts, Prisms and fighters, and sets matches up."
+        else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You can still play against bots for practice; nothing is earned or spent until you're back online."
     })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ServerField(address, BuildConfig.SERVER_URL) { url -> repo.updateSettings { it.copy(serverUrl = url) } }
@@ -273,7 +274,7 @@ private fun DataTab(repo: GameRepository) {
     }, Modifier.width(380.dp).height(56.dp), ButtonStyle.CYAN) { GameText("SOURCE ON GITHUB", Type.Heading) }
     PlainText(REPO_URL, Type.Small, color = Palette.Cyan)
     if (confirm) {
-        ConfirmDialog("RESET EVERYTHING?", "All progress will be lost.", "RESET", { repo.resetProgress(); confirm = false }, { confirm = false }, ButtonStyle.RED)
+        ConfirmDialog("RESET EVERYTHING?", "All progress will be lost.", "RESET", { confirm = false; ask({ reset() }) { repo.resetProgress() } }, { confirm = false }, ButtonStyle.RED)
     }
 }
 

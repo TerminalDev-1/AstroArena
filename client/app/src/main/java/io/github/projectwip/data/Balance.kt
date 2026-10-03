@@ -119,21 +119,6 @@ object Balance {
     const val STARTING_BOLTS = 60
     const val STARTING_PRISMS = 0
 
-    // ---- Rewards (all visible on the result screen) ----
-    fun boltsFor(outcome: MatchOutcome, kos: Int, difficulty: BotDifficulty): Int {
-        val base = when (outcome) {
-            MatchOutcome.VICTORY -> 24
-            MatchOutcome.DRAW -> 14
-            MatchOutcome.DEFEAT -> 10
-        }
-        val koBonus = 2 * kos.coerceAtMost(6)
-        return Math.round((base + koBonus) * difficulty.boltMultiplier)
-    }
-
-    // ---- Last Spark (free-for-all) ----
-    /** Bolts by placement, before the difficulty multiplier and KO bonus. */
-    val placementBolts = intArrayOf(30, 26, 22, 18, 15, 12, 10, 8, 6, 5)
-
     // Health and damage use big numbers (thousands of health, hundreds to a thousand-odd per hit), the scale
     // players of the genre expect. Everything was multiplied by the same factor, so fights last just as long.
 
@@ -157,12 +142,7 @@ object Balance {
     const val STORM_DAMAGE_BASE = 0.10f
     const val STORM_DAMAGE_GROWTH = 0.002f
 
-    fun boltsForPlacement(placement: Int, kos: Int, difficulty: BotDifficulty): Int {
-        val base = placementBolts[(placement - 1).coerceIn(0, placementBolts.lastIndex)]
-        return Math.round((base + 2 * kos.coerceAtMost(6)) * difficulty.boltMultiplier)
-    }
-
-    /** Prisms for the first victory each calendar day. */
+    /** Prisms for the first victory each calendar day (the server pays them; this is for showing it). */
     const val FIRST_WIN_PRISMS = 10
 
     val fighters: List<FighterDef> = listOf(

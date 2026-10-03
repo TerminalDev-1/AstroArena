@@ -188,8 +188,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         booting = false
     }
 
-    // Cups and Spark Drops are the server's: whatever it says this player has is what the game shows.
-    LaunchedEffect(account) { account?.let { repo.syncAccount(it.cups, it.drops, it.dropsLeftToday) } }
+    // Cups, Spark Drops, currencies, fighters and shop deals are the server's: whatever it says this player has is what the game shows.
+    LaunchedEffect(account) { account?.let { repo.sync(it) } }
     // Anyone who isn't a developer plays without the debug menu's cheats, even if their save has some switched on.
     LaunchedEffect(dev, booting) { if (!booting && !dev) repo.clearCheats() }
     // Offline in the menus: quietly keep trying to get back online.
@@ -225,6 +225,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     var toast by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(toast) { if (toast != null) { delay(3200); toast = null } }
     var opening by remember { mutableStateOf(false) }
+    val ask = remember { ServerCall(scope, server, repo, sfx) { toast = it } }
     // Spark Drops are opened by the server: it rolls the drop, the game shows what came out.
     val openCapsule: () -> Unit = {
         if (!opening) {
@@ -237,7 +238,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                         server.openDrop(if (dev) cheats.debugLuck else 0f, dev && cheats.debugInfiniteCapsules)
                     }
                     opening = false
-                    if (result != null) { repo.grantDrop(result); capsule = result }
+                    server.status.value.account?.let { repo.sync(it) }
+                    if (result != null) { repo.dropOpened(); capsule = result }
                     else toast = if (server.status.value.online) "No Spark Drops to open." else "Couldn't reach the server. Try again in a moment."
                 }
             }
@@ -259,7 +261,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         val metrics = UiMetrics(maxWidth.value / scale, maxHeight.value / scale, scale)
 
         val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
-        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalDev provides dev) {
+        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalDev provides dev, LocalServerCall provides ask) {
             if (screen !is Screen.Match) {
                 androidx.compose.ui.viewinterop.AndroidView(
                     factory = { ctx -> io.github.projectwip.render3d.LobbyView(ctx, lobby) },
@@ -294,10 +296,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                         // Only developers choose how tough the bots are. Everyone else gets the server's setting (Easy when offline).
                         s.config.copy(difficulty = if (dev) s.config.difficulty else account?.difficulty ?: io.github.projectwip.data.BotDifficulty.EASY),
                         save.settings, sfx, save.matchesPlayed, server,
+                        onCancel = { screen = Screen.Home },
                         onFinish = { summary ->
                             scope.launch {
-                                // The server says what the match was worth. No answer means an offline match: Bolts only.
+                                // The server says what the match was worth. No answer means an offline match: nothing is earned.
                                 val verdict = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server.reportMatch(summary.serverMatchId, summary.report) }
+                                server.status.value.account?.let { repo.sync(it) }
                                 // The Training Area is practice: nothing to record, straight back to the lobby.
                                 if (summary.report.mode == io.github.projectwip.data.GameMode.TRAINING) screen = Screen.Home
                                 else screen = Screen.Result(summary, repo.applyMatch(summary.report, verdict))
@@ -319,7 +323,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             // Server status in the corner, and its notice across the top of the home screen.
             if (screen !is Screen.Match && capsule == null && reveal == null) {
                 PlainText(
-                    if (serverStatus.online) "● ONLINE" else "● OFFLINE MODE · no Cups or Spark Drops", Type.Small,
+                    if (serverStatus.online) "● ONLINE" else "● OFFLINE MODE · practice only", Type.Small,
                     Modifier.align(Alignment.BottomStart).padding(start = if (dev) 48.dp else 14.dp, bottom = 12.dp),
                     color = if (serverStatus.online) Palette.Positive else Palette.TextDim,
                 )

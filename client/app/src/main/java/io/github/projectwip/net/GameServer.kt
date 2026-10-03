@@ -6,6 +6,10 @@ import io.github.projectwip.ai.BotProfile
 import io.github.projectwip.data.BotDifficulty
 import io.github.projectwip.data.CapsuleResult
 import io.github.projectwip.data.CapsuleTier
+import io.github.projectwip.data.Currency
+import io.github.projectwip.data.CustomOffer
+import io.github.projectwip.data.FighterProgress
+import io.github.projectwip.data.ServerProfile
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.GameMode
 import io.github.projectwip.data.MatchReport
@@ -34,6 +38,10 @@ data class Account(
     val dropsLeftToday: Int,
     /** The bot difficulty the server gives ordinary players. */
     val difficulty: BotDifficulty,
+    /** Currencies, fighters and claimed rewards. */
+    val profile: ServerProfile? = null,
+    /** The shop deals running right now, with how many times this player has bought each. */
+    val deals: List<CustomOffer> = emptyList(),
 )
 
 /** What the game knows about the server right now. */
@@ -60,9 +68,9 @@ data class RemotePlayer(val id: String, val name: String, val cups: Int, val fig
 /**
  * The game's connection to the AstroArena server (see the `server/` directory of the repository).
  *
- * The server is in charge of Cups, Spark Drops (earning them and what comes out of them), the bot difficulty and
- * who gets the debug menu. Without it the game still plays, in offline mode: matches are set up on the device
- * and pay Bolts, but no Cups or Spark Drops are earned and drops can't be opened. Nothing here may ever block
+ * The server is in charge of Cups, Spark Drops, Bolts, Prisms, fighters, the shop and its deals, the bot
+ * difficulty and who gets the debug menu. Without it the game still plays, in offline mode: matches are set up
+ * on the device, but nothing is earned and nothing can be bought, upgraded, claimed or opened. Nothing here may ever block
  * or break offline play.
  *
  * The blocking calls ([connect], [syncSave], [planMatch], [reportMatch], [openDrop], [leaderboard]) must be made
@@ -123,11 +131,79 @@ class GameServer(context: Context) {
             id = o.optString("id"), developer = o.optBoolean("developer"), cups = o.optInt("cups"), rank = o.optInt("rank"), players = o.optInt("players"), drops = o.optInt("drops"),
             dropsLeftToday = o.optInt("dropsLeftToday"),
             difficulty = BotDifficulty.entries.firstOrNull { it.name == o.optString("difficulty") } ?: BotDifficulty.EASY,
+            profile = o.optJSONObject("profile")?.let { profile(it) },
+            deals = o.optJSONArray("deals")?.let { a -> (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { deal(it) } } } ?: emptyList(),
         )
         _status.value = _status.value.copy(account = account)
     }
 
     private fun lost() { _status.value = _status.value.copy(online = false) }
+
+    private fun ints(o: JSONObject, key: String): Set<Int> = o.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.optInt(it) }.toSet() } ?: emptySet()
+
+    private fun fighterNamed(name: String) = FighterId.entries.firstOrNull { it.name == name }
+
+    private fun profile(o: JSONObject): ServerProfile {
+        val fighters = o.optJSONObject("fighters")
+        return ServerProfile(
+            bolts = o.optInt("bolts"), prisms = o.optInt("prisms"), bestCups = o.optInt("bestCups"),
+            fighters = FighterId.entries.associateWith { id ->
+                val f = fighters?.optJSONObject(id.name)
+                FighterProgress(
+                    unlocked = f?.optBoolean("unlocked") ?: (id == FighterId.JUNO), level = (f?.optInt("level", 1) ?: 1).coerceAtLeast(1),
+                    ownedSkins = (f?.let { ints(it, "ownedSkins") } ?: emptySet()) + 0,
+                )
+            },
+            claimedMilestones = ints(o, "claimedMilestones"),
+            lastDailyGiftDay = o.optLong("lastDailyGiftDay", -1), lastFirstWinDay = o.optLong("lastFirstWinDay", -1),
+        )
+    }
+
+    private fun deal(o: JSONObject) = CustomOffer(
+        id = o.optLong("id"), title = o.optString("title", "Offer").take(24), bolts = o.optInt("bolts"), prisms = o.optInt("prisms"),
+        fighter = fighterNamed(o.optString("fighter")), skinFighter = fighterNamed(o.optString("skinFighter")), skinIndex = o.optInt("skinIndex"),
+        currency = Currency.entries.firstOrNull { it.name == o.optString("currency") } ?: Currency.PRISMS,
+        price = o.optInt("price"), wasPrice = o.optInt("wasPrice"), expiresAt = o.optLong("expiresAt"),
+        limit = o.optInt("limit", 1), purchased = o.optInt("purchased"), theme = o.optInt("theme"),
+    )
+
+    /** A request that changes this player's account. The reply (which carries the new account) or null if it was refused or never arrived. */
+    private fun act(path: String, body: JSONObject = JSONObject()): JSONObject? {
+        if (!usable) return null
+        val r = call("POST", path, body, auth = true)
+        if (r == null) lost()
+        return if (r?.code == 200) r.body else null
+    }
+
+    /** Levels a fighter up. Returns what it cost, or null if the server said no. [costFactor] and [noCap] count for developers only. */
+    fun upgrade(fighter: FighterId, costFactor: Float = 1f, noCap: Boolean = false): Int? =
+        act("/v1/fighters/upgrade", JSONObject().put("fighter", fighter.name).put("costFactor", costFactor.toDouble()).put("noCap", noCap))?.optInt("cost")
+
+    /** Buys a standing shop item (see [io.github.projectwip.data.ShopItem.key]) and returns what was received. */
+    fun buy(itemKey: String): Reward? = act("/v1/shop/buy", JSONObject().put("item", itemKey))?.optJSONObject("reward")?.let { reward(it) }
+
+    fun claimGift(): Reward? = act("/v1/shop/gift")?.optJSONObject("reward")?.let { reward(it) }
+
+    /** Claims the Cup Track reward at [cups]. What comes back is what was actually given (owned things are paid out instead). */
+    fun claimMilestone(cups: Int): Reward? = act("/v1/track/claim", JSONObject().put("cups", cups))?.optJSONObject("reward")?.let { reward(it) }
+
+    fun buyDeal(id: Long): Reward? = act("/v1/shop/deals/$id/buy")?.optJSONObject("reward")?.let { reward(it) }
+
+    /** Developers: puts a deal in every player's shop. */
+    fun createDeal(o: CustomOffer): Long? = act("/v1/dev/deals", JSONObject()
+        .put("title", o.title).put("bolts", o.bolts).put("prisms", o.prisms).put("fighter", o.fighter?.name ?: "")
+        .put("skinFighter", o.skinFighter?.name ?: "").put("skinIndex", o.skinIndex).put("currency", o.currency.name)
+        .put("price", o.price).put("wasPrice", o.wasPrice).put("expiresAt", o.expiresAt).put("limit", o.limit).put("theme", o.theme))?.optLong("id")
+
+    /** Developers: takes a deal out of the shop. */
+    fun deleteDeal(id: Long): Boolean? = act("/v1/dev/deals/$id/delete")?.optBoolean("deleted")
+
+    /** Starts this account's progress over on the server. */
+    fun reset(): Boolean? = act("/v1/reset")?.let { true }
+
+    /** Developer hand-outs (the server refuses anyone else). */
+    fun devGrant(cups: Int = 0, drops: Int = 0, bolts: Int = 0, prisms: Int = 0): Boolean? =
+        act("/v1/dev/grant", JSONObject().put("cups", cups).put("drops", drops).put("bolts", bolts).put("prisms", prisms))?.let { true }
 
     private fun register(name: String): Boolean {
         val r = call("POST", "/v1/players", JSONObject().put("name", name).put("version", version)) ?: return false
@@ -244,7 +320,10 @@ class GameServer(context: Context) {
         if (r == null) lost()
         if (r == null || r.code != 200 || o == null) return null
         val account = o.optJSONObject("account")
-        return ServerVerdict(o.optInt("cupDelta"), o.optInt("cups"), o.optBoolean("drop"), account?.optInt("drops") ?: 0, account?.optInt("dropsLeftToday") ?: 0)
+        return ServerVerdict(
+            o.optInt("cupDelta"), o.optInt("cups"), o.optBoolean("drop"), account?.optInt("drops") ?: 0, account?.optInt("dropsLeftToday") ?: 0,
+            bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"),
+        )
     }
 
     /**
@@ -274,12 +353,6 @@ class GameServer(context: Context) {
             "bundle" -> o.optJSONArray("items")?.let { a -> Reward.Bundle((0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { reward(it) } }) }
             else -> null
         }
-    }
-
-    /** Developer hand-outs of Cups and Spark Drops (the server refuses anyone else). */
-    fun devGrant(cups: Int = 0, drops: Int = 0) {
-        if (!usable) return
-        worker.execute { if (call("POST", "/v1/dev/grant", JSONObject().put("cups", cups).put("drops", drops), auth = true) == null) lost() }
     }
 
     /** Real players by Cups, or null when the server can't be asked. */

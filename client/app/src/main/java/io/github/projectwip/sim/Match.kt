@@ -129,6 +129,16 @@ class Match(val config: MatchConfig) {
         )
     }
 
+    /**
+     * The report for a player who walks out: always a defeat, and in free-for-all they place behind everyone
+     * still standing (not first, which is what "not knocked out yet" would otherwise read as).
+     */
+    fun forfeit(): MatchReport {
+        val r = report()
+        val standing = world.fighters.count { !it.eliminated }
+        return r.copy(outcome = MatchOutcome.DEFEAT, placement = if (freeForAll && !player.eliminated) standing else r.placement, mvp = false)
+    }
+
     companion object {
         const val STEP = 1f / 60f
         /** How many minis make up the Training Area's swarm. */

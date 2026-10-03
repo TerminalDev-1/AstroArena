@@ -13,8 +13,9 @@ sealed interface Reward {
 enum class Currency { FREE, BOLTS, PRISMS }
 
 /**
- * A shop offer created in-game with the Offer Creator. Everything about it is chosen by the player:
- * contents, price, an optional "was" price shown as a discount, expiry, purchase limit and colour theme.
+ * A shop deal. Developers make them in-game with the Offer Creator (contents, price, an optional "was" price
+ * shown as a discount, expiry, purchase limit and colour theme); the server keeps them and shows them to every
+ * player, each with their own [purchased] count.
  */
 data class CustomOffer(
     val id: Long,
@@ -130,13 +131,6 @@ object CupTrack {
     fun nextMilestone(cups: Int): Milestone? = milestones.firstOrNull { it.cups > cups }
     fun previousMilestoneCups(cups: Int): Int = milestones.lastOrNull { it.cups <= cups }?.cups ?: 0
 
-    /** If a track reward is already owned (e.g. fighter bought in the shop), it pays out this instead. */
-    fun duplicateCompensation(reward: Reward): Reward = when (reward) {
-        is Reward.UnlockFighter -> Reward.Bolts(300)
-        is Reward.SkinReward -> Reward.Prisms(30)
-        is Reward.Bundle -> Reward.Bundle(reward.items.map { duplicateCompensation(it) })
-        else -> reward
-    }
 }
 
 sealed interface ShopItem {

@@ -69,6 +69,7 @@ fun DebugMenu(save: SaveData, repo: GameRepository, onClose: () -> Unit) {
 @Composable
 fun DebugControls(save: SaveData, repo: GameRepository) {
     val s = save.settings
+    val ask = io.github.projectwip.ui.LocalServerCall.current
     // The slider's own position while it is being dragged, so the number and the odds follow the thumb;
     // the save is only written when it is let go.
     var luck by remember { mutableFloatStateOf(s.debugLuck) }
@@ -76,12 +77,12 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
     fun snap(v: Float) = (v * 10).toInt() / 10f
     val server = io.github.projectwip.ui.LocalServer.current
     val status = server?.status?.collectAsState()?.value
-    // Drops, Cups and the bots' difficulty are the server's, so those cheats only work if it lists this player as a developer.
+    // Everything these cheats touch is the server's, so they only work if it lists this player as a developer.
     val trusted = status?.online == true && status.account?.developer == true
     SectionTitle("DEBUG MENU", "Cheats for trying things out. They change your real save.")
     if (!trusted) PlainText(
-        if (status?.online != true) "Offline: drop luck, infinite drops, the difficulty choice and Cup and drop hand-outs need the server."
-        else "The server doesn't list you as a developer, so it ignores drop luck, infinite drops, your difficulty choice and Cup and drop hand-outs. " +
+        if (status?.online != true) "Offline: everything in this menu needs the server."
+        else "The server doesn't list you as a developer, so it ignores everything in this menu. " +
             "Add your player ID (${server?.playerId ?: "see Settings > Data"}) to game.cfg on the server.",
         Type.Body, color = io.github.projectwip.ui.Palette.Gold,
     )
@@ -111,13 +112,13 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
         Type.Body, color = Color.White)
     SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.cups)} Cups, ${"%,d".format(save.bolts)} Bolts, ${"%,d".format(save.prisms)} Prisms and ${save.capsules} drops.")
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        ChunkyButton({ server?.devGrant(cups = 50) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+50 CUPS", Type.Label, outline = 2.dp) }
-        ChunkyButton({ server?.devGrant(cups = 500) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+500 CUPS", Type.Label, outline = 2.dp) }
-        ChunkyButton({ server?.devGrant(cups = -50) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.RED, lip = 4.dp) { GameText("−50 CUPS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(cups = 50) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+50 CUPS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(cups = 500) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+500 CUPS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(cups = -50) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.RED, lip = 4.dp) { GameText("−50 CUPS", Type.Label, outline = 2.dp) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        ChunkyButton({ repo.debugGrant(bolts = 1000) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("+1,000 BOLTS", Type.Label, outline = 2.dp) }
-        ChunkyButton({ repo.debugGrant(prisms = 100) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("+100 PRISMS", Type.Label, outline = 2.dp) }
-        ChunkyButton({ server?.devGrant(drops = 5) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 DROPS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(bolts = 1000) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("+1,000 BOLTS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(prisms = 100) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("+100 PRISMS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(drops = 5) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 DROPS", Type.Label, outline = 2.dp) }
     }
 }
