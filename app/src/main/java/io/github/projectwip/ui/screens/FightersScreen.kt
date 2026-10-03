@@ -119,10 +119,10 @@ fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId, go:
                 // ---------------- stats + upgrade
                 Panel(Modifier.width(if (ui.wide) 380.dp else 330.dp).fillMaxHeight(), cut = 18.dp) {
                     Column(Modifier.fillMaxSize().padding(16.dp)) {
-                        LevelHeader(prog.level, prog.unlocked, upgradeCount)
+                        LevelHeader(prog.level, prog.unlocked, upgradeCount, Progression.levelCapped(save, def.id))
                         Spacer(Modifier.height(10.dp))
                         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val rows = Progression.statPreview(def, prog.level)
+                            val rows = Progression.statPreview(def, prog.level, Progression.levelCapped(save, def.id))
                             androidx.compose.runtime.key(focus) {
                                 rows.forEachIndexed { i, r -> StatRow(r, i, prog.unlocked) }
                             }
@@ -166,7 +166,7 @@ private fun RosterCard(save: SaveData, id: FighterId, focused: Boolean, onClick:
 }
 
 @Composable
-private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int) {
+private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int, capped: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(64.dp).popOnChange(upgradeCount), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
@@ -182,13 +182,13 @@ private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                GameText("LEVEL $level", Type.Heading, outline = 2.5.dp)
-                if (unlocked) {
+                GameText(if (capped) "MAX LEVEL" else "LEVEL $level", Type.Heading, color = if (capped) Palette.Gold else Color.White, outline = 2.5.dp)
+                if (unlocked && !capped) {
                     GameText("  →  ${level + 1}", Type.Heading, color = Palette.Positive, outline = 2.5.dp)
                 }
             }
             Spacer(Modifier.height(6.dp))
-            PlainText("No level cap · the next level costs ${"%,d".format(Balance.upgradeCostFrom(level))} Bolts", Type.Small)
+            PlainText(if (capped) "Level $level · fully upgraded" else "Level $level of ${maxOf(level, Balance.MAX_LEVEL)} · the next level costs ${"%,d".format(Balance.upgradeCostFrom(level))} Bolts", Type.Small)
         }
     }
 }
@@ -285,7 +285,9 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
         if (save.selectedFighter != id) {
             ChunkyButton({ repo.selectFighter(id) }, Modifier.width(110.dp).height(68.dp), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }
         }
-        run {
+        if (Progression.levelCapped(save, id)) {
+            ChunkyButton({}, Modifier.weight(1f).height(68.dp), ButtonStyle.GOLD, enabled = true) { GameText("MAXED OUT", Type.Heading) }
+        } else {
             val afford = save.bolts >= cost
             ChunkyButton(
                 { if (repo.upgrade(id)) onUpgraded() },
@@ -301,7 +303,7 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
             }
         }
     }
-    if (cost != null && save.bolts < cost) PlainText("Need ${cost - save.bolts} more Bolts — win matches or visit the Shop.", Type.Small, color = Palette.Red)
+    if (!Progression.levelCapped(save, id) && save.bolts < cost) PlainText("Need ${cost - save.bolts} more Bolts — win matches or visit the Shop.", Type.Small, color = Palette.Red)
 }
 
 @Composable

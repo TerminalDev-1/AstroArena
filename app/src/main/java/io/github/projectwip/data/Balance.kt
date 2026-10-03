@@ -85,7 +85,10 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
 }
 
 object Balance {
-    /** There is no level cap; this only stops a damaged save from loading a nonsense level. */
+    /** The highest level a fighter can normally reach. Dev builds can switch the cap off in the debug menu. */
+    const val MAX_LEVEL = 10
+
+    /** Stops a damaged save from loading a nonsense level (levels above [MAX_LEVEL] are valid with the cap off). */
     const val LEVEL_LIMIT = 9999
 
     /** Bolts needed to go FROM level (index+1) TO level (index+2). Past the end of the table see [upgradeCostFrom]. */
@@ -94,7 +97,7 @@ object Balance {
     /** Each level past the table costs this much more than the one before. */
     const val UPGRADE_COST_STEP = 50
 
-    /** Levels never run out: the table covers the early ones, then the price climbs by a fixed step. */
+    /** The table covers levels up to [MAX_LEVEL]; with the cap off the price keeps climbing by a fixed step. */
     fun upgradeCostFrom(level: Int): Int {
         val l = level.coerceAtLeast(1)
         return if (l <= upgradeCost.size) upgradeCost[l - 1] else upgradeCost.last() + UPGRADE_COST_STEP * (l - upgradeCost.size)

@@ -18,6 +18,7 @@ data class ControlLayout(
 data class Settings(
     val botDifficulty: BotDifficulty = BotDifficulty.NORMAL,
     val sfxVolume: Float = 0.8f,
+    val musicVolume: Float = 0.5f,
     val muted: Boolean = false,
     val haptics: Boolean = true,
     /** Multiplier on joystick/button size. */
@@ -40,6 +41,8 @@ data class Settings(
     val debugLuck: Float = 0f,
     /** Debug menu: opening a capsule doesn't use one up. */
     val debugInfiniteCapsules: Boolean = false,
+    /** Debug menu (dev builds only): fighters can be upgraded past [Balance.MAX_LEVEL]. */
+    val debugNoLevelCap: Boolean = false,
 )
 
 data class FighterProgress(

@@ -42,7 +42,8 @@ class ProgressionTest {
         val dmg = rows[1]
         assertEquals(juno.attackDamage.at(4), dmg.current)
         assertEquals(juno.attackDamage.perLevel, dmg.delta)
-        assertNotNull("there is always a next level", Progression.statPreview(juno, 250)[0].next)
+        assertNull("no next level once capped", Progression.statPreview(juno, Balance.MAX_LEVEL, capped = true)[0].next)
+        assertNotNull("with the cap off there is always a next level", Progression.statPreview(juno, 250)[0].next)
     }
 
     @Test fun upgradeSpendsBoltsAndLevelsUp() {
@@ -247,7 +248,14 @@ class ProgressionTest {
         assertEquals(Balance.upgradeCost.last(), Balance.upgradeCostFrom(Balance.upgradeCost.size))
         assertEquals(Balance.upgradeCost.last() + Balance.UPGRADE_COST_STEP, Balance.upgradeCostFrom(Balance.upgradeCost.size + 1))
         assertTrue((1..300).zipWithNext().all { (a, b) -> Balance.upgradeCostFrom(b) >= Balance.upgradeCostFrom(a) })
-        var save = SaveData(bolts = 10_000_000)
+        // Normally the cap holds at MAX_LEVEL...
+        var capped = SaveData(bolts = 10_000_000)
+        repeat(Balance.MAX_LEVEL - 1) { capped = Progression.upgrade(capped, FighterId.JUNO)!! }
+        assertEquals(Balance.MAX_LEVEL, capped.progress(FighterId.JUNO).level)
+        assertTrue(Progression.levelCapped(capped, FighterId.JUNO))
+        assertNull("the cap stops further upgrades", Progression.upgrade(capped, FighterId.JUNO))
+        // ...and the dev toggle lifts it.
+        var save = SaveData(bolts = 10_000_000, settings = io.github.projectwip.data.Settings(debugNoLevelCap = true))
         repeat(60) { save = Progression.upgrade(save, FighterId.JUNO)!! }
         assertEquals(61, save.progress(FighterId.JUNO).level)
         val juno = Balance.fighter(FighterId.JUNO)

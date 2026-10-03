@@ -90,7 +90,11 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
         delay(550)
         repeat(6) { i ->
             rowsShown = i + 1
-            if (i < rewardRowCount(rewards, r.mvp && !ffa)) { sfx?.play(Sound.POP, 0.8f, 0.9f + i * 0.1f); delay(190) }
+            if (i < rewardRowCount(rewards, r.mvp && !ffa)) {
+                // Every reward lands with a pop and a cha-ching, each one a little higher than the last.
+                sfx?.play(Sound.POP, 0.6f, 0.9f + i * 0.1f); sfx?.play(Sound.CHING, 0.8f, 0.9f + i * 0.07f); sfx?.buzz(14, 110)
+                delay(260)
+            }
         }
         // ...and the Cups tick up to their new total.
         if (rewards.cupDelta != 0) {
@@ -100,7 +104,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
             }
             cupsShown.animateTo((rewards.cupsBefore + rewards.cupDelta).toFloat(), tween(1000, easing = FastOutSlowInEasing))
             ticking.cancel()
-            sfx?.play(if (rewards.cupDelta > 0) Sound.REWARD else Sound.DENIED, 0.8f)
+            if (rewards.cupDelta > 0) { sfx?.play(Sound.REWARD, 0.8f); sfx?.play(Sound.CHING, 0.9f, 1.15f) } else sfx?.play(Sound.DENIED, 0.8f)
         }
     }
 

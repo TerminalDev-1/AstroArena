@@ -15,6 +15,7 @@ import io.github.projectwip.ui.App
 
 class MainActivity : ComponentActivity() {
     private lateinit var sfx: Sfx
+    private lateinit var music: io.github.projectwip.audio.Music
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,12 +24,15 @@ class MainActivity : ComponentActivity() {
 
         val repo = (application as? GameApp)?.repository ?: GameRepository(SaveStore(this))
         sfx = Sfx(this).also { it.load() }
+        music = io.github.projectwip.audio.Music(this).also { it.load() }
+        // The no-level-cap cheat is for dev builds: a release build switches it back off.
+        if (!BuildConfig.DEBUG && repo.save.value.settings.debugNoLevelCap) repo.updateSettings { it.copy(debugNoLevelCap = false) }
         io.github.projectwip.render3d.Portraits.start()
         applyRefreshRate(repo.save.value.settings.highFrameRate)
 
         // Debug builds accept `--es screen match|fighters|shop|track|settings|capsuleN` for automated testing.
         val start = if (BuildConfig.DEBUG) intent?.getStringExtra("screen") else null
-        setContent { App(repo, sfx, start) }
+        setContent { App(repo, sfx, music, start) }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -36,9 +40,20 @@ class MainActivity : ComponentActivity() {
         if (hasFocus) hideSystemBars()
     }
 
+    override fun onResume() {
+        super.onResume()
+        music.setForeground(true)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        music.setForeground(false)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         sfx.release()
+        music.release()
     }
 
     private fun hideSystemBars() {

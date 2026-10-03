@@ -94,6 +94,8 @@ class SaveStore(context: Context) {
                 put("attackStickMode", st.attackStickMode.name)
                 put("debugLuck", st.debugLuck.toDouble())
                 put("debugInfiniteCapsules", st.debugInfiniteCapsules)
+                put("debugNoLevelCap", st.debugNoLevelCap)
+                put("musicVolume", st.musicVolume.toDouble())
                 val l = st.controlLayout
                 put("controlLayout", JSONArray(listOf(l.moveX, l.moveY, l.attackX, l.attackY, l.superX, l.superY).map { it.toDouble() }))
             })
@@ -131,6 +133,8 @@ class SaveStore(context: Context) {
                 attackStickMode = enumOr(so.optString("attackStickMode"), sd.attackStickMode),
                 debugLuck = so.optDouble("debugLuck", 0.0).toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, SparkCapsules.MAX_LUCK) },
                 debugInfiniteCapsules = so.optBoolean("debugInfiniteCapsules", false),
+                debugNoLevelCap = so.optBoolean("debugNoLevelCap", false),
+                musicVolume = so.optDouble("musicVolume", sd.musicVolume.toDouble()).toFloat().let { if (it.isNaN()) sd.musicVolume else it.coerceIn(0f, 1f) },
                 controlLayout = so.optJSONArray("controlLayout")?.takeIf { it.length() == 6 }?.let { a ->
                     fun f(i: Int) = a.optDouble(i, -1.0).toFloat().let { if (it.isNaN()) -1f else it.coerceIn(-1f, 1f) }
                     ControlLayout(f(0), f(1), f(2), f(3), f(4), f(5))

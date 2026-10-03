@@ -59,7 +59,68 @@ object SfxSynth {
         Sound.BANNER -> banner().finish(0.8f)
         Sound.COUNT -> count().finish(0.42f)
         Sound.POP -> pop().finish(0.55f)
-        Sound.CHING -> ching().finish(0.6f)
+        Sound.CHING -> ching().finish(0.72f)
+    }
+
+    /**
+     * The lobby music: an eight-bar loop at 112 BPM over Am - F - C - G. Bass, a soft pad, a plucked arpeggio and
+     * light drums run throughout; a lead melody joins for the second half. The tails of the last notes are folded
+     * back onto the start, so the returned samples loop without a seam.
+     */
+    fun renderLobbyMusic(): FloatArray {
+        val beat = 60f / 112f
+        val bars = 8
+        val loop = ((bars * 4 * beat) * RATE).toInt()
+        val c = Clip(bars * 4 * beat + 3f)
+        val chords = listOf(intArrayOf(57, 60, 64), intArrayOf(53, 57, 60), intArrayOf(48, 52, 55), intArrayOf(55, 59, 62))
+        val roots = intArrayOf(45, 41, 36, 43)
+        val arp = intArrayOf(0, 1, 2, 1, 0, 2, 1, 2)
+        for (bar in 0 until bars) {
+            val ch = chords[bar % 4]
+            val t0 = bar * 4 * beat
+            for (n in ch) c.osc(Wave.TRI, t0, 4 * beat + 0.4f, { hz(n) }, { hold(it, 0.18f, 4 * beat - 0.15f, 0.2f) * 0.055f })
+            for (k in 0 until 8) {
+                val at = t0 + k * beat / 2
+                if (k != 3) {
+                    val n = roots[bar % 4] + if (k % 4 == 2) 12 else 0
+                    c.osc(Wave.TRI, at, beat * 0.5f, { hz(n) }, { perc(it, 0.005f, 0.13f) * 0.3f })
+                    c.osc(Wave.SINE, at, beat * 0.5f, { hz(n) }, { perc(it, 0.005f, 0.16f) * 0.24f })
+                }
+                c.bell(at, ch[arp[k]] + if (bar >= 4 && k % 2 == 1) 24 else 12, 0.085f, 0.06f)
+                // Hats on the off-beats, a quieter tick on the beats.
+                c.noise(300 + bar * 8 + k, at, 0.05f, Band.HIGH, { 8500f }, 0.7f, { perc(it, 0.0005f, if (k % 2 == 1) 0.02f else 0.008f) * if (k % 2 == 1) 0.075f else 0.035f })
+            }
+            for (b in 0 until 4) {
+                val at = t0 + b * beat
+                if (b % 2 == 0) {
+                    c.osc(Wave.SINE, at, 0.25f, { glide(it, 0.07f, 125f, 46f) }, { perc(it, 0.002f, 0.08f) * 0.5f })
+                } else {
+                    c.noise(400 + bar * 4 + b, at, 0.16f, Band.BAND, { 1900f }, 0.8f, { perc(it, 0.001f, 0.045f) * 0.2f })
+                    c.osc(Wave.SINE, at, 0.08f, { glide(it, 0.04f, 240f, 150f) }, { perc(it, 0.001f, 0.03f) * 0.12f })
+                }
+            }
+        }
+        // The lead: a four-bar tune over the second half (beats from the start of bar 5, note, length in beats).
+        val tune = listOf(
+            Triple(0f, 76, 1.5f), Triple(1.5f, 74, 0.5f), Triple(2f, 72, 1f), Triple(3f, 69, 1f),
+            Triple(4f, 72, 1.5f), Triple(5.5f, 69, 0.5f), Triple(6f, 65, 1f), Triple(7f, 69, 1f),
+            Triple(8f, 67, 1f), Triple(9f, 72, 1f), Triple(10f, 76, 1.5f), Triple(11.5f, 74, 0.5f),
+            Triple(12f, 74, 2f), Triple(14f, 71, 1f), Triple(15f, 67, 1f),
+        )
+        for ((at, n, len) in tune) {
+            val start = 16 * beat + at * beat
+            val dur = len * beat
+            c.osc(Wave.TRI, start, dur + 0.2f, { hz(n) * (1f + 0.004f * sin(TAU * 5.5f * it)) }, { hold(it, 0.012f, dur - 0.04f, 0.07f) * 0.13f })
+            c.osc(Wave.SINE, start, dur + 0.2f, { hz(n) * 2f }, { hold(it, 0.012f, dur - 0.04f, 0.05f) * 0.035f })
+            c.bell(start, n + 12, 0.05f, 0.05f)
+        }
+        c.reverb(0.16f, 0.7f)
+        // Fold everything that rang past the end back onto the start, then level it (no fade: it has to loop).
+        val d = c.d
+        for (i in loop until d.size) d[i - loop] += d[i]
+        var top = 1e-6f
+        for (i in 0 until loop) top = max(top, abs(d[i]))
+        return FloatArray(loop) { d[it] * 0.7f / top }
     }
 
     // ------------------------------------------------------------------ envelopes & pitch
@@ -471,16 +532,25 @@ object SfxSynth {
         reverb(0.2f, 0.7f)
     }
 
-    /** Ch-ching: two thin, tinny metal pings in quick succession, like coins dropping into a tin. */
-    private fun ching() = Clip(0.42f).apply {
-        for ((at, f) in listOf(0f to 3100f, 0.075f to 3650f)) {
-            fm(at, 0.3f, { f }, 1.47f, { 1.6f * exp(-it / 0.05f) }, { perc(it, 0.0008f, 0.06f) * 0.7f })
-            osc(Wave.SINE, at, 0.25f, { f * 1.68f }, { perc(it, 0.0008f, 0.035f) * 0.35f })
-            osc(Wave.SINE, at, 0.2f, { f * 2.31f }, { perc(it, 0.0008f, 0.02f) * 0.2f })
-            noise(205 + at.toInt(), at, 0.012f, Band.HIGH, { 7000f }, 0.7f, { perc(it, 0.0003f, 0.003f) * 0.5f })
+    /**
+     * Cha-ching: a rattle of coins ("cha"), then a bright three-note bell with some body and a sparkle on top
+     * ("ching"). Fuller and livelier than a bare ping, with a little room around it.
+     */
+    private fun ching() = Clip(0.95f).apply {
+        for ((i, at) in floatArrayOf(0f, 0.035f, 0.065f).withIndex()) {
+            noise(205 + i, at, 0.03f, Band.BAND, { 5200f + i * 900f }, 2.2f, { perc(it, 0.0005f, 0.008f) * 0.5f })
+            fm(at, 0.06f, { 2400f + i * 500f }, 1.47f, { 1.2f }, { perc(it, 0.0006f, 0.012f) * 0.25f })
         }
-        // Nothing below about 2 kHz: that is what makes it tinny rather than bell-like.
-        filter(Band.HIGH, 0.8f) { 2000f }
+        val hit = 0.1f
+        for ((n, g) in listOf(96 to 0.5f, 100 to 0.4f, 103 to 0.34f)) {
+            fm(hit, 0.7f, { hz(n) }, 1.47f, { 1.5f * exp(-it / 0.07f) }, { perc(it, 0.0008f, 0.16f) * g })
+            osc(Wave.SINE, hit, 0.5f, { hz(n) * 2.01f }, { perc(it, 0.0008f, 0.07f) * g * 0.3f })
+        }
+        osc(Wave.SINE, hit, 0.3f, { hz(84) }, { perc(it, 0.001f, 0.08f) * 0.3f })
+        noise(209, hit, 0.02f, Band.HIGH, { 7000f }, 0.7f, { perc(it, 0.0003f, 0.004f) * 0.5f })
+        for ((i, n) in intArrayOf(108, 112, 115).withIndex()) bell(hit + 0.09f + i * 0.045f, n, 0.1f, 0.05f)
+        filter(Band.HIGH, 0.7f) { 500f }
+        reverb(0.18f, 0.62f)
     }
 
     /** One step of a number counting up (played over and over at rising pitch). */

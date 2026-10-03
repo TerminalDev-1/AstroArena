@@ -76,6 +76,12 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
     ToggleRow("INFINITE DROPS", "The drop button always works and opening one never uses it up.", s.debugInfiniteCapsules) { v ->
         repo.updateSettings { it.copy(debugInfiniteCapsules = v) }
     }
+    // Dev builds only: it makes fighters as strong as you like.
+    if (io.github.projectwip.BuildConfig.DEBUG) {
+        ToggleRow("NO LEVEL CAP", "Fighters can be upgraded past level ${io.github.projectwip.data.Balance.MAX_LEVEL}. Only in dev builds.", s.debugNoLevelCap) { v ->
+            repo.updateSettings { it.copy(debugNoLevelCap = v) }
+        }
+    }
     SliderRow("DROP LUCK", "×${"%.1f".format(1f + luck)}", s.debugLuck, 0f, SparkCapsules.MAX_LUCK, onDrag = { luck = snap(it) }) { v ->
         luck = snap(v)
         repo.updateSettings { it.copy(debugLuck = snap(v)) }

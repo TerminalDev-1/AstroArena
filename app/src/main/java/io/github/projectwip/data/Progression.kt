@@ -99,10 +99,14 @@ object Progression {
 
     // ---------------- Upgrades ----------------
 
+    /** At [Balance.MAX_LEVEL] (or beyond) with the cap in force. */
+    fun levelCapped(save: SaveData, id: FighterId): Boolean =
+        save.progress(id).level >= Balance.MAX_LEVEL && !save.settings.debugNoLevelCap
+
     fun canUpgrade(save: SaveData, id: FighterId): Boolean {
         val p = save.progress(id)
         val cost = Balance.upgradeCostFrom(p.level)
-        return p.unlocked && save.bolts >= cost
+        return p.unlocked && !levelCapped(save, id) && save.bolts >= cost
     }
 
     fun upgrade(save: SaveData, id: FighterId): SaveData? {
@@ -115,8 +119,8 @@ object Progression {
         )
     }
 
-    fun statPreview(def: FighterDef, level: Int): List<StatPreview> {
-        val next: Int? = level + 1
+    fun statPreview(def: FighterDef, level: Int, capped: Boolean = false): List<StatPreview> {
+        val next: Int? = if (capped) null else level + 1
         fun line(label: String, s: StatLine, suffix: String = "") = StatPreview(label, s.at(level), next?.let { s.at(it) }, suffix)
         val shots = def.attack.projectiles
         return listOf(

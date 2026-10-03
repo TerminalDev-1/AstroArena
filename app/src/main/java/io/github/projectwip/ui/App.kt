@@ -81,7 +81,7 @@ sealed interface Screen {
 data class RewardReveal(val title: String, val reward: Reward)
 
 @Composable
-fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
+fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music, startScreen: String? = null) {
     val save by repo.save.collectAsState()
     var screen by remember {
         mutableStateOf(
@@ -116,7 +116,12 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
     LaunchedEffect(save.settings) {
         sfx.volume = if (save.settings.muted) 0f else save.settings.sfxVolume
         sfx.hapticsEnabled = save.settings.haptics
+        music.volume = if (save.settings.muted) 0f else save.settings.musicVolume
     }
+
+    // Lobby music plays in the menus and makes way for the match.
+    val inMatch = screen is Screen.Match
+    LaunchedEffect(inMatch) { music.setWanted(!inMatch) }
 
     val go: (Screen) -> Unit = { if (it !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f); screen = it }
     val showReward: (RewardReveal) -> Unit = { reveal = it }
