@@ -62,9 +62,11 @@ enum class CapsuleTier(val label: String, val color: Long, val weight: Int) {
 data class CapsuleResult(
     val tier: CapsuleTier,
     val reward: Reward,
-    /** The capsule split in two while it was being opened: the player keeps a second, unopened one. */
-    val split: Boolean = false,
-)
+    /** How many capsules this one became while it was being opened (1, 2, 4 or 8); the player keeps the extras. */
+    val pieces: Int = 1,
+) {
+    val split get() = pieces > 1
+}
 
 /**
  * Spark Capsules: earned from your first few good finishes each day, opened from the home screen.
@@ -90,8 +92,21 @@ object SparkCapsules {
         return w.map { it / sum }
     }
 
+    /** The most capsules one can turn into. */
+    const val MAX_PIECES = 8
+
     /** Chance that a capsule splits in two as it is opened, leaving a second one to open. Luck helps. */
     fun splitChance(luck: Float = 0f) = 0.12f + 0.05f * luck
+
+    /** Once it has split, the chance that every piece splits again (2 -> 4 -> 8). */
+    fun resplitChance(luck: Float = 0f) = 0.45f + 0.08f * luck
+
+    fun rollPieces(rng: kotlin.random.Random, luck: Float = 0f): Int {
+        if (rng.nextFloat() >= splitChance(luck)) return 1
+        var pieces = 2
+        while (pieces < MAX_PIECES && rng.nextFloat() < resplitChance(luck)) pieces *= 2
+        return pieces
+    }
 
     fun rollTier(rng: kotlin.random.Random, luck: Float = 0f): CapsuleTier {
         var roll = rng.nextFloat()

@@ -28,7 +28,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
@@ -72,9 +71,12 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
     var taps by remember { mutableIntStateOf(0) }
     var tier by remember { mutableIntStateOf(0) }
     var opened by remember { mutableStateOf(false) }
-    // A capsule that splits does it on one of the knocks before the last.
-    val splitTap = remember { if (result.split) 1 + Random(result.hashCode() + 7).nextInt(TAPS - 1) else -1 }
-    var hasSplit by remember { mutableStateOf(false) }
+    // A capsule that splits doubles (2, 4, 8) on separate knocks before the last one.
+    val splitTaps = remember {
+        val doublings = Integer.numberOfTrailingZeros(result.pieces.coerceAtLeast(1))
+        (1 until TAPS).shuffled(Random(result.hashCode() + 7)).take(doublings).toSet()
+    }
+    var pieces by remember { mutableIntStateOf(1) }
     val splitPop = remember { Animatable(0f) }
     val shake = remember { Animatable(0f) }
     val pop = remember { Animatable(1f) }
@@ -84,6 +86,7 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
     DisposableEffect(Unit) {
         lobby.capsuleOpenAt = 0L
         lobby.capsuleSplitAt = 0L
+        lobby.capsulePieces = 1
         lobby.capsuleColor = CapsuleTier.SCRAP.color.toInt()
         lobby.capsuleShown = true
         onDispose { lobby.capsuleShown = false }
@@ -109,11 +112,12 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
             sfx?.buzz(16, 120)
         }
         scope.launch { shake.snapTo(1f); shake.animateTo(0f, tween(420)) }
-        if (taps == splitTap) {
-            hasSplit = true
+        if (taps in splitTaps) {
+            pieces *= 2
+            lobby.capsulePieces = pieces
             lobby.capsuleSplitAt = System.currentTimeMillis()
-            sfx?.play(Sound.POP, pitch = 0.8f)
-            sfx?.play(Sound.DROP_UPGRADE, 0.7f, 1.5f)
+            sfx?.play(Sound.POP, pitch = 0.7f + 0.1f * pieces / 2)
+            sfx?.play(Sound.DROP_UPGRADE, 0.7f, 1.3f + 0.08f * pieces / 2)
             sfx?.buzz(60, 230)
             scope.launch { splitPop.snapTo(1.6f); splitPop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
         }
@@ -137,11 +141,6 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
         contentAlignment = Alignment.Center,
     ) {
         val capsuleRoom = maxHeight * 0.46f
-        // Darken the menu around the capsule but leave a soft window in the middle for the 3D render underneath.
-        if (!opened) Canvas(Modifier.fillMaxSize()) {
-            val r = size.height * 0.52f
-            drawRect(Brush.radialGradient(0.5f to Color.Transparent, 1f to Color(0xE0050212), center = center, radius = r))
-        }
         if (opened) FighterRays(Modifier.size(if (ui.roomy) 640.dp else 520.dp), color)
         if (!opened) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -160,7 +159,7 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
                 val pulse = 1f + 0.08f * sin(time * 7f)
                 GameText(if (taps < TAPS) "TAP TO CHARGE  ·  ${TAPS - taps}" else "HERE IT COMES…", Type.Title, color = Palette.Gold, outline = 3.5.dp,
                     modifier = Modifier.graphicsLayer { scaleX = pulse; scaleY = pulse })
-                if (hasSplit) GameText("IT SPLIT!  +1 CAPSULE", Type.Heading, color = Palette.Green, outline = 3.dp,
+                if (pieces > 1) GameText("SPLIT INTO $pieces!  +${pieces - 1} CAPSULE${if (pieces > 2) "S" else ""}", Type.Heading, color = Palette.Green, outline = 3.dp,
                     modifier = Modifier.graphicsLayer { scaleX = splitPop.value; scaleY = splitPop.value })
             }
         } else {
@@ -174,7 +173,7 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
                 // Bundles list several things, so they get smaller type and room to wrap.
                 val bundle = result.reward is io.github.projectwip.data.Reward.Bundle
                 GameText(rewardLabel(result.reward), if (bundle) Type.Title else Type.Display, outline = 4.dp, align = TextAlign.Center, maxLines = if (bundle) 2 else 1)
-                if (result.split) { Spacer(Modifier.height(6.dp)); io.github.projectwip.ui.Badge("SPLIT · +1 CAPSULE", color = Palette.GreenDeep) }
+                if (result.split) { Spacer(Modifier.height(6.dp)); io.github.projectwip.ui.Badge("SPLIT INTO ${result.pieces} · +${result.pieces - 1} CAPSULE${if (result.pieces > 2) "S" else ""}", color = Palette.GreenDeep) }
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
@@ -183,7 +182,7 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
             }
         }
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value * 0.85f)))
-        if (!opened) PlainText("Capsules charge up at random, and now and then one splits in two. The result is locked in when you open one.", Type.Small,
+        if (!opened) PlainText("Capsules charge up at random, and now and then one splits — into two, four or even eight. The result is locked in when you open one.", Type.Small,
             Modifier.align(Alignment.BottomCenter).graphicsLayer { translationY = -14.dp.toPx() }, align = TextAlign.Center)
     }
 }

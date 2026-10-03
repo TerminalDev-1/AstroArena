@@ -37,7 +37,7 @@ class Capsule3D {
     private var lastCharge = 0L
     private var lastOpen = 0L
     private var lastSplit = 0L
-    /** The second capsule from a split is a fresh Scrap one. */
+    /** The extra capsules from a split are fresh Scrap ones. */
     private val TWIN = floatArrayOf(0.6f, 0.65f, 0.75f)
 
     init {
@@ -144,18 +144,28 @@ class Capsule3D {
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
         GLES30.glClear(GLES30.GL_DEPTH_BUFFER_BIT)
 
-        // A capsule that split: the original slides left and a plain twin pops out to the right.
-        val split = if (p.capsuleSplitAt == 0L) 0f else smooth((now - p.capsuleSplitAt) / 350f)
+        // A capsule that split: two sit side by side; four or eight ring the original, which stays in the middle.
+        val pieces = p.capsulePieces.coerceIn(1, 8)
+        val split = if (p.capsuleSplitAt == 0L || pieces < 2) 0f else smooth((now - p.capsuleSplitAt) / 350f)
         if (p.capsuleSplitAt != lastSplit) {
             lastSplit = p.capsuleSplitAt
-            if (p.capsuleSplitAt != 0L && now - p.capsuleSplitAt < 200) burst(50, 4f, 0xFFFFFFFF.toInt())
+            if (p.capsuleSplitAt != 0L && now - p.capsuleSplitAt < 200) burst(30 + pieces * 8, 4.5f, 0xFFFFFFFF.toInt())
         }
-        val size = 0.62f * (0.6f + 0.4f * fade) * (1f - 0.2f * split)
+        val base = 0.62f * (0.6f + 0.4f * fade)
+        val mainScale = base * when { pieces >= 8 -> 0.66f; pieces >= 4 -> 0.74f; pieces == 2 -> 0.8f; else -> 1f }
         if (solid) {
             val lift = if (knock in 0f..0.42f) 0.08f * (1f - knock / 0.42f) else 0f
-            drawCapsule(lit, -0.62f * split, sin(time * 2.6f) * 0.05f + lift, shake + sin(time * 2.2f) * 3f, time * 50f, size * pop, gap, flash, col)
+            drawCapsule(lit, if (pieces == 2) -0.62f * split else 0f, sin(time * 2.6f) * 0.05f + lift, shake + sin(time * 2.2f) * 3f, time * 50f, mainScale * pop, gap, flash, col)
         }
-        if (split > 0f) drawCapsule(lit, 0.62f * split, sin(time * 2.6f + 1.4f) * 0.05f, sin(time * 2.2f + 1f) * 3f, time * 50f + 70f, size * split, 0f, 0f, TWIN)
+        if (pieces == 2) {
+            drawCapsule(lit, 0.62f * split, sin(time * 2.6f + 1.4f) * 0.05f, sin(time * 2.2f + 1f) * 3f, time * 50f + 70f, mainScale * split, 0f, 0f, TWIN)
+        } else if (pieces > 2) {
+            val twinScale = base * (if (pieces >= 8) 0.36f else 0.44f) * (0.5f + 0.5f * split)
+            for (i in 0 until pieces - 1) {
+                val a = i * 6.2832f / (pieces - 1) + time * 0.35f
+                drawCapsule(lit, cos(a) * 1.5f * split, sin(a) * 0.82f * split + sin(time * 2.6f + i) * 0.03f, sin(time * 2.2f + i) * 4f, time * 50f + i * 50f, twinScale, 0f, 0f, TWIN)
+            }
+        }
 
         // Glow and sparks.
         GLES30.glEnable(GLES30.GL_BLEND)

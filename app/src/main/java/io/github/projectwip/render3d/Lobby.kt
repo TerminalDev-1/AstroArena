@@ -47,8 +47,9 @@ class LobbyParams {
     @Volatile var capsuleChargeAt = 0L
     /** 0 while the capsule is closed. */
     @Volatile var capsuleOpenAt = 0L
-    /** When the capsule split in two (0 = it hasn't). */
+    /** When the capsule last split (0 = it hasn't), and how many capsules there are now. */
     @Volatile var capsuleSplitAt = 0L
+    @Volatile var capsulePieces = 1
 }
 
 /**

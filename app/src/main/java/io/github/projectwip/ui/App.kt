@@ -98,10 +98,10 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
     var reveal by remember { mutableStateOf<RewardReveal?>(null) }
     /** The Spark Capsule being opened, if any. Its reward is already saved by the time this is set. */
     var capsule by remember {
-        // Debug: `--es screen capsule3` previews opening a capsule of tier 3 (`capsule3s`: one that splits) without touching the save.
+        // Debug: `--es screen capsule3` previews opening a capsule of tier 3 (`capsule3s`: one that splits into eight) without touching the save.
         mutableStateOf(startScreen?.takeIf { it.startsWith("capsule") }?.let {
             val tier = CapsuleTier.entries[(it.removePrefix("capsule").removeSuffix("s").toIntOrNull() ?: 0).coerceIn(0, CapsuleTier.entries.lastIndex)]
-            CapsuleResult(tier, Reward.Bolts(100 * (tier.ordinal + 1)), split = it.endsWith("s"))
+            CapsuleResult(tier, Reward.Bolts(100 * (tier.ordinal + 1)), pieces = if (it.endsWith("s")) 8 else 1)
         })
     }
 
@@ -137,7 +137,10 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+            // The menu steps aside while a capsule is being opened, so nothing sits on top of the 3D capsule.
+            val menuAlpha by androidx.compose.animation.core.animateFloatAsState(if (capsule != null) 0f else 1f, tween(160), label = "menu")
             AnimatedContent(
+                modifier = Modifier.graphicsLayer { alpha = menuAlpha },
                 targetState = screen,
                 contentKey = { it::class },
                 transitionSpec = {

@@ -68,7 +68,7 @@ import io.github.projectwip.audio.Sound
 
 const val REPO_URL = "https://github.com/TerminalDev-1/AstroArena"
 
-private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data") }
+private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), DEBUG("Debug") }
 
 @Composable
 fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
@@ -101,6 +101,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                             Tab.AUDIO -> AudioTab(s, set)
                             Tab.DISPLAY -> DisplayTab(s, set)
                             Tab.DATA -> DataTab(repo)
+                            Tab.DEBUG -> DebugControls(save, repo)
                         }
                     }
                 }

@@ -51,8 +51,10 @@ class GameRepository(private val store: SaveStore) {
     fun openCapsule(): CapsuleResult? = Progression.openCapsule(_save.value)?.let { (s, r) -> commit(s); r }
 
     /** Debug menu hand-outs. */
-    fun debugGrant(bolts: Int = 0, prisms: Int = 0, capsules: Int = 0) =
-        commit(_save.value.let { it.copy(bolts = it.bolts + bolts, prisms = it.prisms + prisms, capsules = it.capsules + capsules) })
+    fun debugGrant(bolts: Int = 0, prisms: Int = 0, capsules: Int = 0, cups: Int = 0) = commit(_save.value.let {
+        val newCups = (it.cups + cups).coerceAtLeast(0)
+        it.copy(bolts = it.bolts + bolts, prisms = it.prisms + prisms, capsules = it.capsules + capsules, cups = newCups, bestCups = maxOf(it.bestCups, newCups))
+    })
 
     val capsulesLeftToday: Int get() = Progression.capsulesLeftToday(_save.value, today)
 

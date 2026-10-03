@@ -155,7 +155,7 @@ class ProgressionTest {
         val save = SaveData(capsules = 2, capsuleSeed = 99)
         val (after, result) = Progression.openCapsule(save)!!
         assertEquals("same seed, same capsule (no re-rolling by reloading)", result, Progression.openCapsule(save)!!.second)
-        assertEquals(if (result.split) 2 else 1, after.capsules)
+        assertEquals(1 + result.pieces - 1, after.capsules)
         assertEquals(1, after.capsulesOpened)
         assertTrue("the next capsule must use a fresh seed", after.capsuleSeed != save.capsuleSeed)
         when (val r = result.reward) {
@@ -170,16 +170,20 @@ class ProgressionTest {
         var save = SaveData(capsules = 4000, capsuleSeed = 1)
         val seen = HashMap<CapsuleTier, Int>()
         var splits = 0
+        val pieces = java.util.TreeMap<Int, Int>()
         repeat(4000) {
             val before = save
             val (next, result) = Progression.openCapsule(save)!!
             assertFalse("duplicate ${result.reward}", Progression.owns(before, result.reward))
             seen.merge(result.tier, 1, Int::plus)
             if (result.split) splits++
-            assertEquals("a split hands back a capsule", before.capsules - 1 + (if (result.split) 1 else 0), next.capsules)
+            pieces.merge(result.pieces, 1, Int::plus)
+            assertEquals("a split hands back the extra capsules", before.capsules - 1 + result.pieces - 1, next.capsules)
             save = next
         }
-        println("capsule tiers over 4000 opens: $seen, splits: $splits")
+        println("capsule tiers over 4000 opens: $seen, splits: $splits, pieces: $pieces")
+        assertEquals("capsules only ever become 1, 2, 4 or 8", setOf(1, 2, 4, 8), pieces.keys)
+        assertTrue("bigger splits are rarer", pieces.getValue(2) > pieces.getValue(8))
         assertTrue("about 12% of capsules should split ($splits of 4000)", splits in 380..580)
         assertEquals(CapsuleTier.entries.toSet(), seen.keys)
         for (t in CapsuleTier.entries.zipWithNext()) assertTrue("${t.first} should be more common than ${t.second}", seen.getValue(t.first) > seen.getValue(t.second))

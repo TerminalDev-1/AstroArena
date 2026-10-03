@@ -187,16 +187,36 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             drawPath(p, Color.White); outline(p)
         }
         IconKind.GIFT -> {
-            val box = poly(0.14f, 0.42f, 0.86f, 0.42f, 0.86f, 0.9f, 0.14f, 0.9f)
-            drawPath(box, Palette.Prism); outline(box)
-            val lid = poly(0.08f, 0.28f, 0.92f, 0.28f, 0.92f, 0.44f, 0.08f, 0.44f)
-            drawPath(lid, Color(0xFFFF8BFF)); outline(lid)
-            drawRect(Palette.Gold, Offset(0.43f, 0.28f), Size(0.14f, 0.62f))
-            drawLine(INK, Offset(0.43f, 0.28f), Offset(0.43f, 0.9f), 0.04f); drawLine(INK, Offset(0.57f, 0.28f), Offset(0.57f, 0.9f), 0.04f)
-            val bowL = Path().apply { moveTo(0.5f, 0.28f); cubicTo(0.2f, 0.0f, 0.15f, 0.3f, 0.5f, 0.28f) }
-            val bowR = Path().apply { moveTo(0.5f, 0.28f); cubicTo(0.8f, 0.0f, 0.85f, 0.3f, 0.5f, 0.28f) }
-            drawPath(bowL, Palette.Gold); outline(bowL, 0.05f)
-            drawPath(bowR, Palette.Gold); outline(bowR, 0.05f)
+            // A loot crate thrown open, with a Prism, a Bolt and a spark jumping out of it.
+            drawCircle(Brush.radialGradient(listOf(Palette.Gold.copy(alpha = 0.55f), Color.Transparent), Offset(0.5f, 0.4f), 0.5f), 0.5f, Offset(0.5f, 0.4f))
+            val lid = poly(0.2f, 0.52f, 0.27f, 0.2f, 0.73f, 0.2f, 0.8f, 0.52f)
+            drawPath(lid, Brush.verticalGradient(listOf(Color(0xFF8E3F12), Color(0xFF5A2408)), 0.2f, 0.52f)); outline(lid)
+            val spark = Path()
+            for (i in 0 until 8) {
+                val a = -PI / 2 + i * PI / 4
+                val r = if (i % 2 == 0) 0.13f else 0.05f
+                val x = 0.5f + (cos(a) * r).toFloat(); val y = 0.2f + (sin(a) * r).toFloat()
+                if (i == 0) spark.moveTo(x, y) else spark.lineTo(x, y)
+            }
+            spark.close()
+            drawPath(spark, Color(0xFFFFF3A0)); outline(spark, 0.035f)
+            val nut = hexagon(0.34f, 0.38f, 0.13f, pointy = false)
+            drawPath(nut, Brush.verticalGradient(listOf(Color(0xFFDDF7FF), Palette.Bolt, Palette.BoltDeep), 0.25f, 0.51f)); outline(nut, 0.04f)
+            drawCircle(INK, 0.05f, Offset(0.34f, 0.38f))
+            val gem = poly(0.66f, 0.2f, 0.79f, 0.33f, 0.66f, 0.54f, 0.53f, 0.33f)
+            drawPath(gem, Brush.linearGradient(listOf(Color(0xFFFFB8FF), Palette.Prism, Palette.PrismDeep), Offset(0.55f, 0.2f), Offset(0.77f, 0.52f))); outline(gem, 0.04f)
+            val body = poly(0.16f, 0.52f, 0.84f, 0.52f, 0.8f, 0.92f, 0.2f, 0.92f)
+            drawPath(body, Brush.verticalGradient(listOf(Palette.Orange, Palette.OrangeDeep), 0.52f, 0.92f)); outline(body)
+            for (x in listOf(0.27f, 0.67f)) {
+                val band = poly(x, 0.52f, x + 0.06f, 0.52f, x + 0.06f, 0.92f, x, 0.92f)
+                drawPath(band, Color(0xFF3A2F6B)); outline(band, 0.03f)
+            }
+            val rim = poly(0.11f, 0.47f, 0.89f, 0.47f, 0.89f, 0.58f, 0.11f, 0.58f)
+            drawPath(rim, Brush.verticalGradient(listOf(Color(0xFFFFC56B), Palette.Orange), 0.47f, 0.58f)); outline(rim, 0.05f)
+            val plate = poly(0.43f, 0.6f, 0.57f, 0.6f, 0.57f, 0.76f, 0.43f, 0.76f)
+            drawPath(plate, Palette.Gold); outline(plate, 0.04f)
+            drawCircle(INK, 0.028f, Offset(0.5f, 0.66f))
+            drawLine(INK, Offset(0.5f, 0.66f), Offset(0.5f, 0.72f), 0.025f, cap = StrokeCap.Round)
         }
         IconKind.SWORDS -> {
             for (flip in listOf(false, true)) {
