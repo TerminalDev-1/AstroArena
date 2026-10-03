@@ -84,7 +84,7 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
     KNOCKOUT_RUSH("Knockout Rush", "3v3 · first team to 10 KOs", 6),
     /** You against one giant, with as many lives as it takes. */
     BOSS("Boss Mode", "You against a giant · unlimited lives", 2),
-    /** Practice: dummies, a swarm, a sentry and a boss, none of which move. No timer, nothing won or lost. */
+    /** Practice: dummies, a swarm and a boss that just stand there, plus one sentry gun. No timer, nothing won or lost. */
     TRAINING("Training Area", "Dummies, a swarm, a sentry and a boss · no stakes", 19),
 }
 
@@ -303,7 +303,7 @@ object Balance {
     /** A target dummy: never attacks, soaks up damage and regenerates like anyone else. */
     val dummy: FighterDef = fighter(FighterId.JUNO).let { it.copy(name = "Dummy", title = "Target", health = StatLine(16000, 0)) }
 
-    /** One of the swarm: a little over half size, fragile, and it stings rather than hurts. */
+    /** One of the swarm: a little over half size and fragile. In the Training Area it is a target and never attacks. */
     val mini: FighterDef = fighter(FighterId.JUNO).let {
         it.copy(
             name = "Mini", title = "Swarm", health = StatLine(6000, 0),

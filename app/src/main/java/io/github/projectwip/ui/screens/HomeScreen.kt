@@ -334,7 +334,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                     GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. 1st place: +${Balance.placementCups[0]} Cups"
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win: +${io.github.projectwip.data.BotDifficulty.NORMAL.cupBonus} Cups (Normal)"
                     GameMode.BOSS -> "A giant version of a random fighter. Knock it out to win; you have unlimited lives. Its strength never changes. Pays Bolts only."
-                    GameMode.TRAINING -> "Four dummies, a swarm of minis, a sentry gun and a boss, none of which move. No timer, no rewards: leave whenever you like."
+                    GameMode.TRAINING -> "Four dummies, a swarm of minis and a boss that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },
                 Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 5,
             )

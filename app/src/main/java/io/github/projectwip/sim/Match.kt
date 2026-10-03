@@ -54,14 +54,15 @@ class Match(val config: MatchConfig) {
             repeat(config.mode.players - 1) { roster += botFighter(id, team = id, names.next()); id++ }
         } else if (practice) {
             // Everything stands where it is put, at fixed strength. Order matches the arena's spawn list:
-            // dummies, boss, sentry, swarm. Dummies get no brain, so they never fight back.
+            // dummies, boss, sentry, swarm. Only the sentry gets a brain: the rest are targets that never
+            // fight back, so you can walk right up to the boss and the swarm and practise on them.
             val a = Arenas.trainingArea()
             val dummies = a.spawns[1].size - 2 - TRAINING_MINIS
             repeat(dummies) { roster += Fighter(id++, Balance.dummy, 1, 0, 1, "Dummy ${it + 1}", isBot = true, rooted = true).also { d -> passive += d } }
             val giant = Balance.boss(config.boss ?: FighterId.entries[rng.nextInt(FighterId.entries.size)])
-            roster += Fighter(id++, giant, 1, giant.skins.lastIndex, 1, giant.name, isBot = true, rooted = true)
+            roster += Fighter(id++, giant, 1, giant.skins.lastIndex, 1, giant.name, isBot = true, rooted = true).also { passive += it }
             roster += Fighter(id++, Balance.sentry, 1, 1, 1, "Sentry", isBot = true, rooted = true)
-            repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true) }
+            repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true).also { m -> passive += m } }
         } else if (bossMode) {
             // One giant, always level 1: its stats are fixed and never follow the player's level.
             val def = Balance.boss(config.boss ?: FighterId.entries[rng.nextInt(FighterId.entries.size)])

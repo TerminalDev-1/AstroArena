@@ -229,7 +229,9 @@ class SimulationTest {
         assertEquals("no clock and no score target: it keeps going", Phase.PLAYING, m.world.phase)
         assertFalse(m.isOver)
         assertEquals("targets never leave their spots", start, targets.map { it.x to it.y })
-        assertTrue("dummies never attack", dummies.all { it.damageDealt == 0 })
+        val giant = targets.single { it.scale > 2.4f }
+        assertTrue("dummies, the swarm and the boss never attack", (dummies + minis + giant).all { it.damageDealt == 0 })
+        assertTrue("only the sentry has a brain", m.brains.size == 2) // the bot-driven player in this test, and the sentry
         assertTrue("the player got some practice in", m.player.damageDealt > 0)
         assertFalse(m.world.arena.circleBlocked(m.player.x, m.player.y, m.player.radius * 0.9f))
     }
