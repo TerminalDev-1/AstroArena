@@ -8,8 +8,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - Use the portable JDK (system Java 25 breaks Gradle 8.11):
   `export JAVA_HOME="/c/Users/gamer/AppData/Local/Android/tools/jdk-21.0.12.1+1"`
-- `./gradlew testDebugUnitTest` (add `--tests '*Name*'` for one) · `./gradlew assembleDebug`.
-  `println` from tests lands in `app/build/test-results/testDebugUnitTest/*.xml`.
+- The Android project lives in `client/`: run Gradle from there. `./gradlew testDebugUnitTest` (add `--tests '*Name*'` for one) · `./gradlew assembleDebug`.
+  `println` from tests lands in `client/app/build/test-results/testDebugUnitTest/*.xml`.
 
 ## Device
 
@@ -42,7 +42,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Checkpoint as you go: once a piece is verified (tests or device), commit just that piece and
   `git push origin main`. Never checkpoint unverified or non-compiling work.
 - **Non-negotiable: every version is committed, tagged and released.** Whenever the version in
-  `app/build.gradle.kts` changes, finish by committing, tagging `vX.Y.Z-preview`, pushing the tag and
+  `client/app/build.gradle.kts` changes, finish by committing, tagging `vX.Y.Z-preview`, pushing the tag and
   publishing a GitHub pre-release with the release APK attached (`AstroArena-X.Y.Z-preview.apk`), without
   waiting to be asked. The newest release must always be the newest version, so nobody downloads a stale APK.
   Smoke-test the release APK on the tablet when it is free, then put the debug build back.

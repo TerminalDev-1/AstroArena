@@ -39,7 +39,7 @@ Requirements: **JDK 17 or 21** (Gradle 8.11 can't run on Java 24+), Android SDK 
 
 ```bash
 # local.properties must point at your SDK, e.g.  sdk.dir=C\:/Users/you/AppData/Local/Android/Sdk
-./gradlew assembleDebug          # APK -> app/build/outputs/apk/debug/app-debug.apk
+cd client && ./gradlew assembleDebug          # APK -> client/app/build/outputs/apk/debug/app-debug.apk
 ./gradlew installDebug           # install on the connected device
 ./gradlew testDebugUnitTest      # JVM tests: progression, economy, collision, full bot matches
 ```
@@ -58,14 +58,14 @@ adb shell run-as io.github.projectwip cat files/save.json                       
 
 Almost every number lives in two files:
 
-* [`data/Balance.kt`](app/src/main/java/io/github/projectwip/data/Balance.kt) — fighters, stats
+* [`data/Balance.kt`](client/app/src/main/java/io/github/projectwip/data/Balance.kt) — fighters, stats
   (`StatLine(base, perLevel)`: e.g. damage `100 + 5/level`), upgrade costs, match length, reward formulas,
   bot difficulty reward bonuses.
-* [`data/Catalog.kt`](app/src/main/java/io/github/projectwip/data/Catalog.kt) — Cup Track milestones, Shop
+* [`data/Catalog.kt`](client/app/src/main/java/io/github/projectwip/data/Catalog.kt) — Cup Track milestones, Shop
   items, daily gift, Spark Drop tiers, odds and rewards.
 
-Bot behaviour per difficulty: [`ai/BotProfile.kt`](app/src/main/java/io/github/projectwip/ai/BotProfile.kt).
-The arena is ASCII: edit the quadrant in [`sim/Arena.kt`](app/src/main/java/io/github/projectwip/sim/Arena.kt).
+Bot behaviour per difficulty: [`ai/BotProfile.kt`](client/app/src/main/java/io/github/projectwip/ai/BotProfile.kt).
+The arena is ASCII: edit the quadrant in [`sim/Arena.kt`](client/app/src/main/java/io/github/projectwip/sim/Arena.kt).
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together.
 

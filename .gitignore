@@ -1,14 +1,21 @@
 *.iml
 .gradle/
 .kotlin/
-/local.properties
+local.properties
 .idea/
 .DS_Store
-/build/
-/app/build/
-/captures/
+/client/build/
+/client/app/build/
+/client/captures/
 *.apk
 *.aab
 *.keystore
 *.jks
 /screenshots/
+
+# Server
+__pycache__/
+*.pyc
+/server/*.db
+/server/*.db-*
+/server/logs/
