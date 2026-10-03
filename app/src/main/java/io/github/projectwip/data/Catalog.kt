@@ -48,6 +48,56 @@ data class CustomOffer(
     val discountPercent get() = if (wasPrice > price && wasPrice > 0) ((wasPrice - price) * 100 / wasPrice) else 0
 }
 
+/** How good a Spark Capsule turned out. Each tier up is rarer and pays better. */
+enum class CapsuleTier(val label: String, val color: Long, val weight: Int) {
+    SCRAP("Scrap", 0xFF9AA6C0, 50),
+    TUNED("Tuned", 0xFF4ED36A, 28),
+    CHARGED("Charged", 0xFF2EC4F1, 15),
+    OVERCLOCKED("Overclocked", 0xFFFF8A1F, 5),
+    PRISMATIC("Prismatic", 0xFFFF6BFF, 2),
+}
+
+/** What came out of an opened capsule. */
+data class CapsuleResult(val tier: CapsuleTier, val reward: Reward)
+
+/**
+ * Spark Capsules: earned from your first few good finishes each day, opened from the home screen.
+ * The tier is rolled when the capsule is opened; the reward never duplicates something already owned.
+ */
+object SparkCapsules {
+    /** Capsules that can be earned per calendar day. */
+    const val PER_DAY = 3
+    /** Every save starts with one, so the first open doesn't have to be earned. */
+    const val STARTING = 1
+
+    /** A win in team modes, or a top-4 finish in free-for-all, earns a capsule. */
+    fun earns(report: MatchReport): Boolean =
+        if (report.mode == GameMode.LAST_SPARK) report.placement in 1..4 else report.outcome == MatchOutcome.VICTORY
+
+    fun rollTier(rng: kotlin.random.Random): CapsuleTier {
+        var roll = rng.nextInt(CapsuleTier.entries.sumOf { it.weight })
+        for (t in CapsuleTier.entries) { roll -= t.weight; if (roll < 0) return t }
+        return CapsuleTier.SCRAP
+    }
+
+    fun rollReward(tier: CapsuleTier, save: SaveData, rng: kotlin.random.Random): Reward {
+        fun bolts(lo: Int, hi: Int) = Reward.Bolts((lo + rng.nextInt(hi - lo + 1)) / 5 * 5)
+        fun prisms(lo: Int, hi: Int) = Reward.Prisms(lo + rng.nextInt(hi - lo + 1))
+        fun newSkin(): Reward? = Balance.fighters
+            .filter { save.progress(it.id).unlocked }
+            .flatMap { f -> f.skins.indices.filter { it !in save.progress(f.id).ownedSkins }.map { Reward.SkinReward(f.id, it) } }
+            .randomOrNull(rng)
+        fun newFighter(): Reward? = FighterId.entries.filter { !save.progress(it).unlocked }.randomOrNull(rng)?.let { Reward.UnlockFighter(it) }
+        return when (tier) {
+            CapsuleTier.SCRAP -> bolts(20, 40)
+            CapsuleTier.TUNED -> if (rng.nextInt(3) == 0) prisms(5, 8) else bolts(60, 100)
+            CapsuleTier.CHARGED -> if (rng.nextInt(2) == 0) prisms(12, 18) else bolts(150, 220)
+            CapsuleTier.OVERCLOCKED -> (if (rng.nextInt(2) == 0) newSkin() else null) ?: if (rng.nextBoolean()) prisms(30, 40) else bolts(380, 450)
+            CapsuleTier.PRISMATIC -> newFighter() ?: newSkin() ?: prisms(100, 120)
+        }
+    }
+}
+
 data class Milestone(val cups: Int, val reward: Reward)
 
 /** The Cup Track. Milestones must be sorted by [Milestone.cups] and unique. */

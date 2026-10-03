@@ -48,6 +48,10 @@ class GameRepository(private val store: SaveStore) {
         return r
     }
 
+    fun openCapsule(): CapsuleResult? = Progression.openCapsule(_save.value)?.let { (s, r) -> commit(s); r }
+
+    val capsulesLeftToday: Int get() = Progression.capsulesLeftToday(_save.value, today)
+
     fun claimDailyGift(): Reward? = Progression.claimDailyGift(_save.value, today)?.let { (s, r) -> commit(s); r }
 
     fun selectFighter(id: FighterId) = commit(Progression.selectFighter(_save.value, id))
@@ -59,5 +63,5 @@ class GameRepository(private val store: SaveStore) {
     fun updateSettings(transform: (Settings) -> Settings) = commit(_save.value.copy(settings = transform(_save.value.settings)))
 
     /** Wipes progress but keeps settings. */
-    fun resetProgress() = commit(SaveData(settings = _save.value.settings))
+    fun resetProgress() = commit(SaveData(settings = _save.value.settings, capsuleSeed = System.nanoTime()))
 }

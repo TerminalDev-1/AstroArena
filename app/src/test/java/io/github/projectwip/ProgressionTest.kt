@@ -2,6 +2,9 @@ package io.github.projectwip
 
 import io.github.projectwip.data.Balance
 import io.github.projectwip.data.BotDifficulty
+import io.github.projectwip.data.CapsuleTier
+import io.github.projectwip.data.GameMode
+import io.github.projectwip.data.SparkCapsules
 import io.github.projectwip.data.CupTrack
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.MatchOutcome
@@ -120,5 +123,62 @@ class ProgressionTest {
     @Test fun trackIsSortedAndUnique() {
         val cups = CupTrack.milestones.map { it.cups }
         assertEquals(cups.sorted().distinct(), cups)
+    }
+
+    @Test fun capsulesAreEarnedFromGoodFinishesUpToTheDailyCap() {
+        var save = SaveData(capsules = 0)
+        save = Progression.applyMatch(save, report(MatchOutcome.DEFEAT), today = 5).also { assertFalse(it.second.capsuleEarned) }.first
+        assertEquals(0, save.capsules)
+        repeat(SparkCapsules.PER_DAY) { i ->
+            val (next, rewards) = Progression.applyMatch(save, report(MatchOutcome.VICTORY), today = 5)
+            assertTrue(rewards.capsuleEarned)
+            assertEquals(SparkCapsules.PER_DAY - i - 1, rewards.capsulesLeftToday)
+            save = next
+        }
+        assertEquals(SparkCapsules.PER_DAY, save.capsules)
+        val (capped, rewards) = Progression.applyMatch(save, report(MatchOutcome.VICTORY), today = 5)
+        assertFalse("daily cap reached", rewards.capsuleEarned)
+        assertEquals(SparkCapsules.PER_DAY, capped.capsules)
+        assertEquals(0, Progression.capsulesLeftToday(capped, 5))
+        assertEquals("a new day resets the cap", SparkCapsules.PER_DAY, Progression.capsulesLeftToday(capped, 6))
+        assertTrue(Progression.applyMatch(capped, report(MatchOutcome.VICTORY), today = 6).second.capsuleEarned)
+
+        // Free-for-all: top four counts, fifth doesn't.
+        fun ffa(place: Int) = report(if (place == 1) MatchOutcome.VICTORY else MatchOutcome.DEFEAT).copy(mode = GameMode.LAST_SPARK, placement = place, players = 10)
+        assertTrue(SparkCapsules.earns(ffa(1)))
+        assertTrue(SparkCapsules.earns(ffa(4)))
+        assertFalse(SparkCapsules.earns(ffa(5)))
+    }
+
+    @Test fun openingACapsuleIsDeterministicAndGrantsItsReward() {
+        assertNull(Progression.openCapsule(SaveData(capsules = 0)))
+        val save = SaveData(capsules = 2, capsuleSeed = 99)
+        val (after, result) = Progression.openCapsule(save)!!
+        assertEquals("same seed, same capsule (no re-rolling by reloading)", result, Progression.openCapsule(save)!!.second)
+        assertEquals(1, after.capsules)
+        assertEquals(1, after.capsulesOpened)
+        assertTrue("the next capsule must use a fresh seed", after.capsuleSeed != save.capsuleSeed)
+        when (val r = result.reward) {
+            is Reward.Bolts -> assertEquals(save.bolts + r.amount, after.bolts)
+            is Reward.Prisms -> assertEquals(save.prisms + r.amount, after.prisms)
+            else -> assertTrue(Progression.owns(after, r))
+        }
+    }
+
+    @Test fun capsuleRewardsNeverDuplicateAndRespectTierOdds() {
+        // Open a long run of capsules: nothing already owned may ever come out, and every tier shows up.
+        var save = SaveData(capsules = 4000, capsuleSeed = 1)
+        val seen = HashMap<CapsuleTier, Int>()
+        repeat(4000) {
+            val before = save
+            val (next, result) = Progression.openCapsule(save)!!
+            assertFalse("duplicate ${result.reward}", Progression.owns(before, result.reward))
+            seen.merge(result.tier, 1, Int::plus)
+            save = next
+        }
+        println("capsule tiers over 4000 opens: $seen")
+        assertEquals(CapsuleTier.entries.toSet(), seen.keys)
+        for (t in CapsuleTier.entries.zipWithNext()) assertTrue("${t.first} should be more common than ${t.second}", seen.getValue(t.first) > seen.getValue(t.second))
+        assertTrue("Prismatic capsules unlock every fighter eventually", FighterId.entries.all { save.progress(it).unlocked })
     }
 }

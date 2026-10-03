@@ -24,6 +24,9 @@ data class MatchRewards(
     val bolts: Int,
     val firstWinPrisms: Int,
     val newlyReachedMilestones: List<Milestone>,
+    val capsuleEarned: Boolean = false,
+    /** Spark Capsules that can still be earned today, after this match. */
+    val capsulesLeftToday: Int = 0,
 )
 
 /** One stat row on the upgrade screen. */
@@ -50,7 +53,13 @@ object Progression {
         val prisms = if (firstWin) Balance.FIRST_WIN_PRISMS else 0
         val newCups = (save.cups + cupDelta).coerceAtLeast(0)
         val reached = CupTrack.milestones.filter { it.cups in (save.bestCups + 1)..newCups }
+        val earnedBefore = if (save.capsuleDay == today) save.capsulesEarnedToday else 0
+        val capsule = SparkCapsules.earns(report) && earnedBefore < SparkCapsules.PER_DAY
+        val earnedNow = earnedBefore + if (capsule) 1 else 0
         val next = save.copy(
+            capsules = save.capsules + if (capsule) 1 else 0,
+            capsuleDay = today,
+            capsulesEarnedToday = earnedNow,
             cups = newCups,
             bestCups = maxOf(save.bestCups, newCups),
             bolts = save.bolts + bolts,
@@ -60,7 +69,22 @@ object Progression {
             victories = save.victories + if (report.outcome == MatchOutcome.VICTORY) 1 else 0,
             totalKos = save.totalKos + report.kos,
         )
-        return next to MatchRewards(save.cups, newCups - save.cups, bolts, prisms, reached)
+        return next to MatchRewards(save.cups, newCups - save.cups, bolts, prisms, reached, capsule, SparkCapsules.PER_DAY - earnedNow)
+    }
+
+    // ---------------- Spark Capsules ----------------
+
+    fun capsulesLeftToday(save: SaveData, today: Long): Int =
+        SparkCapsules.PER_DAY - if (save.capsuleDay == today) save.capsulesEarnedToday else 0
+
+    /** Opens one capsule: rolls its tier and reward from the save's seed and grants it. Null if there is none to open. */
+    fun openCapsule(save: SaveData): Pair<SaveData, CapsuleResult>? {
+        if (save.capsules <= 0) return null
+        val rng = kotlin.random.Random(save.capsuleSeed)
+        val tier = SparkCapsules.rollTier(rng)
+        val reward = SparkCapsules.rollReward(tier, save, rng)
+        val next = grant(save, reward).copy(capsules = save.capsules - 1, capsulesOpened = save.capsulesOpened + 1, capsuleSeed = rng.nextLong())
+        return next to CapsuleResult(tier, reward)
     }
 
     // ---------------- Upgrades ----------------

@@ -16,10 +16,10 @@ class SaveStore(context: Context) {
     private val file = AtomicFile(File(context.filesDir, "save.json"))
 
     fun load(): SaveData = try {
-        if (!file.baseFile.exists()) SaveData() else fromJson(JSONObject(String(file.readFully(), Charsets.UTF_8)))
+        if (!file.baseFile.exists()) SaveData(capsuleSeed = System.nanoTime()) else fromJson(JSONObject(String(file.readFully(), Charsets.UTF_8)))
     } catch (e: Exception) {
         Log.e(TAG, "Save unreadable, starting fresh", e)
-        SaveData()
+        SaveData(capsuleSeed = System.nanoTime())
     }
 
     fun write(save: SaveData) {
@@ -50,6 +50,11 @@ class SaveStore(context: Context) {
             put("matchesPlayed", s.matchesPlayed)
             put("victories", s.victories)
             put("totalKos", s.totalKos)
+            put("capsules", s.capsules)
+            put("capsuleDay", s.capsuleDay)
+            put("capsulesEarnedToday", s.capsulesEarnedToday)
+            put("capsulesOpened", s.capsulesOpened)
+            put("capsuleSeed", s.capsuleSeed)
             put("fighters", JSONObject().apply {
                 s.fighters.forEach { (id, p) ->
                     put(id.name, JSONObject().apply {
@@ -133,6 +138,11 @@ class SaveStore(context: Context) {
                 matchesPlayed = o.optInt("matchesPlayed", 0),
                 victories = o.optInt("victories", 0),
                 totalKos = o.optInt("totalKos", 0),
+                capsules = o.optInt("capsules", d.capsules).coerceAtLeast(0),
+                capsuleDay = o.optLong("capsuleDay", -1),
+                capsulesEarnedToday = o.optInt("capsulesEarnedToday", 0).coerceAtLeast(0),
+                capsulesOpened = o.optInt("capsulesOpened", 0).coerceAtLeast(0),
+                capsuleSeed = if (o.has("capsuleSeed")) o.optLong("capsuleSeed") else System.nanoTime(),
                 settings = settings,
                 customOffers = o.optJSONArray("customOffers")?.let { arr ->
                     (0 until arr.length()).mapNotNull { i ->

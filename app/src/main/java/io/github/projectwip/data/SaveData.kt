@@ -47,6 +47,14 @@ data class SaveData(
     val settings: Settings = Settings(),
     /** Offers made with the in-game Offer Creator. */
     val customOffers: List<CustomOffer> = emptyList(),
+    /** Unopened Spark Capsules. */
+    val capsules: Int = SparkCapsules.STARTING,
+    /** The day [capsulesEarnedToday] counts for. */
+    val capsuleDay: Long = -1,
+    val capsulesEarnedToday: Int = 0,
+    val capsulesOpened: Int = 0,
+    /** Seeds the next capsule roll; stored so reloading the game can't re-roll a capsule. */
+    val capsuleSeed: Long = 0,
 ) {
     fun progress(id: FighterId): FighterProgress = fighters[id] ?: FighterProgress()
 
