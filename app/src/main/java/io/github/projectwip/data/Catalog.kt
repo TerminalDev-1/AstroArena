@@ -50,11 +50,11 @@ data class CustomOffer(
 
 /** How good a Spark Capsule turned out. Each tier up is rarer and pays better. */
 enum class CapsuleTier(val label: String, val color: Long, val weight: Int) {
-    SCRAP("Scrap", 0xFF9AA6C0, 40),
+    SCRAP("Scrap", 0xFF4F86FF, 40),
     TUNED("Tuned", 0xFF4ED36A, 28),
-    CHARGED("Charged", 0xFF2EC4F1, 18),
+    CHARGED("Charged", 0xFFA66BFF, 18),
     OVERCLOCKED("Overclocked", 0xFFFF8A1F, 8),
-    PRISMATIC("Prismatic", 0xFFFF6BFF, 4),
+    PRISMATIC("Prismatic", 0xFFFF4FB8, 4),
     ULTRA("Ultra", 0xFFFFE14D, 2),
 }
 

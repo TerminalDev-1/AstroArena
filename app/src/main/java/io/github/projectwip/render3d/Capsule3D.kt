@@ -32,13 +32,13 @@ class Capsule3D {
     private val root = FloatArray(16)
     private val model = FloatArray(16)
     private val eye = floatArrayOf(0f, 0f, 6.2f)
-    private val col = floatArrayOf(0.6f, 0.65f, 0.75f)
+    private val col = floatArrayOf(0.31f, 0.53f, 1f)
     private var fade = 0f
     private var lastCharge = 0L
     private var lastOpen = 0L
     private var lastSplit = 0L
     /** The extra capsules from a split are fresh Scrap ones. */
-    private val TWIN = floatArrayOf(0.6f, 0.65f, 0.75f)
+    private val TWIN = floatArrayOf(0.31f, 0.53f, 1f)
 
     init {
 // A Spark Drop: a puffy five-pointed star. The front half lifts off the back half when it opens.
