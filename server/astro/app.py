@@ -17,7 +17,9 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/shop/gift                  claim the daily gift -> {reward}                      (token)
     POST /v1/shop/deals/<id>/buy        buy a deal -> {reward}                                (token)
     POST /v1/track/claim    {cups}      claim a Cup Track reward -> {reward}                  (token)
-    POST /v1/reset                      start this account's progress over                    (token)
+    POST /v1/shop/daily/<n>/buy {day}   buy one of today's offers -> {reward}                 (token)
+    POST /v1/settings/difficulty {difficulty}  choose the bot difficulty; the server says yes or no  (token)
+    POST /v1/reset                      start this account's progress over                    (token, developer)
     POST /v1/dev/grant      {...}       developer hand-outs                                   (token, developer)
     POST /v1/dev/deals      {...}       put a deal in everyone's shop -> {id}                 (token, developer)
     POST /v1/dev/deals/<id>/delete      take a deal out of the shop                           (token, developer)
@@ -43,16 +45,17 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import rules
+from . import economy, rules
 from .config import Config, parse_version
 from .economy import Refused
-from .store import Store
+from .store import Store, clock, today
 
 API = 2
 MAX_BODY = 512 * 1024
 _MATCH_RESULT = re.compile(r"^/v1/matches/(\d+)/result$")
 _DEAL_BUY = re.compile(r"^/v1/shop/deals/(\d+)/buy$")
 _DEAL_DELETE = re.compile(r"^/v1/dev/deals/(\d+)/delete$")
+_DAILY_BUY = re.compile(r"^/v1/shop/daily/(\d+)/buy$")
 
 
 class Game:
@@ -77,22 +80,44 @@ class Game:
             self._signups[address] = recent
         return allowed
 
+    def difficulty(self, player) -> str:
+        """The bot difficulty this player plays at: the one they picked if it is still allowed, else the default."""
+        picked = player["difficulty"]
+        if picked in rules.DIFFICULTIES and (picked in self.config.allowed_difficulties() or self.config.is_developer(player["id"])):
+            return picked
+        return self.config.default_difficulty()
+
+    def daily_offers(self) -> list[dict]:
+        pool, count = self.config.daily_pool()
+        return economy.daily_offers(pool, count, today())
+
     def account(self, player_id: str) -> dict:
         """A player as the server sees them: what the client shows and is allowed to do."""
         player = self.store.player(player_id)
         rank, players = self.store.rank(player_id)
+        profile = self.store.profile(player_id)
+        developer = self.config.is_developer(player["id"])
+        time_now = clock()
         return {
             "id": player["id"],
             "name": player["name"],
-            "developer": self.config.is_developer(player["id"]),
+            "developer": developer,
             "cups": player["cups"],
             "rank": rank,
             "players": players,
             "drops": player["drops"],
             "dropsLeftToday": self.store.drops_left_today(player),
-            "difficulty": self.config.default_difficulty(),
-            "profile": self.store.profile(player_id),
+            "difficulty": self.difficulty(player),
+            "difficulties": list(rules.DIFFICULTIES) if developer else self.config.allowed_difficulties(),
+            "profile": profile,
             "deals": self.store.deals(player_id),
+            # The day's offers and the clock they run on. Times are the server's: the game counts down from these.
+            "time": time_now,
+            "giftAvailable": profile.get("lastDailyGiftDay") != time_now["day"],
+            "dailyOffers": [
+                {"id": i, **offer, "expiresAt": time_now["dayEndsAt"], "purchased": 1 if economy.bought_today(profile, offer["title"], time_now["day"]) else 0}
+                for i, offer in enumerate(self.daily_offers())
+            ],
         }
 
 
@@ -219,7 +244,13 @@ def make_handler(game: Game, quiet: bool = False):
             if url.path == "/v1/track/claim":
                 return self._act(lambda p, d: {"reward": game.store.claim_milestone(p["id"], int(d.get("cups") or 0))})
             if url.path == "/v1/reset":
-                return self._act(lambda p, d: game.store.reset(p["id"]))
+                return self._act(lambda p, d: game.store.reset(p["id"]), developer=True)
+            if url.path == "/v1/settings/difficulty":
+                return self._act(self._set_difficulty)
+            m = _DAILY_BUY.match(url.path)
+            if m:
+                index = int(m.group(1))
+                return self._act(lambda p, d: {"reward": game.store.buy_daily(p["id"], game.daily_offers(), index, int(d.get("day", -1)))})
             if url.path == "/v1/dev/deals":
                 return self._act(lambda p, d: {"id": game.store.create_deal(p["id"], d)}, developer=True)
             m = _DEAL_BUY.match(url.path)
@@ -251,6 +282,15 @@ def make_handler(game: Game, quiet: bool = False):
                 return self._error(400, "a field has the wrong type")
             return self._send(200, {**extra, "account": game.account(player["id"])})
 
+        def _set_difficulty(self, player, data):
+            wanted = str(data.get("difficulty") or "").upper()
+            if wanted not in rules.DIFFICULTIES:
+                raise Refused(400, "unknown difficulty")
+            if wanted not in game.config.allowed_difficulties() and not game.config.is_developer(player["id"]):
+                raise Refused(403, "the server doesn't allow that difficulty")
+            game.store.set_difficulty(player["id"], wanted)
+            return {"ok": True}
+
         def _upgrade(self, player, data):
             # The cost slider and the level cap switch in the debug menu are for developers only.
             factor, no_cap = 1.0, False
@@ -273,11 +313,8 @@ def make_handler(game: Game, quiet: bool = False):
                 level = int(data.get("level") or 1)
             except (TypeError, ValueError):
                 return self._error(400, "level must be a number")
-            # Only developers choose how hard the bots are; everyone else gets the server's setting.
-            difficulty = game.config.default_difficulty()
-            asked = str(data.get("difficulty") or "").upper()
-            if game.config.is_developer(player["id"]) and asked in rules.DIFFICULTIES:
-                difficulty = asked
+            # The difficulty is the one the player picked earlier and the server approved, not whatever this request says.
+            difficulty = game.difficulty(player)
             return self._send(201, game.store.plan_match(
                 player["id"], mode, str(data.get("fighter") or "JUNO"), level, difficulty, rules.MODES[mode]
             ))

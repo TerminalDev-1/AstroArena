@@ -16,7 +16,7 @@ from astro.app import serve
 from astro.config import matches, parse_version
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-VERSION = "9"
+VERSION = "10"
 
 
 class VersionRules(unittest.TestCase):
@@ -181,7 +181,7 @@ class Economy(unittest.TestCase):
 class Api(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
-        for name in ("versions_not_supported.cfg", "notices.cfg", "bots.cfg", "game.cfg"):
+        for name in ("versions_not_supported.cfg", "notices.cfg", "bots.cfg", "game.cfg", "shop.cfg"):
             shutil.copy(os.path.join(HERE, name), self.dir)
         self.httpd = serve(self.dir, "127.0.0.1", 0, quiet=True)
         self.base = "http://127.0.0.1:%d" % self.httpd.server_address[1]
@@ -231,24 +231,24 @@ class Api(unittest.TestCase):
         status, body = self.call("GET", "/v1/health")
         self.assertEqual(status, 200)
         self.assertTrue(body["ok"])
-        _, old = self.call("GET", "/v1/status?version=8")
+        _, old = self.call("GET", "/v1/status?version=9")
         self.assertFalse(old["supported"])
         self.assertIn("no longer supported", old["message"])
-        _, new = self.call("GET", "/v1/status?version=9")
+        _, new = self.call("GET", "/v1/status?version=10")
         self.assertTrue(new["supported"])
         self.assertEqual(new["notice"], "Welcome to the AstroArena servers!")
 
     def test_cfg_edits_apply_without_restart(self):
-        self.assertTrue(self.call("GET", "/v1/status?version=9")[1]["supported"])
-        self.write_cfg("versions_not_supported.cfg", "<=9 | Time to move on.\n")
-        _, body = self.call("GET", "/v1/status?version=9")
+        self.assertTrue(self.call("GET", "/v1/status?version=10")[1]["supported"])
+        self.write_cfg("versions_not_supported.cfg", "<=10 | Time to move on.\n")
+        _, body = self.call("GET", "/v1/status?version=10")
         self.assertFalse(body["supported"])
         self.assertEqual(body["message"], "Time to move on.")
 
     def test_unsupported_and_unnamed_versions_are_refused_everywhere(self):
         me = self.player()
         self.assertEqual(self.call("GET", "/v1/me", token=me["token"])[0], 200)
-        status, body = self.call("GET", "/v1/me", token=me["token"], version="8")
+        status, body = self.call("GET", "/v1/me", token=me["token"], version="9")
         self.assertEqual(status, 426)
         self.assertIn("no longer supported", body["error"])
         self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, me["token"], version="0.5.1-preview")[0], 426)
@@ -387,9 +387,7 @@ class Api(unittest.TestCase):
         self.assertTrue(self.call("GET", "/v1/me", token=me["token"])[1]["account"]["developer"])
         _, body = self.call("POST", "/v1/dev/grant", {"cups": 500, "drops": 5}, me["token"])
         self.assertEqual((body["account"]["cups"], body["account"]["drops"]), (500, 6))
-        # A developer picks the difficulty, and can open drops for free with luck.
-        _, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "difficulty": "ELITE"}, me["token"])
-        self.assertEqual(plan["difficulty"], "ELITE")
+        # A developer can open drops for free with luck.
         _, drop = self.call("POST", "/v1/drops/open", {"luck": 14, "free": True}, me["token"])
         self.assertEqual(drop["account"]["drops"], 6 + drop["pieces"] - 1)  # free: none used up
         # Someone else is still an ordinary player.
@@ -470,6 +468,82 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("POST", "/v1/dev/deals/%d/delete" % deal_id, {}, buyer["token"])[0], 403)
         self.assertTrue(self.call("POST", "/v1/dev/deals/%d/delete" % deal_id, {}, dev["token"])[1]["deleted"])
         self.assertEqual(self.call("POST", "/v1/shop/deals/%d/buy" % deal_id, {}, buyer["token"])[0], 404)
+
+    def test_the_server_approves_the_difficulty(self):
+        me = self.player()
+        token = me["token"]
+        account = self.call("GET", "/v1/me", token=token)[1]["account"]
+        self.assertEqual((account["difficulty"], account["difficulties"]), ("EASY", ["EASY", "NORMAL", "HARD", "ELITE"]))
+        # Picking one the server allows: it says yes, remembers it, and plans matches with it.
+        status, body = self.call("POST", "/v1/settings/difficulty", {"difficulty": "hard"}, token)
+        self.assertEqual((status, body["ok"], body["account"]["difficulty"]), (200, True, "HARD"))
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "difficulty": "ELITE"}, token)[1]["difficulty"], "HARD")
+        self.assertEqual(self.call("POST", "/v1/settings/difficulty", {"difficulty": "IMPOSSIBLE"}, token)[0], 400)
+        # The operator narrows the choice: the server says no, and a choice that is no longer allowed falls back.
+        self.write_cfg("game.cfg", "[players]\ndifficulty = NORMAL\nallowed = EASY, NORMAL\n")
+        status, body = self.call("POST", "/v1/settings/difficulty", {"difficulty": "ELITE"}, token)
+        self.assertEqual(status, 403)
+        self.assertIn("doesn't allow", body["error"])
+        account = self.call("GET", "/v1/me", token=token)[1]["account"]
+        self.assertEqual((account["difficulty"], account["difficulties"]), ("NORMAL", ["EASY", "NORMAL"]))
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, token)[1]["difficulty"], "NORMAL")
+        # Developers may pick any.
+        self.write_cfg("game.cfg", "[players]\ndifficulty = NORMAL\nallowed = EASY, NORMAL\n[developers]\nids = %s\n" % me["id"])
+        self.assertEqual(self.call("POST", "/v1/settings/difficulty", {"difficulty": "ELITE"}, token)[1]["account"]["difficulty"], "ELITE")
+
+    def test_only_developers_start_an_account_over(self):
+        me = self.player(save={"cups": 50, "capsules": 3, "bolts": 700})
+        self.assertEqual(self.call("POST", "/v1/reset", {}, me["token"])[0], 403)
+        self.assertEqual(self.call("GET", "/v1/me", token=me["token"])[1]["account"]["profile"]["bolts"], 700)
+
+    def test_daily_offers_and_the_clock_are_the_servers(self):
+        me = self.player(save={"cups": 0, "capsules": 0, "bolts": 5000, "prisms": 500})
+        other = self.player("Other")
+        account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]
+        clock = account["time"]
+        self.assertGreater(clock["dayEndsAt"], clock["now"])
+        self.assertLessEqual(clock["dayEndsAt"] - clock["now"], 25 * 3600 * 1000)
+        self.assertTrue(account["giftAvailable"])
+        offers = account["dailyOffers"]
+        self.assertEqual(len(offers), 3)
+        self.assertEqual(len({o["title"] for o in offers}), 3)
+        self.assertTrue(all(o["expiresAt"] == clock["dayEndsAt"] and o["purchased"] == 0 and o["limit"] == 1 for o in offers))
+        # Everyone gets the same offers today.
+        theirs = self.call("GET", "/v1/me", token=other["token"])[1]["account"]["dailyOffers"]
+        self.assertEqual([o["title"] for o in theirs], [o["title"] for o in offers])
+        # Buying one: once a day, and only for the day it was shown.
+        before = account["profile"]
+        self.assertEqual(self.call("POST", "/v1/shop/daily/0/buy", {"day": clock["day"] - 1}, me["token"])[0], 409)
+        status, body = self.call("POST", "/v1/shop/daily/0/buy", {"day": clock["day"]}, me["token"])
+        self.assertEqual(status, 200)
+        offer, after = offers[0], body["account"]["profile"]
+        wallet = {"BOLTS": "bolts", "PRISMS": "prisms"}.get(offer["currency"])
+        expected = dict(bolts=before["bolts"] + offer["bolts"], prisms=before["prisms"] + offer["prisms"])
+        if wallet:
+            expected[wallet] -= offer["price"]
+        self.assertEqual((after["bolts"], after["prisms"]), (expected["bolts"], expected["prisms"]))
+        self.assertEqual([o["purchased"] for o in body["account"]["dailyOffers"]], [1, 0, 0])
+        self.assertEqual(self.call("POST", "/v1/shop/daily/0/buy", {"day": clock["day"]}, me["token"])[0], 409)
+        self.assertEqual(self.call("POST", "/v1/shop/daily/7/buy", {"day": clock["day"]}, me["token"])[0], 404)
+        # The other player's copy is untouched, and the gift flag follows the claim.
+        self.assertEqual(self.call("GET", "/v1/me", token=other["token"])[1]["account"]["dailyOffers"][0]["purchased"], 0)
+        self.assertFalse(self.call("POST", "/v1/shop/gift", {}, me["token"])[1]["account"]["giftAvailable"])
+        # The operator edits shop.cfg: the shop follows, and a broken entry is left out.
+        self.write_cfg("shop.cfg", "[settings]\noffers_per_day = 5\n[Only One]\nbolts = 10\ncurrency = FREE\n[Broken]\nskin_fighter = JUNO\nskin = 9\n[Empty]\nprice = 5\n")
+        offers = self.call("GET", "/v1/me", token=me["token"])[1]["account"]["dailyOffers"]
+        self.assertEqual([o["title"] for o in offers], ["Only One"])
+
+    def test_daily_offers_change_each_day(self):
+        pool = [{"title": "Offer %d" % i, "bolts": 10 * (i + 1), "currency": "FREE"} for i in range(8)]
+        days = [tuple(o["title"] for o in economy.daily_offers(pool, 3, day)) for day in range(20000, 20030)]
+        self.assertTrue(all(len(set(d)) == 3 for d in days))
+        self.assertEqual(days[0], tuple(o["title"] for o in economy.daily_offers(pool, 3, 20000)))  # the same all day
+        self.assertGreater(len(set(days)), 20)  # and different from day to day
+        # Something already owned isn't sold again.
+        p = economy.new_profile()
+        owned = economy.daily_offers([{"title": "Skin", "skinFighter": "JUNO", "skinIndex": 0, "currency": "FREE"}], 1, 5)
+        with self.assertRaises(Refused):
+            economy.buy_daily(p, owned, 0, 5)
 
     def test_old_databases_are_upgraded(self):
         import sqlite3

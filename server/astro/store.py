@@ -81,6 +81,7 @@ PLAYER_COLUMNS = [
     ("imported", "INTEGER NOT NULL DEFAULT 0"),    # 1 once the starting Cups and drops have been settled
     ("flags", "INTEGER NOT NULL DEFAULT 0"),       # results the server refused to believe
     ("profile", "TEXT"),                           # Bolts, Prisms, fighters, claimed rewards (economy.py); NULL until started
+    ("difficulty", "TEXT"),                        # the bot difficulty this player picked (and the server approved); NULL = the default
 ]
 
 BOT_NAMES = [
@@ -99,8 +100,14 @@ def clean_name(name: object) -> str:
 
 
 def today() -> int:
-    """The server's calendar day, counted from 1970 (the same number the game uses for its own day)."""
+    """The server's calendar day, counted from 1970. The day, and when it ends, are the server's to say."""
     return (datetime.date.today() - _EPOCH).days
+
+
+def clock() -> dict:
+    """The server's time, for the game to count down from: now, today's number, and when today ends (ms since 1970)."""
+    midnight = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time.min)
+    return {"now": int(time.time() * 1000), "day": today(), "dayEndsAt": int(midnight.timestamp() * 1000)}
 
 
 class Store:
@@ -160,6 +167,17 @@ class Store:
             profile["bolts"] = max(0, profile["bolts"] + int(bolts))
             profile["prisms"] = max(0, profile["prisms"] + int(prisms))
             self._keep(player_id, profile)
+
+    def set_difficulty(self, player_id: str, difficulty: str) -> None:
+        with self._lock, self._db:
+            self._db.execute("UPDATE players SET difficulty = ? WHERE id = ?", (difficulty, player_id))
+
+    def buy_daily(self, player_id: str, offers: list[dict], index: int, day: int) -> dict:
+        """Buys one of the day's offers. `day` is the day the player saw it on: after midnight it no longer counts."""
+        now = today()
+        if day != now:
+            raise Refused(409, "the shop has changed since then")
+        return self._change(player_id, lambda p: economy.buy_daily(p, offers, index, now))
 
     def reset(self, player_id: str) -> None:
         """Starts a player's progress over: Cups, drops and profile. Their name and account stay."""

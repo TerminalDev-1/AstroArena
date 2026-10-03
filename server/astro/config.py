@@ -5,7 +5,8 @@ They are re-read whenever they change on disk, so there is no need to restart th
 versions_not_supported.cfg   which client versions are turned away, and what they are told
 notices.cfg                  short messages shown to players on the home screen
 bots.cfg                     how bots behave at each difficulty (the client has the same numbers built in as a fallback)
-game.cfg                     the difficulty ordinary players get, who the developers are, how new accounts start
+game.cfg                     the difficulties players may pick, who the developers are, how new accounts start
+shop.cfg                     the pool the day's shop offers are picked from
 """
 
 from __future__ import annotations
@@ -70,6 +71,8 @@ class Config:
         self._notices: list[tuple[str, str]] = []
         self._bots: dict[str, dict[str, float | bool]] = {}
         self._game: dict[str, dict[str, str]] = {}
+        self._shop: list[dict] = []
+        self._offers_per_day = 3
 
     def _path(self, name: str) -> str:
         return os.path.join(self.directory, name)
@@ -110,6 +113,40 @@ class Config:
             parser = configparser.ConfigParser()
             parser.read(self._path("game.cfg"), encoding="utf-8")
             self._game = {section.lower(): dict(parser.items(section)) for section in parser.sections()}
+
+        if self._changed("shop.cfg"):
+            # Section names are kept as written: they are the titles players see.
+            parser = configparser.ConfigParser()
+            parser.optionxform = str.lower
+            parser.read(self._path("shop.cfg"), encoding="utf-8")
+            pool, per_day = [], 3
+            for section in parser.sections():
+                values = dict(parser.items(section))
+                if section.lower() == "settings":
+                    try:
+                        per_day = max(0, int(values.get("offers_per_day", "3")))
+                    except ValueError:
+                        pass
+                    continue
+                pool.append({
+                    "title": section, "bolts": values.get("bolts", 0), "prisms": values.get("prisms", 0),
+                    "fighter": values.get("fighter", "").upper(), "skinFighter": values.get("skin_fighter", "").upper(),
+                    "skinIndex": values.get("skin", 0), "currency": values.get("currency", "PRISMS").upper(),
+                    "price": values.get("price", 0), "wasPrice": values.get("was", 0), "theme": values.get("theme", 0),
+                })
+            self._shop, self._offers_per_day = pool, per_day
+
+    def daily_pool(self) -> tuple[list[dict], int]:
+        """The offers the day's shop is picked from (as written in shop.cfg), and how many to pick."""
+        with self._lock:
+            self._refresh()
+            return [dict(o) for o in self._shop], self._offers_per_day
+
+    def allowed_difficulties(self) -> list[str]:
+        """The difficulties an ordinary player may pick."""
+        raw = self._setting("players", "allowed", "EASY, NORMAL, HARD, ELITE")
+        picked = [d for d in re.split(r"[,\s]+", raw.upper()) if d in ("EASY", "NORMAL", "HARD", "ELITE")]
+        return picked or [self.default_difficulty()]
 
     def _setting(self, section: str, key: str, default: str = "") -> str:
         with self._lock:

@@ -16,6 +16,7 @@ Rewards are small dicts: {"type": "bolts"|"prisms", "amount"}, {"type": "fighter
 from __future__ import annotations
 
 import math
+import random
 
 from . import rules
 
@@ -302,3 +303,42 @@ def buy_deal(profile: dict, deal: dict, purchased: int, now_ms: int) -> dict:
             raise Refused(402, "not enough " + wallet.capitalize())
         profile[wallet] -= deal["price"]
     return grant(profile, deal_reward(deal))
+
+
+# ---------------------------------------------------------------------------- daily offers
+
+def daily_offers(pool: list[dict], count: int, day: int) -> list[dict]:
+    """The day's offers: `count` of the pool, the same for every player, different each day.
+
+    Entries the operator got wrong (an unknown colourway, nothing in them) are left out rather than breaking the shop.
+    """
+    good = []
+    for entry in pool:
+        try:
+            good.append({**clean_deal(entry), "limit": 1, "expiresAt": 0})
+        except Refused:
+            continue
+    picker = random.Random(day * 7919 + 17)
+    return picker.sample(good, min(max(count, 0), len(good)))
+
+
+def buy_daily(profile: dict, offers: list[dict], index: int, day: int) -> dict:
+    """Buys today's offer number `index`, once. What a player has bought today is kept in their profile."""
+    if not 0 <= index < len(offers):
+        raise Refused(404, "no such offer today")
+    offer = offers[index]
+    if profile.get("dailyDay") != day:
+        profile["dailyDay"], profile["dailyBought"] = day, []
+    if offer["title"] in profile["dailyBought"]:
+        raise Refused(409, "already bought today")
+    # An offer for something already owned would just pay out; say no instead.
+    reward = deal_reward(offer)
+    if any(owns(profile, item) for item in reward.get("items", [reward])):
+        raise Refused(409, "you already own what this offer gives")
+    granted = buy_deal(profile, offer, 0, 0)
+    profile["dailyBought"] = profile["dailyBought"] + [offer["title"]]
+    return granted
+
+
+def bought_today(profile: dict, title: str, day: int) -> bool:
+    return profile.get("dailyDay") == day and title in profile.get("dailyBought", [])
