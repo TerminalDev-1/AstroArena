@@ -53,6 +53,7 @@ class FighterModels {
         models[FighterId.JUNO] = buildJuno()
         models[FighterId.BRAKK] = buildBrakk()
         models[FighterId.MIRA] = buildMira()
+        models[FighterId.KITO] = buildKito()
     }
 
     fun model(id: FighterId) = models.getValue(id)
@@ -178,6 +179,39 @@ class FighterModels {
         a.add(Bone.WEAPON, Slot.SKIN) { at(0.06f, 0f, 0f) { sphere(0.08f, 8, 10) } }
         a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.1f, 0f) { capsule(0.075f, 0.14f) } }
         a.add(Bone.ARM, Slot.SKIN) { at(0f, -0.26f, 0f) { sphere(0.08f, 8, 10) } }
+        return a.build(rig)
+    }
+
+    // ------------------------------------------------------------------ Kito — arc-blade assassin
+
+    private fun buildKito(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 1.0f, hipY = 0.4f, hipZ = 0.13f, shoulder = floatArrayOf(0.1f, 0.72f, 0.27f), shoulderL = floatArrayOf(0.02f, 0.8f, -0.27f))
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.DARK) { at(0f, -0.15f, 0f) { capsule(0.085f, 0.18f) } }
+            a.add(bone, Slot.ACCENT) { at(0.04f, -0.36f, 0f) { roundedBox(0.26f, 0.1f, 0.16f, 0.05f) } }
+        }
+        // Slim torso with a sash and a chest plate.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.66f, 0f) { roundedBox(0.4f, 0.5f, 0.46f, 0.18f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0f, 0.5f, 0f) { roundedBox(0.43f, 0.09f, 0.49f, 0.04f) } }
+        a.add(Bone.BODY, Slot.METAL) { at(0.2f, 0.72f, 0f) { roundedBox(0.08f, 0.22f, 0.3f, 0.03f) } }
+        // Scarf: a ring at the neck and a tail streaming out behind.
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0f, 0.92f, 0f) { torus(0.17f, 0.07f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(-0.36f, 0.86f, 0.1f) { rotate(-22f, 0f, 0f, 1f); roundedBox(0.48f, 0.07f, 0.16f, 0.03f) } }
+        // Hooded head with a glowing visor slit and two swept-back fins.
+        a.add(Bone.HEAD, Slot.DARK) { at(0f, 0.2f, 0f) { sphere(0.31f) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.05f, 0.25f, 0f) { ellipsoid(0.34f, 0.33f, 0.34f, 8, 16, 0f, 0.5f) } }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.26f, 0.2f, 0f) { roundedBox(0.1f, 0.07f, 0.4f, 0.03f) } }
+        for (z in listOf(0.2f, -0.2f)) {
+            a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.12f, 0.5f, z) { rotate(if (z > 0f) 20f else -20f, 1f, 0f, 0f); cylinder(0.055f, 0.3f, 6, topRadius = 0f) } }
+        }
+        // Arc blade: hilt, guard and a long glowing edge.
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.06f, 0f, 0f) { alongX { cylinder(0.05f, 0.2f, 8) } } }
+        a.add(Bone.WEAPON, Slot.SECONDARY) { at(0.18f, 0f, 0f) { roundedBox(0.06f, 0.2f, 0.12f, 0.02f) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, emissive = true) { at(0.62f, 0f, 0f) { roundedBox(0.82f, 0.11f, 0.035f, 0.015f) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.02f, 0f, 0f) { sphere(0.09f, 8, 10) } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.11f, 0f) { capsule(0.08f, 0.14f) } }
+        a.add(Bone.ARM, Slot.DARK) { at(0f, -0.28f, 0f) { sphere(0.085f, 8, 10) } }
         return a.build(rig)
     }
 

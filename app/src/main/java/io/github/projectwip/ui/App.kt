@@ -91,6 +91,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "match" -> Screen.Match(startMatchConfig(repo.save.value))
                 "boss" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
                 "fighters" -> Screen.Fighters()
+                "kito" -> Screen.Fighters(FighterId.KITO)
                 "shop" -> Screen.Shop
                 "track" -> Screen.CupTrack
                 "settings" -> Screen.Settings
@@ -161,8 +162,13 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     }
 
     // Lobby music plays in the menus and makes way for the match.
-    val inMatch = screen is Screen.Match
-    LaunchedEffect(inMatch, booting, update) { music.setWanted(!inMatch && !booting && update == null) }
+    // Music: silence while loading and in matches, its own theme on the result screen, the lobby loop elsewhere.
+    val wantedTrack = when (val s = screen) {
+        is Screen.Match -> null
+        is Screen.Result -> if (s.summary.report.outcome == io.github.projectwip.data.MatchOutcome.VICTORY) io.github.projectwip.audio.Track.VICTORY else io.github.projectwip.audio.Track.DEFEAT
+        else -> io.github.projectwip.audio.Track.LOBBY
+    }
+    LaunchedEffect(wantedTrack, booting, update) { music.play(if (booting || update != null) null else wantedTrack) }
 
     val go: (Screen) -> Unit = { if (it !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f); screen = it }
     val showReward: (RewardReveal) -> Unit = { reveal = it }

@@ -147,7 +147,7 @@ private fun RosterCard(save: SaveData, id: FighterId, focused: Boolean, onClick:
     val p = save.progress(id)
     val ui = LocalUi.current
     Box {
-        ChunkyButton(onClick, Modifier.fillMaxWidth().height(if (ui.roomy) 118.dp else 92.dp),
+        ChunkyButton(onClick, Modifier.fillMaxWidth().height(if (ui.roomy) 96.dp else 76.dp),
             if (focused) ButtonStyle.GOLD else if (p.unlocked) ButtonStyle.PURPLE else ButtonStyle.GREY, cut = 14.dp, lip = 4.dp) {
             Row(Modifier.fillMaxSize().padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.fillMaxHeight().aspectRatio(0.8f)) {

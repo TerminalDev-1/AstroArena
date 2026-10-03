@@ -297,4 +297,19 @@ class ProgressionTest {
         assertFalse("garbage is never an update", v.isNewer("latest", "0.4.2-preview"))
         assertFalse(v.isNewer("v0.4.3", "not-a-version"))
     }
+
+    @Test fun rosterHasFourFightersAtGenreScale() {
+        assertEquals(FighterId.entries.size, Balance.fighters.size)
+        assertEquals("the roster lists fighters in id order", FighterId.entries.toList(), Balance.fighters.map { it.id })
+        val kito = Balance.fighter(FighterId.KITO)
+        assertEquals("Kito", kito.name)
+        assertFalse("new fighters start locked", SaveData().progress(FighterId.KITO).unlocked)
+        assertNotNull(Balance.unlockPrismPrice(FighterId.KITO))
+        assertTrue(CupTrack.milestones.any { it.reward == Reward.UnlockFighter(FighterId.KITO) })
+        // Thousands of health, hundreds to a thousand-odd per hit.
+        for (f in Balance.fighters) {
+            assertTrue("${f.name} health ${f.health.base}", f.health.base in 2500..6000)
+            assertTrue("${f.name} damage ${f.attackDamage.base}", f.attackDamage.base in 200..1200)
+        }
+    }
 }

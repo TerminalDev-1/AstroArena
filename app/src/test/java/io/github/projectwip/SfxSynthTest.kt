@@ -50,4 +50,18 @@ class SfxSynthTest {
         val typical = (1 until 2000).maxOf { abs(d[it] - d[it - 1]) }
         assertTrue("click at the loop point", abs(d[0] - d[d.size - 1]) <= typical * 1.5f + 0.01f)
     }
+
+    /** The result-screen themes are separate pieces and loop cleanly too. */
+    @Test fun resultThemesLoopCleanly() {
+        val lobby = SfxSynth.renderLobbyMusic()
+        for ((name, d) in listOf("victory" to SfxSynth.renderVictoryMusic(), "defeat" to SfxSynth.renderDefeatMusic())) {
+            val rms = sqrt(d.sumOf { (it * it).toDouble() } / d.size).toFloat()
+            println("$name music %.2fs rms=%.3f seam=%.3f".format(d.size.toFloat() / SfxSynth.RATE, rms, abs(d[0] - d[d.size - 1])))
+            assertTrue(d.all { it.isFinite() })
+            assertTrue("$name audible", rms > 0.05f)
+            assertTrue("$name is its own piece, not the lobby loop", d.size != lobby.size)
+            val typical = (1 until 2000).maxOf { abs(d[it] - d[it - 1]) }
+            assertTrue("$name clicks at the loop point", abs(d[0] - d[d.size - 1]) <= typical * 1.5f + 0.01f)
+        }
+    }
 }

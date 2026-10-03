@@ -623,5 +623,5 @@ class World(
     }
 
     /** Most valuable player = highest contribution score across both teams. */
-    fun mvp(): Fighter? = fighters.maxByOrNull { it.kos * 3f + it.damageDealt / 400f - it.deaths * 0.5f }
+    fun mvp(): Fighter? = fighters.maxByOrNull { it.kos * 3f + it.damageDealt / 1600f - it.deaths * 0.5f }
 }

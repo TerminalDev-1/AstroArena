@@ -165,6 +165,8 @@ object CupTrack {
         Milestone(700, Reward.Bolts(600)),
         Milestone(850, Reward.SkinReward(FighterId.JUNO, 2)),
         Milestone(1000, Reward.Prisms(100)),
+        Milestone(1200, Reward.UnlockFighter(FighterId.KITO)),
+        Milestone(1500, Reward.SkinReward(FighterId.KITO, 1)),
     )
 
     fun nextMilestone(cups: Int): Milestone? = milestones.firstOrNull { it.cups > cups }

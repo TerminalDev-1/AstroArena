@@ -850,6 +850,7 @@ class MatchRenderer(
         FighterId.JUNO -> 1.85f
         FighterId.BRAKK -> 1.8f
         FighterId.MIRA -> 2.0f
+        FighterId.KITO -> 1.9f
     }
 
     override fun onDestroyed() {}

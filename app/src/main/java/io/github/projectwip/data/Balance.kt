@@ -13,7 +13,7 @@ data class StatLine(val base: Int, val perLevel: Int) {
     fun at(level: Int): Int = base + perLevel * (level.coerceAtLeast(1) - 1)
 }
 
-enum class FighterId { JUNO, BRAKK, MIRA }
+enum class FighterId { JUNO, BRAKK, MIRA, KITO }
 
 enum class AttackShape { BURST, SPREAD, LANCE }
 
@@ -141,6 +141,9 @@ object Balance {
     /** Bolts by placement, before the difficulty multiplier and KO bonus. */
     val placementBolts = intArrayOf(30, 26, 22, 18, 15, 12, 10, 8, 6, 5)
 
+    // Health and damage use big numbers (thousands of health, hundreds to a thousand-odd per hit), the scale
+    // players of the genre expect. Everything was multiplied by the same factor, so fights last just as long.
+
     /** Spark Crates (free-for-all): health, and what each Power Cell inside grants (stacking). */
     /** A fighter has to stay in a thicket this long before it is hidden, so brushing past grass doesn't blink it out. */
     const val THICKET_CONCEAL_SECONDS = 0.8f
@@ -149,7 +152,7 @@ object Balance {
     /** ...and keep seeing the fighter for this long after losing contact. */
     const val THICKET_SPOT_LINGER_SECONDS = 0.5f
 
-    const val CRATE_HP = 1400
+    const val CRATE_HP = 5600
     const val CELL_HEALTH_BONUS = 0.10f
     const val CELL_DAMAGE_BONUS = 0.10f
 
@@ -184,9 +187,9 @@ object Balance {
             role = "Skirmisher",
             lore = "Delivers parcels and bad news at the same speed. Her coil blaster was a toaster once.",
             attackName = "Spark Burst",
-            health = StatLine(950, 50),
-            attackDamage = StatLine(115, 6),
-            superDamage = StatLine(140, 7),
+            health = StatLine(3800, 200),
+            attackDamage = StatLine(460, 24),
+            superDamage = StatLine(560, 28),
             moveSpeed = 3.7f,
             attack = AttackSpec(AttackShape.BURST, projectiles = 3, spreadDegrees = 6f, range = 7.5f, speed = 17f, radius = 0.16f, burstInterval = 0.075f),
             superSpec = SuperSpec(SuperKind.VOLLEY, "Overcharge Volley", "Unloads a wide fan of 9 charged sparks.", projectiles = 9, spreadDegrees = 50f, range = 8.5f, speed = 18f, radius = 0.2f),
@@ -206,9 +209,9 @@ object Balance {
             role = "Tank",
             lore = "Built himself out of a forklift and a grudge. Prefers to discuss things up close.",
             attackName = "Scrap Cannon",
-            health = StatLine(1400, 70),
-            attackDamage = StatLine(60, 3),
-            superDamage = StatLine(320, 16),
+            health = StatLine(5600, 280),
+            attackDamage = StatLine(240, 12),
+            superDamage = StatLine(1280, 64),
             moveSpeed = 3.45f,
             attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 34f, range = 4.6f, speed = 15f, radius = 0.17f, burstInterval = 0f),
             superSpec = SuperSpec(SuperKind.RAM, "Ram Charge", "Charges forward, slamming and knocking back every enemy in the way.", range = 5.5f, speed = 15f, radius = 0.55f),
@@ -229,9 +232,9 @@ object Balance {
             role = "Marksman",
             lore = "Bends starlight through a cut crystal. Never misses twice — usually never once.",
             attackName = "Prism Shot",
-            health = StatLine(700, 35),
-            attackDamage = StatLine(260, 13),
-            superDamage = StatLine(480, 24),
+            health = StatLine(2800, 140),
+            attackDamage = StatLine(1040, 52),
+            superDamage = StatLine(1920, 96),
             moveSpeed = 3.5f,
             attack = AttackSpec(AttackShape.LANCE, projectiles = 1, spreadDegrees = 0f, range = 10f, speed = 22f, radius = 0.18f, burstInterval = 0f),
             superSpec = SuperSpec(SuperKind.PIERCE, "Starlance", "A huge crystal lance that pierces through every enemy in its path.", range = 12f, speed = 20f, radius = 0.38f),
@@ -243,6 +246,29 @@ object Balance {
                 Skin("Starlight", 0xFF8E5CF7, 0xFF2EE6D6, 0xFFFFF3B0, 0),
                 Skin("Ruby Cut", 0xFFE0314F, 0xFFFFC145, 0xFFFFE4EC, 20),
                 Skin("Glacier", 0xFF4CC9F0, 0xFFFFFFFF, 0xFFB5F2FF, 20),
+            ),
+        ),
+        FighterDef(
+            id = FighterId.KITO,
+            name = "Kito",
+            title = "Arc Blade",
+            role = "Assassin",
+            lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming.",
+            attackName = "Arc Slash",
+            health = StatLine(3200, 160),
+            attackDamage = StatLine(520, 26),
+            superDamage = StatLine(1400, 70),
+            moveSpeed = 4.05f,
+            attack = AttackSpec(AttackShape.SPREAD, projectiles = 3, spreadDegrees = 20f, range = 5.6f, speed = 19f, radius = 0.17f, burstInterval = 0f),
+            superSpec = SuperSpec(SuperKind.RAM, "Flash Step", "Blinks forward in a blur, cutting through and knocking back everyone in the way.", range = 6.8f, speed = 21f, radius = 0.5f),
+            ammoMax = 3,
+            reloadSeconds = 1.35f,
+            superChargePerHit = 0.085f,
+            radius = 0.4f,
+            skins = listOf(
+                Skin("Nightfall", 0xFF1F7A8C, 0xFFFF3D7F, 0xFF9BFFF0, 0),
+                Skin("Ember", 0xFFB83227, 0xFFFFC145, 0xFFFFE9A8, 20),
+                Skin("Frostbite", 0xFFE6F1FF, 0xFF3A86FF, 0xFFB5F2FF, 20),
             ),
         ),
     )
@@ -277,5 +303,6 @@ object Balance {
         FighterId.JUNO -> null
         FighterId.BRAKK -> 40
         FighterId.MIRA -> 70
+        FighterId.KITO -> 90
     }
 }
