@@ -41,33 +41,47 @@ class Capsule3D {
     private val TWIN = floatArrayOf(0.6f, 0.65f, 0.75f)
 
     init {
-        fun MeshBuilder.rivets(y: Float) {
-            for (k in 0 until 8) {
-                val a = k * (Math.PI / 4)
-                with { translate((cos(a) * 0.57).toFloat(), y, (sin(a) * 0.57).toFloat()); sphere(0.045f, 6, 8) }
+// A Spark Drop: a puffy five-pointed star. The front half lifts off the back half when it opens.
+        fun MeshBuilder.starHalf(front: Boolean) {
+            val s = if (front) 1f else -1f
+            val pos = ArrayList<FloatArray>()
+            fun v(x: Float, y: Float, z: Float, nx: Float, ny: Float, nz: Float): Int { pos += floatArrayOf(x, y, z); return vertex(x, y, z, nx, ny, nz) }
+            val first = v(0f, 0f, 0.4f * s, 0f, 0f, s)
+            // Every triangle is wound to face away from the middle of the star: the ink outline is an inverted
+            // hull drawn with front faces culled, so a wrong winding paints the whole thing black.
+            fun face(i0: Int, i1: Int, i2: Int) {
+                val p0 = pos[i0 - first]; val p1 = pos[i1 - first]; val p2 = pos[i2 - first]
+                val ux = p1[0] - p0[0]; val uy = p1[1] - p0[1]; val uz = p1[2] - p0[2]
+                val wx = p2[0] - p0[0]; val wy = p2[1] - p0[1]; val wz = p2[2] - p0[2]
+                val nx = uy * wz - uz * wy; val ny = uz * wx - ux * wz; val nz = ux * wy - uy * wx
+                val cx = (p0[0] + p1[0] + p2[0]) / 3f; val cy = (p0[1] + p1[1] + p2[1]) / 3f; val cz = (p0[2] + p1[2] + p2[2]) / 3f
+                if (nx * cx + ny * cy + nz * (cz + 0.2f * s) >= 0f) tri(i0, i1, i2) else tri(i0, i2, i1)
+            }
+            val rim = IntArray(10)
+            val edge = IntArray(10)
+            for (i in 0 until 10) {
+                val a = -Math.PI / 2 + i * Math.PI / 5
+                val r = if (i % 2 == 0) 0.9f else 0.46f
+                val x = (cos(a) * r).toFloat(); val y = -(sin(a) * r).toFloat()
+                val len = kotlin.math.sqrt(x * x + y * y + 0.2f)
+                rim[i] = v(x, y, 0.1f * s, x / len, y / len, 0.45f * s / len)
+                edge[i] = v(x, y, 0f, x / r, y / r, 0f)
+            }
+            for (i in 0 until 10) {
+                val j = (i + 1) % 10
+                face(first, rim[i], rim[j])
+                face(rim[i], rim[j], edge[j]); face(rim[i], edge[j], edge[i])
             }
         }
-        shell = MeshBuilder().apply {
-            color(1f, 1f, 1f)
-            with { translate(0f, 0.37f, 0f); cylinder(0.5f, 0.5f, 28) }
-            with { translate(0f, 0.62f, 0f); ellipsoid(0.5f, 0.5f, 0.5f, 10, 28, 0f, 0.5f) }
-        }.build()
-        collarTop = MeshBuilder().apply {
-            color(0.93f, 0.91f, 1f); with { translate(0f, 0.1f, 0f); cylinder(0.57f, 0.16f, 28) }
-            color(0.106f, 0.063f, 0.208f); rivets(0.1f)
-        }.build()
-        base = MeshBuilder().apply {
-            color(0.3f, 0.22f, 0.66f)
-            with { translate(0f, -0.37f, 0f); cylinder(0.5f, 0.5f, 28) }
-            with { translate(0f, -0.62f, 0f); ellipsoid(0.5f, 0.5f, 0.5f, 10, 28, 0.5f, 1f) }
-            color(0.72f, 0.68f, 0.92f); with { translate(0f, -0.1f, 0f); cylinder(0.57f, 0.16f, 28) }
-            color(0.106f, 0.063f, 0.208f); rivets(-0.1f)
-        }.build()
-        // The glowing seam between the halves, with a lens on the front and back.
+        shell = MeshBuilder().apply { color(1f, 1f, 1f); starHalf(front = true) }.build()
+        // A glint on the upper-left of the face.
+        collarTop = MeshBuilder().apply { color(1f, 1f, 1f); with { translate(-0.2f, 0.26f, 0.3f); rotate(35f, 0f, 0f, 1f); ellipsoid(0.13f, 0.05f, 0.03f, 6, 10) } }.build()
+        base = MeshBuilder().apply { color(1f, 1f, 1f); starHalf(front = false) }.build()
+        // The glowing heart of the star (seen from both sides), and a thin halo that circles it.
         core = MeshBuilder().apply {
             color(1f, 1f, 1f)
-            cylinder(0.54f, 0.07f, 28)
-            for (z in listOf(0.5f, -0.5f)) with { translate(0f, 0f, z); sphere(0.17f, 8, 12) }
+            for (z in listOf(0.3f, -0.3f)) with { translate(0f, 0f, z); ellipsoid(0.2f, 0.2f, 0.12f, 8, 12) }
+            with { rotate(72f, 1f, 0f, 0.2f); torus(1.08f, 0.022f, 44, 6) }
         }.build()
         light = MeshBuilder().apply { color(1f, 1f, 1f); sphere(0.4f, 10, 14) }.build()
         rays = MeshBuilder().apply {
@@ -155,15 +169,15 @@ class Capsule3D {
         val mainScale = base * when { pieces >= 8 -> 0.66f; pieces >= 4 -> 0.74f; pieces == 2 -> 0.8f; else -> 1f }
         if (solid) {
             val lift = if (knock in 0f..0.42f) 0.08f * (1f - knock / 0.42f) else 0f
-            drawCapsule(lit, if (pieces == 2) -0.62f * split else 0f, sin(time * 2.6f) * 0.05f + lift, shake + sin(time * 2.2f) * 3f, time * 50f, mainScale * pop, gap, flash, col)
+            drawCapsule(lit, if (pieces == 2) -0.62f * split else 0f, sin(time * 2.6f) * 0.05f + lift, shake + sin(time * 2.2f) * 3f, sin(time * 1.5f) * 38f, mainScale * pop, gap, flash, col)
         }
         if (pieces == 2) {
-            drawCapsule(lit, 0.62f * split, sin(time * 2.6f + 1.4f) * 0.05f, sin(time * 2.2f + 1f) * 3f, time * 50f + 70f, mainScale * split, 0f, 0f, TWIN)
+            drawCapsule(lit, 0.62f * split, sin(time * 2.6f + 1.4f) * 0.05f, sin(time * 2.2f + 1f) * 3f, sin(time * 1.5f + 1.2f) * 38f, mainScale * split, 0f, 0f, TWIN)
         } else if (pieces > 2) {
             val twinScale = base * (if (pieces >= 8) 0.36f else 0.44f) * (0.5f + 0.5f * split)
             for (i in 0 until pieces - 1) {
                 val a = i * 6.2832f / (pieces - 1) + time * 0.35f
-                drawCapsule(lit, cos(a) * 1.5f * split, sin(a) * 0.82f * split + sin(time * 2.6f + i) * 0.03f, sin(time * 2.2f + i) * 4f, time * 50f + i * 50f, twinScale, 0f, 0f, TWIN)
+                drawCapsule(lit, cos(a) * 1.5f * split, sin(a) * 0.82f * split + sin(time * 2.6f + i) * 0.03f, sin(time * 2.2f + i) * 4f, sin(time * 1.5f + i) * 38f, twinScale, 0f, 0f, TWIN)
             }
         }
 
@@ -201,7 +215,7 @@ class Capsule3D {
         lit.mat4("uModel", root)
         lit.f("uEmissive", 1f)
         lit.v4("uTint", 0.5f + tint[0] * 0.5f, 0.5f + tint[1] * 0.5f, 0.5f + tint[2] * 0.5f, 1f)
-        if (gap < 0.3f) core.draw()
+        if (gap < 0.2f) core.draw()
         if (gap > 0f) {
             System.arraycopy(root, 0, model, 0, 16)
             val g = 1f + gap * 1.6f
@@ -215,7 +229,7 @@ class Capsule3D {
         GLES30.glEnable(GLES30.GL_CULL_FACE)
         GLES30.glCullFace(GLES30.GL_FRONT)
         lit.i("uMode", 1)
-        lit.f("uOutline", 0.035f)
+        lit.f("uOutline", 0.028f)
         drawHalves(lit, gap, tint, outline = true)
         lit.f("uOutline", 0f)
         lit.i("uMode", 0)
@@ -223,16 +237,18 @@ class Capsule3D {
     }
 
     private fun drawHalves(lit: Program, gap: Float, tint: FloatArray, outline: Boolean) {
+        // The halves part front-to-back.
         System.arraycopy(root, 0, model, 0, 16)
-        Matrix.translateM(model, 0, 0f, gap, 0f)
+        Matrix.translateM(model, 0, 0f, 0f, gap * 0.6f)
         lit.mat4("uModel", model)
         if (outline) lit.v4("uTint", Toon.INK[0], Toon.INK[1], Toon.INK[2], 1f) else lit.v4("uTint", tint[0], tint[1], tint[2], 1f)
         shell.draw()
-        if (!outline) lit.v4("uTint", 1f, 1f, 1f, 1f)
-        collarTop.draw()
+        if (!outline) { lit.v4("uTint", 1f, 1f, 1f, 1f); collarTop.draw() }
         System.arraycopy(root, 0, model, 0, 16)
-        Matrix.translateM(model, 0, 0f, -gap, 0f)
+        Matrix.translateM(model, 0, 0f, 0f, -gap * 0.6f)
         lit.mat4("uModel", model)
+        // The bottom half is the same colour, a shade deeper.
+        if (!outline) lit.v4("uTint", tint[0] * 0.72f, tint[1] * 0.72f, tint[2] * 0.78f, 1f)
         base.draw()
     }
 

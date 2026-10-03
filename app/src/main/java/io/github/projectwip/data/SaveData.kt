@@ -73,6 +73,8 @@ data class SaveData(
     val capsuleDay: Long = -1,
     val capsulesEarnedToday: Int = 0,
     val capsulesOpened: Int = 0,
+    /** How many of the unopened ones came from a split (they roll with [SparkCapsules.SPLIT_LUCK] and are opened first). */
+    val boostedCapsules: Int = 0,
     /** Seeds the next capsule roll; stored so reloading the game can't re-roll a capsule. */
     val capsuleSeed: Long = 0,
 ) {

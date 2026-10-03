@@ -147,7 +147,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
                         if (row++ < rowsShown) RewardRow(IconKind.BOLT, "Bolts", "+${rewards.bolts}", Palette.CyanDeep)
                         if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
-                        if (rewards.capsuleEarned && row++ < rowsShown) RewardRow(IconKind.CAPSULE, "Spark Capsule", "+1", Palette.CyanDeep)
+                        if (rewards.capsuleEarned && row++ < rowsShown) RewardRow(IconKind.CAPSULE, "Spark Drop", "+1", Palette.CyanDeep)
                         if (r.mvp && !ffa && row++ < rowsShown) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
 
                         val after = rewards.cupsBefore + rewards.cupDelta
@@ -165,10 +165,10 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         }
                         PlainText("Cups now: $after", Type.Small)
                         if (!rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
-                            PlainText("All of today's Spark Capsules are earned · more tomorrow", Type.Small)
+                            PlainText("All of today's Spark Drops are earned · more tomorrow", Type.Small)
                         }
                         if (!rewards.capsuleEarned && rewards.capsulesLeftToday > 0) {
-                            PlainText("${if (ffa) "Finish top 4" else "Win"} to earn a Spark Capsule · ${rewards.capsulesLeftToday} left today", Type.Small)
+                            PlainText("${if (ffa) "Finish top 4" else "Win"} to earn a Spark Drop · ${rewards.capsulesLeftToday} left today", Type.Small)
                         }
                     }
                 }

@@ -82,11 +82,18 @@ object Progression {
         val infinite = save.settings.debugInfiniteCapsules
         if (save.capsules <= 0 && !infinite) return null
         val rng = kotlin.random.Random(save.capsuleSeed)
-        val tier = SparkCapsules.rollTier(rng, save.settings.debugLuck)
+        // Pieces from an earlier split are opened first, and roll better than a plain one.
+        val boosted = save.boostedCapsules > 0
+        val luck = save.settings.debugLuck + if (boosted) SparkCapsules.SPLIT_LUCK else 0f
+        val rolled = SparkCapsules.rollTier(rng, luck)
+        val tier = if (boosted && rolled == CapsuleTier.SCRAP) CapsuleTier.TUNED else rolled
         val reward = SparkCapsules.rollReward(tier, save, rng)
         val pieces = SparkCapsules.rollPieces(rng, save.settings.debugLuck)
         val left = (if (infinite) save.capsules else save.capsules - 1) + pieces - 1
-        val next = grant(save, reward).copy(capsules = left, capsulesOpened = save.capsulesOpened + 1, capsuleSeed = rng.nextLong())
+        val next = grant(save, reward).copy(
+            capsules = left, capsulesOpened = save.capsulesOpened + 1, capsuleSeed = rng.nextLong(),
+            boostedCapsules = (save.boostedCapsules - if (boosted) 1 else 0) + pieces - 1,
+        )
         return next to CapsuleResult(tier, reward, pieces)
     }
 

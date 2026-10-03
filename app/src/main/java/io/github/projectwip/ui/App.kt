@@ -70,6 +70,7 @@ sealed interface Screen {
     data object Home : Screen { override val depth = 0 }
     data class Fighters(val focus: FighterId? = null) : Screen { override val depth = 1 }
     data object CupTrack : Screen { override val depth = 1 }
+    data object Leaderboard : Screen { override val depth = 1 }
     data object Shop : Screen { override val depth = 1 }
     data object Settings : Screen { override val depth = 1 }
     data class Match(val config: MatchConfig) : Screen { override val depth = 2 }
@@ -90,6 +91,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
                 "shop" -> Screen.Shop
                 "track" -> Screen.CupTrack
                 "settings" -> Screen.Settings
+                "leaders" -> Screen.Leaderboard
                 "result" -> previewResult(repo.save.value)
                 else -> Screen.Home
             }
@@ -164,6 +166,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
                     Screen.Home -> HomeScreen(save, repo, go, showReward, openCapsule)
                     is Screen.Fighters -> FightersScreen(save, repo, s.focus ?: save.selectedFighter, go)
                     Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
+                    Screen.Leaderboard -> io.github.projectwip.ui.screens.LeaderboardScreen(save, repo.today, go)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
                     is Screen.Match -> MatchScreen(s.config, save.settings, sfx, save.matchesPlayed,

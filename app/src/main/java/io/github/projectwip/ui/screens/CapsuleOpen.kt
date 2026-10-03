@@ -140,7 +140,7 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, pri
         val capsuleRoom = maxHeight * 0.46f
         if (!opened) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                GameText("SPARK CAPSULE", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
+                GameText("SPARK DROP", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
                 GameText(shown.label.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), color = color, outline = 5.dp,
                     modifier = Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value })
                 // Room for the 3D capsule, which sits in the middle of the screen.
@@ -155,13 +155,13 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, pri
                 val pulse = 1f + 0.08f * sin(time * 7f)
                 GameText(if (taps < TAPS) "TAP TO CHARGE  ·  ${TAPS - taps}" else "HERE IT COMES…", Type.Title, color = Palette.Gold, outline = 3.5.dp,
                     modifier = Modifier.graphicsLayer { scaleX = pulse; scaleY = pulse })
-                if (pieces > 1) GameText("SPLIT INTO $pieces!  +${pieces - 1} CAPSULE${if (pieces > 2) "S" else ""}", Type.Heading, color = Palette.Green, outline = 3.dp,
+                if (pieces > 1) GameText("SPLIT INTO $pieces!  +${pieces - 1} DROP${if (pieces > 2) "S" else ""}", Type.Heading, color = Palette.Green, outline = 3.dp,
                     modifier = Modifier.graphicsLayer { scaleX = splitPop.value; scaleY = splitPop.value })
             }
         } else {
             io.github.projectwip.ui.RewardShowcase(
-                "${result.tier.label} capsule", Color(result.tier.color), result.reward, boltsNow, prismsNow,
-                note = if (result.split) "SPLIT INTO ${result.pieces} · +${result.pieces - 1} CAPSULE${if (result.pieces > 2) "S" else ""}" else null,
+                "${result.tier.label} drop", Color(result.tier.color), result.reward, boltsNow, prismsNow,
+                note = if (result.split) "SPLIT INTO ${result.pieces} · +${result.pieces - 1} DROP${if (result.pieces > 2) "S" else ""}" else null,
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
@@ -170,7 +170,7 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, pri
             }
         }
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value * 0.85f)))
-        if (!opened) PlainText("Capsules charge up at random, and now and then one splits — into two, four or even eight. The result is locked in when you open one.", Type.Small,
+        if (!opened) PlainText("Drops charge up at random, and now and then one splits — into two, four or even eight — and the pieces roll better. The result is locked in when you open one.", Type.Small,
             Modifier.align(Alignment.BottomCenter).graphicsLayer { translationY = -14.dp.toPx() }, align = TextAlign.Center)
     }
 }

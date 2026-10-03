@@ -73,18 +73,18 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
     var luck by remember { mutableFloatStateOf(s.debugLuck) }
     fun snap(v: Float) = (v * 10).toInt() / 10f
     SectionTitle("DEBUG MENU", "Cheats for trying things out. They change your real save.")
-    ToggleRow("INFINITE CAPSULES", "The capsule button always works and opening one never uses it up.", s.debugInfiniteCapsules) { v ->
+    ToggleRow("INFINITE DROPS", "The drop button always works and opening one never uses it up.", s.debugInfiniteCapsules) { v ->
         repo.updateSettings { it.copy(debugInfiniteCapsules = v) }
     }
-    SliderRow("CAPSULE LUCK", "×${"%.1f".format(1f + luck)}", s.debugLuck, 0f, SparkCapsules.MAX_LUCK, onDrag = { luck = snap(it) }) { v ->
+    SliderRow("DROP LUCK", "×${"%.1f".format(1f + luck)}", s.debugLuck, 0f, SparkCapsules.MAX_LUCK, onDrag = { luck = snap(it) }) { v ->
         luck = snap(v)
         repo.updateSettings { it.copy(debugLuck = snap(v)) }
     }
     val odds = SparkCapsules.odds(luck)
     PlainText(CapsuleTier.entries.joinToString("  ·  ") { "${it.label} ${"%.1f".format(odds[it.ordinal] * 100)}%" }, Type.Body, color = Color.White)
-    PlainText("Chance a capsule splits: ${"%.0f".format(SparkCapsules.splitChance(luck) * 100)}%, then ${"%.0f".format(SparkCapsules.resplitChance(luck) * 100)}% to split again (up to ${SparkCapsules.MAX_PIECES})",
+    PlainText("Chance a drop splits: ${"%.0f".format(SparkCapsules.splitChance(luck) * 100)}%, then ${"%.0f".format(SparkCapsules.resplitChance(luck) * 100)}% to split again (up to ${SparkCapsules.MAX_PIECES})",
         Type.Body, color = Color.White)
-    SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.cups)} Cups, ${"%,d".format(save.bolts)} Bolts, ${"%,d".format(save.prisms)} Prisms and ${save.capsules} capsules.")
+    SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.cups)} Cups, ${"%,d".format(save.bolts)} Bolts, ${"%,d".format(save.prisms)} Prisms and ${save.capsules} drops.")
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ChunkyButton({ repo.debugGrant(cups = 50) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+50 CUPS", Type.Label, outline = 2.dp) }
         ChunkyButton({ repo.debugGrant(cups = 500) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+500 CUPS", Type.Label, outline = 2.dp) }
@@ -93,6 +93,6 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ChunkyButton({ repo.debugGrant(bolts = 1000) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("+1,000 BOLTS", Type.Label, outline = 2.dp) }
         ChunkyButton({ repo.debugGrant(prisms = 100) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("+100 PRISMS", Type.Label, outline = 2.dp) }
-        ChunkyButton({ repo.debugGrant(capsules = 5) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 CAPSULES", Type.Label, outline = 2.dp) }
+        ChunkyButton({ repo.debugGrant(capsules = 5) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 DROPS", Type.Label, outline = 2.dp) }
     }
 }

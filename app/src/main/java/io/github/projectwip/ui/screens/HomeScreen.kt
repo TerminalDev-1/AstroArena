@@ -92,6 +92,14 @@ fun HomeScreen(
             // ---------------- top bar
             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 ProfileAndCups(save, claimable) { go(Screen.CupTrack) }
+                Spacer(Modifier.width(10.dp))
+                val rank = remember(save.cups, repo.today) { io.github.projectwip.data.Leaderboard.rank(save.cups, repo.today) }
+                ChunkyButton({ go(Screen.Leaderboard) }, Modifier.size(104.dp, 58.dp), ButtonStyle.GLASS, lip = 4.dp) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        GameText("#$rank", Type.Heading, color = Palette.Gold, outline = 2.5.dp)
+                        PlainText("LEADERBOARD", Type.Small, color = Color.White, maxLines = 1)
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 CurrencyPill(IconKind.BOLT, save.bolts)
                 Spacer(Modifier.width(10.dp))
@@ -221,7 +229,7 @@ private fun CapsuleButton(count: Int, leftToday: Int, onOpen: () -> Unit) {
                 GameIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = if (count > 0) Palette.Gold else Palette.Grey)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    GameText(if (count > 0) "OPEN CAPSULE" else "SPARK CAPSULES", Type.Heading, outline = 2.5.dp)
+                    GameText(if (count > 0) "OPEN DROP" else "SPARK DROPS", Type.Heading, outline = 2.5.dp)
                     PlainText(
                         when {
                             count > 0 -> "Tap it to charge it up"
@@ -234,7 +242,7 @@ private fun CapsuleButton(count: Int, leftToday: Int, onOpen: () -> Unit) {
             }
         }
         if (count > 0) {
-            val pulse by rememberInfiniteTransition(label = "capsules").animateFloat(1f, 1.15f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
+            val pulse by rememberInfiniteTransition(label = "drops").animateFloat(1f, 1.15f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
             Badge(if (count > 999) "∞" else count.toString(), Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).graphicsLayer { scaleX = pulse; scaleY = pulse })
         }
     }

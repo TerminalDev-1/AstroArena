@@ -179,12 +179,13 @@ class ProgressionTest {
             if (result.split) splits++
             pieces.merge(result.pieces, 1, Int::plus)
             assertEquals("a split hands back the extra capsules", before.capsules - 1 + result.pieces - 1, next.capsules)
-            save = next
+            // Keep every open a plain one here, so the tier counts reflect the base odds.
+            save = next.copy(boostedCapsules = 0)
         }
         println("capsule tiers over 4000 opens: $seen, splits: $splits, pieces: $pieces")
         assertEquals("capsules only ever become 1, 2, 4 or 8", setOf(1, 2, 4, 8), pieces.keys)
         assertTrue("bigger splits are rarer", pieces.getValue(2) > pieces.getValue(8))
-        assertTrue("about 12% of capsules should split ($splits of 4000)", splits in 380..580)
+        assertTrue("plenty of drops should split ($splits of 4000)", splits in 900..1900)
         assertEquals(CapsuleTier.entries.toSet(), seen.keys)
         for (t in CapsuleTier.entries.zipWithNext()) assertTrue("${t.first} should be more common than ${t.second}", seen.getValue(t.first) > seen.getValue(t.second))
         assertTrue("Prismatic capsules unlock every fighter eventually", FighterId.entries.all { save.progress(it).unlocked })
@@ -195,7 +196,7 @@ class ProgressionTest {
         val lucky = SparkCapsules.odds(SparkCapsules.MAX_LUCK)
         assertEquals(1f, normal.sum(), 1e-4f)
         assertEquals(1f, lucky.sum(), 1e-4f)
-        assertEquals("Ultra is the rarest tier", 1f / 101f, normal.last(), 1e-4f)
+        assertEquals("Ultra is the rarest tier", 0.02f, normal.last(), 1e-4f)
         assertEquals(normal.min(), normal.last(), 0f)
         assertTrue("max luck makes Ultra the most likely tier", lucky.last() > 0.5f && lucky.last() == lucky.max())
         assertTrue(SparkCapsules.splitChance(SparkCapsules.MAX_LUCK) > SparkCapsules.splitChance(0f))
@@ -211,5 +212,32 @@ class ProgressionTest {
         assertTrue("infinite capsules never run out", save.capsules >= 0)
         assertEquals(200, save.capsulesOpened)
         assertTrue("luck should show ($prismatic/200 Ultra)", prismatic > 70)
+    }
+
+    @Test fun splitPiecesAreBetterThanPlainDrops() {
+        // Open a plain drop until one splits, then check its pieces are flagged and never come out Scrap.
+        var save = SaveData(capsules = 1, capsuleSeed = 5)
+        while (save.boostedCapsules == 0) save = Progression.openCapsule(save.copy(capsules = 1, boostedCapsules = 0))!!.first
+        val pieces = save.boostedCapsules
+        assertTrue(pieces in 1..7)
+        assertEquals("the extras are the pieces", pieces, save.capsules)
+        repeat(pieces) {
+            val (next, result) = Progression.openCapsule(save.copy(settings = save.settings))!!
+            assertTrue("a split piece is never Scrap", result.tier != CapsuleTier.SCRAP)
+            save = next.copy(capsules = next.capsules.coerceAtLeast(1))
+        }
+    }
+
+    @Test fun leaderboardRanksByCups() {
+        val day = 20000L
+        val low = io.github.projectwip.data.Leaderboard.standings("Me", 0, FighterId.JUNO, day)
+        assertEquals(io.github.projectwip.data.Leaderboard.RIVALS + 1, low.size)
+        assertEquals(1, low.count { it.isPlayer })
+        assertEquals((1..low.size).toList(), low.map { it.rank })
+        assertTrue(low.zipWithNext().all { (a, b) -> a.cups >= b.cups })
+        val mid = io.github.projectwip.data.Leaderboard.rank(400, day)
+        assertTrue("more Cups, better rank", mid < low.first { it.isPlayer }.rank)
+        assertEquals("enough Cups tops the ladder", 1, io.github.projectwip.data.Leaderboard.rank(5000, day))
+        assertEquals("same day, same ladder", low, io.github.projectwip.data.Leaderboard.standings("Me", 0, FighterId.JUNO, day))
     }
 }

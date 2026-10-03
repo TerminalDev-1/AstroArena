@@ -54,6 +54,7 @@ class SaveStore(context: Context) {
             put("capsuleDay", s.capsuleDay)
             put("capsulesEarnedToday", s.capsulesEarnedToday)
             put("capsulesOpened", s.capsulesOpened)
+            put("boostedCapsules", s.boostedCapsules)
             put("capsuleSeed", s.capsuleSeed)
             put("fighters", JSONObject().apply {
                 s.fighters.forEach { (id, p) ->
@@ -154,6 +155,7 @@ class SaveStore(context: Context) {
                 capsuleDay = o.optLong("capsuleDay", -1),
                 capsulesEarnedToday = o.optInt("capsulesEarnedToday", 0).coerceAtLeast(0),
                 capsulesOpened = o.optInt("capsulesOpened", 0).coerceAtLeast(0),
+                boostedCapsules = o.optInt("boostedCapsules", 0).coerceAtLeast(0),
                 capsuleSeed = if (o.has("capsuleSeed")) o.optLong("capsuleSeed") else System.nanoTime(),
                 settings = settings,
                 customOffers = o.optJSONArray("customOffers")?.let { arr ->

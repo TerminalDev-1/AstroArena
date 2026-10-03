@@ -50,12 +50,12 @@ data class CustomOffer(
 
 /** How good a Spark Capsule turned out. Each tier up is rarer and pays better. */
 enum class CapsuleTier(val label: String, val color: Long, val weight: Int) {
-    SCRAP("Scrap", 0xFF9AA6C0, 50),
+    SCRAP("Scrap", 0xFF9AA6C0, 40),
     TUNED("Tuned", 0xFF4ED36A, 28),
-    CHARGED("Charged", 0xFF2EC4F1, 15),
-    OVERCLOCKED("Overclocked", 0xFFFF8A1F, 5),
-    PRISMATIC("Prismatic", 0xFFFF6BFF, 2),
-    ULTRA("Ultra", 0xFFFFE14D, 1),
+    CHARGED("Charged", 0xFF2EC4F1, 18),
+    OVERCLOCKED("Overclocked", 0xFFFF8A1F, 8),
+    PRISMATIC("Prismatic", 0xFFFF6BFF, 4),
+    ULTRA("Ultra", 0xFFFFE14D, 2),
 }
 
 /** What came out of an opened capsule. */
@@ -96,10 +96,13 @@ object SparkCapsules {
     const val MAX_PIECES = 8
 
     /** Chance that a capsule splits in two as it is opened, leaving a second one to open. Luck helps. */
-    fun splitChance(luck: Float = 0f) = 0.12f + 0.05f * luck
+    fun splitChance(luck: Float = 0f) = 0.25f + 0.05f * luck
 
     /** Once it has split, the chance that every piece splits again (2 -> 4 -> 8). */
-    fun resplitChance(luck: Float = 0f) = 0.45f + 0.08f * luck
+    fun resplitChance(luck: Float = 0f) = 0.5f + 0.08f * luck
+
+    /** The pieces a drop splits into are better than a plain one: they roll with this much extra luck and are never Scrap. */
+    const val SPLIT_LUCK = 0.6f
 
     fun rollPieces(rng: kotlin.random.Random, luck: Float = 0f): Int {
         if (rng.nextFloat() >= splitChance(luck)) return 1
@@ -123,13 +126,13 @@ object SparkCapsules {
             .randomOrNull(rng)
         fun newFighter(): Reward? = FighterId.entries.filter { !save.progress(it).unlocked }.randomOrNull(rng)?.let { Reward.UnlockFighter(it) }
         return when (tier) {
-            CapsuleTier.SCRAP -> bolts(20, 40)
-            CapsuleTier.TUNED -> if (rng.nextInt(3) == 0) prisms(5, 8) else bolts(60, 100)
-            CapsuleTier.CHARGED -> if (rng.nextInt(2) == 0) prisms(12, 18) else bolts(150, 220)
-            CapsuleTier.OVERCLOCKED -> (if (rng.nextInt(2) == 0) newSkin() else null) ?: if (rng.nextBoolean()) prisms(30, 40) else bolts(380, 450)
-            CapsuleTier.PRISMATIC -> newFighter() ?: newSkin() ?: prisms(100, 120)
+            CapsuleTier.SCRAP -> bolts(60, 120)
+            CapsuleTier.TUNED -> if (rng.nextInt(3) == 0) prisms(15, 25) else bolts(180, 300)
+            CapsuleTier.CHARGED -> if (rng.nextInt(2) == 0) prisms(35, 50) else bolts(400, 600)
+            CapsuleTier.OVERCLOCKED -> (if (rng.nextInt(2) == 0) newSkin() else null) ?: if (rng.nextBoolean()) prisms(80, 110) else bolts(1000, 1300)
+            CapsuleTier.PRISMATIC -> newFighter() ?: newSkin() ?: prisms(250, 300)
             // The jackpot: something new to play with (while there is anything left) plus a pile of both currencies.
-            CapsuleTier.ULTRA -> Reward.Bundle(listOfNotNull(newFighter() ?: newSkin(), prisms(150, 200), bolts(800, 1000)))
+            CapsuleTier.ULTRA -> Reward.Bundle(listOfNotNull(newFighter() ?: newSkin(), prisms(400, 500), bolts(2000, 2500)))
         }
     }
 }
