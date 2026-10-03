@@ -37,5 +37,11 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 ## Git
 
 - Checkpoint as you go: once a piece is verified (tests or device), commit just that piece and
-  `git push origin main`. Never checkpoint unverified or non-compiling work. Tagging a release needs the user's OK.
+  `git push origin main`. Never checkpoint unverified or non-compiling work.
+- **Non-negotiable: every version is committed, tagged and released.** Whenever the version in
+  `app/build.gradle.kts` changes, finish by committing, tagging `vX.Y.Z-preview`, pushing the tag and
+  publishing a GitHub pre-release with the release APK attached (`AstroArena-X.Y.Z-preview.apk`), without
+  waiting to be asked. The newest release must always be the newest version, so nobody downloads a stale APK.
+  Smoke-test the release APK on the tablet when it is free, then put the debug build back.
+- `gh` needs normal path conversion: don't run it with `MSYS_NO_PATHCONV=1` set.
 - End commit messages with the co-author line used in history. `screenshots/` is gitignored scratch.
