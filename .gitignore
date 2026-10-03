@@ -19,3 +19,6 @@ __pycache__/
 /server/*.db
 /server/*.db-*
 /server/logs/
+
+# The referee module builds into server/referee/referee.jar; its own build folder is scratch.
+client/referee/build/
