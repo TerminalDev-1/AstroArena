@@ -318,6 +318,13 @@ class HudView(
         path.lineTo(r - cut, b); path.lineTo(l + cut * 0.4f, b); path.lineTo(l, b - cut * 0.4f); path.lineTo(l, t + cut); path.close()
         fill.color = color
         c.drawPath(path, fill)
+        c.save()
+        c.clipPath(path)
+        fill.color = Color.argb(46, 255, 255, 255)
+        c.drawRect(l, t, r, t + (b - t) * 0.45f, fill)
+        fill.color = Color.argb(60, 0, 0, 0)
+        c.drawRect(l, b - (b - t) * 0.22f, r, b, fill)
+        c.restore()
         if (outline != null) { stroke.color = outline; stroke.strokeWidth = dp(3f); c.drawPath(path, stroke) }
     }
 

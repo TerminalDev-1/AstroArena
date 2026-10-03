@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -125,12 +126,36 @@ enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val te
     GLASS(Color(0xD8392A8C), Color(0xE01A1150), Color(0xFF0E0828)),
 }
 
+/** Soft drop shadow under a plate, so it reads as sitting above the scene. */
+private fun DrawScope.plateShadow(path: Path, depth: Float) {
+    translate(top = depth) {
+        drawPath(path, Color.Black.copy(alpha = 0.16f), style = Stroke(depth * 1.6f, join = StrokeJoin.Round))
+        drawPath(path, Color.Black.copy(alpha = 0.34f))
+    }
+}
+
+/**
+ * A plate with depth: gradient body, a curved gloss on the upper half, shade gathering at the bottom,
+ * and a bevel (lit top edge, dark bottom edge) just inside the ink outline.
+ */
 private fun DrawScope.plate(shape: Shape, size: Size, brush: Brush, ink: Color, inkWidth: Float, gloss: Boolean) {
     val outline = shape.createOutline(size, layoutDirection, this)
     val path = Path().apply { addOutline(outline) }
     drawPath(path, brush)
-    if (gloss) clipPath(path) {
-        drawRect(Color.White.copy(alpha = 0.22f), topLeft = Offset(0f, 0f), size = Size(size.width, size.height * 0.42f))
+    clipPath(path) {
+        if (gloss) {
+            drawRect(
+                Brush.verticalGradient(0f to Color.White.copy(alpha = 0.46f), 0.46f to Color.White.copy(alpha = 0.1f), 0.5f to Color.Transparent, startY = 0f, endY = size.height),
+                size = size,
+            )
+        }
+        drawRect(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.3f), startY = 0f, endY = size.height), size = size)
+        // Bevel: the stroke is centred on the edge, so the clip leaves only its inner half.
+        drawPath(
+            path,
+            Brush.verticalGradient(0f to Color.White.copy(alpha = 0.6f), 0.5f to Color.White.copy(alpha = 0.06f), 1f to Color.Black.copy(alpha = 0.4f), startY = 0f, endY = size.height),
+            style = Stroke(inkWidth * 3.2f, join = StrokeJoin.Round),
+        )
     }
     drawPath(path, ink, style = Stroke(inkWidth, join = StrokeJoin.Round))
 }
@@ -156,8 +181,11 @@ fun ChunkyButton(
     val sfx = LocalSfx.current
     val s = if (enabled) style else ButtonStyle.GREY
     val shape = remember(cut) { plateShape(cut, cut * 0.4f) }
+    val sheen = enabled && (style == ButtonStyle.ORANGE || style == ButtonStyle.GOLD || style == ButtonStyle.GREEN)
+    val time = if (sheen) rememberAnimTime() else null
     Box(
         modifier
+            .graphicsLayer { val k = 1f - 0.03f * press; scaleX = k; scaleY = k }
             .clickable(interaction, indication = null) {
                 if (enabled) { sfx?.play(sound); onClick() } else sfx?.play(Sound.DENIED, 0.6f)
             }
@@ -165,9 +193,24 @@ fun ChunkyButton(
                 val lipPx = lip.toPx()
                 val ink = 2.5.dp.toPx()
                 val pressPx = lipPx * press
-                plate(shape, size, Brush.verticalGradient(listOf(s.lip, s.lip)), Palette.Ink, ink, gloss = false)
+                val whole = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
+                plateShadow(whole, lipPx * (1.1f - 0.6f * press))
+                drawPath(whole, Brush.verticalGradient(listOf(s.lip, lerp(s.lip, Color.Black, 0.35f))))
+                drawPath(whole, Palette.Ink, style = Stroke(ink, join = StrokeJoin.Round))
                 translate(top = pressPx) {
-                    plate(shape, Size(size.width, size.height - lipPx), Brush.verticalGradient(listOf(s.top, s.bottom)), Palette.Ink, ink, gloss = true)
+                    val face = Size(size.width, size.height - lipPx)
+                    plate(shape, face, Brush.verticalGradient(listOf(lerp(s.top, Color.White, 0.18f), s.top, s.bottom)), Palette.Ink, ink, gloss = true)
+                    if (time != null) {
+                        // A band of light sweeps across every few seconds.
+                        val t = (time.value % 3.2f) / 0.7f
+                        if (t < 1f) clipPath(Path().apply { addOutline(shape.createOutline(face, layoutDirection, this@drawBehind)) }) {
+                            val x = -face.height + (face.width + face.height * 2) * t
+                            val band = Path().apply {
+                                moveTo(x, face.height); lineTo(x + face.height * 0.7f, 0f); lineTo(x + face.height * 1.15f, 0f); lineTo(x + face.height * 0.45f, face.height); close()
+                            }
+                            drawPath(band, Color.White.copy(alpha = 0.3f))
+                        }
+                    }
                 }
             }
             .padding(top = lip * press, bottom = lip * (1f - press)),
@@ -189,13 +232,25 @@ fun Panel(
     Box(
         modifier.drawBehind {
             val ink = 3.dp.toPx()
-            plate(shape, size, Brush.verticalGradient(listOf(color, colorBottom)), Palette.Ink, ink, gloss = false)
+            val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
+            plateShadow(path, 6.dp.toPx())
+            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.14f), color, colorBottom)), Palette.Ink, ink, gloss = false)
+            clipPath(path) {
+                // Faint diagonal brushing, and a sheen across the top, so large panels aren't a flat fill.
+                val step = 22.dp.toPx()
+                var x = -size.height
+                while (x < size.width) {
+                    drawLine(Color.White.copy(alpha = 0.035f), Offset(x, size.height), Offset(x + size.height, 0f), step * 0.45f)
+                    x += step
+                }
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.13f), Color.Transparent), 0f, minOf(size.height * 0.35f, 90.dp.toPx())), size = size)
+            }
             // inner rim highlight
-            val inset = 4.dp.toPx()
+            val inset = 5.dp.toPx()
             translate(inset, inset) {
                 val inner = Size(size.width - inset * 2, size.height - inset * 2)
                 val o = plateShape(cut - 2.dp, (cut * 0.35f - 1.dp).coerceAtLeast(1.dp)).createOutline(inner, layoutDirection, this)
-                drawPath(Path().apply { addOutline(o) }, Color.White.copy(alpha = 0.08f), style = Stroke(1.5.dp.toPx()))
+                drawPath(Path().apply { addOutline(o) }, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.03f))), style = Stroke(1.5.dp.toPx()))
             }
         },
         content = content,
@@ -210,7 +265,9 @@ fun Badge(text: String, modifier: Modifier = Modifier, color: Color = Palette.Re
             .drawBehind {
                 val o = plateShape(6.dp, 2.dp).createOutline(size, layoutDirection, this)
                 val p = Path().apply { addOutline(o) }
-                drawPath(p, color)
+                plateShadow(p, 2.5.dp.toPx())
+                drawPath(p, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.3f), color, lerp(color, Color.Black, 0.25f))))
+                clipPath(p) { drawRect(Color.White.copy(alpha = 0.25f), size = Size(size.width, size.height * 0.42f)) }
                 drawPath(p, Palette.Ink, style = Stroke(2.dp.toPx()))
             }
             .padding(horizontal = 8.dp, vertical = 2.dp),
@@ -232,7 +289,12 @@ fun CurrencyPill(icon: IconKind, value: Int, modifier: Modifier = Modifier, onCl
                 .drawBehind {
                     val o = plateShape(8.dp, 3.dp).createOutline(size, layoutDirection, this)
                     val p = Path().apply { addOutline(o) }
-                    drawPath(p, Palette.PanelInset)
+                    plateShadow(p, 3.dp.toPx())
+                    drawPath(p, Brush.verticalGradient(listOf(Color(0xFF0C0628), Palette.PanelInset, Color(0xFF2A1B6A))))
+                    clipPath(p) {
+                        drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent), 0f, size.height * 0.4f), size = size)
+                        drawLine(Color.White.copy(alpha = 0.22f), Offset(0f, size.height - 2.dp.toPx()), Offset(size.width, size.height - 2.dp.toPx()), 2.dp.toPx())
+                    }
                     drawPath(p, Palette.Ink, style = Stroke(2.5.dp.toPx()))
                 }
                 .then(if (onClick != null) Modifier.clickable(remember { MutableInteractionSource() }, null) { onClick() } else Modifier)
