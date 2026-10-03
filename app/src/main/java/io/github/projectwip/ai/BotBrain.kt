@@ -316,6 +316,8 @@ class BotBrain(
         }
         val goalMoved = hypot(goalX - pathGoalX, goalY - pathGoalY) > 1.2f
         if (path.isEmpty() || goalMoved || repathTimer <= 0f || pathIndex >= path.size) {
+            if (pathfinder.budget <= 0) { thinkTimer = minOf(thinkTimer, 0.05f); return } // someone else searched this tick; go next
+            pathfinder.budget--
             path = pathfinder.find(me.x, me.y, goalX, goalY, me.radius * 0.95f)
             pathIndex = 0
             pathGoalX = goalX; pathGoalY = goalY

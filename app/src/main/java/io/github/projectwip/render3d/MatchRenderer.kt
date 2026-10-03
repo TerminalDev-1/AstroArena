@@ -38,6 +38,8 @@ class MatchRenderer(
 ) : GlRenderer {
     private lateinit var lit: Program
     private lateinit var depth: Program
+    /** The lit shader with a dissolve, used only for fighters that are mid-fade. */
+    private lateinit var litFade: Program
     private lateinit var water: Program
     private lateinit var sprite: Program
     private lateinit var models: FighterModels
@@ -95,6 +97,8 @@ class MatchRenderer(
     private var fpsFrames = 0
     private var fpsTime = 0f
     private var fps = 0
+    private val perfLog = Log.isLoggable("Perf", Log.DEBUG)
+    private var simWorst = 0f
 
     private val match get() = runner.match
     private val world get() = runner.match.world
@@ -102,6 +106,7 @@ class MatchRenderer(
     override fun onCreated() {
         lit = Program(Shaders.LIT_VS, Shaders.LIT_FS, "lit")
         depth = Program(Shaders.LIT_VS, Shaders.DEPTH_FS, "depth")
+        litFade = Program(Shaders.LIT_VS, Shaders.LIT_FADE_FS, "lit-fade")
         water = Program(Shaders.LIT_VS, Shaders.WATER_FS, "water")
         sprite = Program(Shaders.SPRITE_VS, Shaders.SPRITE_FS, "sprite")
         models = FighterModels()
@@ -160,7 +165,13 @@ class MatchRenderer(
         fpsFrames++; fpsTime += dt
         if (fpsTime >= 0.5f) { fps = (fpsFrames / fpsTime).toInt(); fpsFrames = 0; fpsTime = 0f }
 
+        val s0 = System.nanoTime()
         val alpha = runner.update(dt)
+        if (perfLog) {
+            val simMs = (System.nanoTime() - s0) / 1e6f
+            if (simMs > simWorst) simWorst = simMs
+            if (fpsTime == 0f) { Log.i("Perf", "sim worst=${"%.1f".format(simWorst)}ms"); simWorst = 0f }
+        }
         for (e in runner.frameEvents) onEvent(e)
         particles.update(dt)
         updateFighterAnims(dt)
@@ -228,7 +239,7 @@ class MatchRenderer(
         arena.grass.draw()
         depth.f("uSway", 0f)
         drawCrates(depth, shadowPass = true)
-        forEachVisibleFighter(depth, alpha) { f, x, z, facing -> models.draw(depth, f.def, f.skin, x, z, facing, anim, Pass.SHADOW) }
+        forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(depth, f.def, f.skin, x, z, facing, anim, Pass.SHADOW) }
         shadow.end()
     }
 
@@ -256,8 +267,8 @@ class MatchRenderer(
         GLES30.glDepthFunc(GLES30.GL_GREATER)
         GLES30.glDepthMask(false)
         lit.i("uMode", 2)
-        forEachVisibleFighter(lit, alpha) { f, x, z, facing ->
-            if (f.team != match.player.team) return@forEachVisibleFighter
+        forEachSolidFighter(alpha) { f, x, z, facing ->
+            if (f.team != match.player.team) return@forEachSolidFighter
             if (f === match.player) lit.v4("uTint", 0.36f, 1f, 0.48f, 0.55f) else lit.v4("uTint", 0.25f, 0.7f, 1f, 0.45f)
             models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.SILHOUETTE)
         }
@@ -268,7 +279,7 @@ class MatchRenderer(
 
         // Fighters
         lit.f("uRim", 0.45f)
-        forEachVisibleFighter(lit, alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR) }
+        forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR) }
         lit.f("uFlash", 0f)
         lit.f("uEmissive", 0f)
 
@@ -282,10 +293,12 @@ class MatchRenderer(
         arena.solids.draw()
         drawCrates(lit, shadowPass = false, outline = true)
         lit.f("uOutline", FighterModels.OUTLINE)
-        forEachVisibleFighter(lit, alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
+        forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
         lit.f("uOutline", 0f)
         lit.i("uMode", 0)
         GLES30.glDisable(GLES30.GL_CULL_FACE)
+
+        drawFadingFighters(alpha)
 
         // Projectiles (solid cores)
         drawProjectileCores(alpha)
@@ -353,21 +366,58 @@ class MatchRenderer(
     /** Solid enough to carry HUD markers (rings, bars, shields). */
     private fun shown(f: Fighter) = f.alive && shownVis[f.id] > 0.5f
 
-    private inline fun forEachVisibleFighter(p: Program, alpha: Float, block: (Fighter, Float, Float, Float) -> Unit) {
+    /** Fighters drawn fully solid (the normal case). Ones that are mid-fade are drawn by [drawFadingFighters]. */
+    private inline fun forEachSolidFighter(alpha: Float, block: (Fighter, Float, Float, Float) -> Unit) {
         for (f in world.fighters) {
-            val i = f.id
-            if (!f.alive || shownVis[i] <= 0.02f) continue
-            p.f("uDissolve", 1f - shownVis[i])
-            anim.walk = f.walkCycle * 0.9f
-            anim.moving = shownMoving[i]
-            anim.recoil = (1f - f.sinceAttack / 0.16f).coerceIn(0f, 1f)
-            anim.flash = (f.hitFlash / 0.12f).coerceIn(0f, 1f) * 0.8f
-            anim.time = time + i * 0.7f
-            anim.jump = if (f.isDashing) 0.12f else 0f
-            anim.scale = FIGHTER_SCALE
-            block(f, lerp(f.prevX, f.x, alpha), lerp(f.prevY, f.y, alpha), shownFacing[i])
+            if (!f.alive || shownVis[f.id] < 0.999f || !inView(f.x, f.y)) continue
+            poseFor(f)
+            block(f, lerp(f.prevX, f.x, alpha), lerp(f.prevY, f.y, alpha), shownFacing[f.id])
         }
-        p.f("uDissolve", 0f)
+    }
+
+    /**
+     * Whether a spot on the ground can be on screen (with room for tall things and their shadows). The arena is
+     * several screens wide, so skipping fighters and crates outside this saves most of their draw calls.
+     */
+    private fun inView(x: Float, z: Float): Boolean {
+        val dz = z - camZ
+        return kotlin.math.abs(x - camX) < 10f + 8f * aspect && dz > -17f && dz < 11f
+    }
+
+    private fun poseFor(f: Fighter) {
+        val i = f.id
+        anim.walk = f.walkCycle * 0.9f
+        anim.moving = shownMoving[i]
+        anim.recoil = (1f - f.sinceAttack / 0.16f).coerceIn(0f, 1f)
+        anim.flash = (f.hitFlash / 0.12f).coerceIn(0f, 1f) * 0.8f
+        anim.time = time + i * 0.7f
+        anim.jump = if (f.isDashing) 0.12f else 0f
+        anim.scale = FIGHTER_SCALE
+    }
+
+    /** Fighters slipping into or out of cover: colour and outline through the dissolve shader. */
+    private fun drawFadingFighters(alpha: Float) {
+        if (world.fighters.none { it.alive && shownVis[it.id] > 0.02f && shownVis[it.id] < 0.999f }) return
+        setupLit(litFade)
+        litFade.f("uRim", 0.45f)
+        for (pass in 0..1) {
+            if (pass == 1) {
+                GLES30.glEnable(GLES30.GL_CULL_FACE)
+                GLES30.glCullFace(GLES30.GL_FRONT)
+                litFade.i("uMode", 1)
+                litFade.f("uFlash", 0f); litFade.f("uEmissive", 0f)
+                litFade.f("uOutline", FighterModels.OUTLINE)
+            }
+            for (f in world.fighters) {
+                val v = shownVis[f.id]
+                if (!f.alive || v <= 0.02f || v >= 0.999f || !inView(f.x, f.y)) continue
+                poseFor(f)
+                litFade.f("uDissolve", 1f - v)
+                models.draw(litFade, f.def, f.skin, lerp(f.prevX, f.x, alpha), lerp(f.prevY, f.y, alpha), shownFacing[f.id], anim, if (pass == 0) Pass.COLOR else Pass.OUTLINE)
+            }
+        }
+        GLES30.glDisable(GLES30.GL_CULL_FACE)
+        lit.use()
     }
 
     /** Smooth facing and movement amount once per frame (frame-rate independent). */
@@ -398,6 +448,7 @@ class MatchRenderer(
         for (key in world.crateHp.keys) {
             val x = key % w + 0.5f
             val z = key / w + 0.5f
+            if (!inView(x, z)) continue
             val hitAge = time - (crateHitAt[key] ?: -10f)
             val wob = if (hitAge < 0.25f) sin(hitAge * 60f) * 0.06f * (1f - hitAge / 0.25f) else 0f
             Matrix.setIdentityM(model, 0)
@@ -422,6 +473,7 @@ class MatchRenderer(
     private fun drawCells() {
         if (world.pickups.isEmpty()) return
         for (pk in world.pickups) {
+            if (!inView(pk.x, pk.y)) continue
             val y = 0.55f + sin(time * 3f + pk.x) * 0.12f + (0.4f - pk.age).coerceAtLeast(0f) * 2f
             setModel(pk.x, y, pk.y, 1f, 1f, 1f, time * 90f)
             lit.v4("uTint", 1f, 1f, 1f, 1f)

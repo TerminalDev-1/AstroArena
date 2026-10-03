@@ -318,13 +318,19 @@ class HudView(
         path.lineTo(r - cut, b); path.lineTo(l + cut * 0.4f, b); path.lineTo(l, b - cut * 0.4f); path.lineTo(l, t + cut); path.close()
         fill.color = color
         c.drawPath(path, fill)
-        c.save()
-        c.clipPath(path)
+        val mid = maxOf(t + cut, t + (b - t) * 0.45f)
+        path.reset()
+        path.moveTo(l + cut, t); path.lineTo(r - cut * 0.4f, t); path.lineTo(r, t + cut * 0.4f); path.lineTo(r, mid); path.lineTo(l, mid); path.lineTo(l, t + cut); path.close()
         fill.color = Color.argb(46, 255, 255, 255)
-        c.drawRect(l, t, r, t + (b - t) * 0.45f, fill)
+        c.drawPath(path, fill)
+        val low = minOf(b - cut, b - (b - t) * 0.25f)
+        path.reset()
+        path.moveTo(l, low); path.lineTo(r, low); path.lineTo(r, b - cut); path.lineTo(r - cut, b); path.lineTo(l + cut * 0.4f, b); path.lineTo(l, b - cut * 0.4f); path.close()
         fill.color = Color.argb(60, 0, 0, 0)
-        c.drawRect(l, b - (b - t) * 0.22f, r, b, fill)
-        c.restore()
+        c.drawPath(path, fill)
+        path.reset()
+        path.moveTo(l + cut, t); path.lineTo(r - cut * 0.4f, t); path.lineTo(r, t + cut * 0.4f); path.lineTo(r, b - cut)
+        path.lineTo(r - cut, b); path.lineTo(l + cut * 0.4f, b); path.lineTo(l, b - cut * 0.4f); path.lineTo(l, t + cut); path.close()
         if (outline != null) { stroke.color = outline; stroke.strokeWidth = dp(3f); c.drawPath(path, stroke) }
     }
 

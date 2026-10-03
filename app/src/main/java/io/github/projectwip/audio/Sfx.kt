@@ -51,21 +51,29 @@ class Sfx(private val context: Context) {
         }, "sfx-synth").start()
     }
 
+    /**
+     * SoundPool and the vibrator are system calls that can block for milliseconds, and matches call these from
+     * the render thread, so they are handed to a worker thread instead of stalling a frame.
+     */
+    private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "sfx-play").apply { isDaemon = true } }
+
     fun play(s: Sound, gain: Float = 1f, pitch: Float = 1f) {
         if (!loaded || volume <= 0f) return
         val v = (volume * gain).coerceIn(0f, 1f)
-        pool.play(ids[s.ordinal], v, v, 1, 0, pitch.coerceIn(0.5f, 2f))
+        worker.execute { pool.play(ids[s.ordinal], v, v, 1, 0, pitch.coerceIn(0.5f, 2f)) }
     }
 
     fun buzz(ms: Long, strength: Int) {
         if (!hapticsEnabled) return
         val v = vibrator ?: return
         if (!v.hasVibrator()) return
-        val amp = if (v.hasAmplitudeControl()) strength.coerceIn(1, 255) else VibrationEffect.DEFAULT_AMPLITUDE
-        v.vibrate(VibrationEffect.createOneShot(ms, amp))
+        worker.execute {
+            val amp = if (v.hasAmplitudeControl()) strength.coerceIn(1, 255) else VibrationEffect.DEFAULT_AMPLITUDE
+            v.vibrate(VibrationEffect.createOneShot(ms, amp))
+        }
     }
 
-    fun release() = pool.release()
+    fun release() { worker.shutdown(); pool.release() }
 
     private fun writeWav(f: File, samples: FloatArray) {
         val data = ByteBuffer.allocate(samples.size * 2).order(ByteOrder.LITTLE_ENDIAN)

@@ -29,11 +29,13 @@ class Match(val config: MatchConfig) {
     val world: World
     val player: Fighter
     val brains: List<BotBrain>
+    private val pathfinder: Pathfinder
     val freeForAll = config.mode == GameMode.LAST_SPARK
 
     /** Seconds since the match became "over" for the player (ended, or eliminated in free-for-all). */
     var overFor = 0f
         private set
+    private var turn = 0
 
     init {
         val names = BOT_NAMES.shuffled(rng).iterator()
@@ -51,7 +53,7 @@ class Match(val config: MatchConfig) {
         val arena = if (freeForAll) Arenas.staticCanyon() else Arenas.foundryYard()
         val rules = if (freeForAll) MatchRules.lastSpark() else MatchRules.knockoutRush()
         world = World(arena, roster, rules, Random(rng.nextLong()))
-        val pathfinder = Pathfinder(world.arena)
+        pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
         brains = roster.filter { it.isBot }.map { BotBrain(it, profile, world, pathfinder, Random(rng.nextLong())) }
     }
@@ -63,7 +65,10 @@ class Match(val config: MatchConfig) {
     }
 
     fun step(dt: Float) {
-        for (b in brains) b.update(dt)
+        pathfinder.budget = 1
+        // Rotate who goes first so the same bot doesn't always get the tick's one path search.
+        turn++
+        for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
         world.step(dt)
         if (isOver) overFor += dt
     }

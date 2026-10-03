@@ -344,7 +344,7 @@ private fun PlayButton(onClick: () -> Unit) {
         Canvas(Modifier.size(300.dp, 110.dp)) {
             drawOval(Palette.Orange.copy(alpha = 0.18f + glow * 0.2f), Offset(0f, 0f), Size(size.width, size.height))
         }
-        ChunkyButton(onClick, Modifier.fillMaxWidth().height(90.dp), ButtonStyle.ORANGE, cut = 20.dp, lip = 7.dp) {
+        ChunkyButton(onClick, Modifier.fillMaxWidth().height(90.dp), ButtonStyle.ORANGE, cut = 20.dp, lip = 7.dp, sheen = true) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GameIcon(IconKind.PLAY, Modifier.size(36.dp))
                 Spacer(Modifier.width(10.dp))

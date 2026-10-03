@@ -173,6 +173,8 @@ fun ChunkyButton(
     cut: Dp = 12.dp,
     lip: Dp = 5.dp,
     sound: Sound = Sound.TAP,
+    /** A band of light sweeps across now and then. It redraws the button every frame, so use it sparingly. */
+    sheen: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -181,8 +183,7 @@ fun ChunkyButton(
     val sfx = LocalSfx.current
     val s = if (enabled) style else ButtonStyle.GREY
     val shape = remember(cut) { plateShape(cut, cut * 0.4f) }
-    val sheen = enabled && (style == ButtonStyle.ORANGE || style == ButtonStyle.GOLD || style == ButtonStyle.GREEN)
-    val time = if (sheen) rememberAnimTime() else null
+    val time = if (sheen && enabled) rememberAnimTime() else null
     Box(
         modifier
             .graphicsLayer { val k = 1f - 0.03f * press; scaleX = k; scaleY = k }

@@ -84,6 +84,13 @@ class GlThread(
     @Volatile private var height = 0
     @Volatile private var sizeChanged = false
     @Volatile var paused = false
+    private val perfLog = Log.isLoggable("Perf", Log.DEBUG)
+    private var perfFrames = 0
+    private var perfTime = 0f
+    private var perfWorst = 0f
+    private var perfSlow = 0
+    private var perfDraw = 0f
+    private var perfSwap = 0f
 
     fun resize(w: Int, h: Int) { width = w; height = h; sizeChanged = true }
 
@@ -109,8 +116,22 @@ class GlThread(
                 val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f)
                 last = now
                 if (paused) { sleep(30); continue }
+                if (perfLog) {
+                    // Frame pacing every two seconds: `adb shell setprop log.tag.Perf DEBUG`, then `adb logcat -s Perf`.
+                    perfFrames++; perfTime += dt; if (dt > perfWorst) perfWorst = dt
+                    if (dt > 0.02f) perfSlow++
+                    if (perfTime >= 2f) {
+                        Log.i("Perf", "$name fps=${(perfFrames / perfTime).toInt()} worst=${(perfWorst * 1000).toInt()}ms over20ms=$perfSlow" +
+                            " draw=${"%.1f".format(perfDraw / perfFrames)}ms swap=${"%.1f".format(perfSwap / perfFrames)}ms")
+                        perfFrames = 0; perfTime = 0f; perfWorst = 0f; perfSlow = 0; perfDraw = 0f; perfSwap = 0f
+                    }
+                }
+                val f0 = System.nanoTime()
                 renderer.onFrame(dt)
-                if (!egl.swap(surface)) {
+                val f1 = System.nanoTime()
+                val swapped = egl.swap(surface)
+                perfDraw += (f1 - f0) / 1e6f; perfSwap += (System.nanoTime() - f1) / 1e6f
+                if (!swapped) {
                     Log.w(name, "eglSwapBuffers failed: ${EGL14.eglGetError()}")
                     sleep(16)
                 }

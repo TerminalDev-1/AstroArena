@@ -14,6 +14,13 @@ class Pathfinder(private val arena: Arena) {
     private val cameFrom = IntArray(w * h)
     private val closed = BooleanArray(w * h)
 
+    /**
+     * Full searches still allowed this tick. A search is the most expensive thing a bot does, and several bots
+     * re-planning in the same tick made the whole game hitch; [io.github.projectwip.sim.Match] refills this each
+     * step so they take turns. Unlimited unless something manages it.
+     */
+    var budget = Int.MAX_VALUE
+
     private fun walkable(x: Int, y: Int) = x in 0 until w && y in 0 until h && !arena[x, y].blocksMove
 
     /** Returns waypoints (tile centres, smoothed) from start to goal, excluding the start. Empty if unreachable. */
@@ -73,7 +80,8 @@ class Pathfinder(private val arena: Arena) {
         var fromY = sy
         var i = 0
         while (i < pts.size) {
-            var j = pts.lastIndex
+            // Looking a few waypoints ahead finds nearly every shortcut; scanning to the end was quadratic.
+            var j = minOf(pts.lastIndex, i + 10)
             while (j > i && !arena.walkClear(fromX, fromY, pts[j][0], pts[j][1], r)) j--
             out += pts[j]
             fromX = pts[j][0]; fromY = pts[j][1]
