@@ -3,16 +3,23 @@
 Only the Python standard library is used, so there is nothing to install.
 
     GET  /v1/health                     is anything there?
-    GET  /v1/status?version=6           is this client version supported, and is there a notice for it?
+    GET  /v1/status?version=7           is this client version supported, and is there a notice for it?
     GET  /v1/config                     live settings: bot behaviour per difficulty
     POST /v1/players        {name}      create an account -> {id, token}
-    GET  /v1/save                       the stored save                         (needs a token)
-    PUT  /v1/save           {save}      store the save -> {revision}            (needs a token)
-    POST /v1/matches        {...}       plan a match -> {matchId, seed, bots}   (needs a token)
-    POST /v1/matches/<id>/result {...}  report how it went                      (needs a token)
+    GET  /v1/me                         this account as the server sees it                    (token)
+    GET  /v1/save                       the stored save                                       (token)
+    PUT  /v1/save           {save}      store the save -> {revision, account}                 (token)
+    POST /v1/matches        {...}       plan a match -> {matchId, seed, botNames, difficulty} (token)
+    POST /v1/matches/<id>/result {...}  report how it went -> the Cups and drop it earned     (token)
+    POST /v1/drops/open     {...}       open a Spark Drop -> {tier, pieces, reward, account}  (token)
+    POST /v1/dev/grant      {...}       developer hand-outs                                   (token, developer)
     GET  /v1/leaderboard?limit=50       players by Cups
 
-A token goes in the `Authorization: Bearer <token>` header.
+A token goes in the `Authorization: Bearer <token>` header, and every request with a token must also say which
+version of the game is asking (`X-Client-Version`); versions listed in versions_not_supported.cfg are refused.
+
+The server owns each player's Cups and Spark Drops: it works out what a match is worth, refuses results that
+can't be real, and rolls what comes out of a drop. The fight itself still runs on the device.
 """
 
 from __future__ import annotations
@@ -21,17 +28,18 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from .config import Config
+from . import rules
+from .config import Config, parse_version
 from .store import Store
 
-API = 1
+API = 2
 MAX_BODY = 512 * 1024
 _MATCH_RESULT = re.compile(r"^/v1/matches/(\d+)/result$")
-_MODES = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 5, "BOSS": 0, "TRAINING": 0}
 
 
 class Game:
@@ -41,11 +49,37 @@ class Game:
         self.config = Config(directory)
         self.store = Store(db_path or os.path.join(directory, "astroarena.db"))
         self.started = time.time()
+        self._signups: dict[str, list[float]] = {}
+        self._signup_lock = threading.Lock()
+
+    def may_sign_up(self, address: str) -> bool:
+        """Limits how many accounts one address can create per hour."""
+        now = time.time()
+        with self._signup_lock:
+            recent = [t for t in self._signups.get(address, []) if now - t < 3600]
+            allowed = len(recent) < self.config.accounts_per_hour()
+            if allowed:
+                recent.append(now)
+            self._signups[address] = recent
+        return allowed
+
+    def account(self, player_id: str) -> dict:
+        """A player as the server sees them: what the client shows and is allowed to do."""
+        player = self.store.player(player_id)
+        return {
+            "id": player["id"],
+            "name": player["name"],
+            "developer": self.config.is_developer(player["id"]),
+            "cups": player["cups"],
+            "drops": player["drops"],
+            "dropsLeftToday": self.store.drops_left_today(player),
+            "difficulty": self.config.default_difficulty(),
+        }
 
 
 def make_handler(game: Game, quiet: bool = False):
     class Handler(BaseHTTPRequestHandler):
-        server_version = "AstroArena/1"
+        server_version = "AstroArena/2"
         protocol_version = "HTTP/1.1"
 
         # ------------------------------------------------------------ plumbing
@@ -85,12 +119,22 @@ def make_handler(game: Game, quiet: bool = False):
             return data
 
         def _player(self):
-            """The signed-in player, or None after a 401 has been sent."""
+            """The signed-in player, or None after an error reply has been sent."""
             header = self.headers.get("Authorization") or ""
             token = header[7:].strip() if header.startswith("Bearer ") else ""
-            player = game.store.player_for(token, self.headers.get("X-Client-Version") or "")
+            version = (self.headers.get("X-Client-Version") or "").strip()
+            player = game.store.player_for(token, version)
             if player is None:
                 self._error(401, "unknown or missing token")
+                return None
+            # The version gate is enforced here too, not just advertised by /v1/status.
+            if parse_version(version) is None:
+                self._error(426, "this request doesn't say which version of the game sent it")
+                return None
+            message = game.config.unsupported_message(version)
+            if message is not None:
+                self._error(426, message)
+                return None
             return player
 
         # ------------------------------------------------------------ routes
@@ -116,6 +160,9 @@ def make_handler(game: Game, quiet: bool = False):
                 except ValueError:
                     limit = 50
                 return self._send(200, {"players": game.store.leaderboard(limit)})
+            if url.path == "/v1/me":
+                player = self._player()
+                return None if player is None else self._send(200, {"account": game.account(player["id"])})
             if url.path == "/v1/save":
                 player = self._player()
                 if player is None:
@@ -130,39 +177,93 @@ def make_handler(game: Game, quiet: bool = False):
                 data = self._body()
                 if data is None:
                     return None
+                if not game.may_sign_up(self.client_address[0]):
+                    return self._error(429, "too many new accounts from this address; try again later")
                 return self._send(201, game.store.register(data.get("name"), str(data.get("version") or "")))
             if url.path == "/v1/matches":
-                player = self._player()
-                if player is None:
-                    return None
-                data = self._body()
-                if data is None:
-                    return None
-                mode = str(data.get("mode") or "")
-                if mode not in _MODES:
-                    return self._error(400, "unknown mode")
-                try:
-                    level = int(data.get("level") or 1)
-                except (TypeError, ValueError):
-                    return self._error(400, "level must be a number")
-                plan = game.store.plan_match(
-                    player["id"], mode, str(data.get("fighter") or "JUNO"), level, str(data.get("difficulty") or "NORMAL"), _MODES[mode]
-                )
-                return self._send(201, plan)
+                return self._plan_match()
             m = _MATCH_RESULT.match(url.path)
             if m:
-                player = self._player()
-                if player is None:
-                    return None
-                data = self._body()
-                if data is None:
-                    return None
-                try:
-                    ok = game.store.finish_match(player["id"], int(m.group(1)), data)
-                except (TypeError, ValueError):
-                    return self._error(400, "result fields must be numbers")
-                return self._send(200, {"ok": True}) if ok else self._error(409, "no open match with that id")
+                return self._finish_match(int(m.group(1)))
+            if url.path == "/v1/drops/open":
+                return self._open_drop()
+            if url.path == "/v1/dev/grant":
+                return self._dev_grant()
             return self._error(404, "no such endpoint")
+
+        def _plan_match(self):
+            player = self._player()
+            if player is None:
+                return None
+            data = self._body()
+            if data is None:
+                return None
+            mode = str(data.get("mode") or "")
+            if mode not in rules.MODES:
+                return self._error(400, "unknown mode")
+            try:
+                level = int(data.get("level") or 1)
+            except (TypeError, ValueError):
+                return self._error(400, "level must be a number")
+            # Only developers choose how hard the bots are; everyone else gets the server's setting.
+            difficulty = game.config.default_difficulty()
+            asked = str(data.get("difficulty") or "").upper()
+            if game.config.is_developer(player["id"]) and asked in rules.DIFFICULTIES:
+                difficulty = asked
+            return self._send(201, game.store.plan_match(
+                player["id"], mode, str(data.get("fighter") or "JUNO"), level, difficulty, rules.MODES[mode]
+            ))
+
+        def _finish_match(self, match_id: int):
+            player = self._player()
+            if player is None:
+                return None
+            data = self._body()
+            if data is None:
+                return None
+            try:
+                verdict = game.store.finish_match(player["id"], match_id, data)
+            except (TypeError, ValueError):
+                return self._error(400, "result fields must be numbers")
+            if verdict is None:
+                return self._error(409, "no open match with that id")
+            if "rejected" in verdict:
+                return self._error(422, "result refused: " + verdict["rejected"])
+            return self._send(200, {"ok": True, **verdict, "account": game.account(player["id"])})
+
+        def _open_drop(self):
+            player = self._player()
+            if player is None:
+                return None
+            data = self._body()
+            if data is None:
+                return None
+            luck, free = 0.0, False
+            if game.config.is_developer(player["id"]):
+                try:
+                    luck = float(data.get("luck") or 0)
+                except (TypeError, ValueError):
+                    return self._error(400, "luck must be a number")
+                free = data.get("free") is True
+            result = game.store.open_drop(player["id"], luck, free)
+            if result is None:
+                return self._error(409, "no Spark Drops to open")
+            return self._send(200, {**result, "account": game.account(player["id"])})
+
+        def _dev_grant(self):
+            player = self._player()
+            if player is None:
+                return None
+            data = self._body()
+            if data is None:
+                return None
+            if not game.config.is_developer(player["id"]):
+                return self._error(403, "developers only")
+            try:
+                game.store.grant(player["id"], int(data.get("cups") or 0), int(data.get("drops") or 0))
+            except (TypeError, ValueError):
+                return self._error(400, "cups and drops must be numbers")
+            return self._send(200, {"account": game.account(player["id"])})
 
         def do_PUT(self):  # noqa: N802
             if urlparse(self.path).path != "/v1/save":
@@ -177,10 +278,10 @@ def make_handler(game: Game, quiet: bool = False):
             if not isinstance(save, dict):
                 return self._error(400, "save must be a JSON object")
             try:
-                revision = game.store.put_save(player["id"], save)
+                revision = game.store.put_save(player["id"], save, game.config.import_saves())
             except (TypeError, ValueError):
                 return self._error(400, "save has fields of the wrong type")
-            return self._send(200, {"revision": revision})
+            return self._send(200, {"revision": revision, "account": game.account(player["id"])})
 
     return Handler
 

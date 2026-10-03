@@ -5,6 +5,7 @@ They are re-read whenever they change on disk, so there is no need to restart th
 versions_not_supported.cfg   which client versions are turned away, and what they are told
 notices.cfg                  short messages shown to players on the home screen
 bots.cfg                     how bots behave at each difficulty (the client has the same numbers built in as a fallback)
+game.cfg                     the difficulty ordinary players get, who the developers are, how new accounts start
 """
 
 from __future__ import annotations
@@ -68,6 +69,7 @@ class Config:
         self._unsupported: list[tuple[str, str]] = []
         self._notices: list[tuple[str, str]] = []
         self._bots: dict[str, dict[str, float | bool]] = {}
+        self._game: dict[str, dict[str, str]] = {}
 
     def _path(self, name: str) -> str:
         return os.path.join(self.directory, name)
@@ -104,6 +106,35 @@ class Config:
                             continue
                 bots[section.upper()] = values
             self._bots = bots
+        if self._changed("game.cfg"):
+            parser = configparser.ConfigParser()
+            parser.read(self._path("game.cfg"), encoding="utf-8")
+            self._game = {section.lower(): dict(parser.items(section)) for section in parser.sections()}
+
+    def _setting(self, section: str, key: str, default: str = "") -> str:
+        with self._lock:
+            self._refresh()
+            return self._game.get(section, {}).get(key, default).strip()
+
+    def default_difficulty(self) -> str:
+        """The bot difficulty ordinary players are given."""
+        value = self._setting("players", "difficulty", "EASY").upper()
+        return value if value in ("EASY", "NORMAL", "HARD", "ELITE") else "EASY"
+
+    def is_developer(self, player_id: str) -> bool:
+        if self._setting("developers", "everyone", "no").lower() in ("yes", "true", "on", "1"):
+            return True
+        ids = re.split(r"[,\s]+", self._setting("developers", "ids"))
+        return player_id in ids
+
+    def import_saves(self) -> bool:
+        return self._setting("accounts", "import_saves", "yes").lower() in ("yes", "true", "on", "1")
+
+    def accounts_per_hour(self) -> int:
+        try:
+            return max(1, int(self._setting("accounts", "per_address_per_hour", "10")))
+        except ValueError:
+            return 10
 
     def unsupported_message(self, version: str) -> str | None:
         """The message for a client version that is turned away, or None if the version is welcome."""
