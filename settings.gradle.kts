@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ProjectWIPPreview"
+rootProject.name = "AstroArena"
 include(":app")

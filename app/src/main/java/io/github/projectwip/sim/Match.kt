@@ -56,6 +56,7 @@ class Match(val config: MatchConfig) {
         pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
         brains = roster.filter { it.isBot }.map { BotBrain(it, profile, world, pathfinder, Random(rng.nextLong())) }
+        for (b in brains) b.others = brains
     }
 
     private fun botFighter(id: Int, team: Int, name: String): Fighter {

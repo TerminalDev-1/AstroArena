@@ -37,14 +37,14 @@ data class BotProfile(
     companion object {
         fun of(d: BotDifficulty): BotProfile = when (d) {
             BotDifficulty.EASY -> BotProfile(
-                reactionTime = 0.65f, thinkInterval = 0.6f, aimErrorDegrees = 17f, leadFactor = 0f,
+                reactionTime = 0.9f, thinkInterval = 0.7f, aimErrorDegrees = 21f, leadFactor = 0f,
                 dodgeChance = 0f, rangeDiscipline = 0.15f, retreatBelow = 0f, focusWeakest = false,
-                shotDiscipline = false, superSkill = 0.1f, fireHesitation = 0.9f, wander = 0.45f, teamwork = 0f,
+                shotDiscipline = false, superSkill = 0.1f, fireHesitation = 1.3f, wander = 0.5f, teamwork = 0f,
             )
             BotDifficulty.NORMAL -> BotProfile(
-                reactionTime = 0.38f, thinkInterval = 0.38f, aimErrorDegrees = 9f, leadFactor = 0.4f,
-                dodgeChance = 0.25f, rangeDiscipline = 0.6f, retreatBelow = 0.25f, focusWeakest = false,
-                shotDiscipline = true, superSkill = 0.45f, fireHesitation = 0.35f, wander = 0.15f, teamwork = 0.3f,
+                reactionTime = 0.48f, thinkInterval = 0.42f, aimErrorDegrees = 11f, leadFactor = 0.35f,
+                dodgeChance = 0.2f, rangeDiscipline = 0.6f, retreatBelow = 0.25f, focusWeakest = false,
+                shotDiscipline = true, superSkill = 0.4f, fireHesitation = 0.5f, wander = 0.18f, teamwork = 0.3f,
             )
             BotDifficulty.HARD -> BotProfile(
                 reactionTime = 0.2f, thinkInterval = 0.22f, aimErrorDegrees = 4.5f, leadFactor = 0.85f,

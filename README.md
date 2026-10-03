@@ -1,4 +1,4 @@
-# Project WIP-Preview
+# AstroArena
 
 A mobile-first, landscape, **3D arena brawler for Android phones and tablets** — quick 3v3 matches,
 twin-stick touch controls, fighters you level up, Cups, a Cup Track, a Shop — and **bots as a first-class

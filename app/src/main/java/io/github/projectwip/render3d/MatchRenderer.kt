@@ -559,6 +559,16 @@ class MatchRenderer(
             dashRing.draw()
         }
 
+        // ...or on the Spark Crate a tap would shoot.
+        if (runner.autoCrate >= 0) {
+            val x = runner.autoCrate % world.arena.width + 0.5f
+            val z = runner.autoCrate / world.arena.width + 0.5f
+            val pulse = 1f + 0.1f * sin(time * 9f)
+            lit.v4("uTint", 1f, 0.85f, 0.25f, 0.85f)
+            setModel(x, 0.04f, z, 0.85f * pulse, 1f, 0.85f * pulse, -time * 120f)
+            dashRing.draw()
+        }
+
         // Aim indicator
         val inp = runner.input
         if (p.alive && (inp.aimingAttack || inp.aimingSuper)) {
@@ -591,11 +601,15 @@ class MatchRenderer(
         }
 
         // Bobbing arrow above the auto-aim target (lit, so it reads as a 3D object)
-        runner.autoTarget?.let { t ->
+        val t = runner.autoTarget
+        if (t != null || runner.autoCrate >= 0) {
+            val ax = if (t != null) lerp(t.prevX, t.x, alpha) else runner.autoCrate % world.arena.width + 0.5f
+            val az = if (t != null) lerp(t.prevY, t.y, alpha) else runner.autoCrate / world.arena.width + 0.5f
+            val ay = if (t != null) headHeight(t.def.id) + 0.9f else 1.7f
             lit.i("uMode", 0)
             lit.f("uEmissive", 0.7f)
             lit.v4("uTint", 1f, 0.8f, 0.2f, 1f)
-            setModel(lerp(t.prevX, t.x, alpha), headHeight(t.def.id) + 0.9f + sin(time * 5f) * 0.12f, lerp(t.prevY, t.y, alpha), 1f, 1f, 1f, time * 120f)
+            setModel(ax, ay + sin(time * 5f) * 0.12f, az, 1f, 1f, 1f, time * 120f)
             arrow.draw()
             lit.f("uEmissive", 0f)
             lit.i("uMode", 1)

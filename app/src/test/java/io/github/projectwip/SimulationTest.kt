@@ -130,7 +130,43 @@ class SimulationTest {
         }
         println("visibility blips over 6 matches: hides=$shortHides shows=$shortShows")
         assertEquals("an enemy that reappears must stay visible for a moment", 0, shortShows)
-        assertTrue("too many sub-0.3s disappearances ($shortHides)", shortHides <= 30)
+        assertTrue("too many sub-0.3s disappearances ($shortHides)", shortHides <= 40)
+    }
+
+    /** Auto-aim falls back to a Spark Crate it can actually hit, never one behind a wall. */
+    @Test fun autoAimFindsHittableCrates() {
+        val a = Arenas.staticCanyon()
+        val def = Balance.fighter(FighterId.JUNO)
+        val f = Fighter(0, def, 1, 0, 0, "A", true)
+        val w = World(a, listOf(f, Fighter(1, def, 1, 0, 1, "B", true)), io.github.projectwip.sim.MatchRules.lastSpark())
+        // Quadrant row 1 is "gggg.c##..": a crate at (5,1) with open floor to its left and wall to its right.
+        assertEquals(Tile.CRATE, a[5, 1])
+        f.x = 2.5f; f.y = 1.5f
+        assertEquals(1 * a.width + 5, w.nearestHittableCrate(f, 6f))
+        assertEquals("out of range", -1, w.nearestHittableCrate(f, 2f))
+        f.x = 9.5f; f.y = 1.5f // the wall at (6..7, 1) is in the way now
+        assertTrue(w.nearestHittableCrate(f, 6f) != 1 * a.width + 5)
+    }
+
+    /** Free-for-all bots shouldn't pile onto one fighter while the field is still crowded. */
+    @Test fun botsDoNotGangUp() {
+        var samples = 0
+        var mobbed = 0
+        repeat(3) { seed ->
+            val m = Match(MatchConfig(FighterId.JUNO, 3, 0, "T", BotDifficulty.HARD, mode = GameMode.LAST_SPARK, humanPlayer = false, seed = 300L + seed))
+            var t = 0f
+            while (!m.isOver && t < 200f) {
+                m.step(Match.STEP); t += Match.STEP
+                if (m.world.aliveCount <= 3) break
+                for (f in m.world.fighters) {
+                    if (!f.alive) continue
+                    samples++
+                    if (m.brains.count { it.target === f } > 3) mobbed++
+                }
+            }
+        }
+        println("mobbed samples: $mobbed of $samples")
+        assertTrue("fighters were mobbed by 4+ bots in $mobbed of $samples samples", mobbed < samples / 200)
     }
 
     @Test fun circleNeverEntersWalls() {

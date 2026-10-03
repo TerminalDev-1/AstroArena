@@ -37,6 +37,12 @@ class BotBrain(
     var target: Fighter? = null
         private set
 
+    /** The other bots in the match, so a free-for-all doesn't turn into everyone on one fighter. */
+    var others: List<BotBrain> = emptyList()
+
+    /** How many other living bots are already going after [e]. */
+    private fun rivalsOn(e: Fighter) = others.count { it !== this && it.me.alive && it.target === e }
+
     private var seenTime = 0f
     private var thinkTimer = rng.nextFloat() * 0.3f
     private var fireTimer = 0.5f + rng.nextFloat()
@@ -118,12 +124,16 @@ class BotBrain(
         val st0 = world.storm
         val engageRadius = when {
             st0 == null || world.aliveCount <= 3 -> Float.MAX_VALUE
-            st0.elapsed < 35f -> 6f                           // early game: loot, only fight what's close
-            else -> me.def.attack.range + 4.5f
+            st0.elapsed < 45f -> 4.5f                         // early game: loot, only fight what's close
+            else -> me.def.attack.range + 3f
         }
+        val crowded = st0 != null && world.aliveCount > 3
         val enemies = world.fighters.filter {
+            val foughtBack = it.id == me.lastAttackerId && me.sinceDamaged < 3f
             it.team != me.team && it.alive && world.isVisibleTo(it, me.team) &&
-                (dist(it) <= engageRadius || (it.id == me.lastAttackerId && me.sinceDamaged < 3f))
+                (dist(it) <= engageRadius || foughtBack) &&
+                // Free-for-all etiquette: two bots on one fighter is a fight, more is a mugging.
+                (!crowded || foughtBack || it === target || rivalsOn(it) < 2)
         }
 
         // Target choice: nearest by default; smarter bots weigh health, line of fire and spawn shields.
@@ -131,6 +141,7 @@ class BotBrain(
             var s = dist(e)
             if (profile.focusWeakest) s += e.hpFraction * 5f
             if (e === target) s -= 1.5f
+            if (crowded) s += 3f * rivalsOn(e)
             if (profile.shotDiscipline && !arena.shotClear(me.x, me.y, e.x, e.y)) s += 3f
             if (profile.shotDiscipline && e.shield > 0f) s += 6f
             s

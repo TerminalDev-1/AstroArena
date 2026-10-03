@@ -208,7 +208,7 @@ private fun DataTab(repo: GameRepository) {
     SectionTitle("RESET PROGRESS", "Erase Cups, levels, currencies and claimed rewards. Settings are kept. This cannot be undone.")
     ChunkyButton({ confirm = true }, Modifier.width(260.dp).height(56.dp), ButtonStyle.RED) { GameText("RESET PROGRESS", Type.Heading) }
     Spacer(Modifier.height(10.dp))
-    SectionTitle("ABOUT", "Project WIP-Preview ${BuildConfig.VERSION_NAME}. Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
+    SectionTitle("ABOUT", "AstroArena ${BuildConfig.VERSION_NAME}. Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
     val context = androidx.compose.ui.platform.LocalContext.current
     ChunkyButton({
         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(REPO_URL)))

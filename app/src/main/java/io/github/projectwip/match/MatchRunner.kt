@@ -45,6 +45,9 @@ class MatchRunner(
     /** Who a tap on the attack stick would hit right now (drawn as a marker). */
     var autoTarget: Fighter? = null
         private set
+    /** Tile key of the Spark Crate a tap would shoot instead (when no enemy can be hit), or -1. */
+    var autoCrate = -1
+        private set
 
     /** Advances the simulation. Returns the interpolation alpha for rendering. */
     fun update(dt: Float): Float {
@@ -56,7 +59,8 @@ class MatchRunner(
             acc -= Match.STEP
         }
         val p = match.player
-        autoTarget = if (p.alive && match.world.phase == Phase.PLAYING) match.world.nearestVisibleEnemy(p, p.def.attack.range + 0.5f) else null
+        autoTarget = null; autoCrate = -1
+        if (p.alive && match.world.phase == Phase.PLAYING) pickAuto(p.def.attack.range)
         return acc / Match.STEP
     }
 
@@ -97,6 +101,21 @@ class MatchRunner(
         }
     }
 
+    /**
+     * What a tap should shoot, best first: an enemy in range with a clear shot, then a Spark Crate that can be
+     * hit, then an enemy in range that is behind cover (so the shot at least goes their way).
+     */
+    private fun pickAuto(range: Float) {
+        val p = match.player
+        val w = match.world
+        val enemy = w.nearestVisibleEnemy(p, range + 0.5f)
+        autoTarget = enemy
+        autoCrate = -1
+        if (enemy != null && w.arena.shotClear(p.x, p.y, enemy.x, enemy.y)) return
+        val crate = w.nearestHittableCrate(p, range + 0.4f)
+        if (crate >= 0) { autoCrate = crate; autoTarget = null }
+    }
+
     private val lead = FloatArray(2)
 
     /**
@@ -108,8 +127,14 @@ class MatchRunner(
         val c = p.control
         val w = match.world
         if (mode == TouchControls.FireMode.AUTO || hypot(ax, ay) < 0.01f) {
-            // In range first; otherwise still turn toward the nearest visible enemy just beyond it.
-            val t = w.nearestVisibleEnemy(p, range + 0.5f) ?: w.nearestVisibleEnemy(p, range + 3f)
+            // In range first (an enemy, else a crate); otherwise still turn toward the nearest visible enemy just beyond it.
+            pickAuto(range)
+            if (autoCrate >= 0) {
+                c.aimX = autoCrate % w.arena.width + 0.5f - p.x
+                c.aimY = autoCrate / w.arena.width + 0.5f - p.y
+                return
+            }
+            val t = autoTarget ?: w.nearestVisibleEnemy(p, range + 3f)
             if (t != null) {
                 w.leadAim(p, t, speed, lead)
                 c.aimX = lead[0]; c.aimY = lead[1]

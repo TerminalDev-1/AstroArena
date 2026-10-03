@@ -552,7 +552,38 @@ class World(
      */
     fun nearestVisibleEnemy(f: Fighter, maxRange: Float): Fighter? = fighters
         .filter { it.team != f.team && isVisibleTo(it, f.team) && hypot(it.x - f.x, it.y - f.y) <= maxRange }
-        .minByOrNull { hypot(it.x - f.x, it.y - f.y) + if (arena.shotClear(f.x, f.y, it.x, it.y)) 0f else 2.5f }
+        .minByOrNull { autoAimScore(f, it) }
+
+    /** Lower is a better auto-aim target: close, hittable, hurt, and not behind a spawn shield. */
+    private fun autoAimScore(f: Fighter, e: Fighter): Float {
+        var s = hypot(e.x - f.x, e.y - f.y)
+        if (!arena.shotClear(f.x, f.y, e.x, e.y)) s += 6f
+        if (e.shield > 0f) s += 4f
+        s -= (1f - e.hpFraction) * 2f
+        return s
+    }
+
+    /**
+     * Auto-aim for crates: the nearest Spark Crate within [maxRange] that a shot from [f] would actually reach
+     * (nothing but the crate itself in the way). Returns its tile key (y * width + x), or -1.
+     */
+    fun nearestHittableCrate(f: Fighter, maxRange: Float): Int {
+        var best = -1
+        var bestD = maxRange
+        for (key in crateHp.keys) {
+            val cx = key % arena.width + 0.5f
+            val cy = key / arena.width + 0.5f
+            val d = hypot(cx - f.x, cy - f.y)
+            if (d >= bestD) continue
+            val hit = arena.shotBlockedAt(f.x, f.y, cx, cy)
+            if (hit < 0f) continue
+            // The first thing the shot runs into has to be this crate.
+            val hx = f.x + (cx - f.x) / d * (hit + 0.02f)
+            val hy = f.y + (cy - f.y) / d * (hit + 0.02f)
+            if (kotlin.math.floor(hx).toInt() == key % arena.width && kotlin.math.floor(hy).toInt() == key / arena.width) { best = key; bestD = d }
+        }
+        return best
+    }
 
     /**
      * Where to aim so a projectile of [speed] meets [target] if it keeps its current velocity.

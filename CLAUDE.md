@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project WIP-Preview: original mobile 3D arena brawler for Android (landscape, touch, bots). Kotlin + Compose
+AstroArena (repo and package still named ProjectWIP): original mobile 3D arena brawler for Android (landscape, touch, bots). Kotlin + Compose
 menus + custom OpenGL ES 3.0 renderer, no engine. All art and sound is generated in code and must stay
 original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only.
 
