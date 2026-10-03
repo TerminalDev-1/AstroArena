@@ -80,7 +80,12 @@ object SparkCapsules {
 
     /** A win in team modes, or a top-4 finish in free-for-all, earns a capsule. */
     fun earns(report: MatchReport): Boolean =
-        if (report.mode == GameMode.LAST_SPARK) report.placement in 1..4 else report.outcome == MatchOutcome.VICTORY
+        when (report.mode) {
+            GameMode.LAST_SPARK -> report.placement in 1..4
+            GameMode.KNOCKOUT_RUSH -> report.outcome == MatchOutcome.VICTORY
+            // The boss never gets tougher, so beating it can't be a way to farm drops.
+            GameMode.BOSS -> false
+        }
 
     /** Highest luck the debug menu offers (shown as x15). */
     const val MAX_LUCK = 14f

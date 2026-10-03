@@ -90,7 +90,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
         delay(550)
         repeat(6) { i ->
             rowsShown = i + 1
-            if (i < rewardRowCount(rewards, r.mvp && !ffa)) {
+            if (i < rewardRowCount(rewards, r.mvp && r.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH)) {
                 // Every reward lands with a pop and a cha-ching, each one a little higher than the last.
                 sfx?.play(Sound.POP, 0.6f, 0.9f + i * 0.1f); sfx?.play(Sound.CHING, 0.8f, 0.9f + i * 0.07f); sfx?.buzz(14, 110)
                 delay(260)
@@ -118,7 +118,12 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                     if (r.outcome == MatchOutcome.VICTORY) FighterRays(Modifier.size(360.dp), Palette.Gold)
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { scaleX = bannerPop.value; scaleY = bannerPop.value }) {
                         GameText(label, Type.Display.copy(fontSize = Type.Display.fontSize * if (ui.roomy) 1.7f else 1.35f), color = color, outline = 5.dp)
-                        PlainText(if (ffa) "Last Spark · Static Canyon · ${r.difficulty.label} bots" else "Knockout Rush · Foundry Yard · ${r.difficulty.label} bots", Type.Label, color = Palette.TextDim)
+                        PlainText(
+                            when (r.mode) {
+                                io.github.projectwip.data.GameMode.LAST_SPARK -> "Last Spark · Static Canyon · ${r.difficulty.label} bots"
+                                io.github.projectwip.data.GameMode.KNOCKOUT_RUSH -> "Knockout Rush · Foundry Yard · ${r.difficulty.label} bots"
+                                io.github.projectwip.data.GameMode.BOSS -> "Boss Mode · Proving Ground · ${r.difficulty.label} boss"
+                            }, Type.Label, color = Palette.TextDim)
                     }
                 }
                 if (!ffa) Row(verticalAlignment = Alignment.CenterVertically) {
@@ -135,8 +140,9 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         TeamPanel(" ", order.drop(5), Palette.Gold, Modifier.weight(1f), ranked = true)
                     }
                 } else Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TeamPanel("YOUR TEAM", summary.players.filter { it.team == summary.playerTeam }, Palette.Ally, Modifier.weight(1f))
-                    TeamPanel("OPPONENTS", summary.players.filter { it.team != summary.playerTeam }, Palette.Enemy, Modifier.weight(1f))
+                    val bossMode = r.mode == io.github.projectwip.data.GameMode.BOSS
+                    TeamPanel(if (bossMode) "YOU" else "YOUR TEAM", summary.players.filter { it.team == summary.playerTeam }, Palette.Ally, Modifier.weight(1f))
+                    TeamPanel(if (bossMode) "THE BOSS" else "OPPONENTS", summary.players.filter { it.team != summary.playerTeam }, Palette.Enemy, Modifier.weight(1f))
                 }
             }
 
@@ -152,7 +158,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         if (row++ < rowsShown) RewardRow(IconKind.BOLT, "Bolts", "+${rewards.bolts}", Palette.CyanDeep)
                         if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
                         if (rewards.capsuleEarned && row++ < rowsShown) RewardRow(IconKind.CAPSULE, "Spark Drop", "+1", Palette.CyanDeep)
-                        if (r.mvp && !ffa && row++ < rowsShown) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
+                        if (r.mvp && r.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH && row++ < rowsShown) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
 
                         val after = rewards.cupsBefore + rewards.cupDelta
                         val best = save.bestCups

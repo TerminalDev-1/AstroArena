@@ -34,8 +34,6 @@ class Fighter(
     val team: Int,
     val name: String,
     val isBot: Boolean,
-    /** A practice target: nothing drives it, so it just stands there. */
-    val dummy: Boolean = false,
 ) {
     val control = Control()
     val baseMaxHp = def.health.at(level)
@@ -46,7 +44,7 @@ class Fighter(
     val attackDamage get() = (def.attackDamage.at(level) * damageMultiplier).toInt()
     val superDamage get() = (def.superDamage.at(level) * damageMultiplier).toInt()
     val radius = def.radius
-    /** How much bigger than a normal fighter of its kind this one is (the Free Roam boss). */
+    /** How much bigger than a normal fighter of its kind this one is (a Boss Mode giant). */
     val scale = def.radius / io.github.projectwip.data.Balance.fighter(def.id).radius
 
     var x = 0f

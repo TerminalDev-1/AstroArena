@@ -87,7 +87,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         mutableStateOf(
             when (startScreen) {
                 "match" -> Screen.Match(startMatchConfig(repo.save.value))
-                "roam" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.FREE_ROAM))
+                "boss" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
                 "fighters" -> Screen.Fighters()
                 "shop" -> Screen.Shop
                 "track" -> Screen.CupTrack
@@ -177,12 +177,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.Settings -> SettingsScreen(save, repo, go)
                     is Screen.Match -> MatchScreen(s.config, save.settings, sfx, save.matchesPlayed,
                         onFinish = { summary ->
-                            // Free Roam is practice: nothing to record, straight back to the lobby.
-                            if (summary.report.mode == io.github.projectwip.data.GameMode.FREE_ROAM) screen = Screen.Home
-                            else {
-                                val rewards = repo.applyMatch(summary.report)
-                                screen = Screen.Result(summary, rewards)
-                            }
+                            val rewards = repo.applyMatch(summary.report)
+                            screen = Screen.Result(summary, rewards)
                         })
                     is Screen.Result -> ResultScreen(s.summary, s.rewards, save, go)
                 }

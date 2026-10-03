@@ -45,11 +45,13 @@ object Progression {
 
     fun applyMatch(save: SaveData, report: MatchReport, today: Long): Pair<SaveData, MatchRewards> {
         val ffa = report.mode == GameMode.LAST_SPARK
-        val cupDelta = if (ffa) Balance.cupsForPlacement(report.placement, save.cups, report.difficulty)
+        // Boss Mode pays Bolts only: its boss has fixed stats, so Cups and the daily Prisms stay out of it.
+        val boss = report.mode == GameMode.BOSS
+        val cupDelta = if (boss) 0 else if (ffa) Balance.cupsForPlacement(report.placement, save.cups, report.difficulty)
             else Balance.cupsFor(report.outcome, save.cups, report.difficulty, report.mvp)
         val bolts = if (ffa) Balance.boltsForPlacement(report.placement, report.kos, report.difficulty)
             else Balance.boltsFor(report.outcome, report.kos, report.difficulty)
-        val firstWin = report.outcome == MatchOutcome.VICTORY && save.lastFirstWinDay != today
+        val firstWin = !boss && report.outcome == MatchOutcome.VICTORY && save.lastFirstWinDay != today
         val prisms = if (firstWin) Balance.FIRST_WIN_PRISMS else 0
         val newCups = (save.cups + cupDelta).coerceAtLeast(0)
         val reached = CupTrack.milestones.filter { it.cups in (save.bestCups + 1)..newCups }

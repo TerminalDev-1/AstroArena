@@ -251,9 +251,9 @@ private fun CapsuleButton(count: Int, leftToday: Int, onOpen: () -> Unit) {
 
 // ---------------------------------------------------------------------------------------------- mode
 
-fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS; GameMode.FREE_ROAM -> IconKind.SKULL }
+fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS; GameMode.BOSS -> IconKind.SKULL }
 
-fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.FREE_ROAM -> Arenas.provingGround() }
+fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.BOSS -> Arenas.provingGround() }
 
 @Composable
 private fun ModeChip(mode: GameMode, d: BotDifficulty, onClick: () -> Unit) {
@@ -333,7 +333,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 when (m) {
                     GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. 1st place: +${Balance.placementCups[0]} Cups"
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win: +${io.github.projectwip.data.BotDifficulty.NORMAL.cupBonus} Cups (Normal)"
-                    GameMode.FREE_ROAM -> "Practise on four dummies and fight the Titan, a giant boss. No timer, no Cups, no rewards: leave whenever you like."
+                    GameMode.BOSS -> "A giant version of a random fighter. Knock it out before it knocks you out ${Balance.BOSS_LIVES} times. Its strength never changes. Pays Bolts only."
                 },
                 Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center,
             )

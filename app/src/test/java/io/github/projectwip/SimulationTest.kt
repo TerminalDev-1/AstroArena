@@ -169,30 +169,39 @@ class SimulationTest {
         assertTrue("fighters were mobbed by 4+ bots in $mobbed of $samples samples", mobbed < samples / 200)
     }
 
-    /** Free Roam: dummies stay put, the boss is a giant, and the match never ends by itself. */
-    @Test fun freeRoamIsAnEndlessPracticeGround() {
+    /** Boss Mode: one giant with fixed stats; it ends when the boss falls or the player runs out of lives. */
+    @Test fun bossModeIsOneFixedGiant() {
         val a = Arenas.provingGround()
         assertEquals(1, a.spawns[0].size)
-        assertEquals(5, a.spawns[1].size)
-        for (s in a.spawns[1].dropLast(1)) assertFalse("dummy spawn $s blocked", a.circleBlocked(s.x, s.y, 0.5f))
-        assertFalse("the boss needs room", a.circleBlocked(a.spawns[1].last().x, a.spawns[1].last().y, Balance.boss.radius))
+        assertEquals(1, a.spawns[1].size)
+        assertFalse("the boss needs room", a.circleBlocked(a.spawns[1][0].x, a.spawns[1][0].y, 1.25f))
 
-        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.FREE_ROAM, humanPlayer = false, seed = 9L))
-        val dummies = m.world.fighters.filter { it.dummy }
-        val boss = m.world.fighters.last()
-        assertEquals(4, dummies.size)
-        assertEquals("Titan", boss.name)
-        assertTrue("the boss is drawn more than twice normal size", boss.scale > 2f)
-        assertTrue(boss.maxHp > m.player.maxHp * 8)
-        val start = dummies.map { it.x to it.y }
-        var t = 0f
-        while (t < 90f) { m.step(Match.STEP); t += Match.STEP }
-        assertEquals("no clock and no score target: it keeps going", Phase.PLAYING, m.world.phase)
-        assertFalse(m.isOver)
-        assertEquals("dummies never move on their own", start, dummies.map { it.x to it.y })
-        assertTrue("dummies never attack", dummies.all { it.damageDealt == 0 })
-        assertTrue("someone got hurt in ninety seconds", m.world.fighters.sumOf { it.damageDealt } > 0)
-        for (f in m.world.fighters) assertFalse(m.world.arena.circleBlocked(f.x, f.y, f.radius * 0.9f))
+        // Any fighter can be the boss, and its strength ignores the player's level.
+        for (id in FighterId.entries) {
+            val low = Match(MatchConfig(FighterId.JUNO, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = id))
+            val high = Match(MatchConfig(FighterId.JUNO, 60, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = id))
+            val b1 = low.world.fighters.single { it.team != low.player.team }
+            val b2 = high.world.fighters.single { it.team != high.player.team }
+            assertEquals(id, b1.def.id)
+            assertEquals("the boss does not scale with the player", b1.maxHp, b2.maxHp)
+            assertEquals(b1.attackDamage, b2.attackDamage)
+            assertTrue("drawn at two and a half times normal size", b1.scale > 2.4f)
+            assertTrue(high.player.maxHp > low.player.maxHp)
+        }
+        // A random boss still comes from the roster, and the fight always reaches a result.
+        var wins = 0
+        var losses = 0
+        for (seed in 0 until 6) {
+            val m = Match(MatchConfig(FighterId.entries[seed % 3], if (seed % 2 == 0) 3 else 40, 0, "T", BotDifficulty.HARD, mode = GameMode.BOSS, humanPlayer = false, seed = 50L + seed))
+            assertEquals(2, m.world.fighters.size)
+            var t = 0f
+            while (!m.isOver && t < 600f) { m.step(Match.STEP); t += Match.STEP }
+            assertEquals("boss fight must end (seed $seed)", Phase.ENDED, m.world.phase)
+            if (m.world.winningTeam == m.player.team) { wins++; assertEquals(1, m.world.score[0]) } else { losses++; assertEquals(Balance.BOSS_LIVES, m.world.score[1]) }
+            for (f in m.world.fighters) assertFalse(m.world.arena.circleBlocked(f.x, f.y, f.radius * 0.9f))
+        }
+        println("boss fights: $wins won, $losses lost")
+        assertTrue("a strong fighter should be able to beat it", wins >= 1)
     }
 
     @Test fun circleNeverEntersWalls() {

@@ -82,8 +82,8 @@ enum class MatchOutcome { VICTORY, DEFEAT, DRAW }
 enum class GameMode(val title: String, val tagline: String, val players: Int) {
     LAST_SPARK("Last Spark", "10-fighter free-for-all · last one standing", 10),
     KNOCKOUT_RUSH("Knockout Rush", "3v3 · first team to 10 KOs", 6),
-    /** Practice: no timer, no score to reach, nothing won or lost. */
-    FREE_ROAM("Free Roam", "Practice ground · dummies and a giant boss", 6),
+    /** You against one giant. Knock it out before it knocks you out three times. */
+    BOSS("Boss Mode", "You against a giant · 3 lives", 2),
 }
 
 object Balance {
@@ -249,21 +249,26 @@ object Balance {
 
     fun fighter(id: FighterId): FighterDef = fighters.first { it.id == id }
 
-    // ---- Free Roam (practice) ----
-    /** A target dummy: stands still, soaks up damage, and regenerates like anyone else. */
-    val dummy: FighterDef = fighter(FighterId.JUNO).copy(name = "Dummy", health = StatLine(4000, 200))
+    // ---- Boss Mode ----
+    /** Lives the player gets against the boss. */
+    const val BOSS_LIVES = 3
 
     /**
-     * The Titan: a giant version of the scrapyard bruiser. More than double the size, a mountain of health, slow,
-     * with a wider and longer-reaching cannon. It is drawn at the size of its collision radius.
+     * The giant version of any fighter, as fought in Boss Mode: two and a half times the size, a mountain of
+     * health, slower on its feet, hitting harder and reaching further. Its stats are FIXED: a boss is always
+     * created at level 1 and none of these lines grow, so it does not get tougher as the player levels up.
      */
-    val boss: FighterDef = fighter(FighterId.BRAKK).let { b ->
-        b.copy(
-            name = "Titan", title = "Proving Ground Boss",
-            health = StatLine(14000, 700), attackDamage = StatLine(120, 6), superDamage = StatLine(520, 26),
-            moveSpeed = 2.1f, radius = 1.05f, reloadSeconds = 1.9f, superChargePerHit = 0.035f,
-            attack = b.attack.copy(projectiles = 7, spreadDegrees = 46f, range = 6.2f, radius = 0.24f),
-            superSpec = b.superSpec.copy(range = 7f, speed = 13f),
+    fun boss(id: FighterId): FighterDef {
+        val f = fighter(id)
+        return f.copy(
+            name = "Titan ${f.name}", title = "Boss",
+            health = StatLine(f.health.base * 16, 0),
+            attackDamage = StatLine(Math.round(f.attackDamage.base * 1.5f), 0),
+            superDamage = StatLine(Math.round(f.superDamage.base * 1.5f), 0),
+            moveSpeed = f.moveSpeed * 0.62f, radius = f.radius * 2.5f,
+            reloadSeconds = f.reloadSeconds * 1.15f, superChargePerHit = f.superChargePerHit * 0.5f,
+            attack = f.attack.copy(range = f.attack.range * 1.25f, radius = f.attack.radius * 1.5f),
+            superSpec = f.superSpec.copy(range = f.superSpec.range * 1.25f, radius = f.superSpec.radius * 1.5f),
         )
     }
 

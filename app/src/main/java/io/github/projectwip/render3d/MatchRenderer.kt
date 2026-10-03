@@ -805,8 +805,10 @@ class MatchRenderer(
         System.arraycopy(viewProj, 0, s.viewProj, 0, 16)
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
         s.freeForAll = w.rules.freeForAll
-        s.practice = w.rules.practice
-        s.damage = p.damageDealt
+        s.bossMode = w.rules.boss
+        s.livesLeft = (w.rules.enemyKoTarget - w.score[1 - p.team]).coerceAtLeast(0)
+        val giant = if (w.rules.boss) w.fighters.firstOrNull { it.team != p.team } else null
+        s.bossHp = giant?.hp ?: 0; s.bossMaxHp = giant?.maxHp ?: 1; s.bossName = giant?.name
         s.aliveCount = w.aliveCount
         s.placement = if (p.placement > 0) p.placement else if (w.phase == Phase.ENDED && w.rules.freeForAll) 1 else 0
         s.stormElapsed = w.storm?.elapsed ?: -1f

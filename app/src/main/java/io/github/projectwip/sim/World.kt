@@ -22,15 +22,18 @@ data class MatchRules(
     val koTarget: Int = Balance.KO_TARGET,
     val durationSeconds: Float = Balance.MATCH_SECONDS,
     val countdownSeconds: Float = 3f,
-    /** Free Roam: respawns, no clock and no score to reach, so the match only ends when the player leaves. */
-    val practice: Boolean = false,
+    /** KOs the second team (index 1) needs to win, when that differs from [koTarget]. */
+    val enemyKoTarget: Int = koTarget,
+    /** Boss Mode: one giant against the player; shown differently on the HUD. */
+    val boss: Boolean = false,
 ) {
     val respawn get() = !freeForAll
 
     companion object {
         fun knockoutRush() = MatchRules()
         fun lastSpark() = MatchRules(freeForAll = true, durationSeconds = Float.MAX_VALUE)
-        fun freeRoam() = MatchRules(koTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, practice = true)
+        /** The player wins with one knockout (the boss); the boss wins by knocking the player out [Balance.BOSS_LIVES] times. */
+        fun bossMode() = MatchRules(koTarget = 1, enemyKoTarget = Balance.BOSS_LIVES, durationSeconds = Float.MAX_VALUE, boss = true)
     }
 }
 
@@ -465,7 +468,8 @@ class World(
         } else {
             val scoringTeam = 1 - victim.team
             score[scoringTeam]++
-            if (phase == Phase.PLAYING && score[scoringTeam] >= rules.koTarget) end(scoringTeam)
+            val target = if (scoringTeam == 0) rules.koTarget else rules.enemyKoTarget
+            if (phase == Phase.PLAYING && score[scoringTeam] >= target) end(scoringTeam)
         }
     }
 

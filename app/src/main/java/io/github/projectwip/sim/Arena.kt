@@ -260,10 +260,7 @@ object Arenas {
         spawnInset = 1.5f,
     )
 
-    /**
-     * "Proving Ground" — Free Roam. Wide open with a little cover; you start at the bottom, four dummies stand
-     * around the middle and the Titan waits at the top. Enemy spawns are listed dummies first, boss last.
-     */
+    /** "Proving Ground" — Boss Mode. Wide open with a little cover; you start at the bottom, the boss at the top. */
     fun provingGround(): Arena {
         val base = Arena.fromQuadrant(
             name = "Proving Ground",
@@ -285,12 +282,9 @@ object Arenas {
         val w = base.width.toFloat()
         val h = base.height.toFloat()
         fun open(x: Float, y: Float, r: Float) = base.nearestOpen(x, y, r)
-        val enemies = listOf(
-            open(w * 0.25f, h * 0.6f, 0.5f), open(w * 0.75f, h * 0.6f, 0.5f),
-            open(w * 0.32f, h * 0.38f, 0.5f), open(w * 0.68f, h * 0.38f, 0.5f),
-            open(w * 0.5f, h * 0.16f, 1.1f),
-        )
-        return base.withSpawns(listOf(listOf(open(w * 0.5f, h - 1.5f, 0.5f)), enemies))
+        // Room for the biggest boss (2.5 x the widest fighter).
+        val bossSpot = open(w * 0.5f, h * 0.16f, 1.3f)
+        return base.withSpawns(listOf(listOf(open(w * 0.5f, h - 1.5f, 0.5f)), listOf(bossSpot)))
     }
 
     /** "Static Canyon" — 10-fighter Last Spark. Large and square, lots of cover and grass to ambush from. */

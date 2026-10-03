@@ -17,7 +17,7 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 
 | | |
 |---|---|
-| **Modes** | **Last Spark** — 10-fighter free-for-all, last one standing; break Spark Crates for stacking Power Cells (+10% health & damage each) while the Static Storm closes in. **Knockout Rush** — 3v3, first team to 10 KOs, your team starts at the bottom. **Free Roam** — a practice ground with four target dummies and the Titan, a giant boss; no timer, nothing at stake |
+| **Modes** | **Last Spark** — 10-fighter free-for-all, last one standing; break Spark Crates for stacking Power Cells (+10% health & damage each) while the Static Storm closes in. **Knockout Rush** — 3v3, first team to 10 KOs, your team starts at the bottom. **Boss Mode** — you against a giant version of a random fighter; knock it out before it knocks you out three times. The boss's strength is fixed and it pays Bolts only |
 | **Arenas** | *Static Canyon* (44×44, free-for-all) and *Foundry Yard* (vertical 3v3): walls, tall-grass thickets (hide inside), coolant pools (block movement, not shots), destructible crates |
 | **Fighters** | **Juno** (burst skirmisher, starter) · **Brakk** (shotgun tank, ram super) · **Mira** (sniper, piercing super) |
 | **Graphics** | Custom OpenGL ES 3.0: toon lighting, real-time shadows, inked outlines, 4× MSAA, up to 120 Hz |

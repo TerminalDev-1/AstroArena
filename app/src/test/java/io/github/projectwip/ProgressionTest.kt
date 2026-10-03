@@ -274,4 +274,16 @@ class ProgressionTest {
         val up = Progression.upgrade(triple, FighterId.JUNO)!!
         assertEquals(1000 - Balance.upgradeCost[0] * 3, up.bolts)
     }
+
+    @Test fun bossModePaysBoltsOnly() {
+        val save = SaveData(cups = 100, bestCups = 100, capsules = 0)
+        val win = report(MatchOutcome.VICTORY).copy(mode = GameMode.BOSS, players = 2)
+        val (after, rewards) = Progression.applyMatch(save, win, today = 9)
+        assertEquals("no Cups from a boss that never gets tougher", 0, rewards.cupDelta)
+        assertEquals(100, after.cups)
+        assertTrue(rewards.bolts > 0)
+        assertEquals(0, rewards.firstWinPrisms)
+        assertFalse(rewards.capsuleEarned)
+        assertEquals(0, after.capsules)
+    }
 }

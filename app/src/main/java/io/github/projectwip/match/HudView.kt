@@ -184,15 +184,30 @@ class HudView(
         val panelW = dp(260f)
         val panelH = dp(58f)
         chamfer(c, cx - panelW / 2, top, cx + panelW / 2, top + panelH, dp(13f), Color.argb(235, 34, 22, 84), INK)
-        if (s.practice) {
-            // Knockouts so far + running damage total: this is a practice ground, so show the numbers.
+        if (s.bossMode) {
+            // Lives left, and the boss's health across a wide bar under the panel.
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
             text.textSize = dp(30f)
-            outlined(c, s.myScore.toString(), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
+            outlined(c, s.livesLeft.toString(), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
             text.textSize = dp(17f)
-            outlined(c, "FREE ROAM", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
+            outlined(c, if (s.livesLeft == 1) "LIFE LEFT" else "LIVES LEFT", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
             text.textSize = dp(12f)
-            outlined(c, "%,d DAMAGE".format(s.damage), cx + dp(40f), top + dp(46f), Color.rgb(255, 214, 64), dp(3f))
+            outlined(c, "BOSS MODE", cx + dp(40f), top + dp(46f), Color.rgb(255, 214, 64), dp(3f))
+            val bw = dp(420f)
+            val by = top + panelH + dp(26f)
+            val fr = (s.bossHp.toFloat() / s.bossMaxHp).coerceIn(0f, 1f)
+            fill.color = INK
+            c.drawRoundRect(cx - bw / 2 - dp(3f), by - dp(3f), cx + bw / 2 + dp(3f), by + dp(19f), dp(10f), dp(10f), fill)
+            fill.color = Color.rgb(50, 30, 70)
+            c.drawRoundRect(cx - bw / 2, by, cx + bw / 2, by + dp(16f), dp(8f), dp(8f), fill)
+            if (fr > 0f) {
+                fill.color = ENEMY
+                c.drawRoundRect(cx - bw / 2, by, cx - bw / 2 + bw * fr, by + dp(16f), dp(8f), dp(8f), fill)
+                fill.color = Color.argb(70, 255, 255, 255)
+                c.drawRoundRect(cx - bw / 2 + dp(3f), by + dp(2f), cx - bw / 2 + bw * fr - dp(3f), by + dp(7f), dp(4f), dp(4f), fill)
+            }
+            text.textSize = dp(13f)
+            outlined(c, "${(s.bossName ?: "BOSS").uppercase()}  ·  %,d".format(s.bossHp), cx, by + dp(13f), Color.WHITE, dp(3f))
         } else if (s.freeForAll) {
             // Fighters left + mode name
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(200, 40, 64), null)
@@ -263,7 +278,7 @@ class HudView(
             text.textSize = dp(96f) * big
             outlined(c, n.toString(), cx, h * 0.45f, Color.WHITE, dp(9f))
             text.textSize = dp(21f)
-            outlined(c, if (s.practice) "FREE ROAM · PRACTICE, NOTHING AT STAKE" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
+            outlined(c, if (s.bossMode) "BOSS MODE · KNOCK OUT THE GIANT BEFORE YOU RUN OUT OF LIVES" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
         } else if (s.phase == Phase.PLAYING && s.phaseTime < 0.9f) {
             text.textSize = dp(80f) * big
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))
