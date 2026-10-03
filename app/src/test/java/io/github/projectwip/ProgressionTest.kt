@@ -201,6 +201,8 @@ class ProgressionTest {
         assertEquals(normal.min(), normal.last(), 0f)
         assertTrue("max luck makes Ultra the most likely tier", lucky.last() > 0.5f && lucky.last() == lucky.max())
         assertTrue(SparkCapsules.splitChance(SparkCapsules.MAX_LUCK) > SparkCapsules.splitChance(0f))
+        assertTrue("chances never exceed 100%", SparkCapsules.splitChance(SparkCapsules.MAX_LUCK) <= 1f && SparkCapsules.resplitChance(SparkCapsules.MAX_LUCK) <= 1f)
+        assertEquals("the luck slider tops out at x15", 14f, SparkCapsules.MAX_LUCK, 0f)
 
         val settings = io.github.projectwip.data.Settings(debugLuck = SparkCapsules.MAX_LUCK, debugInfiniteCapsules = true)
         var save = SaveData(capsules = 0, capsuleSeed = 3, settings = settings)

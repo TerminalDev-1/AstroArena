@@ -74,6 +74,6 @@ class Music(private val context: Context) {
 
     private companion object {
         /** Bump when the composition changes. */
-        const val CACHE = "music-v1.pcm"
+        const val CACHE = "music-v2.pcm"
     }
 }

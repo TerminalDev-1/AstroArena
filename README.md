@@ -26,7 +26,7 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 | **Progression** | Levels 1–10 with linear, fully visible stat gains · Bolts (upgrades) · Prisms (shop) · Cups · Cup Track rewards |
 | **Spark Drops** | Earned from your first three good finishes a day (a team win, or top 4 in Last Spark). Tap to charge one through six tiers — Scrap, Tuned, Charged, Overclocked, Prismatic, Ultra — then it bursts open: Bolts, Prisms, a colourway or a new fighter, never a duplicate. A drop can split into two, four or eight, and the pieces roll better than a plain one |
 | **Leaderboard** | A Cup ladder of 100. There is no online play yet, so the other 99 are simulated rivals whose Cups drift from day to day |
-| **Sound** | Lobby music (an original eight-bar loop) and every effect are designed in code by a small synth (`audio/SfxSynth.kt`): band-limited oscillators, FM bells, filtered noise, drive, echo and reverb |
+| **Sound** | Lobby music (an original sixteen-bar loop at 138 BPM) and every effect are designed in code by a small synth (`audio/SfxSynth.kt`): band-limited oscillators, FM bells, filtered noise, drive, echo and reverb |
 | **Shop** | Daily free gift · fighter unlocks · Bolt supplies · colourways · **Offer Creator**: design your own deals (bundle contents, price in Bolts/Prisms/free, discount display, expiry, purchase limit, colour theme) |
 | **Menus** | A live 3D lobby behind every screen (camera glides between shots), your fighter on a pedestal you can spin, 3D portraits, mode picker |
 | **Settings** | Bot difficulty, player name, control size/opacity/mode, auto-aim, volume/mute, haptics, frame rate, damage numbers, FPS, reset |

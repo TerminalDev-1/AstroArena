@@ -43,9 +43,9 @@ class SfxSynthTest {
         val rms = sqrt(d.sumOf { (it * it).toDouble() } / d.size).toFloat()
         println("lobby music %.2fs rms=%.3f seam=%.3f".format(seconds, rms, abs(d[0] - d[d.size - 1])))
         assertTrue(d.all { it.isFinite() })
-        assertTrue("eight bars at 112 BPM", abs(seconds - 8 * 4 * 60f / 112f) < 0.01f)
-        assertTrue(d.maxOf { abs(it) } <= 0.71f)
-        assertTrue("audible", rms > 0.05f)
+        assertTrue("the whole loop, to the sample", abs(seconds - SfxSynth.LOBBY_BARS * 4 * 60f / SfxSynth.LOBBY_BPM) < 0.01f)
+        assertTrue(d.maxOf { abs(it) } <= 0.86f)
+        assertTrue("energetic, not background hum", rms > 0.15f)
         // The jump from the last sample back to the first should be no bigger than the steps around it.
         val typical = (1 until 2000).maxOf { abs(d[it] - d[it - 1]) }
         assertTrue("click at the loop point", abs(d[0] - d[d.size - 1]) <= typical * 1.5f + 0.01f)

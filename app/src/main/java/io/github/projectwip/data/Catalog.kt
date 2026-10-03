@@ -82,8 +82,8 @@ object SparkCapsules {
     fun earns(report: MatchReport): Boolean =
         if (report.mode == GameMode.LAST_SPARK) report.placement in 1..4 else report.outcome == MatchOutcome.VICTORY
 
-    /** Highest luck the debug menu offers. */
-    const val MAX_LUCK = 4f
+    /** Highest luck the debug menu offers (shown as x15). */
+    const val MAX_LUCK = 14f
 
     /** Chance of each tier (summing to 1). [luck] multiplies a tier's weight by (1 + luck) for every tier it is above Scrap. */
     fun odds(luck: Float = 0f): List<Float> {
@@ -96,10 +96,10 @@ object SparkCapsules {
     const val MAX_PIECES = 8
 
     /** Chance that a capsule splits in two as it is opened, leaving a second one to open. Luck helps. */
-    fun splitChance(luck: Float = 0f) = 0.25f + 0.05f * luck
+    fun splitChance(luck: Float = 0f) = (0.25f + 0.05f * luck).coerceAtMost(1f)
 
     /** Once it has split, the chance that every piece splits again (2 -> 4 -> 8). */
-    fun resplitChance(luck: Float = 0f) = 0.5f + 0.08f * luck
+    fun resplitChance(luck: Float = 0f) = (0.5f + 0.08f * luck).coerceAtMost(1f)
 
     /** The pieces a drop splits into are better than a plain one: they roll with this much extra luck and are never Scrap. */
     const val SPLIT_LUCK = 0.6f
