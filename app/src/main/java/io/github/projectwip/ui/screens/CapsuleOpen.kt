@@ -55,7 +55,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /** Knocks it takes to open a capsule. Some of them charge it up a tier, the rest just rattle it. */
-private const val TAPS = 4
+private val TAPS = CapsuleTier.entries.size - 1
 
 /**
  * Opening a Spark Capsule. The result is already decided (and saved) before this is shown; the taps only
@@ -72,6 +72,10 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
     var taps by remember { mutableIntStateOf(0) }
     var tier by remember { mutableIntStateOf(0) }
     var opened by remember { mutableStateOf(false) }
+    // A capsule that splits does it on one of the knocks before the last.
+    val splitTap = remember { if (result.split) 1 + Random(result.hashCode() + 7).nextInt(TAPS - 1) else -1 }
+    var hasSplit by remember { mutableStateOf(false) }
+    val splitPop = remember { Animatable(0f) }
     val shake = remember { Animatable(0f) }
     val pop = remember { Animatable(1f) }
     val flash = remember { Animatable(0f) }
@@ -79,6 +83,7 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
     // The capsule itself is 3D, drawn by the lobby renderer; this overlay only tells it what is happening.
     DisposableEffect(Unit) {
         lobby.capsuleOpenAt = 0L
+        lobby.capsuleSplitAt = 0L
         lobby.capsuleColor = CapsuleTier.SCRAP.color.toInt()
         lobby.capsuleShown = true
         onDispose { lobby.capsuleShown = false }
@@ -104,6 +109,14 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
             sfx?.buzz(16, 120)
         }
         scope.launch { shake.snapTo(1f); shake.animateTo(0f, tween(420)) }
+        if (taps == splitTap) {
+            hasSplit = true
+            lobby.capsuleSplitAt = System.currentTimeMillis()
+            sfx?.play(Sound.POP, pitch = 0.8f)
+            sfx?.play(Sound.DROP_UPGRADE, 0.7f, 1.5f)
+            sfx?.buzz(60, 230)
+            scope.launch { splitPop.snapTo(1.6f); splitPop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
+        }
         if (taps == TAPS) scope.launch {
             delay(if (charged) 750 else 450)
             lobby.capsuleOpenAt = System.currentTimeMillis()
@@ -147,6 +160,8 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
                 val pulse = 1f + 0.08f * sin(time * 7f)
                 GameText(if (taps < TAPS) "TAP TO CHARGE  ·  ${TAPS - taps}" else "HERE IT COMES…", Type.Title, color = Palette.Gold, outline = 3.5.dp,
                     modifier = Modifier.graphicsLayer { scaleX = pulse; scaleY = pulse })
+                if (hasSplit) GameText("IT SPLIT!  +1 CAPSULE", Type.Heading, color = Palette.Green, outline = 3.dp,
+                    modifier = Modifier.graphicsLayer { scaleX = splitPop.value; scaleY = splitPop.value })
             }
         } else {
             val rise = remember { Animatable(0.4f) }
@@ -156,7 +171,10 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
                 Spacer(Modifier.height(6.dp))
                 RewardVisual(result.reward, Modifier.size(if (ui.roomy) 170.dp else 120.dp))
                 Spacer(Modifier.height(6.dp))
-                GameText(rewardLabel(result.reward), Type.Display, outline = 4.dp, align = TextAlign.Center)
+                // Bundles list several things, so they get smaller type and room to wrap.
+                val bundle = result.reward is io.github.projectwip.data.Reward.Bundle
+                GameText(rewardLabel(result.reward), if (bundle) Type.Title else Type.Display, outline = 4.dp, align = TextAlign.Center, maxLines = if (bundle) 2 else 1)
+                if (result.split) { Spacer(Modifier.height(6.dp)); io.github.projectwip.ui.Badge("SPLIT · +1 CAPSULE", color = Palette.GreenDeep) }
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
@@ -165,7 +183,7 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
             }
         }
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value * 0.85f)))
-        if (!opened) PlainText("Capsules charge up at random — the reward is locked in when you open one.", Type.Small,
+        if (!opened) PlainText("Capsules charge up at random, and now and then one splits in two. The result is locked in when you open one.", Type.Small,
             Modifier.align(Alignment.BottomCenter).graphicsLayer { translationY = -14.dp.toPx() }, align = TextAlign.Center)
     }
 }

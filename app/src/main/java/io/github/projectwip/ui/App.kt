@@ -98,10 +98,10 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
     var reveal by remember { mutableStateOf<RewardReveal?>(null) }
     /** The Spark Capsule being opened, if any. Its reward is already saved by the time this is set. */
     var capsule by remember {
-        // Debug: `--es screen capsule3` previews opening a capsule of tier 3 without touching the save.
+        // Debug: `--es screen capsule3` previews opening a capsule of tier 3 (`capsule3s`: one that splits) without touching the save.
         mutableStateOf(startScreen?.takeIf { it.startsWith("capsule") }?.let {
-            val tier = CapsuleTier.entries[(it.removePrefix("capsule").toIntOrNull() ?: 0).coerceIn(0, CapsuleTier.entries.lastIndex)]
-            CapsuleResult(tier, Reward.Bolts(100 * (tier.ordinal + 1)))
+            val tier = CapsuleTier.entries[(it.removePrefix("capsule").removeSuffix("s").toIntOrNull() ?: 0).coerceIn(0, CapsuleTier.entries.lastIndex)]
+            CapsuleResult(tier, Reward.Bolts(100 * (tier.ordinal + 1)), split = it.endsWith("s"))
         })
     }
 
@@ -114,6 +114,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
     val showReward: (RewardReveal) -> Unit = { reveal = it; sfx.play(Sound.REWARD) }
 
     val openCapsule: () -> Unit = { repo.openCapsule()?.let { capsule = it } }
+    var debugMenu by remember { mutableStateOf(false) }
 
     BackHandler(enabled = screen !is Screen.Home && screen !is Screen.Match) {
         screen = Screen.Home
@@ -168,6 +169,11 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
             AnimatedVisibility(reveal != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
                 reveal?.let { RewardRevealOverlay(it) { reveal = null } }
             }
+            // The debug menu hides behind a small "D" in the corner of every menu screen.
+            if (screen !is Screen.Match && capsule == null && reveal == null) {
+                io.github.projectwip.ui.screens.DebugButton(Modifier.align(Alignment.BottomStart)) { debugMenu = true }
+            }
+            if (debugMenu) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
             AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
                 capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, onNext = openCapsule, onDone = { capsule = null }) }
             }

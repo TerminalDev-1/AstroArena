@@ -155,7 +155,7 @@ class ProgressionTest {
         val save = SaveData(capsules = 2, capsuleSeed = 99)
         val (after, result) = Progression.openCapsule(save)!!
         assertEquals("same seed, same capsule (no re-rolling by reloading)", result, Progression.openCapsule(save)!!.second)
-        assertEquals(1, after.capsules)
+        assertEquals(if (result.split) 2 else 1, after.capsules)
         assertEquals(1, after.capsulesOpened)
         assertTrue("the next capsule must use a fresh seed", after.capsuleSeed != save.capsuleSeed)
         when (val r = result.reward) {
@@ -169,14 +169,18 @@ class ProgressionTest {
         // Open a long run of capsules: nothing already owned may ever come out, and every tier shows up.
         var save = SaveData(capsules = 4000, capsuleSeed = 1)
         val seen = HashMap<CapsuleTier, Int>()
+        var splits = 0
         repeat(4000) {
             val before = save
             val (next, result) = Progression.openCapsule(save)!!
             assertFalse("duplicate ${result.reward}", Progression.owns(before, result.reward))
             seen.merge(result.tier, 1, Int::plus)
+            if (result.split) splits++
+            assertEquals("a split hands back a capsule", before.capsules - 1 + (if (result.split) 1 else 0), next.capsules)
             save = next
         }
-        println("capsule tiers over 4000 opens: $seen")
+        println("capsule tiers over 4000 opens: $seen, splits: $splits")
+        assertTrue("about 12% of capsules should split ($splits of 4000)", splits in 380..580)
         assertEquals(CapsuleTier.entries.toSet(), seen.keys)
         for (t in CapsuleTier.entries.zipWithNext()) assertTrue("${t.first} should be more common than ${t.second}", seen.getValue(t.first) > seen.getValue(t.second))
         assertTrue("Prismatic capsules unlock every fighter eventually", FighterId.entries.all { save.progress(it).unlocked })
@@ -187,19 +191,21 @@ class ProgressionTest {
         val lucky = SparkCapsules.odds(SparkCapsules.MAX_LUCK)
         assertEquals(1f, normal.sum(), 1e-4f)
         assertEquals(1f, lucky.sum(), 1e-4f)
-        assertEquals(0.02f, normal.last(), 1e-4f)
-        assertTrue("max luck makes Prismatic the most likely tier", lucky.last() > 0.5f && lucky.last() == lucky.max())
+        assertEquals("Ultra is the rarest tier", 1f / 101f, normal.last(), 1e-4f)
+        assertEquals(normal.min(), normal.last(), 0f)
+        assertTrue("max luck makes Ultra the most likely tier", lucky.last() > 0.5f && lucky.last() == lucky.max())
+        assertTrue(SparkCapsules.splitChance(SparkCapsules.MAX_LUCK) > SparkCapsules.splitChance(0f))
 
         val settings = io.github.projectwip.data.Settings(debugLuck = SparkCapsules.MAX_LUCK, debugInfiniteCapsules = true)
         var save = SaveData(capsules = 0, capsuleSeed = 3, settings = settings)
         var prismatic = 0
         repeat(200) {
             val (next, result) = Progression.openCapsule(save)!!
-            if (result.tier == CapsuleTier.PRISMATIC) prismatic++
+            if (result.tier == CapsuleTier.ULTRA) prismatic++
             save = next
         }
-        assertEquals("infinite capsules never run out", 0, save.capsules)
+        assertTrue("infinite capsules never run out", save.capsules >= 0)
         assertEquals(200, save.capsulesOpened)
-        assertTrue("luck should show ($prismatic/200 Prismatic)", prismatic > 70)
+        assertTrue("luck should show ($prismatic/200 Ultra)", prismatic > 70)
     }
 }

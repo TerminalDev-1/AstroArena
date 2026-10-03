@@ -84,8 +84,10 @@ object Progression {
         val rng = kotlin.random.Random(save.capsuleSeed)
         val tier = SparkCapsules.rollTier(rng, save.settings.debugLuck)
         val reward = SparkCapsules.rollReward(tier, save, rng)
-        val next = grant(save, reward).copy(capsules = if (infinite) save.capsules else save.capsules - 1, capsulesOpened = save.capsulesOpened + 1, capsuleSeed = rng.nextLong())
-        return next to CapsuleResult(tier, reward)
+        val split = rng.nextFloat() < SparkCapsules.splitChance(save.settings.debugLuck)
+        val left = (if (infinite) save.capsules else save.capsules - 1) + if (split) 1 else 0
+        val next = grant(save, reward).copy(capsules = left, capsulesOpened = save.capsulesOpened + 1, capsuleSeed = rng.nextLong())
+        return next to CapsuleResult(tier, reward, split)
     }
 
     // ---------------- Upgrades ----------------

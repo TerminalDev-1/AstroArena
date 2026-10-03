@@ -55,10 +55,16 @@ enum class CapsuleTier(val label: String, val color: Long, val weight: Int) {
     CHARGED("Charged", 0xFF2EC4F1, 15),
     OVERCLOCKED("Overclocked", 0xFFFF8A1F, 5),
     PRISMATIC("Prismatic", 0xFFFF6BFF, 2),
+    ULTRA("Ultra", 0xFFFFE14D, 1),
 }
 
 /** What came out of an opened capsule. */
-data class CapsuleResult(val tier: CapsuleTier, val reward: Reward)
+data class CapsuleResult(
+    val tier: CapsuleTier,
+    val reward: Reward,
+    /** The capsule split in two while it was being opened: the player keeps a second, unopened one. */
+    val split: Boolean = false,
+)
 
 /**
  * Spark Capsules: earned from your first few good finishes each day, opened from the home screen.
@@ -84,6 +90,9 @@ object SparkCapsules {
         return w.map { it / sum }
     }
 
+    /** Chance that a capsule splits in two as it is opened, leaving a second one to open. Luck helps. */
+    fun splitChance(luck: Float = 0f) = 0.12f + 0.05f * luck
+
     fun rollTier(rng: kotlin.random.Random, luck: Float = 0f): CapsuleTier {
         var roll = rng.nextFloat()
         for ((i, chance) in odds(luck).withIndex()) { roll -= chance; if (roll < 0f) return CapsuleTier.entries[i] }
@@ -104,6 +113,8 @@ object SparkCapsules {
             CapsuleTier.CHARGED -> if (rng.nextInt(2) == 0) prisms(12, 18) else bolts(150, 220)
             CapsuleTier.OVERCLOCKED -> (if (rng.nextInt(2) == 0) newSkin() else null) ?: if (rng.nextBoolean()) prisms(30, 40) else bolts(380, 450)
             CapsuleTier.PRISMATIC -> newFighter() ?: newSkin() ?: prisms(100, 120)
+            // The jackpot: something new to play with (while there is anything left) plus a pile of both currencies.
+            CapsuleTier.ULTRA -> Reward.Bundle(listOfNotNull(newFighter() ?: newSkin(), prisms(150, 200), bolts(800, 1000)))
         }
     }
 }

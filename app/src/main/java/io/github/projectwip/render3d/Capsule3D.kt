@@ -36,6 +36,9 @@ class Capsule3D {
     private var fade = 0f
     private var lastCharge = 0L
     private var lastOpen = 0L
+    private var lastSplit = 0L
+    /** The second capsule from a split is a fresh Scrap one. */
+    private val TWIN = floatArrayOf(0.6f, 0.65f, 0.75f)
 
     init {
         fun MeshBuilder.rivets(y: Float) {
@@ -141,44 +144,18 @@ class Capsule3D {
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
         GLES30.glClear(GLES30.GL_DEPTH_BUFFER_BIT)
 
-        if (solid) {
-            val s = 0.62f * pop * (0.6f + 0.4f * fade)
-            Matrix.setIdentityM(root, 0)
-            Matrix.translateM(root, 0, 0f, sin(time * 2.6f) * 0.05f + (if (knock in 0f..0.42f) 0.08f * (1f - knock / 0.42f) else 0f), 0f)
-            Matrix.rotateM(root, 0, shake + sin(time * 2.2f) * 3f, 0f, 0f, 1f)
-            Matrix.rotateM(root, 0, 10f, 1f, 0f, 0f)
-            Matrix.rotateM(root, 0, time * 50f, 0f, 1f, 0f)
-            Matrix.scaleM(root, 0, s, s, s)
-
-            lit.i("uMode", 0)
-            lit.f("uRim", 0.5f)
-            lit.f("uFlash", flash * 0.6f)
-            drawHalves(lit, gap, outline = false)
-            lit.f("uFlash", 0f)
-            // Seam glow, and the light that pours out as the halves part.
-            lit.mat4("uModel", root)
-            lit.f("uEmissive", 1f)
-            lit.v4("uTint", 0.5f + col[0] * 0.5f, 0.5f + col[1] * 0.5f, 0.5f + col[2] * 0.5f, 1f)
-            if (gap < 0.3f) core.draw()
-            if (gap > 0f) {
-                System.arraycopy(root, 0, model, 0, 16)
-                val g = 1f + gap * 1.6f
-                Matrix.scaleM(model, 0, g, g, g)
-                lit.mat4("uModel", model)
-                lit.v4("uTint", 1f, 1f, 1f, 1f)
-                light.draw()
-            }
-            lit.f("uEmissive", 0f)
-
-            GLES30.glEnable(GLES30.GL_CULL_FACE)
-            GLES30.glCullFace(GLES30.GL_FRONT)
-            lit.i("uMode", 1)
-            lit.f("uOutline", 0.035f)
-            drawHalves(lit, gap, outline = true)
-            lit.f("uOutline", 0f)
-            lit.i("uMode", 0)
-            GLES30.glDisable(GLES30.GL_CULL_FACE)
+        // A capsule that split: the original slides left and a plain twin pops out to the right.
+        val split = if (p.capsuleSplitAt == 0L) 0f else smooth((now - p.capsuleSplitAt) / 350f)
+        if (p.capsuleSplitAt != lastSplit) {
+            lastSplit = p.capsuleSplitAt
+            if (p.capsuleSplitAt != 0L && now - p.capsuleSplitAt < 200) burst(50, 4f, 0xFFFFFFFF.toInt())
         }
+        val size = 0.62f * (0.6f + 0.4f * fade) * (1f - 0.2f * split)
+        if (solid) {
+            val lift = if (knock in 0f..0.42f) 0.08f * (1f - knock / 0.42f) else 0f
+            drawCapsule(lit, -0.62f * split, sin(time * 2.6f) * 0.05f + lift, shake + sin(time * 2.2f) * 3f, time * 50f, size * pop, gap, flash, col)
+        }
+        if (split > 0f) drawCapsule(lit, 0.62f * split, sin(time * 2.6f + 1.4f) * 0.05f, sin(time * 2.2f + 1f) * 3f, time * 50f + 70f, size * split, 0f, 0f, TWIN)
 
         // Glow and sparks.
         GLES30.glEnable(GLES30.GL_BLEND)
@@ -196,11 +173,50 @@ class Capsule3D {
         GLES30.glDisable(GLES30.GL_BLEND)
     }
 
-    private fun drawHalves(lit: Program, gap: Float, outline: Boolean) {
+    /** One whole capsule: lit body, glowing seam, the light inside as it opens, and its ink outline. */
+    private fun drawCapsule(lit: Program, x: Float, y: Float, tilt: Float, yaw: Float, scale: Float, gap: Float, flash: Float, tint: FloatArray) {
+        Matrix.setIdentityM(root, 0)
+        Matrix.translateM(root, 0, x, y, 0f)
+        Matrix.rotateM(root, 0, tilt, 0f, 0f, 1f)
+        Matrix.rotateM(root, 0, 10f, 1f, 0f, 0f)
+        Matrix.rotateM(root, 0, yaw, 0f, 1f, 0f)
+        Matrix.scaleM(root, 0, scale, scale, scale)
+
+        lit.i("uMode", 0)
+        lit.f("uRim", 0.5f)
+        lit.f("uFlash", flash * 0.6f)
+        drawHalves(lit, gap, tint, outline = false)
+        lit.f("uFlash", 0f)
+        // Seam glow, and the light that pours out as the halves part.
+        lit.mat4("uModel", root)
+        lit.f("uEmissive", 1f)
+        lit.v4("uTint", 0.5f + tint[0] * 0.5f, 0.5f + tint[1] * 0.5f, 0.5f + tint[2] * 0.5f, 1f)
+        if (gap < 0.3f) core.draw()
+        if (gap > 0f) {
+            System.arraycopy(root, 0, model, 0, 16)
+            val g = 1f + gap * 1.6f
+            Matrix.scaleM(model, 0, g, g, g)
+            lit.mat4("uModel", model)
+            lit.v4("uTint", 1f, 1f, 1f, 1f)
+            light.draw()
+        }
+        lit.f("uEmissive", 0f)
+
+        GLES30.glEnable(GLES30.GL_CULL_FACE)
+        GLES30.glCullFace(GLES30.GL_FRONT)
+        lit.i("uMode", 1)
+        lit.f("uOutline", 0.035f)
+        drawHalves(lit, gap, tint, outline = true)
+        lit.f("uOutline", 0f)
+        lit.i("uMode", 0)
+        GLES30.glDisable(GLES30.GL_CULL_FACE)
+    }
+
+    private fun drawHalves(lit: Program, gap: Float, tint: FloatArray, outline: Boolean) {
         System.arraycopy(root, 0, model, 0, 16)
         Matrix.translateM(model, 0, 0f, gap, 0f)
         lit.mat4("uModel", model)
-        if (outline) lit.v4("uTint", Toon.INK[0], Toon.INK[1], Toon.INK[2], 1f) else lit.v4("uTint", col[0], col[1], col[2], 1f)
+        if (outline) lit.v4("uTint", Toon.INK[0], Toon.INK[1], Toon.INK[2], 1f) else lit.v4("uTint", tint[0], tint[1], tint[2], 1f)
         shell.draw()
         if (!outline) lit.v4("uTint", 1f, 1f, 1f, 1f)
         collarTop.draw()

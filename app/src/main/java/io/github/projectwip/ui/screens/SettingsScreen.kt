@@ -65,12 +65,10 @@ import io.github.projectwip.ui.ScreenHeader
 import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.plateShape
 import io.github.projectwip.audio.Sound
-import io.github.projectwip.data.CapsuleTier
-import io.github.projectwip.data.SparkCapsules
 
 const val REPO_URL = "https://github.com/TerminalDev-1/AstroArena"
 
-private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), DEBUG("Debug") }
+private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data") }
 
 @Composable
 fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
@@ -103,7 +101,6 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                             Tab.AUDIO -> AudioTab(s, set)
                             Tab.DISPLAY -> DisplayTab(s, set)
                             Tab.DATA -> DataTab(repo)
-                            Tab.DEBUG -> DebugTab(save, repo, set)
                         }
                     }
                 }
@@ -219,26 +216,10 @@ private fun DataTab(repo: GameRepository) {
     }
 }
 
-@Composable
-private fun DebugTab(save: SaveData, repo: GameRepository, set: ((Settings) -> Settings) -> Unit) {
-    val s = save.settings
-    SectionTitle("DEBUG MENU", "Cheats for trying things out. They change your real save.")
-    ToggleRow("INFINITE CAPSULES", "The capsule button always works and opening one never uses it up.", s.debugInfiniteCapsules) { v -> set { it.copy(debugInfiniteCapsules = v) } }
-    SliderRow("CAPSULE LUCK", "×${"%.1f".format(1f + s.debugLuck)}", s.debugLuck, 0f, SparkCapsules.MAX_LUCK) { v -> set { it.copy(debugLuck = (v * 10).toInt() / 10f) } }
-    val odds = SparkCapsules.odds(s.debugLuck)
-    PlainText(CapsuleTier.entries.joinToString("  ·  ") { "${it.label} ${"%.1f".format(odds[it.ordinal] * 100)}%" }, Type.Body, color = Color.White)
-    SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.bolts)} Bolts, ${"%,d".format(save.prisms)} Prisms and ${save.capsules} capsules.")
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        ChunkyButton({ repo.debugGrant(bolts = 1000) }, Modifier.width(190.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("+1,000 BOLTS", Type.Label, outline = 2.dp) }
-        ChunkyButton({ repo.debugGrant(prisms = 100) }, Modifier.width(190.dp).height(52.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("+100 PRISMS", Type.Label, outline = 2.dp) }
-        ChunkyButton({ repo.debugGrant(capsules = 5) }, Modifier.width(190.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 CAPSULES", Type.Label, outline = 2.dp) }
-    }
-}
-
 // ---------------------------------------------------------------------------------------------- controls
 
 @Composable
-private fun SectionTitle(title: String, body: String) {
+internal fun SectionTitle(title: String, body: String) {
     Column {
         GameText(title, Type.Heading, color = Palette.Gold, outline = 2.5.dp)
         PlainText(body, Type.Body)
@@ -246,7 +227,7 @@ private fun SectionTitle(title: String, body: String) {
 }
 
 @Composable
-private fun ToggleRow(title: String, body: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun ToggleRow(title: String, body: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val sfx = LocalSfx.current
     Row(
         Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, null) { sfx?.play(Sound.UI_TOGGLE, pitch = if (checked) 0.8f else 1.15f); onChange(!checked) },
@@ -294,7 +275,12 @@ private fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> U
 }
 
 @Composable
-private fun SliderRow(title: String, valueLabel: String, value: Float, min: Float, max: Float, onRelease: () -> Unit = {}, onChange: (Float) -> Unit) {
+internal fun SliderRow(
+    title: String, valueLabel: String, value: Float, min: Float, max: Float, onRelease: () -> Unit = {},
+    /** Called continuously while the thumb moves (for live read-outs); [onChange] still commits on release. */
+    onDrag: (Float) -> Unit = {},
+    onChange: (Float) -> Unit,
+) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             GameText(title, Type.Heading, outline = 2.5.dp)
@@ -302,18 +288,19 @@ private fun SliderRow(title: String, valueLabel: String, value: Float, min: Floa
             GameText(valueLabel, Type.Heading, color = Palette.Cyan, outline = 2.5.dp)
         }
         Spacer(Modifier.height(6.dp))
-        ChunkySlider(value, min, max, onRelease, onChange)
+        ChunkySlider(value, min, max, onRelease, onDrag, onChange)
     }
 }
 
 /** Big-thumb slider. Commits on release so we don't write the save file on every frame. */
 @Composable
-private fun ChunkySlider(value: Float, min: Float, max: Float, onRelease: () -> Unit, onChange: (Float) -> Unit) {
+private fun ChunkySlider(value: Float, min: Float, max: Float, onRelease: () -> Unit, onDrag: (Float) -> Unit, onChange: (Float) -> Unit) {
     var local by remember { mutableFloatStateOf(value) }
     var dragging by remember { mutableStateOf(false) }
     LaunchedEffect(value) { if (!dragging) local = value }
     val change by rememberUpdatedState(onChange)
     val release by rememberUpdatedState(onRelease)
+    val drag by rememberUpdatedState(onDrag)
     fun toValue(x: Float, w: Float, pad: Float) = (min + ((x - pad) / (w - pad * 2)).coerceIn(0f, 1f) * (max - min))
     Canvas(
         Modifier.fillMaxWidth().height(44.dp)
@@ -324,10 +311,10 @@ private fun ChunkySlider(value: Float, min: Float, max: Float, onRelease: () -> 
             .pointerInput(min, max) {
                 val pad = size.height / 2f
                 detectDragGestures(
-                    onDragStart = { o -> dragging = true; local = toValue(o.x, size.width.toFloat(), pad) },
+                    onDragStart = { o -> dragging = true; local = toValue(o.x, size.width.toFloat(), pad); drag(local) },
                     onDragEnd = { dragging = false; change(local); release() },
                     onDragCancel = { dragging = false; change(local) },
-                ) { ch, _ -> local = toValue(ch.position.x, size.width.toFloat(), pad) }
+                ) { ch, _ -> local = toValue(ch.position.x, size.width.toFloat(), pad); drag(local) }
             },
     ) {
         val pad = size.height / 2
