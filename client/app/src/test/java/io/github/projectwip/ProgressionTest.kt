@@ -13,6 +13,8 @@ import io.github.projectwip.data.Progression
 import io.github.projectwip.data.PurchaseResult
 import io.github.projectwip.data.Reward
 import io.github.projectwip.data.SaveData
+import io.github.projectwip.data.ServerVerdict
+import io.github.projectwip.data.CapsuleResult
 import io.github.projectwip.data.Shop
 import io.github.projectwip.data.StatLine
 import org.junit.Assert.assertEquals
@@ -55,20 +57,45 @@ class ProgressionTest {
         assertNull("can't afford", Progression.upgrade(SaveData(bolts = 0), FighterId.JUNO))
     }
 
-    @Test fun victoryGrantsCupsBoltsAndFirstWinBonusOnce() {
-        val (a, r1) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100)
-        assertEquals(BotDifficulty.NORMAL.cupBonus, a.cups)
+    @Test fun theServerAwardsCupsAndTheGameAwardsBoltsAndTheFirstWinBonusOnce() {
+        val (a, r1) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = ServerVerdict(8, 8, false, 1, 3))
+        assertEquals(8, a.cups)
+        assertEquals(8, a.bestCups)
+        assertEquals(0, r1.cupsBefore)
+        assertEquals(8, r1.cupDelta)
+        assertTrue(r1.online)
+        assertTrue(r1.bolts > 0)
         assertEquals(Balance.FIRST_WIN_PRISMS, r1.firstWinPrisms)
-        val (_, r2) = Progression.applyMatch(a, report(MatchOutcome.VICTORY), today = 100)
+        val (_, r2) = Progression.applyMatch(a, report(MatchOutcome.VICTORY), today = 100, verdict = ServerVerdict(8, 16, false, 1, 3))
         assertEquals(0, r2.firstWinPrisms)
+        assertEquals(8, r2.cupsBefore)
     }
 
-    @Test fun defeatNeverDropsCupsBelowZero() {
-        val (s, r) = Progression.applyMatch(SaveData(cups = 3), report(MatchOutcome.DEFEAT), 1)
-        assertTrue(s.cups >= 0)
-        assertTrue(r.cupDelta <= 0)
-        val (s2, _) = Progression.applyMatch(SaveData(cups = 500, bestCups = 500), report(MatchOutcome.DEFEAT), 1)
-        assertEquals(494, s2.cups)
+    @Test fun theServersTotalsAreAdoptedNotAddedUp() {
+        // Applying the same verdict to a save that already took on the server's numbers must not count it twice.
+        val verdict = ServerVerdict(cupDelta = -6, cups = 494, drop = true, drops = 4, dropsLeftToday = 1)
+        val synced = Progression.syncAccount(SaveData(cups = 500, bestCups = 500, capsules = 3), 494, 4, 1, today = 7)
+        val (after, rewards) = Progression.applyMatch(synced, report(MatchOutcome.DEFEAT), today = 7, verdict = verdict)
+        assertEquals(494, after.cups)
+        assertEquals(500, after.bestCups)
+        assertEquals(4, after.capsules)
+        assertEquals(500, rewards.cupsBefore)
+        assertTrue(rewards.capsuleEarned)
+        assertEquals(1, rewards.capsulesLeftToday)
+        assertEquals(1, Progression.capsulesLeftToday(after, 7))
+    }
+
+    @Test fun offlineMatchesPayBoltsButNoCupsOrDrops() {
+        val save = SaveData(cups = 120, bestCups = 120, capsules = 2)
+        val (after, rewards) = Progression.applyMatch(save, report(MatchOutcome.VICTORY), today = 3, verdict = null)
+        assertFalse(rewards.online)
+        assertEquals(0, rewards.cupDelta)
+        assertEquals(120, after.cups)
+        assertFalse(rewards.capsuleEarned)
+        assertEquals(2, after.capsules)
+        assertTrue(rewards.bolts > 0)
+        assertEquals(save.bolts + rewards.bolts, after.bolts)
+        assertEquals(1, after.matchesPlayed)
     }
 
     @Test fun cupTrackClaimsOnceAndKeepsBestCups() {
@@ -106,19 +133,15 @@ class ProgressionTest {
         assertFalse(Progression.dailyGiftAvailable(s, 10))
     }
 
-    @Test fun lastSparkRewardsFollowPlacement() {
+    @Test fun lastSparkBoltsFollowPlacement() {
         fun ffa(place: Int) = MatchReport(outcome = if (place == 1) MatchOutcome.VICTORY else MatchOutcome.DEFEAT,
             mode = io.github.projectwip.data.GameMode.LAST_SPARK, placement = place, players = 10, fighter = FighterId.JUNO,
             kos = 0, deaths = 1, damageDealt = 0, mvp = false, difficulty = BotDifficulty.NORMAL, blueScore = 0, redScore = 0)
         val start = SaveData(cups = 200, bestCups = 200)
-        val first = Progression.applyMatch(start, ffa(1), 1).second
-        val fifth = Progression.applyMatch(start, ffa(5), 1).second
-        val last = Progression.applyMatch(start, ffa(10), 1).second
-        assertEquals(Balance.placementCups[0], first.cupDelta)
-        assertTrue(first.cupDelta > fifth.cupDelta && fifth.cupDelta > last.cupDelta)
-        assertTrue(first.bolts > last.bolts)
-        // Beginners never lose Cups.
-        assertEquals(0, Progression.applyMatch(SaveData(cups = 10, bestCups = 10), ffa(10), 1).second.cupDelta)
+        val first = Progression.applyMatch(start, ffa(1), 1, null).second
+        val fifth = Progression.applyMatch(start, ffa(5), 1, null).second
+        val last = Progression.applyMatch(start, ffa(10), 1, null).second
+        assertTrue(first.bolts > fifth.bolts && fifth.bolts > last.bolts)
     }
 
     @Test fun trackIsSortedAndUnique() {
@@ -126,73 +149,31 @@ class ProgressionTest {
         assertEquals(cups.sorted().distinct(), cups)
     }
 
-    @Test fun capsulesAreEarnedFromGoodFinishesUpToTheDailyCap() {
-        var save = SaveData(capsules = 0)
-        save = Progression.applyMatch(save, report(MatchOutcome.DEFEAT), today = 5).also { assertFalse(it.second.capsuleEarned) }.first
-        assertEquals(0, save.capsules)
-        repeat(SparkCapsules.PER_DAY) { i ->
-            val (next, rewards) = Progression.applyMatch(save, report(MatchOutcome.VICTORY), today = 5)
-            assertTrue(rewards.capsuleEarned)
-            assertEquals(SparkCapsules.PER_DAY - i - 1, rewards.capsulesLeftToday)
-            save = next
-        }
-        assertEquals(SparkCapsules.PER_DAY, save.capsules)
-        val (capped, rewards) = Progression.applyMatch(save, report(MatchOutcome.VICTORY), today = 5)
-        assertFalse("daily cap reached", rewards.capsuleEarned)
-        assertEquals(SparkCapsules.PER_DAY, capped.capsules)
-        assertEquals(0, Progression.capsulesLeftToday(capped, 5))
-        assertEquals("a new day resets the cap", SparkCapsules.PER_DAY, Progression.capsulesLeftToday(capped, 6))
-        assertTrue(Progression.applyMatch(capped, report(MatchOutcome.VICTORY), today = 6).second.capsuleEarned)
-
-        // Free-for-all: top four counts, fifth doesn't.
-        fun ffa(place: Int) = report(if (place == 1) MatchOutcome.VICTORY else MatchOutcome.DEFEAT).copy(mode = GameMode.LAST_SPARK, placement = place, players = 10)
-        assertTrue(SparkCapsules.earns(ffa(1)))
-        assertTrue(SparkCapsules.earns(ffa(4)))
-        assertFalse(SparkCapsules.earns(ffa(5)))
+    @Test fun theServersDropCountIsShownAndResetsWithTheDay() {
+        val save = Progression.syncAccount(SaveData(capsules = 0), cups = 30, drops = 5, dropsLeftToday = 0, today = 5)
+        assertEquals(5, save.capsules)
+        assertEquals(30, save.cups)
+        assertEquals(0, Progression.capsulesLeftToday(save, 5))
+        assertEquals("a new day resets the cap", SparkCapsules.PER_DAY, Progression.capsulesLeftToday(save, 6))
+        assertEquals("best Cups never go down", 30, Progression.syncAccount(save, 10, 5, 3, 6).bestCups)
     }
 
-    @Test fun openingACapsuleIsDeterministicAndGrantsItsReward() {
-        assertNull(Progression.openCapsule(SaveData(capsules = 0)))
-        val save = SaveData(capsules = 2, capsuleSeed = 99)
-        val (after, result) = Progression.openCapsule(save)!!
-        assertEquals("same seed, same capsule (no re-rolling by reloading)", result, Progression.openCapsule(save)!!.second)
-        assertEquals(1 + result.pieces - 1, after.capsules)
-        assertEquals(1, after.capsulesOpened)
-        assertTrue("the next capsule must use a fresh seed", after.capsuleSeed != save.capsuleSeed)
-        when (val r = result.reward) {
-            is Reward.Bolts -> assertEquals(save.bolts + r.amount, after.bolts)
-            is Reward.Prisms -> assertEquals(save.prisms + r.amount, after.prisms)
-            else -> assertTrue(Progression.owns(after, r))
-        }
+    @Test fun aDropTheServerOpenedIsGranted() {
+        val save = SaveData(capsules = 2)
+        val bolts = Progression.grantDrop(save, CapsuleResult(CapsuleTier.SCRAP, Reward.Bolts(100)))
+        assertEquals(save.bolts + 100, bolts.bolts)
+        assertEquals(1, bolts.capsulesOpened)
+        assertEquals("the count of unopened drops is the server's to change", 2, bolts.capsules)
+        val bundle = Reward.Bundle(listOf(Reward.UnlockFighter(FighterId.MIRA), Reward.Prisms(400), Reward.Bolts(2000)))
+        val ultra = Progression.grantDrop(save, CapsuleResult(CapsuleTier.ULTRA, bundle, pieces = 8))
+        assertTrue(ultra.progress(FighterId.MIRA).unlocked)
+        assertEquals(save.prisms + 400, ultra.prisms)
+        // A fighter that is somehow already owned is paid out instead of wasted.
+        val again = Progression.grantDrop(ultra, CapsuleResult(CapsuleTier.PRISMATIC, Reward.UnlockFighter(FighterId.MIRA)))
+        assertEquals(ultra.bolts + 300, again.bolts)
     }
 
-    @Test fun capsuleRewardsNeverDuplicateAndRespectTierOdds() {
-        // Open a long run of capsules: nothing already owned may ever come out, and every tier shows up.
-        var save = SaveData(capsules = 4000, capsuleSeed = 1)
-        val seen = HashMap<CapsuleTier, Int>()
-        var splits = 0
-        val pieces = java.util.TreeMap<Int, Int>()
-        repeat(4000) {
-            val before = save
-            val (next, result) = Progression.openCapsule(save)!!
-            assertFalse("duplicate ${result.reward}", Progression.owns(before, result.reward))
-            seen.merge(result.tier, 1, Int::plus)
-            if (result.split) splits++
-            pieces.merge(result.pieces, 1, Int::plus)
-            assertEquals("a split hands back the extra capsules", before.capsules - 1 + result.pieces - 1, next.capsules)
-            // Keep every open a plain one here, so the tier counts reflect the base odds.
-            save = next.copy(boostedCapsules = 0)
-        }
-        println("capsule tiers over 4000 opens: $seen, splits: $splits, pieces: $pieces")
-        assertEquals("capsules only ever become 1, 2, 4 or 8", setOf(1, 2, 4, 8), pieces.keys)
-        assertTrue("bigger splits are rarer", pieces.getValue(2) > pieces.getValue(8))
-        assertTrue("plenty of drops should split ($splits of 4000)", splits in 900..1900)
-        assertEquals(CapsuleTier.entries.toSet(), seen.keys)
-        for (t in CapsuleTier.entries.zipWithNext()) assertTrue("${t.first} should be more common than ${t.second}", seen.getValue(t.first) > seen.getValue(t.second))
-        assertTrue("Prismatic capsules unlock every fighter eventually", FighterId.entries.all { save.progress(it).unlocked })
-    }
-
-    @Test fun debugLuckAndInfiniteCapsules() {
+    @Test fun dropOddsShownInTheDebugMenu() {
         val normal = SparkCapsules.odds(0f)
         val lucky = SparkCapsules.odds(SparkCapsules.MAX_LUCK)
         assertEquals(1f, normal.sum(), 1e-4f)
@@ -203,32 +184,11 @@ class ProgressionTest {
         assertTrue(SparkCapsules.splitChance(SparkCapsules.MAX_LUCK) > SparkCapsules.splitChance(0f))
         assertTrue("chances never exceed 100%", SparkCapsules.splitChance(SparkCapsules.MAX_LUCK) <= 1f && SparkCapsules.resplitChance(SparkCapsules.MAX_LUCK) <= 1f)
         assertEquals("the luck slider tops out at x15", 14f, SparkCapsules.MAX_LUCK, 0f)
-
-        val settings = io.github.projectwip.data.Settings(debugLuck = SparkCapsules.MAX_LUCK, debugInfiniteCapsules = true)
-        var save = SaveData(capsules = 0, capsuleSeed = 3, settings = settings)
-        var prismatic = 0
-        repeat(200) {
-            val (next, result) = Progression.openCapsule(save)!!
-            if (result.tier == CapsuleTier.ULTRA) prismatic++
-            save = next
-        }
-        assertTrue("infinite capsules never run out", save.capsules >= 0)
-        assertEquals(200, save.capsulesOpened)
-        assertTrue("luck should show ($prismatic/200 Ultra)", prismatic > 70)
     }
 
-    @Test fun splitPiecesAreBetterThanPlainDrops() {
-        // Open a plain drop until one splits, then check its pieces are flagged and never come out Scrap.
-        var save = SaveData(capsules = 1, capsuleSeed = 5)
-        while (save.boostedCapsules == 0) save = Progression.openCapsule(save.copy(capsules = 1, boostedCapsules = 0))!!.first
-        val pieces = save.boostedCapsules
-        assertTrue(pieces in 1..7)
-        assertEquals("the extras are the pieces", pieces, save.capsules)
-        repeat(pieces) {
-            val (next, result) = Progression.openCapsule(save.copy(settings = save.settings))!!
-            assertTrue("a split piece is never Scrap", result.tier != CapsuleTier.SCRAP)
-            save = next.copy(capsules = next.capsules.coerceAtLeast(1))
-        }
+    @Test fun cheatsCanBeSwitchedOff() {
+        val cheating = io.github.projectwip.data.Settings(debugLuck = 9f, debugInfiniteCapsules = true, debugNoLevelCap = true, debugUpgradeCost = 0f, playerName = "Ace")
+        assertEquals(io.github.projectwip.data.Settings(playerName = "Ace"), Progression.withoutCheats(cheating))
     }
 
     @Test fun leaderboardRanksByCups() {
@@ -278,7 +238,7 @@ class ProgressionTest {
     @Test fun bossModePaysBoltsOnly() {
         val save = SaveData(cups = 100, bestCups = 100, capsules = 0)
         val win = report(MatchOutcome.VICTORY).copy(mode = GameMode.BOSS, players = 2)
-        val (after, rewards) = Progression.applyMatch(save, win, today = 9)
+        val (after, rewards) = Progression.applyMatch(save, win, today = 9, verdict = ServerVerdict(0, 100, false, 0, 3))
         assertEquals("no Cups from a boss that never gets tougher", 0, rewards.cupDelta)
         assertEquals(100, after.cups)
         assertTrue(rewards.bolts > 0)
@@ -330,7 +290,7 @@ class ProgressionTest {
 
         assertTrue(Progression.isFresh(SaveData()))
         assertFalse(Progression.isFresh(SaveData(cups = 5, bestCups = 5)))
-        assertFalse(Progression.isFresh(Progression.applyMatch(SaveData(), report(MatchOutcome.DEFEAT), today = 1).first))
+        assertFalse(Progression.isFresh(Progression.applyMatch(SaveData(), report(MatchOutcome.DEFEAT), today = 1, verdict = null).first))
 
         // Real players from the server slot into the ladder by Cups and are marked.
         val others = listOf(io.github.projectwip.data.LeaderboardEntry(0, "Rival", 900, FighterId.MIRA, false))

@@ -29,7 +29,7 @@ def main() -> None:
     print(f"AstroArena server listening on port {args.port}")
     print(f"  In the game: Settings > Data > Server address:  http://{lan_address()}:{args.port}")
     print(f"  Database: {os.path.join(here, 'astroarena.db')}")
-    print("  Edit versions_not_supported.cfg, notices.cfg and bots.cfg while it runs; changes apply at once.")
+    print("  Edit the .cfg files (versions_not_supported, notices, bots, game) while it runs; changes apply at once.")
     print("  Ctrl+C to stop.")
     try:
         httpd.serve_forever()

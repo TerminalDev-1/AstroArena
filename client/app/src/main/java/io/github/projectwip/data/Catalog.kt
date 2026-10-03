@@ -69,24 +69,15 @@ data class CapsuleResult(
 }
 
 /**
- * Spark Capsules: earned from your first few good finishes each day, opened from the home screen.
- * The tier is rolled when the capsule is opened; the reward never duplicates something already owned.
+ * Spark Capsules ("Spark Drops" to players): earned from your first few good finishes each day, opened from the
+ * home screen. The game server decides all of it: whether a match earned one, and what comes out when one is
+ * opened (`server/astro/rules.py`). What is left here is only what the game needs to show them.
  */
 object SparkCapsules {
     /** Capsules that can be earned per calendar day. */
     const val PER_DAY = 3
     /** Every save starts with one, so the first open doesn't have to be earned. */
     const val STARTING = 1
-
-    /** A win in team modes, or a top-4 finish in free-for-all, earns a capsule. */
-    fun earns(report: MatchReport): Boolean =
-        when (report.mode) {
-            GameMode.LAST_SPARK -> report.placement in 1..4
-            GameMode.KNOCKOUT_RUSH -> report.outcome == MatchOutcome.VICTORY
-            // The boss never gets tougher, so beating it can't be a way to farm drops.
-            GameMode.BOSS -> false
-            GameMode.TRAINING -> false
-        }
 
     /** Highest luck the debug menu offers (shown as x15). */
     const val MAX_LUCK = 14f
@@ -107,40 +98,6 @@ object SparkCapsules {
     /** Once it has split, the chance that every piece splits again (2 -> 4 -> 8). */
     fun resplitChance(luck: Float = 0f) = (0.5f + 0.08f * luck).coerceAtMost(1f)
 
-    /** The pieces a drop splits into are better than a plain one: they roll with this much extra luck and are never Scrap. */
-    const val SPLIT_LUCK = 0.6f
-
-    fun rollPieces(rng: kotlin.random.Random, luck: Float = 0f): Int {
-        if (rng.nextFloat() >= splitChance(luck)) return 1
-        var pieces = 2
-        while (pieces < MAX_PIECES && rng.nextFloat() < resplitChance(luck)) pieces *= 2
-        return pieces
-    }
-
-    fun rollTier(rng: kotlin.random.Random, luck: Float = 0f): CapsuleTier {
-        var roll = rng.nextFloat()
-        for ((i, chance) in odds(luck).withIndex()) { roll -= chance; if (roll < 0f) return CapsuleTier.entries[i] }
-        return CapsuleTier.SCRAP
-    }
-
-    fun rollReward(tier: CapsuleTier, save: SaveData, rng: kotlin.random.Random): Reward {
-        fun bolts(lo: Int, hi: Int) = Reward.Bolts((lo + rng.nextInt(hi - lo + 1)) / 5 * 5)
-        fun prisms(lo: Int, hi: Int) = Reward.Prisms(lo + rng.nextInt(hi - lo + 1))
-        fun newSkin(): Reward? = Balance.fighters
-            .filter { save.progress(it.id).unlocked }
-            .flatMap { f -> f.skins.indices.filter { it !in save.progress(f.id).ownedSkins }.map { Reward.SkinReward(f.id, it) } }
-            .randomOrNull(rng)
-        fun newFighter(): Reward? = FighterId.entries.filter { !save.progress(it).unlocked }.randomOrNull(rng)?.let { Reward.UnlockFighter(it) }
-        return when (tier) {
-            CapsuleTier.SCRAP -> bolts(60, 120)
-            CapsuleTier.TUNED -> if (rng.nextInt(3) == 0) prisms(15, 25) else bolts(180, 300)
-            CapsuleTier.CHARGED -> if (rng.nextInt(2) == 0) prisms(35, 50) else bolts(400, 600)
-            CapsuleTier.OVERCLOCKED -> (if (rng.nextInt(2) == 0) newSkin() else null) ?: if (rng.nextBoolean()) prisms(80, 110) else bolts(1000, 1300)
-            CapsuleTier.PRISMATIC -> newFighter() ?: newSkin() ?: prisms(250, 300)
-            // The jackpot: something new to play with (while there is anything left) plus a pile of both currencies.
-            CapsuleTier.ULTRA -> Reward.Bundle(listOfNotNull(newFighter() ?: newSkin(), prisms(400, 500), bolts(2000, 2500)))
-        }
-    }
 }
 
 data class Milestone(val cups: Int, val reward: Reward)

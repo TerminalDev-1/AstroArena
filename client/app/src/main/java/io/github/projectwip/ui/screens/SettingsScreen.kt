@@ -78,6 +78,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
     var editingLayout by remember { mutableStateOf(false) }
     val s = save.settings
     val set: ((Settings) -> Settings) -> Unit = { repo.updateSettings(it) }
+    val dev = io.github.projectwip.ui.LocalDev.current
     val ui = LocalUi.current
 
     Box(Modifier.fillMaxSize()) {
@@ -87,7 +88,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
             ScreenHeader("SETTINGS", { go(Screen.Home) }, null, null)
             Row(Modifier.weight(1f).padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
                 Column(Modifier.width(if (ui.roomy) 200.dp else 170.dp), verticalArrangement = Arrangement.spacedBy(if (ui.roomy) 10.dp else 7.dp)) {
-                    for (t in Tab.entries) {
+                    for (t in Tab.entries.filter { it != Tab.DEBUG || dev }) {
                         ChunkyButton({ tab = t }, Modifier.fillMaxWidth().height(if (ui.roomy) 58.dp else 42.dp),
                             if (t == tab) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
                             GameText(t.label.uppercase(), Type.Label, outline = 2.dp)
@@ -103,7 +104,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                             Tab.AUDIO -> AudioTab(s, set)
                             Tab.DISPLAY -> DisplayTab(s, set)
                             Tab.DATA -> DataTab(repo)
-                            Tab.DEBUG -> DebugControls(save, repo)
+                            Tab.DEBUG -> if (dev) DebugControls(save, repo)
                         }
                     }
                 }
@@ -115,8 +116,10 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
 
 @Composable
 private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
-    SectionTitle("BOT DIFFICULTY", "Changes how bots think — reaction time, aim, dodging, positioning, target choice and super timing. Never their health or damage.")
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    // Only developers choose the difficulty; everyone else plays at the one the server sets.
+    val dev = io.github.projectwip.ui.LocalDev.current
+    if (dev) SectionTitle("BOT DIFFICULTY", "Changes how bots think — reaction time, aim, dodging, positioning, target choice and super timing. Never their health or damage.")
+    if (dev) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         for (d in BotDifficulty.entries) {
             val selected = d == s.botDifficulty
             Box(Modifier.weight(1f)) {
@@ -246,14 +249,17 @@ private fun DataTab(repo: GameRepository) {
     SectionTitle("SERVER", when {
         status == null -> "No server connection in this build."
         !status.supported -> "The server at ${status.url} doesn't support this version."
-        status.online -> "Online: connected to ${status.url}. Your save is backed up there and matches are set up by the server."
-        else -> "Offline: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. Playing locally; nothing is lost."
+        status.online -> "Online: connected to ${status.url}. The server keeps your Cups and Spark Drops, sets matches up and backs up your save."
+        else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. Matches still pay Bolts; Cups and Spark Drops wait until you're back online."
     })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ServerField(address, BuildConfig.SERVER_URL) { url -> repo.updateSettings { it.copy(serverUrl = url) } }
         ChunkyButton({
             if (server != null) scope.launch(kotlinx.coroutines.Dispatchers.IO) { io.github.projectwip.ui.connectToServer(server, repo) }
         }, Modifier.width(190.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("RECONNECT", Type.Heading) }
+    }
+    server?.playerId?.let { id ->
+        PlainText("Player ID: $id" + if (status?.account?.developer == true) "  ·  developer" else "", Type.Body, color = Color.White)
     }
     PlainText("Leave the address empty to use the built-in one. Start the server on your computer with server/run.bat; it prints the address to type here.",
         Type.Small, color = Palette.TextDim.copy(alpha = 0.8f))

@@ -29,8 +29,9 @@ class GameRepository(private val store: SaveStore) {
     /** Replaces the whole save with one restored from the server, keeping this device's own settings. */
     fun restore(fromServer: SaveData) = commit(fromServer.copy(settings = _save.value.settings))
 
-    fun applyMatch(report: MatchReport): MatchRewards {
-        val (next, rewards) = Progression.applyMatch(_save.value, report, today)
+    /** [verdict] is what the server awarded; null for an offline match. */
+    fun applyMatch(report: MatchReport, verdict: ServerVerdict?): MatchRewards {
+        val (next, rewards) = Progression.applyMatch(_save.value, report, today, verdict)
         commit(next)
         return rewards
     }
@@ -55,13 +56,23 @@ class GameRepository(private val store: SaveStore) {
         return r
     }
 
-    fun openCapsule(): CapsuleResult? = Progression.openCapsule(_save.value)?.let { (s, r) -> commit(s); r }
+    /** Adds the reward of a Spark Drop the server opened. */
+    fun grantDrop(result: CapsuleResult) = commit(Progression.grantDrop(_save.value, result))
 
-    /** Debug menu hand-outs. */
-    fun debugGrant(bolts: Int = 0, prisms: Int = 0, capsules: Int = 0, cups: Int = 0) = commit(_save.value.let {
-        val newCups = (it.cups + cups).coerceAtLeast(0)
-        it.copy(bolts = it.bolts + bolts, prisms = it.prisms + prisms, capsules = it.capsules + capsules, cups = newCups, bestCups = maxOf(it.bestCups, newCups))
-    })
+    /** Takes on the Cups and Spark Drops the server holds for this player. */
+    fun syncAccount(cups: Int, drops: Int, dropsLeftToday: Int) {
+        val next = Progression.syncAccount(_save.value, cups, drops, dropsLeftToday, today)
+        if (next != _save.value) commit(next)
+    }
+
+    /** Switches the debug menu's cheats off, if any are on. */
+    fun clearCheats() {
+        val clean = Progression.withoutCheats(_save.value.settings)
+        if (clean != _save.value.settings) commit(_save.value.copy(settings = clean))
+    }
+
+    /** Debug menu hand-outs. (Cups and Spark Drops are handed out by the server.) */
+    fun debugGrant(bolts: Int = 0, prisms: Int = 0) = commit(_save.value.let { it.copy(bolts = it.bolts + bolts, prisms = it.prisms + prisms) })
 
     val capsulesLeftToday: Int get() = Progression.capsulesLeftToday(_save.value, today)
 

@@ -16,6 +16,7 @@ data class ControlLayout(
 }
 
 data class Settings(
+    /** Developers only; everyone else plays at the difficulty the server sets (Easy when offline). */
     val botDifficulty: BotDifficulty = BotDifficulty.NORMAL,
     val sfxVolume: Float = 0.8f,
     val musicVolume: Float = 0.5f,

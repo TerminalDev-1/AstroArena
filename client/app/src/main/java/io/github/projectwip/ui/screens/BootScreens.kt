@@ -42,11 +42,12 @@ import io.github.projectwip.ui.rememberAnimTime
 import kotlin.math.sin
 
 /**
- * Shown while the game gets ready: it checks GitHub for a newer release and builds its sounds and music.
- * [progress] is real (0..1 of that work), and [status] says which part is happening.
+ * Shown while the game gets ready: it connects to the game server, checks GitHub for a newer release and builds
+ * its sounds and music. [progress] is real (0..1 of that work), and [status] says which part is happening.
+ * [onSkip], when given, offers a way to stop waiting for the server.
  */
 @Composable
-fun LoadingScreen(progress: Float, status: String) {
+fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null) {
     val time by rememberAnimTime()
     Box(
         // Swallows touches so nothing underneath can be pressed while loading.
@@ -59,7 +60,10 @@ fun LoadingScreen(progress: Float, status: String) {
             GameText("ASTROARENA", Type.Display.copy(fontSize = Type.Display.fontSize * 1.5f), color = Palette.Gold, outline = 5.dp)
             Spacer(Modifier.height(18.dp))
             // One, two, three dots, repeating.
-            GameText("LOADING" + ".".repeat(1 + (time * 2.5f).toInt() % 3), Type.Title, outline = 3.5.dp, modifier = Modifier.width(190.dp))
+            // While the server is being reached that is what it says; after that it is plain loading.
+            val connecting = status.startsWith("Connecting")
+            GameText((if (connecting) "CONNECTING TO SERVER" else "LOADING") + ".".repeat(1 + (time * 2.5f).toInt() % 3), Type.Title, outline = 3.5.dp,
+                modifier = Modifier.width(if (connecting) 430.dp else 190.dp))
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ProgressBar(progress, Modifier.width(360.dp).height(22.dp), animate = false)
@@ -69,7 +73,40 @@ fun LoadingScreen(progress: Float, status: String) {
             Spacer(Modifier.height(8.dp))
             PlainText(status, Type.Label, color = Palette.TextDim)
         }
+        if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
+            GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
+        }
         PlainText("v${BuildConfig.VERSION_NAME.removePrefix("v")}", Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
+    }
+}
+
+/**
+ * The server didn't answer for a whole minute. The player chooses: keep trying, or play in offline mode, where
+ * matches against bots still work and pay Bolts but Cups and Spark Drops stand still.
+ */
+@Composable
+fun ConnectFailedScreen(url: String, onRetry: () -> Unit, onOffline: () -> Unit) {
+    Box(
+        Modifier.fillMaxSize().background(Color(0xF00B0620)).clickable(remember { MutableInteractionSource() }, null) { },
+        contentAlignment = Alignment.Center,
+    ) {
+        Panel(Modifier.widthIn(max = 700.dp).padding(18.dp), cut = 20.dp) {
+            Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                GameText("CAN'T REACH THE SERVER", Type.Display, color = Palette.Gold, outline = 4.dp)
+                PlainText(
+                    "The game tried for a minute and got no answer" + (if (url.isNotBlank()) " from $url" else "") + ". Check your connection, or that the server is running, and try again.",
+                    Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 4,
+                )
+                PlainText(
+                    "In offline mode you can still play every mode against bots and earn Bolts. Cups and Spark Drops are only earned online, and drops can't be opened until you are back.",
+                    Type.Small, align = TextAlign.Center, maxLines = 4,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    ChunkyButton(onRetry, Modifier.size(230.dp, 64.dp), ButtonStyle.GREEN) { GameText("RETRY", Type.Heading) }
+                    ChunkyButton(onOffline, Modifier.size(260.dp, 64.dp), ButtonStyle.PURPLE) { GameText("OFFLINE MODE", Type.Heading) }
+                }
+            }
+        }
     }
 }
 

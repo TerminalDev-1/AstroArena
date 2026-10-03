@@ -41,13 +41,23 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - `client/` is the whole Android game. `server/` is the game server: Python, standard library only, SQLite.
   `python run.py` (or `run.bat`) starts it on port 8765; `python -m unittest` in `server/` runs its tests.
-- The client must work with no server. Everything in `net/GameServer.kt` is best effort: on any failure the game
-  falls back to local saves, locally set-up matches, built-in bot profiles and a simulated leaderboard. Never make
-  a feature depend on the server being there.
-- The match itself runs on the device. The server sets matches up (seed, bot names), records results, stores
-  saves, serves `bots.cfg` / `notices.cfg`, and turns away versions listed in `versions_not_supported.cfg`.
-- Testing against the server on this PC: start it, `adb reverse tcp:8765 tcp:8765`, then launch with
-  `--es server http://127.0.0.1:8765` (`--es server default` clears it). Don't commit `server/astroarena.db`.
+- The server is in charge, by the user's decision: it owns each player's Cups and Spark Drops (it works out what
+  a match is worth, refuses results that can't be real, and rolls what comes out of a drop), sets the bot
+  difficulty, and says who is a developer. Those rules live in `server/astro/rules.py`. Don't add client-side
+  ways to earn Cups or drops, or to roll a drop.
+- Offline mode still has to work: every mode plays against bots and pays Bolts, with no Cups, no new drops and
+  no opening drops. The loading screen tries the server for 60 seconds, then offers Retry or Offline mode.
+- Developers = debug builds, plus the player ids in `server/game.cfg`. Only they see the debug menu and the
+  difficulty choice; the server ignores luck, free drops, difficulty and hand-outs from anyone else. The tablet's
+  id is listed there. Everyone else plays on the difficulty in `game.cfg` (Easy).
+- A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py`. A change to the Cup table goes in
+  `rules.py` (the client has no copy).
+- The match itself runs on the device, so the server can't catch a client that plays with cheats, only one that
+  claims results. Don't describe it as cheat-proof.
+- Testing against the server on this PC: start it and launch the game; the built-in address is this PC's LAN
+  address. `--es server <url>` (debug builds) points at another one, `--es server default` clears it. A match
+  started with `--es screen match` begins before the connection is up, so it is an offline match.
+  Don't commit `server/astroarena.db`.
 
 ## Git
 

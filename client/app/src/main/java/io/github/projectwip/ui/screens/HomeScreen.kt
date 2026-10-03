@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,6 +79,8 @@ fun HomeScreen(
     @Suppress("UNUSED_PARAMETER") showReward: (RewardReveal) -> Unit, openCapsule: () -> Unit,
 ) {
     val ui = LocalUi.current
+    val dev = io.github.projectwip.ui.LocalDev.current
+    val online = io.github.projectwip.ui.LocalServer.current?.status?.collectAsState()?.value?.online == true
     val prog = save.progress(save.selectedFighter)
     val canUpgradeAny = Balance.fighters.any { Progression.canUpgrade(save, it.id) }
     val claimable = Progression.claimable(save).size
@@ -129,9 +132,9 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.End,
                 ) {
-                    CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), openCapsule)
+                    CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online, openCapsule)
                     Spacer(Modifier.height(10.dp))
-                    ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
+                    ModeChip(save.selectedMode, save.settings.botDifficulty.takeIf { dev }) { picking = true }
                     Spacer(Modifier.height(12.dp))
                     PlayButton { go(Screen.Match(startMatchConfig(save))) }
                 }
@@ -221,9 +224,9 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
     }
 }
 
-/** Spark Capsules waiting to be opened, or how to earn the next one. */
+/** Spark Capsules waiting to be opened, or how to earn the next one. The server earns and opens them, so offline they wait. */
 @Composable
-private fun CapsuleButton(count: Int, leftToday: Int, onOpen: () -> Unit) {
+private fun CapsuleButton(count: Int, leftToday: Int, online: Boolean, onOpen: () -> Unit) {
     Box {
         ChunkyButton(onOpen, Modifier.fillMaxWidth().height(62.dp), ButtonStyle.CYAN, enabled = count > 0, cut = 14.dp, lip = 4.dp) {
             Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -233,6 +236,7 @@ private fun CapsuleButton(count: Int, leftToday: Int, onOpen: () -> Unit) {
                     GameText(if (count > 0) "OPEN DROP" else "SPARK DROPS", Type.Heading, outline = 2.5.dp)
                     PlainText(
                         when {
+                            !online -> if (count > 0) "Opens when you're back online" else "Earned and opened online"
                             count > 0 -> "Tap it to charge it up"
                             leftToday > 0 -> "Win or top 4 earns one · $leftToday left today"
                             else -> "Today's are all earned · more tomorrow"
@@ -256,7 +260,7 @@ fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; Ga
 fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.BOSS -> Arenas.provingGround(); GameMode.TRAINING -> Arenas.trainingArea() }
 
 @Composable
-private fun ModeChip(mode: GameMode, d: BotDifficulty, onClick: () -> Unit) {
+private fun ModeChip(mode: GameMode, d: BotDifficulty?, onClick: () -> Unit) {
     ChunkyButton(onClick, Modifier.fillMaxWidth().height(84.dp), ButtonStyle.GLASS, cut = 16.dp, sound = Sound.UI_OPEN) {
         Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             GameIcon(modeIcon(mode), Modifier.size(42.dp))
@@ -264,7 +268,8 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty, onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
                 PlainText(mode.tagline, Type.Small, maxLines = 1)
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Only developers choose the bots' difficulty, so only they are shown it.
+                if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
                     PlainText("Bots: ", Type.Small)
                     PlainText(d.label, Type.Label, color = difficultyColor(d))
                 }
@@ -277,6 +282,7 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty, onClick: () -> Unit) {
 @Composable
 private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit) {
     val ui = LocalUi.current
+    val dev = io.github.projectwip.ui.LocalDev.current
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
             .clickable(remember { MutableInteractionSource() }, null, onClick = onClose),
@@ -293,9 +299,9 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GameText("BOTS", Type.Heading, outline = 2.5.dp)
-                    Spacer(Modifier.width(6.dp))
-                    for (d in BotDifficulty.entries) {
+                    if (dev) GameText("BOTS", Type.Heading, outline = 2.5.dp)
+                    if (dev) Spacer(Modifier.width(6.dp))
+                    if (dev) for (d in BotDifficulty.entries) {
                         val sel = d == save.settings.botDifficulty
                         ChunkyButton({ repo.updateSettings { it.copy(botDifficulty = d) } }, Modifier.size(118.dp, 50.dp),
                             if (sel) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
@@ -331,8 +337,8 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
             PlainText("${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
             PlainText(
                 when (m) {
-                    GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. 1st place: +${Balance.placementCups[0]} Cups"
-                    GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win: +${io.github.projectwip.data.BotDifficulty.NORMAL.cupBonus} Cups (Normal)"
+                    GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. The higher you finish, the more Cups."
+                    GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win to earn Cups."
                     GameMode.BOSS -> "A giant version of a random fighter. Knock it out to win; you have unlimited lives. Its strength never changes. Pays Bolts only."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a boss that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },

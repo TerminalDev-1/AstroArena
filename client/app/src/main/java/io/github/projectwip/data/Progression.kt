@@ -27,6 +27,23 @@ data class MatchRewards(
     val capsuleEarned: Boolean = false,
     /** Spark Capsules that can still be earned today, after this match. */
     val capsulesLeftToday: Int = 0,
+    /** False for an offline match: the server wasn't there to award Cups or a Spark Drop. */
+    val online: Boolean = true,
+)
+
+/**
+ * What the game server decided a match was worth. Cups and Spark Drops are the server's to give, so these are
+ * totals to adopt, not amounts to add up on the device.
+ */
+data class ServerVerdict(
+    val cupDelta: Int,
+    /** The player's Cups after this match. */
+    val cups: Int,
+    /** This match earned a Spark Drop. */
+    val drop: Boolean,
+    /** Unopened Spark Drops after this match. */
+    val drops: Int,
+    val dropsLeftToday: Int,
 )
 
 /** One stat row on the upgrade screen. */
@@ -43,25 +60,26 @@ sealed interface PurchaseResult {
 /** Pure progression rules: every function takes a save and returns a new one. */
 object Progression {
 
-    fun applyMatch(save: SaveData, report: MatchReport, today: Long): Pair<SaveData, MatchRewards> {
+    /**
+     * Records a finished match. Bolts and the first-win Prisms are worked out here; Cups and Spark Drops come
+     * from the server's [verdict]. With no verdict (an offline match) neither changes.
+     */
+    fun applyMatch(save: SaveData, report: MatchReport, today: Long, verdict: ServerVerdict?): Pair<SaveData, MatchRewards> {
         val ffa = report.mode == GameMode.LAST_SPARK
-        // Boss Mode pays Bolts only: its boss has fixed stats, so Cups and the daily Prisms stay out of it.
+        // Boss Mode pays Bolts only: its boss has fixed stats, so the daily Prisms stay out of it.
         val boss = report.mode == GameMode.BOSS
-        val cupDelta = if (boss) 0 else if (ffa) Balance.cupsForPlacement(report.placement, save.cups, report.difficulty)
-            else Balance.cupsFor(report.outcome, save.cups, report.difficulty, report.mvp)
         val bolts = if (ffa) Balance.boltsForPlacement(report.placement, report.kos, report.difficulty)
             else Balance.boltsFor(report.outcome, report.kos, report.difficulty)
         val firstWin = !boss && report.outcome == MatchOutcome.VICTORY && save.lastFirstWinDay != today
         val prisms = if (firstWin) Balance.FIRST_WIN_PRISMS else 0
-        val newCups = (save.cups + cupDelta).coerceAtLeast(0)
+        val newCups = (verdict?.cups ?: save.cups).coerceAtLeast(0)
+        val cupDelta = verdict?.cupDelta ?: 0
         val reached = CupTrack.milestones.filter { it.cups in (save.bestCups + 1)..newCups }
-        val earnedBefore = if (save.capsuleDay == today) save.capsulesEarnedToday else 0
-        val capsule = SparkCapsules.earns(report) && earnedBefore < SparkCapsules.PER_DAY
-        val earnedNow = earnedBefore + if (capsule) 1 else 0
+        val leftToday = verdict?.dropsLeftToday ?: capsulesLeftToday(save, today)
         val next = save.copy(
-            capsules = save.capsules + if (capsule) 1 else 0,
+            capsules = verdict?.drops ?: save.capsules,
             capsuleDay = today,
-            capsulesEarnedToday = earnedNow,
+            capsulesEarnedToday = SparkCapsules.PER_DAY - leftToday,
             cups = newCups,
             bestCups = maxOf(save.bestCups, newCups),
             bolts = save.bolts + bolts,
@@ -71,8 +89,14 @@ object Progression {
             victories = save.victories + if (report.outcome == MatchOutcome.VICTORY) 1 else 0,
             totalKos = save.totalKos + report.kos,
         )
-        return next to MatchRewards(save.cups, newCups - save.cups, bolts, prisms, reached, capsule, SparkCapsules.PER_DAY - earnedNow)
+        return next to MatchRewards(newCups - cupDelta, cupDelta, bolts, prisms, reached, verdict?.drop == true, leftToday, online = verdict != null)
     }
+
+    /** Takes on the Cups and Spark Drops the server holds for this player. */
+    fun syncAccount(save: SaveData, cups: Int, drops: Int, dropsLeftToday: Int, today: Long): SaveData = save.copy(
+        cups = cups.coerceAtLeast(0), bestCups = maxOf(save.bestCups, cups),
+        capsules = drops.coerceAtLeast(0), capsuleDay = today, capsulesEarnedToday = SparkCapsules.PER_DAY - dropsLeftToday,
+    )
 
     /** A save nobody has played on yet: the only kind that is replaced by the copy the server holds. */
     fun isFresh(save: SaveData): Boolean =
@@ -84,25 +108,18 @@ object Progression {
     fun capsulesLeftToday(save: SaveData, today: Long): Int =
         SparkCapsules.PER_DAY - if (save.capsuleDay == today) save.capsulesEarnedToday else 0
 
-    /** Opens one capsule: rolls its tier and reward from the save's seed and grants it. Null if there is none to open. */
-    fun openCapsule(save: SaveData): Pair<SaveData, CapsuleResult>? {
-        val infinite = save.settings.debugInfiniteCapsules
-        if (save.capsules <= 0 && !infinite) return null
-        val rng = kotlin.random.Random(save.capsuleSeed)
-        // Pieces from an earlier split are opened first, and roll better than a plain one.
-        val boosted = save.boostedCapsules > 0
-        val luck = save.settings.debugLuck + if (boosted) SparkCapsules.SPLIT_LUCK else 0f
-        val rolled = SparkCapsules.rollTier(rng, luck)
-        val tier = if (boosted && rolled == CapsuleTier.SCRAP) CapsuleTier.TUNED else rolled
-        val reward = SparkCapsules.rollReward(tier, save, rng)
-        val pieces = SparkCapsules.rollPieces(rng, save.settings.debugLuck)
-        val left = (if (infinite) save.capsules else save.capsules - 1) + pieces - 1
-        val next = grant(save, reward).copy(
-            capsules = left, capsulesOpened = save.capsulesOpened + 1, capsuleSeed = rng.nextLong(),
-            boostedCapsules = (save.boostedCapsules - if (boosted) 1 else 0) + pieces - 1,
-        )
-        return next to CapsuleResult(tier, reward, pieces)
+    /**
+     * Adds what came out of a Spark Drop the server opened. The server knows what the player owns, so a
+     * duplicate should never arrive; if one does it is compensated rather than wasted.
+     */
+    fun grantDrop(save: SaveData, result: CapsuleResult): SaveData {
+        val reward = if (owns(save, result.reward)) CupTrack.duplicateCompensation(result.reward) else result.reward
+        return grant(save, reward).copy(capsulesOpened = save.capsulesOpened + 1)
     }
+
+    /** Puts the debug menu's cheats back to normal (for players the server doesn't list as developers). */
+    fun withoutCheats(settings: Settings): Settings =
+        settings.copy(debugLuck = 0f, debugInfiniteCapsules = false, debugNoLevelCap = false, debugUpgradeCost = 1f)
 
     // ---------------- Upgrades ----------------
 

@@ -63,8 +63,9 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
 }
 
 /**
- * Starts a match. The game server is asked to set it up first (its seed, which fixes the bots, and their
- * names); if there is no server, or it doesn't answer quickly, the match is set up on the device instead.
+ * Starts a match. The game server is asked to set it up first (its seed, which fixes the bots, their names
+ * and how tough they are); if there is no server, or it doesn't answer quickly, the match is set up on the
+ * device instead and counts as an offline match.
  */
 @Composable
 fun MatchScreen(
@@ -76,7 +77,7 @@ fun MatchScreen(
         val plan = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             server?.planMatch(config.mode, config.playerFighter, config.playerLevel, config.difficulty)
         }
-        planned = if (plan == null) config else config.copy(seed = plan.seed, botNames = plan.botNames, serverMatchId = plan.matchId)
+        planned = if (plan == null) config else config.copy(seed = plan.seed, botNames = plan.botNames, serverMatchId = plan.matchId, difficulty = plan.difficulty ?: config.difficulty)
     }
     val ready = planned
     if (ready == null) {

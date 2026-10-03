@@ -130,16 +130,7 @@ object Balance {
         return Math.round((base + koBonus) * difficulty.boltMultiplier)
     }
 
-    /** Cups change. Wins are rewarded by difficulty; losses cost more as your count grows. */
-    fun cupsFor(outcome: MatchOutcome, currentCups: Int, difficulty: BotDifficulty, mvp: Boolean): Int = when (outcome) {
-        MatchOutcome.VICTORY -> difficulty.cupBonus + if (mvp) 2 else 0
-        MatchOutcome.DRAW -> 1
-        MatchOutcome.DEFEAT -> -minOf(6, currentCups / 80).coerceAtMost(currentCups)
-    }
-
     // ---- Last Spark (free-for-all) ----
-    /** Cups by placement (index 0 = 1st). Positive values scale with bot difficulty. */
-    val placementCups = intArrayOf(10, 8, 6, 4, 2, 0, -1, -2, -3, -4)
     /** Bolts by placement, before the difficulty multiplier and KO bonus. */
     val placementBolts = intArrayOf(30, 26, 22, 18, 15, 12, 10, 8, 6, 5)
 
@@ -165,13 +156,6 @@ object Balance {
     /** Storm damage per second as a fraction of max health; grows with time spent shrinking. */
     const val STORM_DAMAGE_BASE = 0.10f
     const val STORM_DAMAGE_GROWTH = 0.002f
-
-    fun cupsForPlacement(placement: Int, currentCups: Int, difficulty: BotDifficulty): Int {
-        val base = placementCups[(placement - 1).coerceIn(0, placementCups.lastIndex)]
-        return if (base > 0) Math.round(base * difficulty.cupBonus / 8f)
-        else if (currentCups < 40) 0 // beginners don't lose Cups
-        else maxOf(base, -currentCups)
-    }
 
     fun boltsForPlacement(placement: Int, kos: Int, difficulty: BotDifficulty): Int {
         val base = placementBolts[(placement - 1).coerceIn(0, placementBolts.lastIndex)]
