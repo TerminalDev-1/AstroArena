@@ -15,6 +15,7 @@ enum class Sound {
     SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
+    UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP,
 }
 
 /**
@@ -38,10 +39,10 @@ object SfxSynth {
         Sound.SUPER_READY -> superReady().finish(0.7f)
         Sound.TICK -> tick().finish(0.6f)
         Sound.GO -> go().finish(0.8f)
-        Sound.TAP -> tap().finish(0.45f)
+        Sound.TAP -> tap().finish(0.5f)
         Sound.UPGRADE -> upgrade().finish(0.8f)
         Sound.REWARD -> reward().finish(0.7f)
-        Sound.VICTORY -> victory().finish(0.6f)
+        Sound.VICTORY -> victory().finish(0.8f)
         Sound.DEFEAT -> defeat().finish(0.75f)
         Sound.DENIED -> denied().finish(0.5f)
         Sound.PICKUP -> pickup().finish(0.7f)
@@ -51,6 +52,13 @@ object SfxSynth {
         Sound.DROP_OPEN -> dropOpen().finish(0.9f)
         Sound.WHOOSH -> whoosh().finish(0.4f)
         Sound.VERSUS -> versus().finish(0.85f)
+        Sound.UI_BACK -> uiBack().finish(0.45f)
+        Sound.UI_SELECT -> uiSelect().finish(0.5f)
+        Sound.UI_TOGGLE -> uiToggle().finish(0.45f)
+        Sound.UI_OPEN -> uiOpen().finish(0.55f)
+        Sound.BANNER -> banner().finish(0.8f)
+        Sound.COUNT -> count().finish(0.42f)
+        Sound.POP -> pop().finish(0.55f)
     }
 
     // ------------------------------------------------------------------ envelopes & pitch
@@ -371,16 +379,24 @@ object SfxSynth {
         reverb(0.18f, 0.6f)
     }
 
-    /** Victory: a short, warm rising chime over a soft chord. Pleased, not triumphant. */
-    private fun victory() = Clip(1.7f).apply {
-        for ((i, n) in intArrayOf(72, 76, 79, 84).withIndex()) bell(i * 0.11f, n, 0.42f, 0.11f)
-        bell(0.44f, 88, 0.3f, 0.2f)
-        val pad = Clip(1.7f).apply {
-            for (n in intArrayOf(60, 67, 72, 76)) osc(Wave.TRI, 0.3f, 1.3f, { hz(n) }, { hold(it, 0.12f, 0.5f, 0.25f) * 0.16f })
-            filter(Band.LOW, 0.7f) { 2200f }
+    /** Victory fanfare: da-da-da-daaa, da-DAAA. */
+    private fun victory() = Clip(2.3f).apply {
+        val horn = Clip(2.3f).apply {
+            val tune = listOf(Triple(67, 0f, 0.1f), Triple(72, 0.13f, 0.1f), Triple(76, 0.26f, 0.1f), Triple(79, 0.39f, 0.28f),
+                Triple(76, 0.72f, 0.1f), Triple(84, 0.85f, 0.75f))
+            for ((n, at, dur) in tune) brass(at, dur, n, 0.4f)
+            for (n in intArrayOf(60, 64, 67)) brass(0.39f, 0.28f, n, 0.16f)
+            for (n in intArrayOf(72, 76, 79)) brass(0.85f, 0.75f, n, 0.2f)
+            filter(Band.LOW, 0.9f) { 3600f }
         }
-        mix(pad)
-        reverb(0.2f, 0.7f)
+        mix(horn)
+        osc(Wave.SINE, 0.39f, 0.4f, { hz(48) }, { hold(it, 0.01f, 0.25f, 0.05f) * 0.35f })
+        osc(Wave.SINE, 0.85f, 1f, { hz(48) }, { hold(it, 0.01f, 0.7f, 0.08f) * 0.4f })
+        for (at in floatArrayOf(0f, 0.13f, 0.26f, 0.39f, 0.72f, 0.85f)) {
+            noise((at * 100).toInt() + 150, at, 0.08f, Band.HIGH, { 6000f }, 0.7f, { perc(it, 0.001f, 0.02f) * 0.12f })
+        }
+        for ((i, n) in intArrayOf(96, 100, 103, 108).withIndex()) bell(0.87f + i * 0.06f, n, 0.14f, 0.12f)
+        reverb(0.25f, 0.78f)
     }
 
     /** Defeat: four falling notes, the last one sagging. */
@@ -399,10 +415,69 @@ object SfxSynth {
 
     // ------------------------------------------------------------------ menus
 
-    private fun tap() = Clip(0.08f).apply {
-        osc(Wave.SINE, 0f, 0.07f, { glide(it, 0.03f, 1500f, 850f) }, { perc(it, 0.001f, 0.012f) * 0.7f })
-        osc(Wave.TRI, 0f, 0.05f, { 420f }, { perc(it, 0.001f, 0.01f) * 0.4f })
+/** Button press: a rounded pop with a glassy tick on top. */
+    private fun tap() = Clip(0.14f).apply {
+        osc(Wave.SINE, 0f, 0.09f, { glide(it, 0.03f, 1250f, 700f) }, { perc(it, 0.001f, 0.014f) * 0.7f })
+        osc(Wave.TRI, 0f, 0.06f, { 350f }, { perc(it, 0.001f, 0.012f) * 0.45f })
+        fm(0f, 0.1f, { 2100f }, 2f, { 0.8f }, { perc(it, 0.001f, 0.02f) * 0.18f })
         noise(111, 0f, 0.008f, Band.HIGH, { 6000f }, 0.7f, { perc(it, 0.0003f, 0.002f) * 0.3f })
+    }
+
+    /** Going back: the same pop, falling instead of bright. */
+    private fun uiBack() = Clip(0.18f).apply {
+        osc(Wave.SINE, 0f, 0.15f, { glide(it, 0.09f, 700f, 380f) }, { perc(it, 0.002f, 0.04f) * 0.7f })
+        osc(Wave.TRI, 0f, 0.1f, { glide(it, 0.09f, 350f, 200f) }, { perc(it, 0.002f, 0.03f) * 0.3f })
+    }
+
+    /** Choosing a tab or an option: two quick glass notes going up. */
+    private fun uiSelect() = Clip(0.4f).apply {
+        bell(0f, 79, 0.5f, 0.035f)
+        bell(0.055f, 86, 0.5f, 0.05f)
+        osc(Wave.SINE, 0f, 0.05f, { 300f }, { perc(it, 0.001f, 0.012f) * 0.3f })
+    }
+
+    /** A switch flipping: click, then a short tone (played higher for on, lower for off). */
+    private fun uiToggle() = Clip(0.2f).apply {
+        noise(201, 0f, 0.01f, Band.HIGH, { 5000f }, 0.7f, { perc(it, 0.0003f, 0.003f) * 0.4f })
+        osc(Wave.SINE, 0f, 0.06f, { 900f }, { perc(it, 0.001f, 0.015f) * 0.5f })
+        osc(Wave.SINE, 0.05f, 0.14f, { 1350f }, { perc(it, 0.002f, 0.03f) * 0.6f })
+        osc(Wave.TRI, 0.05f, 0.1f, { 675f }, { perc(it, 0.002f, 0.02f) * 0.2f })
+    }
+
+    /** A dialog or picker opening: a breath of air into a soft two-note chime. */
+    private fun uiOpen() = Clip(0.7f).apply {
+        noise(202, 0f, 0.16f, Band.BAND, { glide(it, 0.12f, 800f, 4000f) }, 1.5f, { perc(it, 0.06f, 0.04f) * 0.3f })
+        bell(0.09f, 76, 0.45f, 0.06f)
+        bell(0.15f, 83, 0.45f, 0.08f)
+        reverb(0.15f, 0.6f)
+    }
+
+    /** The result banner landing: a rush, a thump with a brass stab, then a spray of chimes. */
+    private fun banner() = Clip(1.5f).apply {
+        val hit = 0.13f
+        noise(203, 0f, 0.17f, Band.BAND, { glide(it, hit, 500f, 5000f) }, 2.5f, { swell(it, hit) * 0.45f })
+        osc(Wave.SINE, hit, 0.5f, { glide(it, 0.18f, 160f, 45f) }, { perc(it, 0.002f, 0.14f) })
+        noise(204, hit, 0.3f, Band.LOW, { glide(it, 0.2f, 7000f, 500f) }, 0.9f, { perc(it, 0.001f, 0.06f) * 0.6f })
+        val horn = Clip(1.5f).apply {
+            for (n in intArrayOf(60, 67, 72)) brass(hit, 0.2f, n, 0.3f)
+            filter(Band.LOW, 1f) { 700f + 3000f * perc((it - hit).coerceAtLeast(0f), 0.02f, 0.2f) }
+        }
+        mix(horn)
+        drive(1.3f)
+        for ((i, n) in intArrayOf(84, 88, 91, 96, 100).withIndex()) bell(hit + 0.1f + i * 0.05f, n, 0.16f, 0.09f)
+        reverb(0.22f, 0.72f)
+    }
+
+    /** One step of a number counting up (played over and over at rising pitch). */
+    private fun count() = Clip(0.07f).apply {
+        osc(Wave.SINE, 0f, 0.06f, { 1568f }, { perc(it, 0.001f, 0.012f) * 0.6f })
+        osc(Wave.TRI, 0f, 0.05f, { 784f }, { perc(it, 0.001f, 0.01f) * 0.3f })
+    }
+
+    /** Something popping into place (reward rows, sliders). */
+    private fun pop() = Clip(0.3f).apply {
+        osc(Wave.SINE, 0f, 0.1f, { glide(it, 0.05f, 500f, 1100f) }, { perc(it, 0.002f, 0.03f) * 0.7f })
+        bell(0.03f, 84, 0.3f, 0.04f)
     }
 
     private fun denied() = Clip(0.32f).apply {

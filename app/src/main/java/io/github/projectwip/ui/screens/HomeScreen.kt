@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
 import io.github.projectwip.data.BotDifficulty
 import io.github.projectwip.data.CupTrack
@@ -247,7 +248,7 @@ fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.stat
 
 @Composable
 private fun ModeChip(mode: GameMode, d: BotDifficulty, onClick: () -> Unit) {
-    ChunkyButton(onClick, Modifier.fillMaxWidth().height(84.dp), ButtonStyle.GLASS, cut = 16.dp) {
+    ChunkyButton(onClick, Modifier.fillMaxWidth().height(84.dp), ButtonStyle.GLASS, cut = 16.dp, sound = Sound.UI_OPEN) {
         Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             GameIcon(modeIcon(mode), Modifier.size(42.dp))
             Spacer(Modifier.width(10.dp))
@@ -288,7 +289,7 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
                     for (d in BotDifficulty.entries) {
                         val sel = d == save.settings.botDifficulty
                         ChunkyButton({ repo.updateSettings { it.copy(botDifficulty = d) } }, Modifier.size(118.dp, 50.dp),
-                            if (sel) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp) {
+                            if (sel) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
                             GameText(d.label.uppercase(), Type.Label, color = if (sel) Color.White else difficultyColor(d), outline = 2.dp)
                         }
                     }
@@ -303,7 +304,7 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
 @Composable
 private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap: Boolean, onClick: () -> Unit) {
     val arena = remember(m) { arenaFor(m) }
-    ChunkyButton(onClick, modifier.height(if (showMap) 330.dp else 190.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, cut = 18.dp) {
+    ChunkyButton(onClick, modifier.height(if (showMap) 330.dp else 190.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, cut = 18.dp, sound = Sound.UI_SELECT) {
         Column(Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GameIcon(modeIcon(m), Modifier.size(34.dp))

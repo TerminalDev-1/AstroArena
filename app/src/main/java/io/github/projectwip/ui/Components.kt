@@ -435,7 +435,7 @@ fun ProgressBar(
 @Composable
 fun ScreenHeader(title: String, onBack: () -> Unit, bolts: Int?, prisms: Int?, modifier: Modifier = Modifier, extra: @Composable () -> Unit = {}) {
     Row(modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        ChunkyButton(onBack, Modifier.size(52.dp, 50.dp), ButtonStyle.PURPLE) { GameIcon(IconKind.BACK, Modifier.size(26.dp)) }
+        ChunkyButton(onBack, Modifier.size(52.dp, 50.dp), ButtonStyle.PURPLE, sound = Sound.UI_BACK) { GameIcon(IconKind.BACK, Modifier.size(26.dp)) }
         Spacer(Modifier.width(14.dp))
         GameText(title, Type.Title, outline = 3.5.dp)
         Spacer(Modifier.width(14.dp))

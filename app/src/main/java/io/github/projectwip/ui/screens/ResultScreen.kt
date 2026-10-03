@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +59,7 @@ import io.github.projectwip.ui.plateShape
 import io.github.projectwip.ui.rewardLabel
 import io.github.projectwip.ui.startMatchConfig
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, go: (Screen) -> Unit) {
@@ -72,13 +76,32 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     }
     val bannerPop = remember { Animatable(0.3f) }
     val cupsShown = remember { Animatable(rewards.cupsBefore.toFloat()) }
+    /** How many reward rows have popped in so far. */
+    var rowsShown by remember { mutableIntStateOf(0) }
+    val won = r.outcome == MatchOutcome.VICTORY
     LaunchedEffect(Unit) {
+        // The banner lands (lower and duller for a loss)...
+        sfx?.play(Sound.BANNER, pitch = if (won) 1f else 0.72f)
+        sfx?.buzz(50, 200)
         bannerPop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow))
     }
     LaunchedEffect(Unit) {
-        delay(700)
-        if (rewards.cupDelta != 0) sfx?.play(Sound.REWARD, 0.7f)
-        cupsShown.animateTo((rewards.cupsBefore + rewards.cupDelta).toFloat(), tween(1100, easing = FastOutSlowInEasing))
+        // ...then the rewards pop in one by one, each a little higher...
+        delay(550)
+        repeat(6) { i ->
+            rowsShown = i + 1
+            if (i < rewardRowCount(rewards, r.mvp && !ffa)) { sfx?.play(Sound.POP, 0.8f, 0.9f + i * 0.1f); delay(190) }
+        }
+        // ...and the Cups tick up to their new total.
+        if (rewards.cupDelta != 0) {
+            val ticking = launch {
+                var n = 0
+                while (true) { sfx?.play(Sound.COUNT, 0.6f, 0.85f + minOf(n, 12) * 0.05f); n++; delay(75) }
+            }
+            cupsShown.animateTo((rewards.cupsBefore + rewards.cupDelta).toFloat(), tween(1000, easing = FastOutSlowInEasing))
+            ticking.cancel()
+            sfx?.play(if (rewards.cupDelta > 0) Sound.REWARD else Sound.DENIED, 0.8f)
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -118,13 +141,14 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                 Panel(Modifier.weight(1f).fillMaxWidth(), cut = 18.dp) {
                     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         GameText("REWARDS", Type.Title, color = Palette.Gold, outline = 3.dp)
-                        RewardRow(IconKind.CUP, "%,d".format(cupsShown.value.toInt()),
+                        var row = 0
+                        if (row++ < rowsShown) RewardRow(IconKind.CUP, "%,d".format(cupsShown.value.toInt()),
                             (if (rewards.cupDelta >= 0) "+" else "") + rewards.cupDelta,
                             if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
-                        RewardRow(IconKind.BOLT, "Bolts", "+${rewards.bolts}", Palette.CyanDeep)
-                        if (rewards.firstWinPrisms > 0) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
-                        if (rewards.capsuleEarned) RewardRow(IconKind.CAPSULE, "Spark Capsule", "+1", Palette.CyanDeep)
-                        if (r.mvp && !ffa) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
+                        if (row++ < rowsShown) RewardRow(IconKind.BOLT, "Bolts", "+${rewards.bolts}", Palette.CyanDeep)
+                        if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
+                        if (rewards.capsuleEarned && row++ < rowsShown) RewardRow(IconKind.CAPSULE, "Spark Capsule", "+1", Palette.CyanDeep)
+                        if (r.mvp && !ffa && row++ < rowsShown) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
 
                         val after = rewards.cupsBefore + rewards.cupDelta
                         val best = save.bestCups
@@ -160,10 +184,16 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     }
 }
 
+/** How many rows the rewards panel will show, so each one gets its own pop. */
+private fun rewardRowCount(rewards: MatchRewards, mvpBonus: Boolean) =
+    2 + (if (rewards.firstWinPrisms > 0) 1 else 0) + (if (rewards.capsuleEarned) 1 else 0) + (if (mvpBonus) 1 else 0)
+
 @Composable
 private fun RewardRow(icon: IconKind, label: String, value: String, chip: Color) {
+    val pop = remember { Animatable(0.6f) }
+    LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium)) }
     Row(
-        Modifier.fillMaxWidth().drawBehind {
+        Modifier.fillMaxWidth().graphicsLayer { scaleX = pop.value; scaleY = pop.value }.drawBehind {
             val o = plateShape(10.dp, 4.dp).createOutline(size, layoutDirection, this)
             val p = androidx.compose.ui.graphics.Path().apply { addOutline(o) }
             drawPath(p, Palette.PanelInset)

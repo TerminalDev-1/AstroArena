@@ -201,7 +201,7 @@ class MatchRunner(
             is GameEvent.SuperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY); sfx.buzz(25, 120) }
             is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }
             is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop }
-            is GameEvent.MatchEnd -> if (e.winningTeam == match.player.team) sfx.play(Sound.VICTORY, 0.8f) else sfx.play(Sound.DEFEAT)
+            is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
             is GameEvent.Eliminated -> if (e.fighterId == pid) sfx.play(Sound.DEFEAT)
             is GameEvent.StormHit -> if (e.targetId == pid) {
                 sfx.play(Sound.HURT, 0.6f, 0.8f); sfx.buzz(20, 90)

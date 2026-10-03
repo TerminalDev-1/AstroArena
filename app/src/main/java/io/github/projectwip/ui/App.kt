@@ -90,6 +90,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
                 "shop" -> Screen.Shop
                 "track" -> Screen.CupTrack
                 "settings" -> Screen.Settings
+                "result" -> previewResult(repo.save.value)
                 else -> Screen.Home
             }
         )
@@ -174,6 +175,18 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
     }
 }
 
+/** Debug (`--es screen result`): the result screen with made-up numbers, without playing or touching the save. */
+private fun previewResult(save: io.github.projectwip.data.SaveData): Screen {
+    val report = io.github.projectwip.data.MatchReport(
+        outcome = io.github.projectwip.data.MatchOutcome.VICTORY, mode = io.github.projectwip.data.GameMode.LAST_SPARK, placement = 1, players = 10,
+        fighter = save.selectedFighter, kos = 4, deaths = 0, damageDealt = 5200, mvp = true, difficulty = save.settings.botDifficulty, blueScore = 0, redScore = 0,
+    )
+    val players = (1..10).map { i ->
+        io.github.projectwip.ui.screens.PlayerLine(if (i == 1) save.settings.playerName else "Bot $i", FighterId.entries[i % 3], 0, i, 10 - i, 1, 6000 - i * 500, i == 1, i == 1, i != 1, placement = i)
+    }
+    return Screen.Result(MatchSummary(report, players, 1), MatchRewards(save.cups, 8, 32, 10, emptyList(), capsuleEarned = true, capsulesLeftToday = 2))
+}
+
 fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
     val p = save.progress(save.selectedFighter)
     return MatchConfig(save.selectedFighter, p.level, p.skin, save.settings.playerName, save.settings.botDifficulty, mode = save.selectedMode)
@@ -232,7 +245,8 @@ fun ConfirmDialog(
     content: @Composable () -> Unit = {},
 ) {
     val pop = remember { Animatable(0.7f) }
-    LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = 0.55f)) }
+    val sfx = LocalSfx.current
+    LaunchedEffect(Unit) { sfx?.play(Sound.UI_OPEN); pop.animateTo(1f, spring(dampingRatio = 0.55f)) }
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.65f))
             .clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss),

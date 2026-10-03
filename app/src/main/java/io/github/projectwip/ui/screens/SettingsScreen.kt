@@ -89,7 +89,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                 Column(Modifier.width(if (ui.roomy) 200.dp else 170.dp), verticalArrangement = Arrangement.spacedBy(if (ui.roomy) 10.dp else 7.dp)) {
                     for (t in Tab.entries) {
                         ChunkyButton({ tab = t }, Modifier.fillMaxWidth().height(if (ui.roomy) 58.dp else 42.dp),
-                            if (t == tab) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp) {
+                            if (t == tab) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
                             GameText(t.label.uppercase(), Type.Label, outline = 2.dp)
                         }
                     }
@@ -121,7 +121,7 @@ private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
             val selected = d == s.botDifficulty
             Box(Modifier.weight(1f)) {
                 ChunkyButton({ set { it.copy(botDifficulty = d) } }, Modifier.fillMaxWidth().height(150.dp),
-                    if (selected) ButtonStyle.ORANGE else ButtonStyle.PURPLE, cut = 14.dp) {
+                    if (selected) ButtonStyle.ORANGE else ButtonStyle.PURPLE, cut = 14.dp, sound = Sound.UI_SELECT) {
                     Column(Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         GameText(d.label.uppercase(), Type.Heading, color = if (selected) Color.White else difficultyColor(d), outline = 2.5.dp)
                         Spacer(Modifier.height(4.dp))
@@ -249,7 +249,7 @@ private fun SectionTitle(title: String, body: String) {
 private fun ToggleRow(title: String, body: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val sfx = LocalSfx.current
     Row(
-        Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, null) { sfx?.play(Sound.TAP); onChange(!checked) },
+        Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, null) { sfx?.play(Sound.UI_TOGGLE, pitch = if (checked) 0.8f else 1.15f); onChange(!checked) },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -286,7 +286,7 @@ private fun lerp(a: Color, b: Color, t: Float) = Color(
 private fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEachIndexed { i, o ->
-            ChunkyButton({ onSelect(i) }, Modifier.width(150.dp).height(50.dp), if (i == selected) ButtonStyle.CYAN else ButtonStyle.PURPLE, lip = 4.dp) {
+            ChunkyButton({ onSelect(i) }, Modifier.width(150.dp).height(50.dp), if (i == selected) ButtonStyle.CYAN else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
                 GameText(o, Type.Label, outline = 2.dp)
             }
         }
