@@ -14,7 +14,7 @@ import kotlin.random.Random
 enum class Sound {
     SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
-    PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN,
+    PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
 }
 
 /**
@@ -41,7 +41,7 @@ object SfxSynth {
         Sound.TAP -> tap().finish(0.45f)
         Sound.UPGRADE -> upgrade().finish(0.8f)
         Sound.REWARD -> reward().finish(0.7f)
-        Sound.VICTORY -> victory().finish(0.8f)
+        Sound.VICTORY -> victory().finish(0.6f)
         Sound.DEFEAT -> defeat().finish(0.75f)
         Sound.DENIED -> denied().finish(0.5f)
         Sound.PICKUP -> pickup().finish(0.7f)
@@ -49,6 +49,8 @@ object SfxSynth {
         Sound.DROP_TAP -> dropTap().finish(0.75f)
         Sound.DROP_UPGRADE -> dropUpgrade().finish(0.8f)
         Sound.DROP_OPEN -> dropOpen().finish(0.9f)
+        Sound.WHOOSH -> whoosh().finish(0.4f)
+        Sound.VERSUS -> versus().finish(0.85f)
     }
 
     // ------------------------------------------------------------------ envelopes & pitch
@@ -369,24 +371,16 @@ object SfxSynth {
         reverb(0.18f, 0.6f)
     }
 
-    /** Victory fanfare: da-da-da-daaa, da-DAAA. */
-    private fun victory() = Clip(2.3f).apply {
-        val horn = Clip(2.3f).apply {
-            val tune = listOf(Triple(67, 0f, 0.1f), Triple(72, 0.13f, 0.1f), Triple(76, 0.26f, 0.1f), Triple(79, 0.39f, 0.28f),
-                Triple(76, 0.72f, 0.1f), Triple(84, 0.85f, 0.75f))
-            for ((n, at, dur) in tune) brass(at, dur, n, 0.4f)
-            for (n in intArrayOf(60, 64, 67)) brass(0.39f, 0.28f, n, 0.16f)
-            for (n in intArrayOf(72, 76, 79)) brass(0.85f, 0.75f, n, 0.2f)
-            filter(Band.LOW, 0.9f) { 3600f }
+    /** Victory: a short, warm rising chime over a soft chord. Pleased, not triumphant. */
+    private fun victory() = Clip(1.7f).apply {
+        for ((i, n) in intArrayOf(72, 76, 79, 84).withIndex()) bell(i * 0.11f, n, 0.42f, 0.11f)
+        bell(0.44f, 88, 0.3f, 0.2f)
+        val pad = Clip(1.7f).apply {
+            for (n in intArrayOf(60, 67, 72, 76)) osc(Wave.TRI, 0.3f, 1.3f, { hz(n) }, { hold(it, 0.12f, 0.5f, 0.25f) * 0.16f })
+            filter(Band.LOW, 0.7f) { 2200f }
         }
-        mix(horn)
-        osc(Wave.SINE, 0.39f, 0.4f, { hz(48) }, { hold(it, 0.01f, 0.25f, 0.05f) * 0.35f })
-        osc(Wave.SINE, 0.85f, 1f, { hz(48) }, { hold(it, 0.01f, 0.7f, 0.08f) * 0.4f })
-        for (at in floatArrayOf(0f, 0.13f, 0.26f, 0.39f, 0.72f, 0.85f)) {
-            noise((at * 100).toInt() + 150, at, 0.08f, Band.HIGH, { 6000f }, 0.7f, { perc(it, 0.001f, 0.02f) * 0.12f })
-        }
-        for ((i, n) in intArrayOf(96, 100, 103, 108).withIndex()) bell(0.87f + i * 0.06f, n, 0.14f, 0.12f)
-        reverb(0.25f, 0.78f)
+        mix(pad)
+        reverb(0.2f, 0.7f)
     }
 
     /** Defeat: four falling notes, the last one sagging. */
@@ -435,6 +429,28 @@ object SfxSynth {
         bell(0.07f, 95, 0.25f, 0.09f)
         noise(131, 0f, 0.02f, Band.HIGH, { 6000f }, 0.7f, { perc(it, 0.0005f, 0.004f) * 0.3f })
         echo(0.12f, 0.25f, 0.18f)
+    }
+
+    /** A screen sliding in: a quick breath of filtered air. */
+    private fun whoosh() = Clip(0.34f).apply {
+        noise(191, 0f, 0.32f, Band.BAND, { glide(it, 0.25f, 500f, 3800f) }, 1.4f, { perc(it, 0.09f, 0.07f) * 0.8f })
+        noise(192, 0f, 0.32f, Band.HIGH, { 5000f }, 0.7f, { perc(it, 0.12f, 0.05f) * 0.15f })
+    }
+
+    /** The "VS" landing on the line-up screen: a short rush, then a heavy slam with a metal ring to it. */
+    private fun versus() = Clip(1.3f).apply {
+        val hit = 0.12f
+        noise(193, 0f, 0.16f, Band.BAND, { glide(it, hit, 400f, 4500f) }, 2.5f, { swell(it, hit) * 0.5f })
+        osc(Wave.SINE, hit, 0.6f, { glide(it, 0.2f, 170f, 36f) }, { perc(it, 0.002f, 0.18f) })
+        noise(194, hit, 0.5f, Band.LOW, { glide(it, 0.3f, 6000f, 300f) }, 0.9f, { perc(it, 0.001f, 0.09f) * 0.8f })
+        fm(hit, 0.6f, { 196f }, 1.41f, { 3f * exp(-it / 0.06f) }, { perc(it, 0.001f, 0.12f) * 0.4f })
+        val horn = Clip(1.3f).apply {
+            for (n in intArrayOf(43, 50, 55)) brass(hit, 0.22f, n, 0.3f)
+            filter(Band.LOW, 1f) { 500f + 2600f * perc(it - hit, 0.02f, 0.2f).coerceIn(0f, 1f) }
+        }
+        mix(horn)
+        drive(1.5f)
+        reverb(0.22f, 0.72f)
     }
 
     // ------------------------------------------------------------------ Spark Capsules

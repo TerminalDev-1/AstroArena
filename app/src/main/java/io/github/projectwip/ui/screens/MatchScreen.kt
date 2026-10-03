@@ -67,6 +67,8 @@ fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed
     var paused by remember { mutableStateOf(false) }
     var view by remember { mutableStateOf<MatchView?>(null) }
     var done by remember { mutableStateOf(false) }
+    /** The line-up is showing; the match waits behind it. */
+    var intro by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
     LaunchedEffect(Unit) { (context as? MainActivity)?.applyRefreshRate(settings.highFrameRate) }
@@ -79,6 +81,7 @@ fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed
     }
 
     BackHandler(enabled = !done) {
+        if (intro) return@BackHandler
         paused = !paused
         if (paused) view?.paused = true else view?.resumeGame()
     }
@@ -87,12 +90,13 @@ fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed
         AndroidView(
             factory = { ctx ->
                 MatchView(ctx, match, settings, sfx, matchesPlayed,
-                    onPauseRequested = { if (!done) { paused = true; view?.paused = true } },
+                    onPauseRequested = { if (!done && !intro) { paused = true; view?.paused = true } },
                     onFinished = { report -> finish(report) },
-                ).also { view = it }
+                ).also { view = it; it.paused = true }
             },
             modifier = Modifier.fillMaxSize(),
         )
+        if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
         if (paused && !done) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
                 Panel(cut = 20.dp) {

@@ -5,7 +5,7 @@ twin-stick touch controls, fighters you level up, Cups, a Cup Track, a Shop — 
 way to play**. Launch it, pick a fighter, press PLAY, and you're in a match against bots in seconds. No
 account, no server, no matchmaking.
 
-**Repository:** https://github.com/TerminalDev-1/ProjectWIP-Preview
+**Repository:** https://github.com/TerminalDev-1/AstroArena
 
 > **Preview software.** This is an experiment. Anything — rules, balance, saves, code — may change without
 > notice. There is no promise of maintenance.

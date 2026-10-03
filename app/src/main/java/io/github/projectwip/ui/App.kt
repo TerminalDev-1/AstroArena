@@ -109,7 +109,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
         sfx.hapticsEnabled = save.settings.haptics
     }
 
-    val go: (Screen) -> Unit = { screen = it }
+    val go: (Screen) -> Unit = { if (it !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f); screen = it }
     val showReward: (RewardReveal) -> Unit = { reveal = it; sfx.play(Sound.REWARD) }
 
     val openCapsule: () -> Unit = { repo.openCapsule()?.let { capsule = it } }

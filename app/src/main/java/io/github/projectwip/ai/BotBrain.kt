@@ -74,6 +74,9 @@ class BotBrain(
     /** Tile index of a crate we're breaking (free-for-all), or -1. */
     private var crateKey = -1
 
+    /** Seconds since this bot last had anyone to fight. */
+    private var idle = 0f
+
     private var stuckTimer = 0f
     private var stuckCheckX = me.x
     private var stuckCheckY = me.y
@@ -93,6 +96,7 @@ class BotBrain(
         repathTimer -= dt
         strafeTimer -= dt
         lastKnownAge += dt
+        if (target == null) idle += dt else idle = 0f
 
         target?.let { t ->
             if (t.alive && world.isVisibleTo(t, me.team)) {
@@ -295,6 +299,16 @@ class BotBrain(
     }
 
     private fun pickPatrolPoint() {
+        // Bored of wandering: now and then head for roughly where the nearest opponent is, so fights find
+        // the player instead of the player having to search the map. Only a rough area, and only sometimes.
+        if (idle > 5f && rng.nextFloat() < 0.4f) {
+            val o = world.fighters.filter { it.team != me.team && it.alive }.minByOrNull { dist(it) }
+            if (o != null) {
+                patrolX = (o.x + (rng.nextFloat() - 0.5f) * 5f).coerceIn(1f, arena.width - 1f)
+                patrolY = (o.y + (rng.nextFloat() - 0.5f) * 5f).coerceIn(1f, arena.height - 1f)
+                return
+            }
+        }
         world.storm?.let { z ->
             // Free-for-all: roam a few tiles from where we are, drifting toward the safe centre.
             val a = rng.nextFloat() * 6.283f

@@ -140,6 +140,9 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             ProgressBar((best - prev).toFloat() / (next.cups - prev), Modifier.fillMaxWidth().height(16.dp))
                         }
                         PlainText("Cups now: $after", Type.Small)
+                        if (!rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
+                            PlainText("All of today's Spark Capsules are earned · more tomorrow", Type.Small)
+                        }
                         if (!rewards.capsuleEarned && rewards.capsulesLeftToday > 0) {
                             PlainText("${if (ffa) "Finish top 4" else "Win"} to earn a Spark Capsule · ${rewards.capsulesLeftToday} left today", Type.Small)
                         }

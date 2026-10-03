@@ -68,7 +68,7 @@ import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.CapsuleTier
 import io.github.projectwip.data.SparkCapsules
 
-const val REPO_URL = "https://github.com/TerminalDev-1/ProjectWIP-Preview"
+const val REPO_URL = "https://github.com/TerminalDev-1/AstroArena"
 
 private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), DEBUG("Debug") }
 
