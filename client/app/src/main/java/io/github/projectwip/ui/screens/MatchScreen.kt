@@ -46,7 +46,7 @@ data class PlayerLine(
     val placement: Int = 0,
 )
 
-data class MatchSummary(val report: MatchReport, val players: List<PlayerLine>, val playerTeam: Int)
+data class MatchSummary(val report: MatchReport, val players: List<PlayerLine>, val playerTeam: Int, val serverMatchId: Long = 0)
 
 fun summarize(match: Match, report: MatchReport): MatchSummary {
     // Free-for-all: the star goes to the last fighter standing; team modes use the contribution score.
@@ -58,11 +58,36 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
                 placement = if (it === match.player) match.placement else it.placement)
         },
         match.player.team,
+        match.config.serverMatchId,
     )
 }
 
+/**
+ * Starts a match. The game server is asked to set it up first (its seed, which fixes the bots, and their
+ * names); if there is no server, or it doesn't answer quickly, the match is set up on the device instead.
+ */
 @Composable
-fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed: Int, onFinish: (MatchSummary) -> Unit) {
+fun MatchScreen(
+    config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed: Int,
+    server: io.github.projectwip.net.GameServer?, onFinish: (MatchSummary) -> Unit,
+) {
+    var planned by remember { mutableStateOf<MatchConfig?>(null) }
+    LaunchedEffect(Unit) {
+        val plan = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            server?.planMatch(config.mode, config.playerFighter, config.playerLevel, config.difficulty)
+        }
+        planned = if (plan == null) config else config.copy(seed = plan.seed, botNames = plan.botNames, serverMatchId = plan.matchId)
+    }
+    val ready = planned
+    if (ready == null) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF1C143A)), contentAlignment = Alignment.Center) {
+            GameText("FINDING A MATCH…", Type.Title, outline = 3.5.dp)
+        }
+    } else MatchBody(ready, settings, sfx, matchesPlayed, onFinish)
+}
+
+@Composable
+private fun MatchBody(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed: Int, onFinish: (MatchSummary) -> Unit) {
     val match = remember { Match(config) }
     var paused by remember { mutableStateOf(false) }
     var view by remember { mutableStateOf<MatchView?>(null) }

@@ -17,10 +17,17 @@ class GameRepository(private val store: SaveStore) {
 
     val today: Long get() = LocalDate.now().toEpochDay()
 
+    /** Called with every new save (the server connection uses it to upload a copy). */
+    var onCommit: ((SaveData) -> Unit)? = null
+
     private fun commit(next: SaveData) {
         _save.value = next
         io.execute { store.write(next) }
+        onCommit?.invoke(next)
     }
+
+    /** Replaces the whole save with one restored from the server, keeping this device's own settings. */
+    fun restore(fromServer: SaveData) = commit(fromServer.copy(settings = _save.value.settings))
 
     fun applyMatch(report: MatchReport): MatchRewards {
         val (next, rewards) = Progression.applyMatch(_save.value, report, today)

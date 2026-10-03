@@ -35,6 +35,8 @@ data class Settings(
     val showFps: Boolean = false,
     val playerName: String = "Player",
     val controlLayout: ControlLayout = ControlLayout(),
+    /** Address of the game server, e.g. http://192.168.1.103:8765. Blank = the address this build was made with. */
+    val serverUrl: String = "",
     /** Unlocked: touching anywhere on the right half of the screen is the attack stick. */
     val attackStickMode: MoveStickMode = MoveStickMode.FLOATING,
     /** Debug menu: 0 = normal capsule odds; each point multiplies the weight of every tier above the last. */

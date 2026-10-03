@@ -23,6 +23,10 @@ data class MatchConfig(
     val seed: Long = System.nanoTime(),
     /** Boss Mode: which fighter the giant is. Null picks one at random. */
     val boss: FighterId? = null,
+    /** Names for the bots, when the game server set this match up. Any shortfall is filled from the built-in list. */
+    val botNames: List<String> = emptyList(),
+    /** The server's id for this match (0 = set up on the device). */
+    val serverMatchId: Long = 0,
 )
 
 /** A complete match: world + bot brains. Advance it with [step]. */
@@ -43,7 +47,7 @@ class Match(val config: MatchConfig) {
     private var turn = 0
 
     init {
-        val names = BOT_NAMES.shuffled(rng).iterator()
+        val names = (config.botNames + BOT_NAMES.shuffled(rng)).iterator()
         val passive = HashSet<Fighter>()
         val roster = ArrayList<Fighter>()
         var id = 0

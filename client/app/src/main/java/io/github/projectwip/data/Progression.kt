@@ -74,6 +74,11 @@ object Progression {
         return next to MatchRewards(save.cups, newCups - save.cups, bolts, prisms, reached, capsule, SparkCapsules.PER_DAY - earnedNow)
     }
 
+    /** A save nobody has played on yet: the only kind that is replaced by the copy the server holds. */
+    fun isFresh(save: SaveData): Boolean =
+        save.matchesPlayed == 0 && save.capsulesOpened == 0 && save.cups == 0 && save.bestCups == 0 &&
+            save.fighters.values.all { it.level == 1 } && save.fighters.values.count { it.unlocked } == 1
+
     // ---------------- Spark Capsules ----------------
 
     fun capsulesLeftToday(save: SaveData, today: Long): Int =

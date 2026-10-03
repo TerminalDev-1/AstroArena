@@ -175,10 +175,11 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             ProgressBar((best - prev).toFloat() / (next.cups - prev), Modifier.fillMaxWidth().height(16.dp))
                         }
                         PlainText("Cups now: $after", Type.Small)
-                        if (!rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
+                        val dropsHere = r.mode != io.github.projectwip.data.GameMode.BOSS
+                        if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
                             PlainText("All of today's Spark Drops are earned · more tomorrow", Type.Small)
                         }
-                        if (!rewards.capsuleEarned && rewards.capsulesLeftToday > 0) {
+                        if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday > 0) {
                             PlainText("${if (ffa) "Finish top 4" else "Win"} to earn a Spark Drop · ${rewards.capsulesLeftToday} left today", Type.Small)
                         }
                     }

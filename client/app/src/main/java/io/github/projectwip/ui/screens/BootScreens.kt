@@ -69,7 +69,7 @@ fun LoadingScreen(progress: Float, status: String) {
             Spacer(Modifier.height(8.dp))
             PlainText(status, Type.Label, color = Palette.TextDim)
         }
-        PlainText("v${BuildConfig.VERSION_NAME}", Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
+        PlainText("v${BuildConfig.VERSION_NAME.removePrefix("v")}", Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
     }
 }
 
@@ -105,6 +105,32 @@ fun UpdateScreen(update: UpdateInfo, onSkip: () -> Unit) {
                     ChunkyButton({ open(update.pageUrl) }, Modifier.size(210.dp, 50.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("RELEASE PAGE", Type.Label, outline = 2.dp) }
                     if (BuildConfig.DEBUG) ChunkyButton(onSkip, Modifier.size(210.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) { GameText("PLAY ANYWAY (DEV)", Type.Label, outline = 2.dp) }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The game server has turned this version away (it is listed in the server's versions_not_supported.cfg).
+ * Shows the server's own message. Dev builds can carry on regardless.
+ */
+@Composable
+fun UnsupportedScreen(message: String, releasesUrl: String, onSkip: () -> Unit) {
+    val context = LocalContext.current
+    Box(
+        Modifier.fillMaxSize().background(Color(0xF00B0620)).clickable(remember { MutableInteractionSource() }, null) { },
+        contentAlignment = Alignment.Center,
+    ) {
+        Panel(Modifier.widthIn(max = 680.dp).padding(18.dp), cut = 20.dp) {
+            Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                GameText("VERSION NOT SUPPORTED", Type.Display, color = Palette.Gold, outline = 4.dp)
+                PlainText(message.ifBlank { "This version of the game is no longer supported. Please update to keep playing." },
+                    Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 5)
+                PlainText("You have version ${BuildConfig.VERSION_NAME}. Your progress is kept.", Type.Small, align = TextAlign.Center)
+                ChunkyButton({
+                    try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releasesUrl))) } catch (_: Exception) { }
+                }, Modifier.size(320.dp, 64.dp), ButtonStyle.GREEN) { GameText("GET THE LATEST VERSION", Type.Heading) }
+                if (BuildConfig.DEBUG) ChunkyButton(onSkip, Modifier.size(210.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) { GameText("PLAY ANYWAY (DEV)", Type.Label, outline = 2.dp) }
             }
         }
     }

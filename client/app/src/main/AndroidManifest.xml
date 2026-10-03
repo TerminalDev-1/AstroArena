@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- Only used to ask GitHub whether a newer release of the game exists. -->
+    <!-- Used to ask GitHub whether a newer release exists, and to talk to the game server (plain HTTP on a home network). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-feature android:name="android.hardware.touchscreen.multitouch.distinct" android:required="true" />
@@ -14,7 +14,8 @@
         android:roundIcon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.ProjectWIP"
-        android:resizeableActivity="true">
+        android:resizeableActivity="true"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

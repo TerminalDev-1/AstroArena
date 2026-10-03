@@ -91,6 +91,7 @@ class SaveStore(context: Context) {
                 put("highFrameRate", st.highFrameRate)
                 put("showFps", st.showFps)
                 put("playerName", st.playerName)
+                put("serverUrl", st.serverUrl)
                 put("attackStickMode", st.attackStickMode.name)
                 put("debugLuck", st.debugLuck.toDouble())
                 put("debugInfiniteCapsules", st.debugInfiniteCapsules)
@@ -131,6 +132,7 @@ class SaveStore(context: Context) {
                 highFrameRate = so.optBoolean("highFrameRate", sd.highFrameRate),
                 showFps = so.optBoolean("showFps", sd.showFps),
                 playerName = so.optString("playerName", sd.playerName).take(16).ifBlank { sd.playerName },
+                serverUrl = so.optString("serverUrl", "").take(120),
                 attackStickMode = enumOr(so.optString("attackStickMode"), sd.attackStickMode),
                 debugLuck = so.optDouble("debugLuck", 0.0).toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, SparkCapsules.MAX_LUCK) },
                 debugInfiniteCapsules = so.optBoolean("debugInfiniteCapsules", false),

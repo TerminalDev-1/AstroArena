@@ -3,7 +3,7 @@
 A mobile-first, landscape, **3D arena brawler for Android phones and tablets** — quick 3v3 matches,
 twin-stick touch controls, fighters you level up, Cups, a Cup Track, a Shop — and **bots as a first-class
 way to play**. Launch it, pick a fighter, press PLAY, and you're in a match against bots in seconds. No
-account, no server, no matchmaking.
+account and no matchmaking, and the optional game server is not needed to play.
 
 **Repository:** https://github.com/TerminalDev-1/AstroArena
 
@@ -30,7 +30,18 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 | **Shop** | Daily free gift · fighter unlocks · Bolt supplies · colourways · **Offer Creator**: design your own deals (bundle contents, price in Bolts/Prisms/free, discount display, expiry, purchase limit, colour theme) |
 | **Menus** | A live 3D lobby behind every screen (camera glides between shots), your fighter on a pedestal you can spin, 3D portraits, mode picker |
 | **Settings** | Bot difficulty, player name, control size/opacity/mode, auto-aim, volume/mute, haptics, frame rate, damage numbers, FPS, reset |
-| **Persistence** | Everything above is saved to a JSON file and survives restarts |
+| **Persistence** | Everything above is saved to a JSON file and survives restarts; with the server running, a copy is kept there too |
+
+## Layout
+
+| | |
+|---|---|
+| [`client/`](client) | The Android game: Kotlin, Jetpack Compose menus, a custom OpenGL ES 3.0 renderer |
+| [`server/`](server) | The game server: Python (standard library only) with a SQLite database. See [server/README.md](server/README.md) |
+
+The game works on its own. With the server running it also backs up your save, has matches set up by the
+server, takes its bot behaviour and notices from the server, shows real players on the leaderboard, and can be
+told that a version is no longer supported. If the server can't be reached it carries on locally.
 
 ## Build & run
 

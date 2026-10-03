@@ -65,6 +65,8 @@ import io.github.projectwip.ui.ScreenHeader
 import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.plateShape
 import io.github.projectwip.audio.Sound
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
 
 const val REPO_URL = "https://github.com/TerminalDev-1/AstroArena"
 
@@ -133,6 +135,35 @@ private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
     }
     SectionTitle("PLAYER NAME", "Shown above your fighter in matches.")
     NameField(s.playerName) { n -> set { it.copy(playerName = n) } }
+}
+
+/** Where the game server lives. Empty means "use the address this build was made with" (shown as the hint). */
+@Composable
+private fun ServerField(value: String, hint: String, onChange: (String) -> Unit) {
+    var text by remember(value) { mutableStateOf(value) }
+    Box(
+        Modifier.width(430.dp).height(52.dp).drawBehind {
+            val o = plateShape(10.dp, 4.dp).createOutline(size, layoutDirection, this)
+            val p = androidx.compose.ui.graphics.Path().apply { addOutline(o) }
+            drawPath(p, Palette.PanelInset)
+            drawPath(p, Palette.Ink, style = Stroke(2.5.dp.toPx()))
+        }.padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        if (text.isEmpty()) PlainText(hint, Type.Label, color = Palette.TextDim.copy(alpha = 0.6f), maxLines = 1)
+        BasicTextField(
+            text,
+            onValueChange = { v ->
+                val clean = v.filter { it.isLetterOrDigit() || it in ":/.-_" }.take(120)
+                text = clean
+                onChange(clean.trim())
+            },
+            singleLine = true,
+            textStyle = Type.Label,
+            cursorBrush = SolidColor(Palette.Gold),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 @Composable
@@ -207,7 +238,27 @@ private fun DataTab(repo: GameRepository) {
     SectionTitle("RESET PROGRESS", "Erase Cups, levels, currencies and claimed rewards. Settings are kept. This cannot be undone.")
     ChunkyButton({ confirm = true }, Modifier.width(260.dp).height(56.dp), ButtonStyle.RED) { GameText("RESET PROGRESS", Type.Heading) }
     Spacer(Modifier.height(10.dp))
-    SectionTitle("ABOUT", "AstroArena ${BuildConfig.VERSION_NAME}. Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
+    // ---- game server
+    val server = io.github.projectwip.ui.LocalServer.current
+    val status = server?.status?.collectAsState()?.value
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val address = repo.save.collectAsState().value.settings.serverUrl
+    SectionTitle("SERVER", when {
+        status == null -> "No server connection in this build."
+        !status.supported -> "The server at ${status.url} doesn't support this version."
+        status.online -> "Online: connected to ${status.url}. Your save is backed up there and matches are set up by the server."
+        else -> "Offline: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. Playing locally; nothing is lost."
+    })
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ServerField(address, BuildConfig.SERVER_URL) { url -> repo.updateSettings { it.copy(serverUrl = url) } }
+        ChunkyButton({
+            if (server != null) scope.launch(kotlinx.coroutines.Dispatchers.IO) { io.github.projectwip.ui.connectToServer(server, repo) }
+        }, Modifier.width(190.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("RECONNECT", Type.Heading) }
+    }
+    PlainText("Leave the address empty to use the built-in one. Start the server on your computer with server/run.bat; it prints the address to type here.",
+        Type.Small, color = Palette.TextDim.copy(alpha = 0.8f))
+    Spacer(Modifier.height(10.dp))
+    SectionTitle("ABOUT", "AstroArena v${BuildConfig.VERSION_NAME}. Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
     val context = androidx.compose.ui.platform.LocalContext.current
     ChunkyButton({
         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(REPO_URL)))

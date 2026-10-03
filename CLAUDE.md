@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-AstroArena (the package id is still `io.github.projectwip`, so saves carry over): original mobile 3D arena brawler for Android (landscape, touch, bots). Kotlin + Compose
+AstroArena (the package id is still `io.github.projectwip`, so saves carry over): original mobile 3D arena brawler for Android (landscape, touch, bots), with an optional Python game server. Kotlin + Compose
 menus + custom OpenGL ES 3.0 renderer, no engine. All art and sound is generated in code and must stay
 original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Spark Drops"; the code still calls them capsules.
 
@@ -37,14 +37,28 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   an APK exists. So a release with a broken APK locks every player out: never publish one that wasn't built from
   the tagged commit with tests passing. Debug: `--es screen update` (fake) or `updatecheck` (real check as v0.0.1).
 
+## Client and server
+
+- `client/` is the whole Android game. `server/` is the game server: Python, standard library only, SQLite.
+  `python run.py` (or `run.bat`) starts it on port 8765; `python -m unittest` in `server/` runs its tests.
+- The client must work with no server. Everything in `net/GameServer.kt` is best effort: on any failure the game
+  falls back to local saves, locally set-up matches, built-in bot profiles and a simulated leaderboard. Never make
+  a feature depend on the server being there.
+- The match itself runs on the device. The server sets matches up (seed, bot names), records results, stores
+  saves, serves `bots.cfg` / `notices.cfg`, and turns away versions listed in `versions_not_supported.cfg`.
+- Testing against the server on this PC: start it, `adb reverse tcp:8765 tcp:8765`, then launch with
+  `--es server http://127.0.0.1:8765` (`--es server default` clears it). Don't commit `server/astroarena.db`.
+
 ## Git
 
 - Checkpoint as you go: once a piece is verified (tests or device), commit just that piece and
   `git push origin main`. Never checkpoint unverified or non-compiling work.
-- **Non-negotiable: every version is committed, tagged and released.** Whenever the version in
-  `client/app/build.gradle.kts` changes, finish by committing, tagging `vX.Y.Z-preview`, pushing the tag and
-  publishing a GitHub pre-release with the release APK attached (`AstroArena-X.Y.Z-preview.apk`), without
-  waiting to be asked. The newest release must always be the newest version, so nobody downloads a stale APK.
+- **Non-negotiable: every version is committed, tagged and released.** Versions are whole numbers from v6 on
+  (`versionName = "6"`, then "7"). Whenever the version in `client/app/build.gradle.kts` changes, finish by
+  committing, tagging `vN.0`, pushing the tag and publishing a GitHub pre-release titled "AstroArena vN" with the
+  release APK attached (`AstroArena-vN.apk`), without waiting to be asked. The tag keeps the `.0` because installs
+  of 0.4.2 to 0.5.1 can only read tags of the form `vX.Y`; a bare `v6` tag would be invisible to their updater.
+  The newest release must always be the newest version, so nobody downloads a stale APK.
   Smoke-test the release APK on the tablet when it is free, then put the debug build back.
 - `gh` needs normal path conversion: don't run it with `MSYS_NO_PATHCONV=1` set.
 - End commit messages with the co-author line used in history. `screenshots/` is gitignored scratch.

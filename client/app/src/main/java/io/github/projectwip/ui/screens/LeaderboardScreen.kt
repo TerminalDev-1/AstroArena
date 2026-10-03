@@ -19,7 +19,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -48,8 +50,15 @@ import io.github.projectwip.ui.plateShape
 /** The Cup ladder: where the player stands among the (for now simulated) field. */
 @Composable
 fun LeaderboardScreen(save: SaveData, today: Long, go: (Screen) -> Unit) {
-    val standings = remember(save.cups, save.settings.playerName, save.selectedFighter, today) {
-        Leaderboard.standings(save.settings.playerName, save.cups, save.selectedFighter, today)
+    // Real players come from the game server when it is reachable; the rest of the ladder is simulated.
+    val server = io.github.projectwip.ui.LocalServer.current
+    var real by remember { androidx.compose.runtime.mutableStateOf<List<LeaderboardEntry>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        val players = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server?.leaderboard() } ?: return@LaunchedEffect
+        real = players.filter { it.id != server?.playerId }.map { LeaderboardEntry(0, it.name, it.cups, it.fighter, false) }
+    }
+    val standings = remember(save.cups, save.settings.playerName, save.selectedFighter, today, real) {
+        Leaderboard.standings(save.settings.playerName, save.cups, save.selectedFighter, today, real)
     }
     val me = standings.first { it.isPlayer }
     val list = rememberLazyListState()
@@ -70,7 +79,7 @@ fun LeaderboardScreen(save: SaveData, today: Long, go: (Screen) -> Unit) {
                             items(standings, key = { it.rank }) { LeaderRow(it) }
                         }
                         Spacer(Modifier.height(6.dp))
-                        PlainText("Ranked by Cups. There's no online play yet, so the other names are simulated rivals whose Cups drift from day to day.",
+                        PlainText("Ranked by Cups. Players marked ONLINE are real players on your server; the other names are simulated rivals whose Cups drift from day to day.",
                             Type.Small, Modifier.padding(start = 30.dp), maxLines = 2)
                     }
                 }
@@ -95,6 +104,7 @@ private fun LeaderRow(e: LeaderboardEntry) {
         Spacer(Modifier.width(10.dp))
         GameText(e.name, Type.Heading, color = if (e.isPlayer) Palette.Gold else Color.White, outline = 2.5.dp)
         if (e.isPlayer) { Spacer(Modifier.width(8.dp)); Badge("YOU", color = Palette.GreenDeep) }
+        if (e.online) { Spacer(Modifier.width(8.dp)); Badge("ONLINE", color = Palette.CyanDeep) }
         Spacer(Modifier.weight(1f))
         GameIcon(IconKind.CUP, Modifier.size(32.dp))
         Spacer(Modifier.width(6.dp))

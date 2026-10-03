@@ -23,6 +23,11 @@ class MainActivity : ComponentActivity() {
         hideSystemBars()
 
         val repo = (application as? GameApp)?.repository ?: GameRepository(SaveStore(this))
+        val server = (application as? GameApp)?.server ?: io.github.projectwip.net.GameServer(this)
+        // Every save also goes to the server (when there is one), so a fresh install can get it back.
+        repo.onCommit = { server.pushSave(SaveStore.toJson(it)) }
+        // Debug: `--es server http://host:port` points this install at another server ("default" clears it).
+        if (BuildConfig.DEBUG) intent?.getStringExtra("server")?.let { url -> repo.updateSettings { it.copy(serverUrl = if (url == "default") "" else url) } }
         sfx = Sfx(this).also { it.load() }
         music = io.github.projectwip.audio.Music(this).also { it.load() }
         // The no-level-cap cheat is for dev builds: a release build switches it back off.
@@ -32,7 +37,7 @@ class MainActivity : ComponentActivity() {
 
         // Debug builds accept `--es screen match|fighters|shop|track|settings|capsuleN` for automated testing.
         val start = if (BuildConfig.DEBUG) intent?.getStringExtra("screen") else null
-        setContent { App(repo, sfx, music, start) }
+        setContent { App(repo, sfx, music, server, start) }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

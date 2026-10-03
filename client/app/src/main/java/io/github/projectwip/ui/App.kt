@@ -83,7 +83,7 @@ sealed interface Screen {
 data class RewardReveal(val title: String, val reward: Reward)
 
 @Composable
-fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music, startScreen: String? = null) {
+fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music, server: io.github.projectwip.net.GameServer, startScreen: String? = null) {
     val save by repo.save.collectAsState()
     var screen by remember {
         mutableStateOf(
@@ -118,10 +118,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         })
     }
 
-    // ---- start-up: load sounds and music, and ask GitHub whether a newer release exists
+    // ---- start-up: connect to the game server, ask GitHub whether a newer release exists, load sounds and music
+    val serverStatus by server.status.collectAsState()
+    var unsupportedSkipped by remember { mutableStateOf(false) }
     var booting by remember { mutableStateOf(true) }
     var bootProgress by remember { mutableStateOf(0f) }
-    var bootStatus by remember { mutableStateOf("Checking for updates…") }
+    var bootStatus by remember { mutableStateOf("Connecting to server…") }
     var update by remember {
         // Debug: `--es screen update` shows the update screen with made-up details.
         mutableStateOf(if (startScreen == "update") io.github.projectwip.net.UpdateInfo("9.9.9-preview", "## New\n- Example note one\n- Example note two", REPO_RELEASES, REPO_RELEASES) else null)
@@ -135,19 +137,27 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             if (found != null) update = found
             checked.set(true)
         }
+        // The server: is this version welcome, sign in, fetch live settings, and sync the save.
+        val connected = java.util.concurrent.atomic.AtomicBoolean(false)
+        launch(kotlinx.coroutines.Dispatchers.IO) {
+            connectToServer(server, repo)
+            connected.set(true)
+        }
         val started = System.currentTimeMillis()
         while (true) {
             val waited = System.currentTimeMillis() - started
-            val target = 0.2f * (if (checked.get()) 1f else (waited / 4000f).coerceAtMost(0.9f)) + 0.6f * sfx.progress + 0.2f * (if (music.ready) 1f else 0f)
+            val target = 0.15f * (if (connected.get()) 1f else (waited / 4000f).coerceAtMost(0.9f)) +
+                0.1f * (if (checked.get()) 1f else (waited / 4000f).coerceAtMost(0.9f)) + 0.55f * sfx.progress + 0.2f * (if (music.ready) 1f else 0f)
             // The bar only ever moves forward, and eases toward the real figure so it doesn't jump.
             bootProgress = maxOf(bootProgress, bootProgress + (target - bootProgress) * 0.2f)
             bootStatus = when {
+                !connected.get() -> "Connecting to server…"
                 !checked.get() -> "Checking for updates…"
                 sfx.progress < 1f -> "Building sound effects…"
                 !music.ready -> "Composing the lobby music…"
                 else -> "Ready!"
             }
-            val done = checked.get() && sfx.progress >= 1f && music.ready
+            val done = connected.get() && checked.get() && sfx.progress >= 1f && music.ready
             // Stay up long enough to be read; never hang forever if something fails to load.
             if ((done && waited > 1200 && bootProgress > 0.985f) || waited > 15000) break
             delay(40)
@@ -169,7 +179,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         is Screen.Result -> if (s.summary.report.outcome == io.github.projectwip.data.MatchOutcome.VICTORY) io.github.projectwip.audio.Track.VICTORY else io.github.projectwip.audio.Track.DEFEAT
         else -> io.github.projectwip.audio.Track.LOBBY
     }
-    LaunchedEffect(wantedTrack, booting, update) { music.play(if (booting || update != null) null else wantedTrack) }
+    val blocked = update != null || (!serverStatus.supported && !unsupportedSkipped)
+    LaunchedEffect(wantedTrack, booting, blocked) { music.play(if (booting || blocked) null else wantedTrack) }
 
     val go: (Screen) -> Unit = { if (it !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f); screen = it }
     val showReward: (RewardReveal) -> Unit = { reveal = it }
@@ -191,7 +202,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         val metrics = UiMetrics(maxWidth.value / scale, maxHeight.value / scale, scale)
 
         val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
-        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalSfx provides sfx, LocalLobby provides lobby) {
+        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server) {
             if (screen !is Screen.Match) {
                 androidx.compose.ui.viewinterop.AndroidView(
                     factory = { ctx -> io.github.projectwip.render3d.LobbyView(ctx, lobby) },
@@ -222,9 +233,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.Leaderboard -> io.github.projectwip.ui.screens.LeaderboardScreen(save, repo.today, go)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
-                    is Screen.Match -> MatchScreen(s.config, save.settings, sfx, save.matchesPlayed,
+                    is Screen.Match -> MatchScreen(s.config, save.settings, sfx, save.matchesPlayed, server,
                         onFinish = { summary ->
                             // The Training Area is practice: nothing to record, straight back to the lobby.
+                            server.reportMatch(summary.serverMatchId, summary.report)
                             if (summary.report.mode == io.github.projectwip.data.GameMode.TRAINING) screen = Screen.Home
                             else {
                                 val rewards = repo.applyMatch(summary.report)
@@ -244,7 +256,21 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             }
             if (debugMenu) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
             // On top of everything: the loading screen, then (if a newer release exists) the update screen.
+            // Server status in the corner, and its notice across the top of the home screen.
+            if (screen !is Screen.Match && capsule == null && reveal == null) {
+                PlainText(
+                    if (serverStatus.online) "● ONLINE" else "● OFFLINE · playing locally", Type.Small,
+                    Modifier.align(Alignment.BottomStart).padding(start = 48.dp, bottom = 12.dp),
+                    color = if (serverStatus.online) Palette.Positive else Palette.TextDim,
+                )
+                if (screen is Screen.Home && serverStatus.online && serverStatus.notice.isNotBlank()) {
+                    Badge(serverStatus.notice.take(90), Modifier.align(Alignment.TopCenter).padding(top = 74.dp), color = Palette.CyanDeep)
+                }
+            }
             if (!booting) update?.let { io.github.projectwip.ui.screens.UpdateScreen(it) { update = null } }
+            if (!booting && update == null && !serverStatus.supported && !unsupportedSkipped) {
+                io.github.projectwip.ui.screens.UnsupportedScreen(serverStatus.message, REPO_RELEASES) { unsupportedSkipped = true }
+            }
             AnimatedVisibility(booting, enter = fadeIn(tween(0)), exit = fadeOut(tween(250))) {
                 io.github.projectwip.ui.screens.LoadingScreen(bootProgress, bootStatus)
             }
@@ -268,6 +294,22 @@ private fun previewResult(save: io.github.projectwip.data.SaveData): Screen {
 }
 
 private const val REPO_RELEASES = "https://github.com/TerminalDev-1/AstroArena/releases"
+
+/**
+ * Says hello to the game server and syncs the save with it. Blocking: call it off the main thread.
+ * A save nobody has played on is replaced by the copy the server holds; otherwise this device's save wins
+ * and is uploaded.
+ */
+fun connectToServer(server: io.github.projectwip.net.GameServer, repo: GameRepository) {
+    val save = repo.save.value
+    val url = save.settings.serverUrl.ifBlank { io.github.projectwip.BuildConfig.SERVER_URL }
+    val stored = server.connect(url, io.github.projectwip.BuildConfig.VERSION_NAME, save.settings.playerName)
+    val status = server.status.value
+    if (!status.online || !status.supported) return
+    val restored = stored?.let { runCatching { io.github.projectwip.data.SaveStore.fromJson(it) }.getOrNull() }
+    if (restored != null && io.github.projectwip.data.Progression.isFresh(save) && !io.github.projectwip.data.Progression.isFresh(restored)) repo.restore(restored)
+    else server.pushSave(io.github.projectwip.data.SaveStore.toJson(repo.save.value))
+}
 
 fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
     val p = save.progress(save.selectedFighter)

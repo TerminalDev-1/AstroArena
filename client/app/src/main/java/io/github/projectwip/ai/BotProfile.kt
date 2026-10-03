@@ -34,8 +34,30 @@ data class BotProfile(
     /** Stays near teammates instead of charging alone. */
     val teamwork: Float,
 ) {
+    /**
+     * This profile with any of its numbers replaced. Keys are the field names in lower case (as the server's
+     * bots.cfg spells them); unknown keys and values of the wrong type are ignored.
+     */
+    fun withOverrides(values: Map<String, Any>): BotProfile {
+        fun f(key: String, now: Float) = (values[key] as? Number)?.toFloat() ?: now
+        fun b(key: String, now: Boolean) = values[key] as? Boolean ?: now
+        return copy(
+            reactionTime = f("reactiontime", reactionTime), thinkInterval = f("thinkinterval", thinkInterval),
+            aimErrorDegrees = f("aimerrordegrees", aimErrorDegrees), leadFactor = f("leadfactor", leadFactor),
+            dodgeChance = f("dodgechance", dodgeChance), rangeDiscipline = f("rangediscipline", rangeDiscipline),
+            retreatBelow = f("retreatbelow", retreatBelow), focusWeakest = b("focusweakest", focusWeakest),
+            shotDiscipline = b("shotdiscipline", shotDiscipline), superSkill = f("superskill", superSkill),
+            fireHesitation = f("firehesitation", fireHesitation), wander = f("wander", wander), teamwork = f("teamwork", teamwork),
+        )
+    }
+
     companion object {
-        fun of(d: BotDifficulty): BotProfile = when (d) {
+        /** Profiles sent by the game server. Empty (the default, and whenever it can't be reached) = the built-in ones. */
+        @Volatile var overrides: Map<BotDifficulty, BotProfile> = emptyMap()
+
+        fun of(d: BotDifficulty): BotProfile = overrides[d] ?: builtIn(d)
+
+        fun builtIn(d: BotDifficulty): BotProfile = when (d) {
             BotDifficulty.EASY -> BotProfile(
                 reactionTime = 0.9f, thinkInterval = 0.7f, aimErrorDegrees = 21f, leadFactor = 0f,
                 dodgeChance = 0f, rangeDiscipline = 0.15f, retreatBelow = 0f, focusWeakest = false,

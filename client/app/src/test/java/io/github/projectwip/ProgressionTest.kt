@@ -296,6 +296,12 @@ class ProgressionTest {
         assertFalse("an older release is not an update", v.isNewer("v0.3.3-preview", "0.4.2-preview"))
         assertFalse("garbage is never an update", v.isNewer("latest", "0.4.2-preview"))
         assertFalse(v.isNewer("v0.4.3", "not-a-version"))
+        // Whole-number versions (v6 onward), and the two-part tag older installs can read.
+        assertTrue(v.isNewer("v6.0", "0.5.1-preview"))
+        assertTrue(v.isNewer("v6", "0.5.1-preview"))
+        assertTrue(v.isNewer("v7.0", "6"))
+        assertFalse("v6.0 is the same version as 6", v.isNewer("v6.0", "6"))
+        assertFalse(v.isNewer("0.5.1-preview", "6"))
     }
 
     @Test fun rosterHasFourFightersAtGenreScale() {
@@ -311,5 +317,27 @@ class ProgressionTest {
             assertTrue("${f.name} health ${f.health.base}", f.health.base in 2500..6000)
             assertTrue("${f.name} damage ${f.attackDamage.base}", f.attackDamage.base in 200..1200)
         }
+    }
+
+    @Test fun serverCanRetuneBotsAndFreshSavesAreRecognised() {
+        val base = io.github.projectwip.ai.BotProfile.builtIn(BotDifficulty.EASY)
+        val tuned = base.withOverrides(mapOf("reactiontime" to 0.25, "shotdiscipline" to true, "nonsense" to 9, "wander" to "lots"))
+        assertEquals(0.25f, tuned.reactionTime, 1e-6f)
+        assertTrue(tuned.shotDiscipline)
+        assertEquals("a value of the wrong type is ignored", base.wander, tuned.wander, 0f)
+        assertEquals(base.aimErrorDegrees, tuned.aimErrorDegrees, 0f)
+        assertEquals("with nothing from the server, bots use their built-in behaviour", base, io.github.projectwip.ai.BotProfile.of(BotDifficulty.EASY))
+
+        assertTrue(Progression.isFresh(SaveData()))
+        assertFalse(Progression.isFresh(SaveData(cups = 5, bestCups = 5)))
+        assertFalse(Progression.isFresh(Progression.applyMatch(SaveData(), report(MatchOutcome.DEFEAT), today = 1).first))
+
+        // Real players from the server slot into the ladder by Cups and are marked.
+        val others = listOf(io.github.projectwip.data.LeaderboardEntry(0, "Rival", 900, FighterId.MIRA, false))
+        val ladder = io.github.projectwip.data.Leaderboard.standings("Me", 100, FighterId.JUNO, 20000L, others)
+        assertEquals(io.github.projectwip.data.Leaderboard.RIVALS + 2, ladder.size)
+        val rival = ladder.single { it.online }
+        assertEquals("Rival", rival.name)
+        assertTrue(rival.rank < ladder.first { it.isPlayer }.rank)
     }
 }
