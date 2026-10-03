@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
         io.github.projectwip.render3d.Portraits.start()
         applyRefreshRate(repo.save.value.settings.highFrameRate)
 
-        // Debug builds accept `--es screen match|fighters|shop|track|settings` for automated testing.
+        // Debug builds accept `--es screen match|fighters|shop|track|settings|capsuleN` for automated testing.
         val start = if (BuildConfig.DEBUG) intent?.getStringExtra("screen") else null
         setContent { App(repo, sfx, start) }
     }

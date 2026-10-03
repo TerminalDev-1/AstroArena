@@ -39,6 +39,14 @@ class LobbyParams {
     @Volatile var dragYaw = 0f
     @Volatile var celebrateAt = 0L
     @Volatile var cheerAt = 0L
+
+    // Spark Capsule opening (see Capsule3D): the menu sets these, the GL thread animates from them.
+    @Volatile var capsuleShown = false
+    @Volatile var capsuleColor = 0
+    @Volatile var capsuleKnockAt = 0L
+    @Volatile var capsuleChargeAt = 0L
+    /** 0 while the capsule is closed. */
+    @Volatile var capsuleOpenAt = 0L
 }
 
 /**
@@ -54,6 +62,7 @@ class LobbyScene {
     private val shadow = ShadowMap(1024)
     private val sprites = SpriteBatch(512)
     private val particles = Particles3D(512)
+    private val capsule = Capsule3D()
     private val rng = Random(9)
 
     private val sky: Mesh
@@ -340,6 +349,8 @@ class LobbyScene {
         sprites.flush()
         GLES30.glDepthMask(true)
         GLES30.glDisable(GLES30.GL_BLEND)
+
+        capsule.render(aspect, p, time, dt, lit, sprite, sprites)
     }
 
     /** Floating crates, bolts and Power Cells, kept to the sides so the fighter stays clear. */

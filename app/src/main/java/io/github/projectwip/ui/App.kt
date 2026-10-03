@@ -49,6 +49,7 @@ import io.github.projectwip.audio.Sfx
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
 import io.github.projectwip.data.CapsuleResult
+import io.github.projectwip.data.CapsuleTier
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.GameRepository
 import io.github.projectwip.data.MatchRewards
@@ -95,7 +96,13 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
     }
     var reveal by remember { mutableStateOf<RewardReveal?>(null) }
     /** The Spark Capsule being opened, if any. Its reward is already saved by the time this is set. */
-    var capsule by remember { mutableStateOf<CapsuleResult?>(null) }
+    var capsule by remember {
+        // Debug: `--es screen capsule3` previews opening a capsule of tier 3 without touching the save.
+        mutableStateOf(startScreen?.takeIf { it.startsWith("capsule") }?.let {
+            val tier = CapsuleTier.entries[(it.removePrefix("capsule").toIntOrNull() ?: 0).coerceIn(0, CapsuleTier.entries.lastIndex)]
+            CapsuleResult(tier, Reward.Bolts(100 * (tier.ordinal + 1)))
+        })
+    }
 
     LaunchedEffect(save.settings) {
         sfx.volume = if (save.settings.muted) 0f else save.settings.sfxVolume

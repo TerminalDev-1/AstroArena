@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -26,10 +28,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -40,19 +40,17 @@ import io.github.projectwip.ui.ButtonStyle
 import io.github.projectwip.ui.ChunkyButton
 import io.github.projectwip.ui.FighterRays
 import io.github.projectwip.ui.GameText
+import io.github.projectwip.ui.LocalLobby
 import io.github.projectwip.ui.LocalSfx
 import io.github.projectwip.ui.LocalUi
 import io.github.projectwip.ui.Palette
 import io.github.projectwip.ui.PlainText
 import io.github.projectwip.ui.RewardVisual
 import io.github.projectwip.ui.Type
-import io.github.projectwip.ui.drawCapsuleUnit
 import io.github.projectwip.ui.rememberAnimTime
 import io.github.projectwip.ui.rewardLabel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -77,7 +75,14 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
     val shake = remember { Animatable(0f) }
     val pop = remember { Animatable(1f) }
     val flash = remember { Animatable(0f) }
-    val split = remember { Animatable(0f) }
+    val lobby = LocalLobby.current
+    // The capsule itself is 3D, drawn by the lobby renderer; this overlay only tells it what is happening.
+    DisposableEffect(Unit) {
+        lobby.capsuleOpenAt = 0L
+        lobby.capsuleColor = CapsuleTier.SCRAP.color.toInt()
+        lobby.capsuleShown = true
+        onDispose { lobby.capsuleShown = false }
+    }
     val shown = CapsuleTier.entries[tier]
     val color = Color(shown.color)
 
@@ -85,8 +90,11 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
         if (opened || taps >= TAPS) return
         val charged = plan[taps]
         taps++
+        lobby.capsuleKnockAt = System.currentTimeMillis()
         if (charged) {
             tier++
+            lobby.capsuleColor = CapsuleTier.entries[tier].color.toInt()
+            lobby.capsuleChargeAt = System.currentTimeMillis()
             sfx?.play(Sound.DROP_UPGRADE, pitch = 0.85f + 0.12f * tier)
             sfx?.buzz(45, 210)
             scope.launch { pop.snapTo(1.4f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
@@ -98,47 +106,37 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
         scope.launch { shake.snapTo(1f); shake.animateTo(0f, tween(420)) }
         if (taps == TAPS) scope.launch {
             delay(if (charged) 750 else 450)
-            split.animateTo(1f, tween(160))
+            lobby.capsuleOpenAt = System.currentTimeMillis()
             sfx?.play(Sound.DROP_OPEN)
             sfx?.buzz(90, 255)
+            delay(260)
+            lobby.capsuleShown = false
             opened = true
             flash.snapTo(1f)
             flash.animateTo(0f, tween(650))
         }
     }
 
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f))
+    BoxWithConstraints(
+        // While the capsule is closed the lobby renderer does the dimming, so the 3D capsule stays bright.
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (opened) 0.8f else 0f))
             .clickable(remember { MutableInteractionSource() }, null) { knock() },
         contentAlignment = Alignment.Center,
     ) {
-        FighterRays(Modifier.size(if (ui.roomy) 640.dp else 520.dp), color)
+        val capsuleRoom = maxHeight * 0.46f
+        // Darken the menu around the capsule but leave a soft window in the middle for the 3D render underneath.
+        if (!opened) Canvas(Modifier.fillMaxSize()) {
+            val r = size.height * 0.52f
+            drawRect(Brush.radialGradient(0.5f to Color.Transparent, 1f to Color(0xE0050212), center = center, radius = r))
+        }
+        if (opened) FighterRays(Modifier.size(if (ui.roomy) 640.dp else 520.dp), color)
         if (!opened) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 GameText("SPARK CAPSULE", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
                 GameText(shown.label.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), color = color, outline = 5.dp,
                     modifier = Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value })
-                Spacer(Modifier.height(4.dp))
-                val wobble = sin(shake.value * PI.toFloat() * 5f) * 13f * shake.value
-                Canvas(
-                    Modifier.size(if (ui.roomy) 250.dp else 180.dp).graphicsLayer {
-                        rotationZ = wobble + sin(time * 2.2f) * 2.5f
-                        translationY = sin(time * 2.6f) * 6.dp.toPx() - shake.value * 10.dp.toPx()
-                        scaleX = pop.value; scaleY = pop.value
-                    },
-                ) {
-                    withTransform({ scale(size.width, size.height, Offset.Zero) }) {
-                        // Charge crackling around the shell: more arcs the higher the tier.
-                        for (i in 0 until 3 + tier * 3) {
-                            val a = i * 2.399f + time * (0.6f + (i % 3) * 0.35f)
-                            val r0 = 0.5f + 0.03f * sin(time * 5f + i)
-                            val r1 = r0 + 0.07f + 0.05f * sin(time * 7f + i * 1.7f)
-                            drawLine(color.copy(alpha = 0.75f), Offset(0.5f + cos(a) * r0 * 0.8f, 0.5f + sin(a) * r0), Offset(0.5f + cos(a) * r1 * 0.8f, 0.5f + sin(a) * r1), 0.014f, cap = StrokeCap.Round)
-                        }
-                        drawCapsuleUnit(color, split = split.value, glow = 0.35f + 0.12f * tier + 0.1f * sin(time * 5f))
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
+                // Room for the 3D capsule, which sits in the middle of the screen.
+                Spacer(Modifier.height(capsuleRoom))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     for (t in CapsuleTier.entries) Canvas(Modifier.size(if (t.ordinal == tier) 20.dp else 14.dp)) {
                         drawCircle(Palette.Ink)
