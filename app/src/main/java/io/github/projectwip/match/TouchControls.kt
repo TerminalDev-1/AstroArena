@@ -302,28 +302,56 @@ class TouchControls(private val density: Float) {
 
         // ---- Super stick
         val sk = superStick
-        val sx = superCx + sk.knobX * superRadius * 1.4f
-        val sy = superCy + sk.knobY * superRadius * 1.4f
         val sr = superRadius
-        if (superCharge >= 1f && alive) {
+        val charged = superCharge >= 1f && alive
+        val bx = if (charged) superCx + sk.knobX * sr * 1.4f else superCx
+        val by = if (charged) superCy + sk.knobY * sr * 1.4f else superCy
+        if (charged) {
+            // Charged: glowing gold button with spinning rays, so it can't be missed.
             val pulse = 1f + 0.06f * kotlin.math.sin(time * 6f)
             fill.color = Color.argb(a * 90 / 255, 255, 214, 64)
-            c.drawCircle(superCx, superCy, sr * 1.35f * pulse, fill)
+            c.drawCircle(superCx, superCy, sr * 1.38f * pulse, fill)
             if (sk.active) ring(c, superCx, superCy, sr * 1.4f, Color.argb(a * 50 / 255, 60, 40, 0), Color.argb(a * 160 / 255, 255, 230, 120))
-            fill.color = Color.argb(a, 255, 205, 40)
-            c.drawCircle(sx, sy, sr, fill)
+            line.color = Color.argb(a * 220 / 255, 255, 240, 170); line.strokeWidth = dp(4f)
+            for (i in 0 until 8) {
+                val ang = time * 1.6f + i * (Math.PI / 4).toFloat()
+                val cs = kotlin.math.cos(ang); val sn = kotlin.math.sin(ang)
+                c.drawLine(bx + cs * sr * 1.16f, by + sn * sr * 1.16f, bx + cs * sr * 1.36f * pulse, by + sn * sr * 1.36f * pulse, line)
+            }
+            if (goldShader == null || goldShaderRadius != sr) {
+                goldShaderRadius = sr
+                goldShader = android.graphics.RadialGradient(-sr * 0.3f, -sr * 0.35f, sr * 1.5f,
+                    intArrayOf(Color.rgb(255, 248, 180), Color.rgb(255, 200, 40), Color.rgb(238, 126, 20)), floatArrayOf(0f, 0.5f, 1f),
+                    android.graphics.Shader.TileMode.CLAMP)
+            }
+            c.save(); c.translate(bx, by)
+            fill.color = Color.WHITE; fill.alpha = a; fill.shader = goldShader
+            c.drawCircle(0f, 0f, sr, fill)
+            fill.shader = null
+            c.restore()
         } else {
-            fill.color = Color.argb(a * 150 / 255, 40, 30, 70)
-            c.drawCircle(superCx, superCy, sr, fill)
-            line.color = Color.argb(a, 255, 205, 40); line.strokeWidth = dp(5f)
-            arc.set(superCx - sr * 0.82f, superCy - sr * 0.82f, superCx + sr * 0.82f, superCy + sr * 0.82f)
+            // Charging: dark button, the rim fills up clockwise.
+            fill.color = Color.argb(a * 170 / 255, 40, 30, 70)
+            c.drawCircle(bx, by, sr, fill)
+            arc.set(bx - sr * 1.16f, by - sr * 1.16f, bx + sr * 1.16f, by + sr * 1.16f)
+            line.strokeWidth = dp(7f)
+            line.color = Color.argb(a * 120 / 255, 11, 6, 32)
+            c.drawArc(arc, 0f, 360f, false, line)
+            line.color = Color.argb(a, 255, 205, 40)
             c.drawArc(arc, -90f, 360f * superCharge.coerceIn(0f, 1f), false, line)
         }
-        line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(3f)
-        c.drawCircle(if (superCharge >= 1f) sx else superCx, if (superCharge >= 1f) sy else superCy, sr, line)
-        // Star glyph
-        star(c, if (superCharge >= 1f) sx else superCx, if (superCharge >= 1f) sy else superCy, sr * 0.45f,
-            if (superCharge >= 1f) Color.argb(a, 60, 30, 0) else Color.argb(a * 160 / 255, 255, 255, 255))
+        line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(3.5f)
+        c.drawCircle(bx, by, sr, line)
+        burst(c, bx, by - sr * 0.1f, sr * 0.72f, charged, a)
+        if (charged) {
+            text.textSize = sr * 0.42f
+            text.style = Paint.Style.STROKE; text.strokeWidth = dp(4f); text.strokeJoin = Paint.Join.ROUND
+            text.color = Color.argb(a, 11, 6, 32)
+            c.drawText("SUPER", bx, by + sr * 1.02f, text)
+            text.style = Paint.Style.FILL
+            text.color = Color.argb(a, 255, 255, 255)
+            c.drawText("SUPER", bx, by + sr * 1.02f, text)
+        }
 
         // ---- Pause
         fill.color = Color.argb(200, 20, 12, 50)
@@ -351,23 +379,45 @@ class TouchControls(private val density: Float) {
         c.drawLine(x, y + r * 0.4f, x, y + r, line)
     }
 
-    private val starPath = android.graphics.Path()
-    private fun star(c: Canvas, x: Float, y: Float, r: Float, color: Int) {
-        starPath.reset()
-        for (i in 0 until 10) {
-            val ang = -Math.PI / 2 + i * Math.PI / 5
-            val rr = if (i % 2 == 0) r else r * 0.45f
+    private var goldShader: android.graphics.Shader? = null
+    private var goldShaderRadius = 0f
+    private val glyph = android.graphics.Path()
+
+    /** The super emblem: a spiky energy burst with a lightning bolt through it. */
+    private fun burst(c: Canvas, x: Float, y: Float, r: Float, charged: Boolean, a: Int) {
+        glyph.reset()
+        for (i in 0 until 16) {
+            val ang = -Math.PI / 2 + i * Math.PI / 8
+            val rr = if (i % 2 == 0) r else r * 0.64f
             val px = x + (kotlin.math.cos(ang) * rr).toFloat()
             val py = y + (kotlin.math.sin(ang) * rr).toFloat()
-            if (i == 0) starPath.moveTo(px, py) else starPath.lineTo(px, py)
+            if (i == 0) glyph.moveTo(px, py) else glyph.lineTo(px, py)
         }
-        starPath.close()
-        fill.color = color
-        c.drawPath(starPath, fill)
+        glyph.close()
+        line.strokeJoin = Paint.Join.ROUND
+        fill.color = if (charged) Color.argb(a, 255, 255, 255) else Color.argb(a * 150 / 255, 176, 164, 214)
+        c.drawPath(glyph, fill)
+        line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(2.5f)
+        c.drawPath(glyph, line)
+
+        glyph.reset()
+        val k = r * 1.5f
+        for (i in BOLT.indices step 2) {
+            val px = x + (BOLT[i] - 0.5f) * k
+            val py = y + (BOLT[i + 1] - 0.5f) * k
+            if (i == 0) glyph.moveTo(px, py) else glyph.lineTo(px, py)
+        }
+        glyph.close()
+        fill.color = if (charged) Color.argb(a, 255, 112, 20) else Color.argb(a * 220 / 255, 52, 40, 88)
+        c.drawPath(glyph, fill)
+        line.strokeWidth = dp(2f)
+        c.drawPath(glyph, line)
     }
 
     companion object {
         const val TAP_THRESHOLD = 0.28f
         const val CANCEL_THRESHOLD = 0.2f
+        /** Lightning bolt outline in a unit square. */
+        private val BOLT = floatArrayOf(0.58f, 0.12f, 0.3f, 0.55f, 0.48f, 0.55f, 0.4f, 0.9f, 0.72f, 0.42f, 0.53f, 0.42f)
     }
 }
