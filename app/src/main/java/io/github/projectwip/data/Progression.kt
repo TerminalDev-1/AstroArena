@@ -79,11 +79,12 @@ object Progression {
 
     /** Opens one capsule: rolls its tier and reward from the save's seed and grants it. Null if there is none to open. */
     fun openCapsule(save: SaveData): Pair<SaveData, CapsuleResult>? {
-        if (save.capsules <= 0) return null
+        val infinite = save.settings.debugInfiniteCapsules
+        if (save.capsules <= 0 && !infinite) return null
         val rng = kotlin.random.Random(save.capsuleSeed)
-        val tier = SparkCapsules.rollTier(rng)
+        val tier = SparkCapsules.rollTier(rng, save.settings.debugLuck)
         val reward = SparkCapsules.rollReward(tier, save, rng)
-        val next = grant(save, reward).copy(capsules = save.capsules - 1, capsulesOpened = save.capsulesOpened + 1, capsuleSeed = rng.nextLong())
+        val next = grant(save, reward).copy(capsules = if (infinite) save.capsules else save.capsules - 1, capsulesOpened = save.capsulesOpened + 1, capsuleSeed = rng.nextLong())
         return next to CapsuleResult(tier, reward)
     }
 

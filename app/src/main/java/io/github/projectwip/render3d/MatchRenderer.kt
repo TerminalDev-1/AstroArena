@@ -79,6 +79,8 @@ class MatchRenderer(
     private var aspect = 1.6f
     private var camX = Float.NaN
     private var camZ = 0f
+    private var lookX = 0f
+    private var lookZ = 0f
     private var eyeX = 0f; private var eyeY = 0f; private var eyeZ = 0f
     private var shake = 0f
     private var time = 0f
@@ -176,14 +178,19 @@ class MatchRenderer(
 
     private fun updateCamera(dt: Float, alpha: Float) {
         val p = match.player
-        var tx = lerp(p.prevX, p.x, alpha)
-        var tz = lerp(p.prevY, p.y, alpha)
         val inp = runner.input
-        if (inp.aimingAttack || inp.aimingSuper) { tx += inp.aimX * 1.5f; tz += inp.aimY * 1.1f }
+        val aiming = inp.aimingAttack || inp.aimingSuper
+        // The look-ahead while aiming eases in and out...
+        val ka = 1f - exp(-dt * 8f)
+        lookX += ((if (aiming) inp.aimX * 1.5f else 0f) - lookX) * ka
+        lookZ += ((if (aiming) inp.aimY * 1.1f else 0f) - lookZ) * ka
+        val tx = lerp(p.prevX, p.x, alpha) + lookX
+        val tz = lerp(p.prevY, p.y, alpha) + lookZ
         val dist = distance()
-        // The camera stays centred on you (with a small look-ahead while aiming).
+        // ...but the camera itself is locked to you: a soft follow made your own movement feel late.
+        // (Stiff rather than rigid, so a respawn glides across instead of cutting.)
         if (camX.isNaN()) { camX = tx; camZ = tz }
-        val k = 1f - exp(-dt * 8f)
+        val k = 1f - exp(-dt * 40f)
         camX += (tx - camX) * k
         camZ += (tz - camZ) * k
         shake = max(0f, shake - dt)

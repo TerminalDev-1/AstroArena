@@ -160,7 +160,7 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
-                    if (remaining > 0) ChunkyButton(onNext, Modifier.size(220.dp, 60.dp), ButtonStyle.GREEN) { GameText("OPEN NEXT ($remaining)", Type.Heading) }
+                    if (remaining > 0) ChunkyButton(onNext, Modifier.size(220.dp, 60.dp), ButtonStyle.GREEN) { GameText(if (remaining > 999) "OPEN NEXT" else "OPEN NEXT ($remaining)", Type.Heading) }
                 }
             }
         }

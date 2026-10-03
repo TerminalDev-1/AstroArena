@@ -30,7 +30,7 @@ class TouchControls(private val density: Float) {
         var knobY = 0f
         var maxDrag = 0f
         val active get() = pointerId != -1
-        fun reset() { pointerId = -1; maxDrag = 0f }
+        fun reset() { pointerId = -1; maxDrag = 0f; knobX = 0f; knobY = 0f }
     }
 
     enum class FireMode { NONE, AIMED, AUTO }
@@ -68,6 +68,7 @@ class TouchControls(private val density: Float) {
     private var fixedMoveY = 0f
     /** The player placed the move stick themselves: it stays put and is grabbed only near where it sits. */
     private var moveCustom = false
+    private val attackFloating get() = settings.attackStickMode == MoveStickMode.FLOATING
     val moveCx get() = fixedMoveX
     val moveCy get() = fixedMoveY
     var attackCx = 0f; private set
@@ -146,13 +147,17 @@ class TouchControls(private val density: Float) {
         if (!superStick.active && superReady && hypot(x - superCx, y - superCy) < superRadius * 1.6f) {
             grab(superStick, id, x, y, x, y); return
         }
-        if (!attack.active && hypot(x - attackCx, y - attackCy) < attackRadius * 1.8f) {
+        val moveZone = !move.active && moveCustom && hypot(x - fixedMoveX, y - fixedMoveY) < moveRadius * 1.8f
+        if (!attack.active && !moveZone && hypot(x - attackCx, y - attackCy) < attackRadius * 1.8f) {
             grab(attack, id, x, y, x, y); return
         }
-        if (move.active) return
-        if (moveCustom) {
-            if (hypot(x - fixedMoveX, y - fixedMoveY) < moveRadius * 1.8f) grab(move, id, fixedMoveX, fixedMoveY, x, y)
-        } else if (x < width * 0.5f) {
+        if (moveZone) { grab(move, id, fixedMoveX, fixedMoveY, x, y); return }
+        // Unlocked attack stick: the whole right half of the screen aims and fires.
+        if (!attack.active && attackFloating && x >= width * 0.5f) {
+            grab(attack, id, x, y, x, y); return
+        }
+        if (move.active || moveCustom) return
+        if (x < width * 0.5f) {
             if (settings.moveStickMode == MoveStickMode.FIXED) {
                 grab(move, id, fixedMoveX, fixedMoveY, x, y)
             } else {
@@ -288,12 +293,15 @@ class TouchControls(private val density: Float) {
 
         // ---- Attack stick
         val ready = ammo >= 1f && alive
-        ring(c, attackCx, attackCy, attackRadius, Color.argb(a * 60 / 255, 40, 10, 10), Color.argb(a * 150 / 255, 255, 255, 255))
+        // Unlocked: while held, the stick sits under the thumb instead of at its resting spot.
+        val ax = if (attack.active && attackFloating) attack.baseX else attackCx
+        val ay = if (attack.active && attackFloating) attack.baseY else attackCy
+        ring(c, ax, ay, attackRadius, Color.argb(a * 60 / 255, 40, 10, 10), Color.argb(a * 150 / 255, 255, 255, 255))
         // Ammo segments around the rim
         val segs = ammoMax
         val gap = 8f
         val sweep = (360f - gap * segs) / segs
-        arc.set(attackCx - attackRadius * 1.12f, attackCy - attackRadius * 1.12f, attackCx + attackRadius * 1.12f, attackCy + attackRadius * 1.12f)
+        arc.set(ax - attackRadius * 1.12f, ay - attackRadius * 1.12f, ax + attackRadius * 1.12f, ay + attackRadius * 1.12f)
         line.strokeWidth = dp(7f)
         for (i in 0 until segs) {
             val start = -90f + i * (sweep + gap) + gap / 2
@@ -305,8 +313,8 @@ class TouchControls(private val density: Float) {
                 c.drawArc(arc, start, sweep * f, false, line)
             }
         }
-        val kx = attackCx + attack.knobX * attackRadius
-        val ky = attackCy + attack.knobY * attackRadius
+        val kx = ax + attack.knobX * attackRadius
+        val ky = ay + attack.knobY * attackRadius
         fill.color = if (ready) Color.argb(a, 255, 122, 26) else Color.argb(a * 160 / 255, 120, 110, 130)
         c.drawCircle(kx, ky, attackRadius * 0.46f, fill)
         line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(3f)
@@ -317,14 +325,16 @@ class TouchControls(private val density: Float) {
         val sk = superStick
         val sr = superRadius
         val charged = superCharge >= 1f && alive
-        val bx = if (charged) superCx + sk.knobX * sr * 1.4f else superCx
-        val by = if (charged) superCy + sk.knobY * sr * 1.4f else superCy
+        val restX = if (sk.active && attackFloating) sk.baseX else superCx
+        val restY = if (sk.active && attackFloating) sk.baseY else superCy
+        val bx = if (charged) restX + sk.knobX * sr * 1.4f else superCx
+        val by = if (charged) restY + sk.knobY * sr * 1.4f else superCy
         if (charged) {
             // Charged: glowing gold button with spinning rays, so it can't be missed.
             val pulse = 1f + 0.06f * kotlin.math.sin(time * 6f)
             fill.color = Color.argb(a * 90 / 255, 255, 214, 64)
             c.drawCircle(superCx, superCy, sr * 1.38f * pulse, fill)
-            if (sk.active) ring(c, superCx, superCy, sr * 1.4f, Color.argb(a * 50 / 255, 60, 40, 0), Color.argb(a * 160 / 255, 255, 230, 120))
+            if (sk.active) ring(c, restX, restY, sr * 1.4f, Color.argb(a * 50 / 255, 60, 40, 0), Color.argb(a * 160 / 255, 255, 230, 120))
             line.color = Color.argb(a * 220 / 255, 255, 240, 170); line.strokeWidth = dp(4f)
             for (i in 0 until 8) {
                 val ang = time * 1.6f + i * (Math.PI / 4).toFloat()

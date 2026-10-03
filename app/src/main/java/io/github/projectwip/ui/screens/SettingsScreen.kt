@@ -65,10 +65,12 @@ import io.github.projectwip.ui.ScreenHeader
 import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.plateShape
 import io.github.projectwip.audio.Sound
+import io.github.projectwip.data.CapsuleTier
+import io.github.projectwip.data.SparkCapsules
 
 const val REPO_URL = "https://github.com/TerminalDev-1/ProjectWIP-Preview"
 
-private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data") }
+private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), DEBUG("Debug") }
 
 @Composable
 fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
@@ -84,9 +86,9 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("SETTINGS", { go(Screen.Home) }, null, null)
             Row(Modifier.weight(1f).padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
-                Column(Modifier.width(if (ui.roomy) 200.dp else 170.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.width(if (ui.roomy) 200.dp else 170.dp), verticalArrangement = Arrangement.spacedBy(if (ui.roomy) 10.dp else 7.dp)) {
                     for (t in Tab.entries) {
-                        ChunkyButton({ tab = t }, Modifier.fillMaxWidth().height(if (ui.roomy) 58.dp else 48.dp),
+                        ChunkyButton({ tab = t }, Modifier.fillMaxWidth().height(if (ui.roomy) 58.dp else 42.dp),
                             if (t == tab) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp) {
                             GameText(t.label.uppercase(), Type.Label, outline = 2.dp)
                         }
@@ -101,6 +103,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                             Tab.AUDIO -> AudioTab(s, set)
                             Tab.DISPLAY -> DisplayTab(s, set)
                             Tab.DATA -> DataTab(repo)
+                            Tab.DEBUG -> DebugTab(save, repo, set)
                         }
                     }
                 }
@@ -166,9 +169,13 @@ private fun ControlsTab(s: Settings, set: ((Settings) -> Settings) -> Unit, onEd
     SectionTitle("CONTROL LAYOUT", "Drag the move stick, attack and super buttons anywhere on screen — for example all on one side, to play one-handed." +
         if (s.controlLayout.isDefault) "" else " You are using a custom layout.")
     ChunkyButton(onEditLayout, Modifier.width(260.dp).height(56.dp), ButtonStyle.CYAN) { GameText("EDIT LAYOUT", Type.Heading) }
-    SectionTitle("MOVE STICK", "Floating appears wherever your left thumb lands. Fixed always sits in the corner.")
-    Segmented(listOf("FLOATING", "FIXED"), if (s.moveStickMode == MoveStickMode.FLOATING) 0 else 1) { i ->
+    SectionTitle("MOVE STICK", "Unlocked: the stick appears wherever your thumb lands on the left half and follows it. Locked: it always sits in its spot.")
+    Segmented(listOf("UNLOCKED", "LOCKED"), if (s.moveStickMode == MoveStickMode.FLOATING) 0 else 1) { i ->
         set { it.copy(moveStickMode = if (i == 0) MoveStickMode.FLOATING else MoveStickMode.FIXED) }
+    }
+    SectionTitle("ATTACK & SUPER", "Unlocked: touch anywhere on the right half to aim and fire, and the sticks move under your thumb. Locked: only the buttons themselves respond.")
+    Segmented(listOf("UNLOCKED", "LOCKED"), if (s.attackStickMode == MoveStickMode.FLOATING) 0 else 1) { i ->
+        set { it.copy(attackStickMode = if (i == 0) MoveStickMode.FLOATING else MoveStickMode.FIXED) }
     }
     SliderRow("CONTROL SIZE", "${(s.controlScale * 100).toInt()}%", s.controlScale, 0.7f, 1.4f) { v -> set { it.copy(controlScale = v) } }
     SliderRow("CONTROL OPACITY", "${(s.controlOpacity * 100).toInt()}%", s.controlOpacity, 0.3f, 1f) { v -> set { it.copy(controlOpacity = v) } }
@@ -209,6 +216,22 @@ private fun DataTab(repo: GameRepository) {
     PlainText(REPO_URL, Type.Small, color = Palette.Cyan)
     if (confirm) {
         ConfirmDialog("RESET EVERYTHING?", "All progress will be lost.", "RESET", { repo.resetProgress(); confirm = false }, { confirm = false }, ButtonStyle.RED)
+    }
+}
+
+@Composable
+private fun DebugTab(save: SaveData, repo: GameRepository, set: ((Settings) -> Settings) -> Unit) {
+    val s = save.settings
+    SectionTitle("DEBUG MENU", "Cheats for trying things out. They change your real save.")
+    ToggleRow("INFINITE CAPSULES", "The capsule button always works and opening one never uses it up.", s.debugInfiniteCapsules) { v -> set { it.copy(debugInfiniteCapsules = v) } }
+    SliderRow("CAPSULE LUCK", "×${"%.1f".format(1f + s.debugLuck)}", s.debugLuck, 0f, SparkCapsules.MAX_LUCK) { v -> set { it.copy(debugLuck = (v * 10).toInt() / 10f) } }
+    val odds = SparkCapsules.odds(s.debugLuck)
+    PlainText(CapsuleTier.entries.joinToString("  ·  ") { "${it.label} ${"%.1f".format(odds[it.ordinal] * 100)}%" }, Type.Body, color = Color.White)
+    SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.bolts)} Bolts, ${"%,d".format(save.prisms)} Prisms and ${save.capsules} capsules.")
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ChunkyButton({ repo.debugGrant(bolts = 1000) }, Modifier.width(190.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("+1,000 BOLTS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ repo.debugGrant(prisms = 100) }, Modifier.width(190.dp).height(52.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("+100 PRISMS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ repo.debugGrant(capsules = 5) }, Modifier.width(190.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 CAPSULES", Type.Label, outline = 2.dp) }
     }
 }
 

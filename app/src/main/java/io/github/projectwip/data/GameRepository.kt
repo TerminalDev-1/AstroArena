@@ -50,6 +50,10 @@ class GameRepository(private val store: SaveStore) {
 
     fun openCapsule(): CapsuleResult? = Progression.openCapsule(_save.value)?.let { (s, r) -> commit(s); r }
 
+    /** Debug menu hand-outs. */
+    fun debugGrant(bolts: Int = 0, prisms: Int = 0, capsules: Int = 0) =
+        commit(_save.value.let { it.copy(bolts = it.bolts + bolts, prisms = it.prisms + prisms, capsules = it.capsules + capsules) })
+
     val capsulesLeftToday: Int get() = Progression.capsulesLeftToday(_save.value, today)
 
     fun claimDailyGift(): Reward? = Progression.claimDailyGift(_save.value, today)?.let { (s, r) -> commit(s); r }

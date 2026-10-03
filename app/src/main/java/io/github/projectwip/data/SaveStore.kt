@@ -90,6 +90,9 @@ class SaveStore(context: Context) {
                 put("highFrameRate", st.highFrameRate)
                 put("showFps", st.showFps)
                 put("playerName", st.playerName)
+                put("attackStickMode", st.attackStickMode.name)
+                put("debugLuck", st.debugLuck.toDouble())
+                put("debugInfiniteCapsules", st.debugInfiniteCapsules)
                 val l = st.controlLayout
                 put("controlLayout", JSONArray(listOf(l.moveX, l.moveY, l.attackX, l.attackY, l.superX, l.superY).map { it.toDouble() }))
             })
@@ -124,6 +127,9 @@ class SaveStore(context: Context) {
                 highFrameRate = so.optBoolean("highFrameRate", sd.highFrameRate),
                 showFps = so.optBoolean("showFps", sd.showFps),
                 playerName = so.optString("playerName", sd.playerName).take(16).ifBlank { sd.playerName },
+                attackStickMode = enumOr(so.optString("attackStickMode"), sd.attackStickMode),
+                debugLuck = so.optDouble("debugLuck", 0.0).toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, SparkCapsules.MAX_LUCK) },
+                debugInfiniteCapsules = so.optBoolean("debugInfiniteCapsules", false),
                 controlLayout = so.optJSONArray("controlLayout")?.takeIf { it.length() == 6 }?.let { a ->
                     fun f(i: Int) = a.optDouble(i, -1.0).toFloat().let { if (it.isNaN()) -1f else it.coerceIn(-1f, 1f) }
                     ControlLayout(f(0), f(1), f(2), f(3), f(4), f(5))

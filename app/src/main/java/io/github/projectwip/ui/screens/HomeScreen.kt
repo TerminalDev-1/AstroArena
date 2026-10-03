@@ -120,7 +120,7 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.End,
                 ) {
-                    CapsuleButton(save.capsules, Progression.capsulesLeftToday(save, repo.today), openCapsule)
+                    CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), openCapsule)
                     Spacer(Modifier.height(10.dp))
                     ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
                     Spacer(Modifier.height(12.dp))
@@ -234,7 +234,7 @@ private fun CapsuleButton(count: Int, leftToday: Int, onOpen: () -> Unit) {
         }
         if (count > 0) {
             val pulse by rememberInfiniteTransition(label = "capsules").animateFloat(1f, 1.15f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
-            Badge(count.toString(), Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).graphicsLayer { scaleX = pulse; scaleY = pulse })
+            Badge(if (count > 999) "∞" else count.toString(), Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).graphicsLayer { scaleX = pulse; scaleY = pulse })
         }
     }
 }

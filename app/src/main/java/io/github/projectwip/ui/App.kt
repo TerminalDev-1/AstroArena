@@ -168,7 +168,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
                 reveal?.let { RewardRevealOverlay(it) { reveal = null } }
             }
             AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                capsule?.let { CapsuleOpenOverlay(it, save.capsules, onNext = openCapsule, onDone = { capsule = null }) }
+                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, onNext = openCapsule, onDone = { capsule = null }) }
             }
         }
     }

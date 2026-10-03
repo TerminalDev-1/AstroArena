@@ -181,4 +181,25 @@ class ProgressionTest {
         for (t in CapsuleTier.entries.zipWithNext()) assertTrue("${t.first} should be more common than ${t.second}", seen.getValue(t.first) > seen.getValue(t.second))
         assertTrue("Prismatic capsules unlock every fighter eventually", FighterId.entries.all { save.progress(it).unlocked })
     }
+
+    @Test fun debugLuckAndInfiniteCapsules() {
+        val normal = SparkCapsules.odds(0f)
+        val lucky = SparkCapsules.odds(SparkCapsules.MAX_LUCK)
+        assertEquals(1f, normal.sum(), 1e-4f)
+        assertEquals(1f, lucky.sum(), 1e-4f)
+        assertEquals(0.02f, normal.last(), 1e-4f)
+        assertTrue("max luck makes Prismatic the most likely tier", lucky.last() > 0.5f && lucky.last() == lucky.max())
+
+        val settings = io.github.projectwip.data.Settings(debugLuck = SparkCapsules.MAX_LUCK, debugInfiniteCapsules = true)
+        var save = SaveData(capsules = 0, capsuleSeed = 3, settings = settings)
+        var prismatic = 0
+        repeat(200) {
+            val (next, result) = Progression.openCapsule(save)!!
+            if (result.tier == CapsuleTier.PRISMATIC) prismatic++
+            save = next
+        }
+        assertEquals("infinite capsules never run out", 0, save.capsules)
+        assertEquals(200, save.capsulesOpened)
+        assertTrue("luck should show ($prismatic/200 Prismatic)", prismatic > 70)
+    }
 }

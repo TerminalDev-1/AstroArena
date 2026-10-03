@@ -55,7 +55,9 @@ class MatchView(
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (Build.VERSION.SDK_INT >= 30) {
-            holder.surface.setFrameRate(if (settings.highFrameRate) 120f else 60f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+            // Ask for exactly what the panel runs at: 120 fps content on a 144 Hz screen judders.
+            val hz = if (settings.highFrameRate) display?.refreshRate ?: 120f else 60f
+            holder.surface.setFrameRate(hz, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
         }
         thread = GlThread(holder.surface, MatchRenderer(runner, channel, matchesPlayed), "match-gl").also { it.start() }
     }

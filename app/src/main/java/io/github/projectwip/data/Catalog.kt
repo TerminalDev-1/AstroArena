@@ -74,9 +74,19 @@ object SparkCapsules {
     fun earns(report: MatchReport): Boolean =
         if (report.mode == GameMode.LAST_SPARK) report.placement in 1..4 else report.outcome == MatchOutcome.VICTORY
 
-    fun rollTier(rng: kotlin.random.Random): CapsuleTier {
-        var roll = rng.nextInt(CapsuleTier.entries.sumOf { it.weight })
-        for (t in CapsuleTier.entries) { roll -= t.weight; if (roll < 0) return t }
+    /** Highest luck the debug menu offers. */
+    const val MAX_LUCK = 4f
+
+    /** Chance of each tier (summing to 1). [luck] multiplies a tier's weight by (1 + luck) for every tier it is above Scrap. */
+    fun odds(luck: Float = 0f): List<Float> {
+        val w = CapsuleTier.entries.map { it.weight * Math.pow(1.0 + luck, it.ordinal.toDouble()).toFloat() }
+        val sum = w.sum()
+        return w.map { it / sum }
+    }
+
+    fun rollTier(rng: kotlin.random.Random, luck: Float = 0f): CapsuleTier {
+        var roll = rng.nextFloat()
+        for ((i, chance) in odds(luck).withIndex()) { roll -= chance; if (roll < 0f) return CapsuleTier.entries[i] }
         return CapsuleTier.SCRAP
     }
 

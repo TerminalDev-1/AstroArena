@@ -1,5 +1,6 @@
 package io.github.projectwip.data
 
+/** FLOATING = unlocked: the stick appears wherever the thumb lands. FIXED = locked in place. */
 enum class MoveStickMode { FLOATING, FIXED }
 
 /**
@@ -33,6 +34,12 @@ data class Settings(
     val showFps: Boolean = false,
     val playerName: String = "Player",
     val controlLayout: ControlLayout = ControlLayout(),
+    /** Unlocked: touching anywhere on the right half of the screen is the attack stick. */
+    val attackStickMode: MoveStickMode = MoveStickMode.FLOATING,
+    /** Debug menu: 0 = normal capsule odds; each point multiplies the weight of every tier above the last. */
+    val debugLuck: Float = 0f,
+    /** Debug menu: opening a capsule doesn't use one up. */
+    val debugInfiniteCapsules: Boolean = false,
 )
 
 data class FighterProgress(
