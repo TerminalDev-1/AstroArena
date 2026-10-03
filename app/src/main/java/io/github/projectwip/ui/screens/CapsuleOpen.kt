@@ -37,17 +37,14 @@ import io.github.projectwip.data.CapsuleResult
 import io.github.projectwip.data.CapsuleTier
 import io.github.projectwip.ui.ButtonStyle
 import io.github.projectwip.ui.ChunkyButton
-import io.github.projectwip.ui.FighterRays
 import io.github.projectwip.ui.GameText
 import io.github.projectwip.ui.LocalLobby
 import io.github.projectwip.ui.LocalSfx
 import io.github.projectwip.ui.LocalUi
 import io.github.projectwip.ui.Palette
 import io.github.projectwip.ui.PlainText
-import io.github.projectwip.ui.RewardVisual
 import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.rememberAnimTime
-import io.github.projectwip.ui.rewardLabel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.sin
@@ -61,7 +58,7 @@ private val TAPS = CapsuleTier.entries.size - 1
  * reveal it: each knock either rattles the capsule or charges it up a tier, and the last one bursts it open.
  */
 @Composable
-fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit, onDone: () -> Unit) = key(result) {
+fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, prismsNow: Int, onNext: () -> Unit, onDone: () -> Unit) = key(result) {
     val sfx = LocalSfx.current
     val ui = LocalUi.current
     val scope = rememberCoroutineScope()
@@ -141,7 +138,6 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
         contentAlignment = Alignment.Center,
     ) {
         val capsuleRoom = maxHeight * 0.46f
-        if (opened) FighterRays(Modifier.size(if (ui.roomy) 640.dp else 520.dp), color)
         if (!opened) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 GameText("SPARK CAPSULE", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
@@ -163,18 +159,10 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, onNext: () -> Unit
                     modifier = Modifier.graphicsLayer { scaleX = splitPop.value; scaleY = splitPop.value })
             }
         } else {
-            val rise = remember { Animatable(0.4f) }
-            androidx.compose.runtime.LaunchedEffect(Unit) { rise.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)) }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { scaleX = rise.value; scaleY = rise.value }) {
-                GameText("${result.tier.label} capsule".uppercase(), Type.Title, color = Color(result.tier.color), outline = 3.5.dp)
-                Spacer(Modifier.height(6.dp))
-                RewardVisual(result.reward, Modifier.size(if (ui.roomy) 170.dp else 120.dp))
-                Spacer(Modifier.height(6.dp))
-                // Bundles list several things, so they get smaller type and room to wrap.
-                val bundle = result.reward is io.github.projectwip.data.Reward.Bundle
-                GameText(rewardLabel(result.reward), if (bundle) Type.Title else Type.Display, outline = 4.dp, align = TextAlign.Center, maxLines = if (bundle) 2 else 1)
-                if (result.split) { Spacer(Modifier.height(6.dp)); io.github.projectwip.ui.Badge("SPLIT INTO ${result.pieces} · +${result.pieces - 1} CAPSULE${if (result.pieces > 2) "S" else ""}", color = Palette.GreenDeep) }
-                Spacer(Modifier.height(16.dp))
+            io.github.projectwip.ui.RewardShowcase(
+                "${result.tier.label} capsule", Color(result.tier.color), result.reward, boltsNow, prismsNow,
+                note = if (result.split) "SPLIT INTO ${result.pieces} · +${result.pieces - 1} CAPSULE${if (result.pieces > 2) "S" else ""}" else null,
+            ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
                     if (remaining > 0) ChunkyButton(onNext, Modifier.size(220.dp, 60.dp), ButtonStyle.GREEN) { GameText(if (remaining > 999) "OPEN NEXT" else "OPEN NEXT ($remaining)", Type.Heading) }

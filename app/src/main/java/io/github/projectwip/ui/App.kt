@@ -100,8 +100,14 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
     var capsule by remember {
         // Debug: `--es screen capsule3` previews opening a capsule of tier 3 (`capsule3s`: one that splits into eight) without touching the save.
         mutableStateOf(startScreen?.takeIf { it.startsWith("capsule") }?.let {
-            val tier = CapsuleTier.entries[(it.removePrefix("capsule").removeSuffix("s").toIntOrNull() ?: 0).coerceIn(0, CapsuleTier.entries.lastIndex)]
-            CapsuleResult(tier, Reward.Bolts(100 * (tier.ordinal + 1)), pieces = if (it.endsWith("s")) 8 else 1)
+            val tier = CapsuleTier.entries[(it.removePrefix("capsule").trimEnd('s', 'f', 'b').toIntOrNull() ?: 0).coerceIn(0, CapsuleTier.entries.lastIndex)]
+            // Suffixes: s = splits into eight, f = a fighter comes out, b = a bundle comes out.
+            val reward = when {
+                it.endsWith("f") -> Reward.UnlockFighter(FighterId.MIRA)
+                it.endsWith("b") -> Reward.Bundle(listOf(Reward.SkinReward(FighterId.BRAKK, 1), Reward.Prisms(150), Reward.Bolts(800)))
+                else -> Reward.Bolts(100 * (tier.ordinal + 1))
+            }
+            CapsuleResult(tier, reward, pieces = if (it.endsWith("s")) 8 else 1)
         })
     }
 
@@ -111,7 +117,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
     }
 
     val go: (Screen) -> Unit = { if (it !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f); screen = it }
-    val showReward: (RewardReveal) -> Unit = { reveal = it; sfx.play(Sound.REWARD) }
+    val showReward: (RewardReveal) -> Unit = { reveal = it }
 
     val openCapsule: () -> Unit = { repo.openCapsule()?.let { capsule = it } }
     var debugMenu by remember { mutableStateOf(false) }
@@ -170,7 +176,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
             }
 
             AnimatedVisibility(reveal != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                reveal?.let { RewardRevealOverlay(it) { reveal = null } }
+                reveal?.let { RewardRevealOverlay(it, save.bolts, save.prisms) { reveal = null } }
             }
             // The debug menu hides behind a small "D" in the corner of every menu screen.
             if (screen !is Screen.Match && capsule == null && reveal == null) {
@@ -178,7 +184,7 @@ fun App(repo: GameRepository, sfx: Sfx, startScreen: String? = null) {
             }
             if (debugMenu) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
             AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, onNext = openCapsule, onDone = { capsule = null }) }
+                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, onNext = openCapsule, onDone = { capsule = null }) }
             }
         }
     }
@@ -221,22 +227,13 @@ fun RewardVisual(r: Reward, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RewardRevealOverlay(r: RewardReveal, onDismiss: () -> Unit) {
-    val pop = remember { Animatable(0.4f) }
-    LaunchedEffect(r) { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)) }
+private fun RewardRevealOverlay(r: RewardReveal, boltsNow: Int, prismsNow: Int, onDismiss: () -> Unit) {
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f))
-            .clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss),
+        // Swallows taps so nothing underneath is pressed while the reward plays out.
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).clickable(remember { MutableInteractionSource() }, null) { },
         contentAlignment = Alignment.Center,
     ) {
-        FighterRays(Modifier.size(520.dp))
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }) {
-            GameText(r.title.uppercase(), Type.Title, color = Palette.Gold, outline = 3.5.dp)
-            Spacer(Modifier.height(8.dp))
-            RewardVisual(r.reward, Modifier.size(170.dp))
-            Spacer(Modifier.height(8.dp))
-            GameText(rewardLabel(r.reward), Type.Display, outline = 4.dp, align = TextAlign.Center)
-            Spacer(Modifier.height(18.dp))
+        RewardShowcase(r.title, Palette.Gold, r.reward, boltsNow, prismsNow) {
             ChunkyButton(onDismiss, Modifier.size(200.dp, 60.dp), ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
         }
     }

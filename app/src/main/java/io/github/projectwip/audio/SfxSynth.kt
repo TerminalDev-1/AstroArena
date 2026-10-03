@@ -15,7 +15,7 @@ enum class Sound {
     SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
-    UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP,
+    UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING,
 }
 
 /**
@@ -59,6 +59,7 @@ object SfxSynth {
         Sound.BANNER -> banner().finish(0.8f)
         Sound.COUNT -> count().finish(0.42f)
         Sound.POP -> pop().finish(0.55f)
+        Sound.CHING -> ching().finish(0.6f)
     }
 
     // ------------------------------------------------------------------ envelopes & pitch
@@ -466,6 +467,18 @@ object SfxSynth {
         drive(1.3f)
         for ((i, n) in intArrayOf(84, 88, 91, 96, 100).withIndex()) bell(hit + 0.1f + i * 0.05f, n, 0.16f, 0.09f)
         reverb(0.22f, 0.72f)
+    }
+
+    /** Ch-ching: two thin, tinny metal pings in quick succession, like coins dropping into a tin. */
+    private fun ching() = Clip(0.42f).apply {
+        for ((at, f) in listOf(0f to 3100f, 0.075f to 3650f)) {
+            fm(at, 0.3f, { f }, 1.47f, { 1.6f * exp(-it / 0.05f) }, { perc(it, 0.0008f, 0.06f) * 0.7f })
+            osc(Wave.SINE, at, 0.25f, { f * 1.68f }, { perc(it, 0.0008f, 0.035f) * 0.35f })
+            osc(Wave.SINE, at, 0.2f, { f * 2.31f }, { perc(it, 0.0008f, 0.02f) * 0.2f })
+            noise(205 + at.toInt(), at, 0.012f, Band.HIGH, { 7000f }, 0.7f, { perc(it, 0.0003f, 0.003f) * 0.5f })
+        }
+        // Nothing below about 2 kHz: that is what makes it tinny rather than bell-like.
+        filter(Band.HIGH, 0.8f) { 2000f }
     }
 
     /** One step of a number counting up (played over and over at rising pitch). */
