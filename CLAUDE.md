@@ -84,5 +84,10 @@ See `README.md` (features, build, where to change rules) and `docs/ARCHITECTURE.
 
 - Commit as the repo-local git identity (already configured); end commit messages with the co-author line used
   in history. Remote: `https://github.com/TerminalDev-1/ProjectWIP-Preview` (public); releases are tagged
-  `vX.Y.Z-preview`. Ask before pushing or tagging unless the user asked for it.
+  `vX.Y.Z-preview`. Ask before tagging a release unless the user asked for it.
+- **Checkpoint to GitHub while you work.** As soon as a piece of code or logic is verified (tests pass, or it was
+  checked on the device), commit just that piece and `git push origin main`, so there is always a known-good
+  version to fall back to. One checkpoint per verified piece — don't batch a whole session into one commit, and
+  never checkpoint something unverified or a build that doesn't compile. Checkpoint pushes need no extra
+  confirmation; tagging a release still does.
 - `screenshots/` is gitignored scratch space for device captures.
