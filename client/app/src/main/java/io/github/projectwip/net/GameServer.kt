@@ -12,6 +12,8 @@ import io.github.projectwip.data.FighterProgress
 import io.github.projectwip.data.ServerProfile
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.GameMode
+import io.github.projectwip.data.JudgedResult
+import io.github.projectwip.data.MatchOutcome
 import io.github.projectwip.data.MatchReport
 import io.github.projectwip.data.Reward
 import io.github.projectwip.data.ServerVerdict
@@ -69,7 +71,11 @@ data class ServerStatus(
 )
 
 /** A match as the server set it up. */
-data class MatchPlan(val matchId: Long, val seed: Long, val botNames: List<String>, val difficulty: BotDifficulty?)
+data class MatchPlan(
+    val matchId: Long, val seed: Long, val botNames: List<String>, val difficulty: BotDifficulty?,
+    /** The level the server holds for the fighter; the match is played (and replayed) at this level. */
+    val level: Int?,
+)
 
 /** A real player on the server's leaderboard. */
 data class RemotePlayer(val id: String, val name: String, val cups: Int, val fighter: FighterId)
@@ -79,7 +85,10 @@ data class RemotePlayer(val id: String, val name: String, val cups: Int, val fig
  *
  * The server is in charge of Cups, Spark Drops, Bolts, Prisms, fighters, the shop and its deals, the bot
  * difficulty and who gets the debug menu. Without it the game still plays, in offline mode: matches are set up
- * on the device, but nothing is earned and nothing can be bought, upgraded, claimed or opened. Nothing here may ever block
+ * on the device, but nothing is earned and nothing can be bought, upgraded, claimed or opened.
+ *
+ * A match is still played on the device, but its result is the server's: the device hands in what the player did
+ * and the server replays the match itself ([reportMatch]). Nothing here may ever block
  * or break offline play.
  *
  * The blocking calls ([connect], [syncSave], [planMatch], [reportMatch], [openDrop], [leaderboard]) must be made
@@ -337,26 +346,46 @@ class GameServer(context: Context) {
             return null
         }
         val names = o.optJSONArray("botNames")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() } } ?: emptyList()
-        return MatchPlan(o.optLong("matchId"), o.optLong("seed"), names, BotDifficulty.entries.firstOrNull { it.name == o.optString("difficulty") })
+        val planned = BotDifficulty.entries.firstOrNull { it.name == o.optString("difficulty") }
+        // The bots must behave exactly as the server will have them behave when it replays this match.
+        o.optJSONObject("bots")?.let { settings ->
+            val d = planned ?: difficulty
+            val values = HashMap<String, Any>()
+            for (key in settings.keys()) values[key] = settings.get(key)
+            BotProfile.overrides = BotProfile.overrides + (d to BotProfile.builtIn(d).withOverrides(values))
+        }
+        return MatchPlan(o.optLong("matchId"), o.optLong("seed"), names, planned, if (o.has("level")) o.optInt("level") else null)
     }
 
     /**
-     * Tells the server how a match it planned went. The server answers with what the match was worth: the Cups
-     * and whether it earned a Spark Drop. Null when the match wasn't the server's, the server couldn't be
-     * reached, or it refused the result.
+     * Hands a finished match to the server: the player's [inputs] (see [io.github.projectwip.sim.InputLog]), which
+     * the server replays to find the result for itself, and the device's own [report] for servers without a
+     * referee. The answer is what the match was worth and, with a referee, how the server says it went. Null
+     * when the match wasn't the server's, the server couldn't be reached, or it refused the match.
      */
-    fun reportMatch(matchId: Long, report: MatchReport): ServerVerdict? {
+    fun reportMatch(matchId: Long, report: MatchReport, inputs: ByteArray?): ServerVerdict? {
         if (matchId <= 0 || !usable) return null
         val body = JSONObject().put("outcome", report.outcome.name).put("placement", report.placement)
             .put("kos", report.kos).put("deaths", report.deaths).put("damage", report.damageDealt).put("mvp", report.mvp)
-        val r = call("POST", "/v1/matches/$matchId/result", body, auth = true)
+        if (inputs != null) {
+            val packed = java.io.ByteArrayOutputStream()
+            java.util.zip.GZIPOutputStream(packed).use { it.write(inputs) }
+            body.put("inputs", java.util.Base64.getEncoder().encodeToString(packed.toByteArray()))
+        }
+        // Replaying a match takes the server a second or two.
+        val r = call("POST", "/v1/matches/$matchId/result", body, auth = true, timeoutMs = 20000)
         val o = r?.body
         if (r == null) lost()
         if (r == null || r.code != 200 || o == null) return null
         val account = o.optJSONObject("account")
+        val judged = o.optJSONObject("report")?.let { j ->
+            MatchOutcome.entries.firstOrNull { it.name == j.optString("outcome") }?.let {
+                JudgedResult(it, j.optInt("placement"), j.optInt("kos"), j.optInt("deaths"), j.optInt("damage"), j.optBoolean("mvp"))
+            }
+        }
         return ServerVerdict(
             o.optInt("cupDelta"), o.optInt("cups"), o.optBoolean("drop"), account?.optInt("drops") ?: 0, account?.optInt("dropsLeftToday") ?: 0,
-            bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"),
+            bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"), judged = judged,
         )
     }
 

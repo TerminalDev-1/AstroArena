@@ -48,7 +48,17 @@ data class PlayerLine(
     val placement: Int = 0,
 )
 
-data class MatchSummary(val report: MatchReport, val players: List<PlayerLine>, val playerTeam: Int, val serverMatchId: Long = 0)
+data class MatchSummary(
+    val report: MatchReport, val players: List<PlayerLine>, val playerTeam: Int, val serverMatchId: Long = 0,
+    /** What the player did, tick by tick: the server replays the match from this. */
+    val inputs: ByteArray? = null,
+) {
+    /** This summary with the server's findings in place of the device's own. */
+    fun judged(j: io.github.projectwip.data.JudgedResult): MatchSummary = copy(
+        report = j.over(report),
+        players = players.map { if (it.isPlayer) it.copy(kos = j.kos, deaths = j.deaths, damage = j.damage, placement = j.placement) else it },
+    )
+}
 
 fun summarize(match: Match, report: MatchReport): MatchSummary {
     // Free-for-all: the star goes to the last fighter standing; team modes use the contribution score.
@@ -61,6 +71,7 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
         },
         match.player.team,
         match.config.serverMatchId,
+        match.inputs.toBytes(),
     )
 }
 
@@ -82,7 +93,10 @@ fun MatchScreen(
             server?.planMatch(config.mode, config.playerFighter, config.playerLevel, config.difficulty)
         }
         val planned = if (plan == null) config
-            else config.copy(seed = plan.seed, botNames = plan.botNames, serverMatchId = plan.matchId, difficulty = plan.difficulty ?: config.difficulty)
+            else config.copy(
+                seed = plan.seed, botNames = plan.botNames, serverMatchId = plan.matchId,
+                difficulty = plan.difficulty ?: config.difficulty, playerLevel = plan.level ?: config.playerLevel,
+            )
         match = Match(planned)
     }
     val ready = match

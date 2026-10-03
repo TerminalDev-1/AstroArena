@@ -254,6 +254,23 @@ class ProgressionTest {
         assertTrue(other.fingerprint != io.github.projectwip.sim.Referee.fingerprint(live))
     }
 
+    @Test fun theServersResultReplacesTheDevices() {
+        val mine = report(MatchOutcome.VICTORY, kos = 7).copy(mode = GameMode.LAST_SPARK, placement = 1, mvp = true)
+        val judged = io.github.projectwip.data.JudgedResult(MatchOutcome.DEFEAT, placement = 6, kos = 1, deaths = 1, damage = 900, mvp = false)
+        val shown = judged.over(mine)
+        assertEquals(MatchOutcome.DEFEAT, shown.outcome)
+        assertEquals(6, shown.placement)
+        assertEquals(1, shown.kos)
+        assertEquals(900, shown.damageDealt)
+        assertFalse(shown.mvp)
+        assertEquals("what the match was stays as it was", mine.mode to mine.fighter, shown.mode to shown.fighter)
+        val verdict = ServerVerdict(-1, 99, false, 0, 3, bolts = 14, judged = judged)
+        val (after, rewards) = Progression.applyMatch(SaveData(cups = 100, bestCups = 100), shown, today = 4, verdict = verdict)
+        assertEquals(0, after.victories)
+        assertEquals(1, after.totalKos)
+        assertEquals(-1, rewards.cupDelta)
+    }
+
     @Test fun versionsCompareByNumber() {
         val v = io.github.projectwip.data.Versions
         assertTrue(v.isNewer("v0.4.2-preview", "0.4.1-preview"))

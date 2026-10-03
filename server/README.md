@@ -3,6 +3,10 @@
 A small game server in Python: a JSON API over HTTP in front of a SQLite database. It uses only the Python
 standard library (3.10 or newer), so there is nothing to install.
 
+To referee matches it also needs **Java 17 or newer** (it runs the game's own simulation, `referee/referee.jar`).
+When it starts it says whether the referee is on. Without Java it still runs, but can only check that results
+are believable.
+
 ## Run it
 
 Double-click `run.bat`, or:
@@ -34,7 +38,7 @@ server never locks anyone out.
 | **Deals** | shop offers made by developers in the game's Offer Creator, stored here and shown to every player |
 | **Leaderboard** | the real accounts on this server, ranked by Cups; there are no made-up names |
 | **Spark Drops** | the server decides when one is earned (three a day) and rolls what comes out when it is opened |
-| **Matches** | the server plans each match (seed, bot names, difficulty) and checks the result it is sent |
+| **Matches** | the server plans each match (seed, bots, difficulty, fighter level). The game hands in what the player did, and the server replays the whole match to get the result |
 | **Saves** | the game uploads its save (settings and local statistics) after every change; a fresh install restores it |
 
 The `.cfg` files are re-read when they change, so edits apply without a restart.
@@ -56,21 +60,30 @@ the debug menu's cheats unless the id is listed.
 
 ### What the server can and can't stop
 
-The fight itself runs on the device; the server only sees the summary. So:
+The fight is played on the device, which then hands in the player's inputs, tick by tick. The server replays
+the match with those inputs, the seed and the bots it chose, using the game's own simulation, and takes the
+result from its replay. So:
+
+- A device can't claim a result. Whatever it says about who won, the knockouts or the damage is ignored.
+- Changed health, damage, speed or cooldowns on the device change nothing: the replay uses the real numbers.
+- A match that is handed in unfinished counts as walking out: a defeat, in last place.
+- A match can't be handed in faster than it could have been played.
 
 - A save file can't set Cups, Spark Drops, Bolts, Prisms, levels or what is owned. They are read from a save
   once, when an account first uploads one (so earlier progress carries over); set `import_saves = no` in
   `game.cfg` to stop even that.
 - Buying, upgrading and claiming are checked on the server: the price is the server's, the player has to be
   able to afford it, and nothing is granted twice.
-- A result is refused if the server didn't plan the match, if it was already reported, if it is finished faster
-  than a match can be played, or if its numbers are impossible for the mode. Refused results are counted in the
-  `flags` column of the `players` table.
+- A result is refused if the server didn't plan the match, if it was already reported, or if the inputs are
+  missing or can't be replayed. Refused results are counted in the `flags` column of the `players` table.
 - What comes out of a drop is rolled on the server, so a client can't choose its reward or open drops it
   doesn't have.
 - Unsupported versions are refused on every request, not just told to update.
-- It can't catch a modified client that actually plays the match with cheats (aimbot, extra damage) and reports
-  a plausible result. Only running the fight on the server would stop that.
+- It can't tell how the inputs were made. A program that plays for the player (an aimbot, a bot script) hands
+  in inputs that replay perfectly well. Seeing through walls is also possible, since the device has to know
+  where everyone is in order to draw the match.
+- The server's log says, for every match, whether the device's own result agreed with the replay. They should
+  always agree for an honest game; "the device said ..." means that device is lying or its game is modified.
 
 ## Data
 
@@ -94,14 +107,14 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | | |
 |---|---|
 | `GET /v1/health` | `{ok, api, players, matches, finished}` |
-| `GET /v1/status?version=10` | `{supported, message, notice}` |
+| `GET /v1/status?version=11` | `{supported, message, notice}` |
 | `GET /v1/config` | `{bots: {EASY: {...}, ...}}` |
 | `POST /v1/players` `{name, version}` | `{id, token}` |
 | `GET /v1/me` * | `{account}` |
 | `GET /v1/save` * | `{revision, updatedAt, save}` or 404 |
 | `PUT /v1/save` * `{save}` | `{revision, account}` |
-| `POST /v1/matches` * `{mode, fighter, level, difficulty}` | `{matchId, seed, botNames, difficulty}` |
-| `POST /v1/matches/<id>/result` * `{outcome, placement, kos, deaths, damage, mvp}` | `{cupDelta, cups, drop, account}`, or 422 if refused |
+| `POST /v1/matches` * `{mode, fighter}` | `{matchId, seed, botNames, difficulty, fighter, level, bots, refereed}`; 409 if the fighter isn't unlocked |
+| `POST /v1/matches/<id>/result` * `{inputs}` (base64 of the gzipped input log; the device's own result fields are only used when there is no referee) | `{verified, report, cupDelta, cups, drop, bolts, firstWinPrisms, account}`, or 422 if refused |
 | `POST /v1/drops/open` * `{luck, free}` | `{tier, pieces, reward, account}`, or 409 if there are none |
 | `POST /v1/fighters/upgrade` * `{fighter}` | `{cost, account}`; 402 if it can't be afforded, 409 if it can't be upgraded |
 | `POST /v1/shop/buy` * `{item}` | `{reward, account}`; items are `fighter_MIRA`, `skin_MIRA_1`, `crate_s` / `crate_m` / `crate_l` |

@@ -48,7 +48,15 @@ data class ServerVerdict(
     val bolts: Int = 0,
     /** Prisms for the first win of the day (0 if this wasn't it). */
     val firstWinPrisms: Int = 0,
+    /** How the match went according to the server's own replay of it. Null if the server has no referee running. */
+    val judged: JudgedResult? = null,
 )
+
+/** A match's result as the server's referee found it by replaying the match from the player's inputs. */
+data class JudgedResult(val outcome: MatchOutcome, val placement: Int, val kos: Int, val deaths: Int, val damage: Int, val mvp: Boolean) {
+    /** [report] with the referee's findings in place of the device's. */
+    fun over(report: MatchReport): MatchReport = report.copy(outcome = outcome, placement = placement, kos = kos, deaths = deaths, damageDealt = damage, mvp = mvp)
+}
 
 /**
  * The part of a player's progress the game server keeps: currencies, fighters and claimed rewards. The game

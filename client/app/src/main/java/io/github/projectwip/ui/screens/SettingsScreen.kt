@@ -255,14 +255,14 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     SectionTitle("SERVER", when {
         status == null -> "No server connection in this build."
         !status.supported -> "The server at ${status.url} doesn't support this version."
-        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Spark Drops, Bolts, Prisms and fighters, and sets matches up."
+        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Spark Drops, Bolts, Prisms and fighters, sets matches up and decides their results."
         else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You can still play against bots for practice; nothing is earned or spent until you're back online."
     })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ServerField(address, BuildConfig.SERVER_URL) { url -> repo.updateSettings { it.copy(serverUrl = url) } }
         ChunkyButton({
             if (server != null) scope.launch(kotlinx.coroutines.Dispatchers.IO) { io.github.projectwip.ui.connectToServer(server, repo) }
-        }, Modifier.width(190.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("RECONNECT", Type.Heading) }
+        }, Modifier.width(230.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("RECONNECT", Type.Heading) }
     }
     server?.playerId?.let { id ->
         PlainText("Player ID: $id" + if (status?.account?.developer == true) "  ·  developer" else "", Type.Body, color = Color.White)
@@ -286,7 +286,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
 private fun DeveloperTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
     val server = io.github.projectwip.ui.LocalServer.current
     val listed = server?.status?.collectAsState()?.value?.account?.developer == true
-    SectionTitle("DEVELOPER", if (listed) "The server lists you as a developer." else "This is a dev build. The server doesn't list you as a developer, so it will ignore the debug menu's cheats.")
+    SectionTitle("DEVELOPER", if (listed) "The server lists you as a developer." else "The server no longer lists you as a developer.")
     ToggleRow("DEVELOPER MENU", "Shows a small D button in the corner of the menu screens. It opens the debug menu: drop luck, upgrade cost, hand-outs.", s.devMenu) { v ->
         set { it.copy(devMenu = v) }
     }

@@ -51,7 +51,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   upgraded, claimed or opened. The loading screen tries the server for 60 seconds, then offers Retry or Offline mode.
 - Prices and tables shown by the client (`Balance.kt`, `Catalog.kt`) are copies for display; the server's are
   the ones that count. Change both.
-- Developers = debug builds, plus the player ids in `server/game.cfg` (the tablet's is listed). Only they get
+- Developers = the player ids in `server/game.cfg` (the tablet's is listed), and nobody else: a debug build is
+  not enough, and offline nobody is one. Only they get
   Settings > Developer, where the debug menu's D button is switched on (it is off by default); only they can
   make shop deals (the in-game Offer Creator) or reset an account. The server ignores luck, free drops, free
   upgrades and hand-outs from anyone else.
@@ -62,8 +63,16 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
   is asked for a name before their account is made (`NameScreen`).
 - A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`.
-- The match itself runs on the device, so the server can't catch a client that plays with cheats, only one that
-  claims results. Don't describe it as cheat-proof.
+- Matches: the device plays the match and records the player's `Control` on every tick (`sim/InputLog`). The
+  server replays that record through the same simulation (`sim/Referee`, built into `server/referee/referee.jar`,
+  started by `server/astro/referee.py`) with the seed, bots and fighter level it handed out, and the result is
+  the replay's. What the device says the result was is ignored.
+- **The referee must be the same simulation as the game.** After any change under `sim/`, `ai/` or `data/`, run
+  `./gradlew :referee:installReferee` in `client/` and commit the new jar with the change; a release always ships
+  with a jar built from the same commit. `ProgressionTest.theRefereeReplaysAMatchExactly` guards determinism:
+  nothing in the simulation may depend on wall-clock time, unseeded randomness or object identity order.
+- What the referee can't see is how the inputs were produced: an aimbot that feeds perfect inputs still passes.
+  Don't describe it as cheat-proof. Without Java on the server it falls back to checking results are believable.
 - Testing against the server on this PC: start it and launch the game; the built-in address is this PC's LAN
   address. `--es server <url>` (debug builds) points at another one, `--es server default` clears it. A match
   started with `--es screen match` begins before the connection is up, so it is an offline match.

@@ -121,8 +121,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // ---- start-up: connect to the game server, ask GitHub whether a newer release exists, load sounds and music
     val serverStatus by server.status.collectAsState()
     val account = serverStatus.account
-    // The debug menu and its cheats belong to developers: dev builds, and the players the server lists as developers.
-    val dev = io.github.projectwip.BuildConfig.DEBUG || account?.developer == true
+    // The debug menu and its cheats belong to developers, and the server says who those are. A dev build is not enough.
+    val dev = account?.developer == true
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var unsupportedSkipped by remember { mutableStateOf(false) }
     var booting by remember { mutableStateOf(true) }
@@ -224,6 +224,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     var toast by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(toast) { if (toast != null) { delay(3200); toast = null } }
     var opening by remember { mutableStateOf(false) }
+    /** A match has just ended and the server is replaying it to decide the result. */
+    var judging by remember { mutableStateOf(false) }
     val ask = remember { ServerCall(scope, server, repo, sfx) { toast = it } }
     // Spark Drops are opened by the server: it rolls the drop, the game shows what came out.
     val openCapsule: () -> Unit = {
@@ -299,12 +301,18 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                         onCancel = { screen = Screen.Home },
                         onFinish = { summary ->
                             scope.launch {
-                                // The server says what the match was worth. No answer means an offline match: nothing is earned.
-                                val verdict = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server.reportMatch(summary.serverMatchId, summary.report) }
+                                // The server replays the match from the player's inputs: the result and what it is worth are
+                                // its own. No answer means an offline match: the device's result is shown and nothing is earned.
+                                judging = summary.serverMatchId > 0 && serverStatus.online
+                                val verdict = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    server.reportMatch(summary.serverMatchId, summary.report, summary.inputs)
+                                }
+                                judging = false
                                 server.status.value.account?.let { repo.sync(it) }
+                                val shown = verdict?.judged?.let { summary.judged(it) } ?: summary
                                 // The Training Area is practice: nothing to record, straight back to the lobby.
-                                if (summary.report.mode == io.github.projectwip.data.GameMode.TRAINING) screen = Screen.Home
-                                else screen = Screen.Result(summary, repo.applyMatch(summary.report, verdict))
+                                if (shown.report.mode == io.github.projectwip.data.GameMode.TRAINING) screen = Screen.Home
+                                else screen = Screen.Result(shown, repo.applyMatch(shown.report, verdict))
                             }
                         })
                     is Screen.Result -> ResultScreen(s.summary, s.rewards, save, go)
@@ -333,6 +341,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             if (!booting) update?.let { io.github.projectwip.ui.screens.UpdateScreen(it) { update = null } }
             if (!booting && update == null && !serverStatus.supported && !unsupportedSkipped) {
                 io.github.projectwip.ui.screens.UnsupportedScreen(serverStatus.message, REPO_RELEASES) { unsupportedSkipped = true }
+            }
+            if (judging) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
+                GameText("THE SERVER IS CHECKING THE MATCH…", Type.Title, outline = 3.5.dp)
             }
             toast?.let { Badge(it, Modifier.align(Alignment.TopCenter).padding(top = 120.dp), color = Palette.RedDeep) }
             AnimatedVisibility(booting, enter = fadeIn(tween(0)), exit = fadeOut(tween(250))) {

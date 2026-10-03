@@ -350,6 +350,12 @@ def make_handler(game: Game, quiet: bool = False):
                         game.store.refuse_match(player["id"], match_id)
                     return self._error(refused.status, refused.message)
                 result = judged
+                # For whoever runs the server: did the device's own account of the match agree with the replay?
+                claimed = {k: data.get(k) for k in ("outcome", "placement", "kos", "deaths", "damage")}
+                agrees = all(judged[k] == v for k, v in claimed.items())
+                sys.stderr.write("%s  referee: match %d, %d ticks, %s place %d, %d KOs; the device %s\n" % (
+                    time.strftime("%H:%M:%S"), match_id, judged["ticks"], judged["outcome"], judged["placement"], judged["kos"],
+                    "agrees" if agrees else "said %s" % claimed))
             try:
                 verdict = game.store.finish_match(player["id"], match_id, result, verified=judged is not None)
             except (TypeError, ValueError):
