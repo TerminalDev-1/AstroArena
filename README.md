@@ -17,7 +17,7 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 
 | | |
 |---|---|
-| **Modes** | **Last Spark** — 10-fighter free-for-all, last one standing; break Spark Crates for stacking Power Cells (+10% health & damage each) while the Static Storm closes in. **Knockout Rush** — 3v3, first team to 10 KOs, your team starts at the bottom. **Boss Mode** — you against a giant version of a random fighter; knock it out before it knocks you out three times. The boss's strength is fixed and it pays Bolts only |
+| **Modes** | **Last Spark** — 10-fighter free-for-all, last one standing; break Spark Crates for stacking Power Cells (+10% health & damage each) while the Static Storm closes in. **Knockout Rush** — 3v3, first team to 10 KOs, your team starts at the bottom. **Boss Mode** — you against a giant version of a random fighter; knock it out to win, with unlimited lives. The boss's strength is fixed and it pays Bolts only. **Training Area** — a practice ground with four dummies, a swarm of twelve minis, a sentry gun and a boss, none of which move; nothing at stake |
 | **Arenas** | *Static Canyon* (44×44, free-for-all) and *Foundry Yard* (vertical 3v3): walls, tall-grass thickets (hide inside), coolant pools (block movement, not shots), destructible crates |
 | **Fighters** | **Juno** (burst skirmisher, starter) · **Brakk** (shotgun tank, ram super) · **Mira** (sniper, piercing super) · **Kito** (fast blade assassin, dash super) |
 | **Graphics** | Custom OpenGL ES 3.0: toon lighting, real-time shadows, inked outlines, 4× MSAA, up to 120 Hz |
@@ -26,7 +26,7 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 | **Progression** | Levels 1–10 with linear, fully visible stat gains · Bolts (upgrades) · Prisms (shop) · Cups · Cup Track rewards |
 | **Spark Drops** | Earned from your first three good finishes a day (a team win, or top 4 in Last Spark). Tap to charge one through six tiers — Scrap, Tuned, Charged, Overclocked, Prismatic, Ultra — then it bursts open: Bolts, Prisms, a colourway or a new fighter, never a duplicate. A drop can split into two, four or eight, and the pieces roll better than a plain one |
 | **Leaderboard** | A Cup ladder of 100. There is no online play yet, so the other 99 are simulated rivals whose Cups drift from day to day |
-| **Sound** | Music (a heavy sixteen-bar lobby loop, plus separate victory and defeat themes) and every effect are designed in code by a small synth (`audio/SfxSynth.kt`): band-limited oscillators, FM bells, filtered noise, drive, echo and reverb |
+| **Sound** | Music (a sixteen-bar dark-electro lobby loop in four sections, plus separate victory and defeat themes) and every effect are designed in code by a small synth (`audio/SfxSynth.kt`): band-limited oscillators, FM bells, filtered noise, drive, echo and reverb |
 | **Shop** | Daily free gift · fighter unlocks · Bolt supplies · colourways · **Offer Creator**: design your own deals (bundle contents, price in Bolts/Prisms/free, discount display, expiry, purchase limit, colour theme) |
 | **Menus** | A live 3D lobby behind every screen (camera glides between shots), your fighter on a pedestal you can spin, 3D portraits, mode picker |
 | **Settings** | Bot difficulty, player name, control size/opacity/mode, auto-aim, volume/mute, haptics, frame rate, damage numbers, FPS, reset |

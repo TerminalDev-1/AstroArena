@@ -34,6 +34,8 @@ class Fighter(
     val team: Int,
     val name: String,
     val isBot: Boolean,
+    /** Fixed to the spot (Training Area targets): it can turn and shoot, but never walks, dashes or gets shoved. */
+    val rooted: Boolean = false,
 ) {
     val control = Control()
     val baseMaxHp = def.health.at(level)

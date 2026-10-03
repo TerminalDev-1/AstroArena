@@ -34,6 +34,8 @@ class Match(val config: MatchConfig) {
     private val pathfinder: Pathfinder
     val freeForAll = config.mode == GameMode.LAST_SPARK
     val bossMode = config.mode == GameMode.BOSS
+    /** Training Area: nothing at stake, and it never ends on its own. */
+    val practice = config.mode == GameMode.TRAINING
 
     /** Seconds since the match became "over" for the player (ended, or eliminated in free-for-all). */
     var overFor = 0f
@@ -42,6 +44,7 @@ class Match(val config: MatchConfig) {
 
     init {
         val names = BOT_NAMES.shuffled(rng).iterator()
+        val passive = HashSet<Fighter>()
         val roster = ArrayList<Fighter>()
         var id = 0
         player = Fighter(id++, Balance.fighter(config.playerFighter), config.playerLevel, config.playerSkin, 0, config.playerName, isBot = !config.humanPlayer)
@@ -49,6 +52,16 @@ class Match(val config: MatchConfig) {
         // Bots use the same level as the player — difficulty comes from behaviour, never from stats.
         if (freeForAll) {
             repeat(config.mode.players - 1) { roster += botFighter(id, team = id, names.next()); id++ }
+        } else if (practice) {
+            // Everything stands where it is put, at fixed strength. Order matches the arena's spawn list:
+            // dummies, boss, sentry, swarm. Dummies get no brain, so they never fight back.
+            val a = Arenas.trainingArea()
+            val dummies = a.spawns[1].size - 2 - TRAINING_MINIS
+            repeat(dummies) { roster += Fighter(id++, Balance.dummy, 1, 0, 1, "Dummy ${it + 1}", isBot = true, rooted = true).also { d -> passive += d } }
+            val giant = Balance.boss(config.boss ?: FighterId.entries[rng.nextInt(FighterId.entries.size)])
+            roster += Fighter(id++, giant, 1, giant.skins.lastIndex, 1, giant.name, isBot = true, rooted = true)
+            roster += Fighter(id++, Balance.sentry, 1, 1, 1, "Sentry", isBot = true, rooted = true)
+            repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true) }
         } else if (bossMode) {
             // One giant, always level 1: its stats are fixed and never follow the player's level.
             val def = Balance.boss(config.boss ?: FighterId.entries[rng.nextInt(FighterId.entries.size)])
@@ -57,12 +70,12 @@ class Match(val config: MatchConfig) {
             repeat(2) { roster += botFighter(id++, 0, names.next()) }
             repeat(3) { roster += botFighter(id++, 1, names.next()) }
         }
-        val arena = if (freeForAll) Arenas.staticCanyon() else if (bossMode) Arenas.provingGround() else Arenas.foundryYard()
-        val rules = if (freeForAll) MatchRules.lastSpark() else if (bossMode) MatchRules.bossMode() else MatchRules.knockoutRush()
+        val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.trainingArea() else if (bossMode) Arenas.provingGround() else Arenas.foundryYard()
+        val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.training() else if (bossMode) MatchRules.bossMode() else MatchRules.knockoutRush()
         world = World(arena, roster, rules, Random(rng.nextLong()))
         pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
-        brains = roster.filter { it.isBot }.map { BotBrain(it, profile, world, pathfinder, Random(rng.nextLong())) }
+        brains = roster.filter { it.isBot && it !in passive }.map { BotBrain(it, profile, world, pathfinder, Random(rng.nextLong())) }
         for (b in brains) b.others = brains
     }
 
@@ -113,6 +126,8 @@ class Match(val config: MatchConfig) {
 
     companion object {
         const val STEP = 1f / 60f
+        /** How many minis make up the Training Area's swarm. */
+        const val TRAINING_MINIS = 12
 
         val BOT_NAMES = listOf(
             "Rivet", "Cobalt", "Fennick", "Quill", "Tamsin", "Brisk", "Moss", "Pixel", "Juniper",

@@ -251,9 +251,9 @@ private fun CapsuleButton(count: Int, leftToday: Int, onOpen: () -> Unit) {
 
 // ---------------------------------------------------------------------------------------------- mode
 
-fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS; GameMode.BOSS -> IconKind.SKULL }
+fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS; GameMode.BOSS -> IconKind.SKULL; GameMode.TRAINING -> IconKind.FIGHTERS }
 
-fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.BOSS -> Arenas.provingGround() }
+fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.BOSS -> Arenas.provingGround(); GameMode.TRAINING -> Arenas.trainingArea() }
 
 @Composable
 private fun ModeChip(mode: GameMode, d: BotDifficulty, onClick: () -> Unit) {
@@ -282,11 +282,11 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
             .clickable(remember { MutableInteractionSource() }, null, onClick = onClose),
         contentAlignment = Alignment.Center,
     ) {
-        Panel(Modifier.widthIn(max = 900.dp).padding(24.dp).clickable(remember { MutableInteractionSource() }, null) { }, cut = 22.dp) {
+        Panel(Modifier.widthIn(max = 1180.dp).padding(18.dp).clickable(remember { MutableInteractionSource() }, null) { }, cut = 22.dp) {
             Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 GameText("CHOOSE A MODE", Type.Title, outline = 3.5.dp)
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     for (m in GameMode.entries) {
                         ModeCard(m, m == save.selectedMode, Modifier.weight(1f), showMap = ui.roomy) { repo.selectMode(m) }
                     }
@@ -316,9 +316,9 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
     ChunkyButton(onClick, modifier.height(if (showMap) 330.dp else 190.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, cut = 18.dp, sound = Sound.UI_SELECT) {
         Column(Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                GameIcon(modeIcon(m), Modifier.size(34.dp))
-                Spacer(Modifier.width(8.dp))
-                GameText(m.title.uppercase(), Type.Heading, outline = 3.dp)
+                GameIcon(modeIcon(m), Modifier.size(26.dp))
+                Spacer(Modifier.width(6.dp))
+                GameText(m.title.uppercase(), Type.Label, outline = 2.5.dp)
             }
             PlainText(m.tagline, Type.Label, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center)
             Spacer(Modifier.height(6.dp))
@@ -333,9 +333,10 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 when (m) {
                     GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. 1st place: +${Balance.placementCups[0]} Cups"
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win: +${io.github.projectwip.data.BotDifficulty.NORMAL.cupBonus} Cups (Normal)"
-                    GameMode.BOSS -> "A giant version of a random fighter. Knock it out before it knocks you out ${Balance.BOSS_LIVES} times. Its strength never changes. Pays Bolts only."
+                    GameMode.BOSS -> "A giant version of a random fighter. Knock it out to win; you have unlimited lives. Its strength never changes. Pays Bolts only."
+                    GameMode.TRAINING -> "Four dummies, a swarm of minis, a sentry gun and a boss, none of which move. No timer, no rewards: leave whenever you like."
                 },
-                Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center,
+                Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 5,
             )
         }
     }

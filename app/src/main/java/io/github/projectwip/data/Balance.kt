@@ -82,8 +82,10 @@ enum class MatchOutcome { VICTORY, DEFEAT, DRAW }
 enum class GameMode(val title: String, val tagline: String, val players: Int) {
     LAST_SPARK("Last Spark", "10-fighter free-for-all · last one standing", 10),
     KNOCKOUT_RUSH("Knockout Rush", "3v3 · first team to 10 KOs", 6),
-    /** You against one giant. Knock it out before it knocks you out three times. */
-    BOSS("Boss Mode", "You against a giant · 3 lives", 2),
+    /** You against one giant, with as many lives as it takes. */
+    BOSS("Boss Mode", "You against a giant · unlimited lives", 2),
+    /** Practice: dummies, a swarm, a sentry and a boss, none of which move. No timer, nothing won or lost. */
+    TRAINING("Training Area", "Dummies, a swarm, a sentry and a boss · no stakes", 19),
 }
 
 object Balance {
@@ -276,9 +278,6 @@ object Balance {
     fun fighter(id: FighterId): FighterDef = fighters.first { it.id == id }
 
     // ---- Boss Mode ----
-    /** Lives the player gets against the boss. */
-    const val BOSS_LIVES = 3
-
     /**
      * The giant version of any fighter, as fought in Boss Mode: two and a half times the size, a mountain of
      * health, slower on its feet, hitting harder and reaching further. Its stats are FIXED: a boss is always
@@ -296,6 +295,28 @@ object Balance {
             attack = f.attack.copy(range = f.attack.range * 1.25f, radius = f.attack.radius * 1.5f),
             superSpec = f.superSpec.copy(range = f.superSpec.range * 1.25f, radius = f.superSpec.radius * 1.5f),
         )
+    }
+
+    // ---- Training Area ----
+    // Everything here is created at level 1 with flat stat lines, like the boss: it is a fixed yardstick.
+
+    /** A target dummy: never attacks, soaks up damage and regenerates like anyone else. */
+    val dummy: FighterDef = fighter(FighterId.JUNO).let { it.copy(name = "Dummy", title = "Target", health = StatLine(16000, 0)) }
+
+    /** One of the swarm: a little over half size, fragile, and it stings rather than hurts. */
+    val mini: FighterDef = fighter(FighterId.JUNO).let {
+        it.copy(
+            name = "Mini", title = "Swarm", health = StatLine(6000, 0),
+            attackDamage = StatLine(Math.round(it.attackDamage.base * 0.3f), 0), superDamage = StatLine(Math.round(it.superDamage.base * 0.3f), 0),
+            radius = it.radius * 0.62f, reloadSeconds = it.reloadSeconds * 1.6f, superChargePerHit = 0f,
+            attack = it.attack.copy(range = it.attack.range * 0.8f),
+        )
+    }
+
+    /** The sentry: a long-range gun on an island of coolant. Slow to reload, so its shots can be dodged. */
+    val sentry: FighterDef = fighter(FighterId.MIRA).let {
+        it.copy(name = "Sentry", title = "Turret", health = StatLine(16000, 0), attackDamage = StatLine(it.attackDamage.base, 0),
+            superDamage = StatLine(it.superDamage.base, 0), reloadSeconds = 2.4f, superChargePerHit = 0f)
     }
 
     /** How a locked fighter can be obtained. */

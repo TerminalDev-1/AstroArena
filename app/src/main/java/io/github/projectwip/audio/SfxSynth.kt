@@ -62,118 +62,104 @@ object SfxSynth {
         Sound.CHING -> ching().finish(0.72f)
     }
 
-    const val LOBBY_BPM = 138f
+    const val LOBBY_BPM = 124f
     const val LOBBY_BARS = 16
 
     /**
-     * The lobby music: a sixteen-bar loop at 138 BPM over Am - F - C - G, built to feel like a game menu rather
-     * than a waiting room. A four-on-the-floor kick, snare on two and four and busy hats drive it; a saw bass
-     * bounces in octaves and ducks under each kick; chord stabs hit the off-beats; a square-wave arpeggio runs
-     * in sixteenths. The second half adds a saw lead and lifts the arpeggio an octave, and each half ends in a
-     * snare roll. Tails are folded back onto the start, so the returned samples loop without a seam.
+     * The lobby music (second edition, written from scratch): sixteen bars of dark electro at 124 BPM in E minor
+     * over Em - C - G - D. It is arranged in four four-bar sections so it doesn't sit on one idea:
+     *  1. groove: a syncopated kick, gated snare, galloping sixteenth-note bass and a pumping pad;
+     *  2. the same with a detuned-saw lead playing the tune;
+     *  3. breakdown: the drums drop to a heartbeat while bells answer each other over the pad;
+     *  4. everything back in, the lead an octave up, ending on a tom fill.
+     * Tails are folded back onto the start, so the returned samples loop without a seam.
      */
     fun renderLobbyMusic(): FloatArray {
         val beat = 60f / LOBBY_BPM
         val bars = LOBBY_BARS
-        val loop = ((bars * 4 * beat) * RATE).toInt()
         val total = bars * 4 * beat + 3f
-        val chords = listOf(intArrayOf(57, 60, 64), intArrayOf(53, 57, 60), intArrayOf(48, 52, 55), intArrayOf(55, 59, 62))
-        val roots = intArrayOf(45, 41, 36, 43)
-        /** 1 right after a kick, falling to 0: used to duck the bass and stabs so the kick punches through. */
-        fun duck(t: Float): Float { val p = (t % beat) / beat; return (p / 0.45f).coerceIn(0f, 1f) }
-
+        val chords = listOf(intArrayOf(52, 55, 59), intArrayOf(48, 52, 55), intArrayOf(55, 59, 62), intArrayOf(50, 54, 57))
+        val roots = intArrayOf(40, 36, 43, 38)
         val drums = Clip(total)
         val bass = Clip(total)
-        val stabs = Clip(total)
-        val grit = Clip(total)
-        val arp = Clip(total)
+        val pad = Clip(total)
         val lead = Clip(total)
+        val bells = Clip(total)
         for (bar in 0 until bars) {
+            val section = bar / 4
+            val breakdown = section == 2
             val ch = chords[bar % 4]
+            val root = roots[bar % 4]
             val t0 = bar * 4 * beat
-            val second = bar >= bars / 2
-            val lastOfHalf = bar % (bars / 2) == bars / 2 - 1
-            for (b in 0 until 4) {
-                val at = t0 + b * beat
-                // Kick on every beat.
-                drums.osc(Wave.SINE, at, 0.4f, { glide(it, 0.085f, 190f, 38f) }, { perc(it, 0.001f, 0.13f) * 1.25f })
-                drums.noise(500 + bar * 4 + b, at, 0.012f, Band.HIGH, { 3000f }, 0.7f, { perc(it, 0.0003f, 0.003f) * 0.3f })
-                // Snare on two and four.
-                if (b % 2 == 1) {
-                    drums.noise(600 + bar * 4 + b, at, 0.2f, Band.BAND, { 1900f }, 0.7f, { perc(it, 0.001f, 0.055f) * 0.5f })
-                    drums.osc(Wave.SINE, at, 0.1f, { glide(it, 0.04f, 260f, 170f) }, { perc(it, 0.001f, 0.035f) * 0.32f })
+            // Kick: one, the "and" of two, three (a heartbeat on one only in the breakdown).
+            for (at in if (breakdown) floatArrayOf(0f) else floatArrayOf(0f, 1.5f, 2f, 3.5f)) {
+                drums.osc(Wave.SINE, t0 + at * beat, 0.4f, { glide(it, 0.08f, 175f, 40f) }, { perc(it, 0.001f, 0.12f) * 1.15f })
+                drums.noise(2000 + bar * 8 + (at * 2).toInt(), t0 + at * beat, 0.012f, Band.HIGH, { 3200f }, 0.7f, { perc(it, 0.0003f, 0.003f) * 0.3f })
+            }
+            if (!breakdown) {
+                // A big gated snare on two and four.
+                for (b in intArrayOf(1, 3)) {
+                    drums.noise(2100 + bar * 4 + b, t0 + b * beat, 0.26f, Band.BAND, { 1700f }, 0.6f, { hold(it, 0.001f, 0.13f, 0.02f) * 0.42f })
+                    drums.osc(Wave.SINE, t0 + b * beat, 0.12f, { glide(it, 0.05f, 230f, 150f) }, { perc(it, 0.001f, 0.04f) * 0.35f })
                 }
-                // Hats in sixteenths, with an open one on the off-beat.
-                for (s in 0 until 4) {
-                    val open = s == 2
-                    drums.noise(700 + bar * 16 + b * 4 + s, at + s * beat / 4, if (open) 0.14f else 0.04f, Band.HIGH, { 9000f }, 0.7f,
-                        { perc(it, 0.0005f, if (open) 0.04f else 0.012f) * if (open) 0.2f else if (s == 0) 0.07f else 0.11f })
+                // Hats on the eighths, the off-beats open.
+                for (k in 0 until 8) {
+                    val open = k % 2 == 1
+                    drums.noise(2200 + bar * 8 + k, t0 + k * beat / 2, if (open) 0.12f else 0.04f, Band.HIGH, { 9500f }, 0.7f,
+                        { perc(it, 0.0005f, if (open) 0.035f else 0.01f) * if (open) 0.17f else 0.1f })
+                }
+                // Galloping bass: da-dadada on every beat.
+                for (b in 0 until 4) for ((s, g) in listOf(0 to 1f, 2 to 0.7f, 3 to 0.85f)) {
+                    val at = t0 + b * beat + s * beat / 4
+                    bass.osc(Wave.SAW, at, beat * 0.3f, { hz(root) }, { perc(it, 0.003f, 0.07f) * 0.5f * g })
+                    bass.osc(Wave.SAW, at, beat * 0.3f, { hz(root) * 1.008f }, { perc(it, 0.003f, 0.07f) * 0.35f * g })
+                    bass.osc(Wave.SINE, at, beat * 0.3f, { hz(root - 12) }, { hold(it, 0.004f, beat * 0.2f, 0.02f) * 0.55f * g })
+                }
+            } else {
+                // Breakdown: a long sub note and bells answering each other.
+                bass.osc(Wave.SINE, t0, 4 * beat, { hz(root - 12) }, { hold(it, 0.05f, 4 * beat - 0.2f, 0.1f) * 0.5f })
+                for ((k, step) in intArrayOf(0, 2, 1, 2, 0, 1, 2, 1).withIndex()) {
+                    bells.bell(t0 + k * beat / 2, ch[step] + if (k % 2 == 0) 24 else 12, 0.16f, 0.12f)
                 }
             }
-            // A snare roll into the turnaround.
-            if (lastOfHalf) for (s in 0 until 8) {
-                val at = t0 + 3 * beat + s * beat / 8
-                drums.noise(900 + bar * 8 + s, at, 0.08f, Band.BAND, { 2100f }, 0.8f, { perc(it, 0.001f, 0.025f) * (0.2f + 0.04f * s) })
+            // Pad: detuned saws on the chord, pumped in eighths (held flat through the breakdown).
+            for (n in ch) for (det in floatArrayOf(0.995f, 1.005f)) {
+                pad.osc(Wave.SAW, t0, 4 * beat + 0.2f, { hz(n) * det }, { t ->
+                    val gate = if (breakdown) 1f else 0.35f + 0.65f * ((t % (beat / 2)) / (beat / 2))
+                    hold(t, 0.05f, 4 * beat - 0.1f, 0.12f) * 0.06f * gate
+                })
             }
-            // Bass: octave-bouncing eighths.
-            for (k in 0 until 8) {
-                val at = t0 + k * beat / 2
-                val n = roots[bar % 4] + if (k % 2 == 1) 12 else 0
-                bass.osc(Wave.SAW, at, beat * 0.5f, { hz(n) }, { perc(it, 0.004f, 0.11f) * 0.5f })
-                bass.osc(Wave.SQUARE, at, beat * 0.5f, { hz(n) * 0.5f }, { perc(it, 0.004f, 0.13f) * 0.34f })
-                bass.osc(Wave.SAW, at, beat * 0.5f, { hz(n) * 1.007f }, { perc(it, 0.004f, 0.11f) * 0.3f })
-                // Sub: the root an octave below, held, so the low end never drops out.
-                bass.osc(Wave.SINE, at, beat * 0.5f, { hz(roots[bar % 4] - 12) }, { hold(it, 0.006f, beat * 0.42f, 0.02f) * 0.55f })
-                // Chord stabs on the off-beats.
-                if (k % 2 == 1) for (n2 in ch) stabs.brass(at, 0.09f, n2 + 12, 0.16f)
-            }
-            // A growling low fifth held across the bar, for weight.
-            for (n in intArrayOf(roots[bar % 4], roots[bar % 4] + 7)) {
-                grit.osc(Wave.SAW, t0, 4 * beat, { hz(n) * 1.004f }, { hold(it, 0.02f, 4 * beat - 0.06f, 0.05f) * 0.2f })
-                grit.osc(Wave.SAW, t0, 4 * beat, { hz(n) * 0.996f }, { hold(it, 0.02f, 4 * beat - 0.06f, 0.05f) * 0.2f })
-            }
-            // Arpeggio: sixteenths up and down the chord over two octaves.
-            for (s in 0 until 16) {
-                val step = intArrayOf(0, 1, 2, 3, 4, 5, 4, 3)[s % 8]
-                val n = ch[step % 3] + 12 * (step / 3) + if (second) 24 else 12
-                arp.osc(Wave.SQUARE, t0 + s * beat / 4, 0.12f, { hz(n) }, { perc(it, 0.002f, 0.035f) * 0.075f })
+            // Tom fill into the turnaround at the end of each half.
+            if (bar % 8 == 7) for ((i, f) in floatArrayOf(190f, 160f, 130f, 100f).withIndex()) {
+                drums.osc(Wave.SINE, t0 + 3 * beat + i * beat / 4, 0.25f, { glide(it, 0.12f, f, f * 0.6f) }, { perc(it, 0.002f, 0.07f) * 0.55f })
             }
         }
-        // The lead, over the second half: (beats from the start of bar 9, note, length in beats). Two four-bar phrases.
-        val phrase = listOf(
-            Triple(0f, 76, 0.75f), Triple(0.75f, 76, 0.25f), Triple(1f, 79, 0.5f), Triple(1.5f, 76, 0.5f), Triple(2f, 74, 0.5f), Triple(2.5f, 72, 0.5f), Triple(3f, 74, 1f),
-            Triple(4f, 72, 0.75f), Triple(4.75f, 72, 0.25f), Triple(5f, 77, 0.5f), Triple(5.5f, 72, 0.5f), Triple(6f, 69, 1f), Triple(7f, 72, 0.5f), Triple(7.5f, 74, 0.5f),
-            Triple(8f, 76, 1f), Triple(9f, 79, 0.5f), Triple(9.5f, 84, 1f), Triple(10.5f, 79, 0.5f), Triple(11f, 76, 1f),
-            Triple(12f, 74, 0.5f), Triple(12.5f, 79, 0.5f), Triple(13f, 83, 1f), Triple(14f, 79, 0.5f), Triple(14.5f, 74, 0.5f), Triple(15f, 71, 1f),
+        // The tune (beats from the start of its section, note, length in beats): sections two and four.
+        val tune = listOf(
+            Triple(0f, 71, 1f), Triple(1f, 74, 0.5f), Triple(1.5f, 76, 1.5f), Triple(3f, 74, 0.5f), Triple(3.5f, 71, 0.5f),
+            Triple(4f, 72, 1f), Triple(5f, 76, 0.5f), Triple(5.5f, 79, 1.5f), Triple(7f, 76, 1f),
+            Triple(8f, 74, 0.5f), Triple(8.5f, 79, 0.5f), Triple(9f, 83, 1.5f), Triple(10.5f, 79, 0.5f), Triple(11f, 74, 1f),
+            Triple(12f, 78, 1f), Triple(13f, 76, 0.5f), Triple(13.5f, 74, 0.5f), Triple(14f, 69, 1f), Triple(15f, 71, 1f),
         )
-        for (rep in 0 until 2) for ((at, n, len) in phrase) {
-            val start = (bars / 2 * 4 + rep * 16 + at) * beat
+        for ((section, up) in listOf(1 to 0, 3 to 12)) for ((at, n, len) in tune) {
+            val start = (section * 16 + at) * beat
             val dur = len * beat
-            val up = if (rep == 1 && at >= 8f) 12 else 0
-            lead.osc(Wave.SAW, start, dur + 0.15f, { hz(n + up) * (1f + 0.005f * sin(TAU * 6f * it)) }, { hold(it, 0.008f, dur - 0.03f, 0.04f) * 0.2f })
-            lead.osc(Wave.SQUARE, start, dur + 0.15f, { hz(n + up) * 1.005f }, { hold(it, 0.008f, dur - 0.03f, 0.04f) * 0.1f })
+            for (det in floatArrayOf(0.994f, 1f, 1.006f)) {
+                lead.osc(Wave.SAW, start, dur + 0.12f, { hz(n + up) * det * (1f + 0.004f * sin(TAU * 5.5f * it)) }, { hold(it, 0.01f, dur - 0.03f, 0.04f) * 0.11f })
+            }
         }
-        bass.filter(Band.LOW, 1.6f) { 950f }
-        bass.drive(2.4f)
-        grit.filter(Band.LOW, 1.2f) { 1300f }
-        grit.drive(3f)
-        stabs.filter(Band.LOW, 1f) { 3800f }
-        arp.filter(Band.LOW, 0.8f) { 4200f }
-        lead.filter(Band.LOW, 1.1f) { 4800f }
-        lead.echo(beat * 0.75f, 0.3f, 0.22f)
-        // Duck the bass and stabs under the kick.
-        for (i in bass.d.indices) { val k = 0.3f + 0.7f * duck(i * DT); bass.d[i] *= k; stabs.d[i] *= k; grit.d[i] *= k * 0.55f }
+        bass.filter(Band.LOW, 1.5f) { 1000f }
+        bass.drive(2.2f)
+        pad.filter(Band.LOW, 0.9f) { 2400f }
+        lead.filter(Band.LOW, 1.2f) { 5200f }
+        lead.echo(beat * 0.75f, 0.32f, 0.25f)
+        bells.echo(beat * 0.5f, 0.35f, 0.3f)
 
         val c = Clip(total)
-        c.mix(drums).mix(bass).mix(grit).mix(stabs).mix(arp).mix(lead)
-        c.drive(1.6f)
-        c.reverb(0.1f, 0.6f)
-        // Fold everything that rang past the end back onto the start, then level it (no fade: it has to loop).
-        val d = c.d
-        for (i in loop until d.size) d[i - loop] += d[i]
-        var top = 1e-6f
-        for (i in 0 until loop) top = max(top, abs(d[i]))
-        return FloatArray(loop) { d[it] * 0.85f / top }
+        c.mix(drums).mix(bass).mix(pad).mix(lead).mix(bells)
+        c.drive(1.5f)
+        c.reverb(0.13f, 0.66f)
+        return loopOut(c, ((bars * 4 * beat) * RATE).toInt(), 0.85f)
     }
 
     /** Folds whatever rang past the loop point back onto the start and levels it, so the result loops cleanly. */

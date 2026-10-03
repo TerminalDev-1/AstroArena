@@ -188,20 +188,50 @@ class SimulationTest {
             assertTrue("drawn at two and a half times normal size", b1.scale > 2.4f)
             assertTrue(high.player.maxHp > low.player.maxHp)
         }
-        // A random boss still comes from the roster, and the fight always reaches a result.
+        // Unlimited lives: the fight can only end with the boss down, however often the player falls.
         var wins = 0
-        var losses = 0
         for (seed in 0 until 6) {
             val m = Match(MatchConfig(FighterId.entries[seed % 3], if (seed % 2 == 0) 3 else 40, 0, "T", BotDifficulty.HARD, mode = GameMode.BOSS, humanPlayer = false, seed = 50L + seed))
             assertEquals(2, m.world.fighters.size)
             var t = 0f
-            while (!m.isOver && t < 600f) { m.step(Match.STEP); t += Match.STEP }
-            assertEquals("boss fight must end (seed $seed)", Phase.ENDED, m.world.phase)
-            if (m.world.winningTeam == m.player.team) { wins++; assertEquals(1, m.world.score[0]) } else { losses++; assertEquals(Balance.BOSS_LIVES, m.world.score[1]) }
+            while (!m.isOver && t < 240f) { m.step(Match.STEP); t += Match.STEP }
+            if (m.world.phase == Phase.ENDED) { wins++; assertEquals("only the player can win", m.player.team, m.world.winningTeam) }
             for (f in m.world.fighters) assertFalse(m.world.arena.circleBlocked(f.x, f.y, f.radius * 0.9f))
         }
-        println("boss fights: $wins won, $losses lost")
+        println("boss fights won inside four minutes: $wins of 6")
         assertTrue("a strong fighter should be able to beat it", wins >= 1)
+    }
+
+    /** Training Area: nineteen fighters, the targets never leave their spots, and it never ends by itself. */
+    @Test fun trainingAreaIsAnEndlessPracticeGround() {
+        val a = Arenas.trainingArea()
+        assertEquals(1, a.spawns[0].size)
+        assertEquals(4 + 1 + 1 + Match.TRAINING_MINIS, a.spawns[1].size)
+        for (s in a.spawns[1]) assertEquals("targets stand on open floor", Tile.FLOOR, a.tileAt(s.x, s.y))
+        val sentrySpot = a.spawns[1][5]
+        assertTrue("the sentry's island can't be walked onto", a.circleBlocked(sentrySpot.x + 1f, sentrySpot.y, 0.4f))
+        assertTrue("but it can shoot out over the coolant", a.shotClear(sentrySpot.x, sentrySpot.y, sentrySpot.x + 4f, sentrySpot.y))
+
+        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, humanPlayer = false, seed = 9L))
+        assertEquals(19, m.world.fighters.size)
+        assertTrue(m.world.fighters.size <= io.github.projectwip.match.HudSnapshot.MAX)
+        val targets = m.world.fighters.filter { it.team != m.player.team }
+        assertTrue(targets.all { it.rooted })
+        val dummies = targets.filter { it.name.startsWith("Dummy") }
+        val minis = targets.filter { it.name.startsWith("Mini") }
+        assertEquals(4, dummies.size)
+        assertEquals(Match.TRAINING_MINIS, minis.size)
+        assertTrue("minis are small", minis.all { it.scale < 0.7f })
+        assertTrue("one giant", targets.count { it.scale > 2.4f } == 1)
+        val start = targets.map { it.x to it.y }
+        var t = 0f
+        while (t < 90f) { m.step(Match.STEP); t += Match.STEP }
+        assertEquals("no clock and no score target: it keeps going", Phase.PLAYING, m.world.phase)
+        assertFalse(m.isOver)
+        assertEquals("targets never leave their spots", start, targets.map { it.x to it.y })
+        assertTrue("dummies never attack", dummies.all { it.damageDealt == 0 })
+        assertTrue("the player got some practice in", m.player.damageDealt > 0)
+        assertFalse(m.world.arena.circleBlocked(m.player.x, m.player.y, m.player.radius * 0.9f))
     }
 
     @Test fun circleNeverEntersWalls() {

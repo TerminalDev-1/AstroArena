@@ -32,7 +32,12 @@ class HudSnapshot {
     var freeForAll = false
     /** Boss Mode: the giant's health and the player's remaining lives go on the HUD instead of a score. */
     var bossMode = false
-    var livesLeft = 0
+    /** How often the player has been knocked out (Boss Mode has no life limit, it just counts). */
+    var timesDown = 0
+    /** Training Area: no clock, no target. */
+    var practice = false
+    /** Damage the player has dealt so far. */
+    var damage = 0
     var bossHp = 0
     var bossMaxHp = 1
     var bossName: String? = null
@@ -62,7 +67,7 @@ class HudSnapshot {
         myScore = o.myScore; theirScore = o.theirScore; koTarget = o.koTarget; winningTeam = o.winningTeam; playerTeam = o.playerTeam
         playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; ammo = o.ammo; ammoMax = o.ammoMax; superCharge = o.superCharge
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
-        bossMode = o.bossMode; livesLeft = o.livesLeft; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
+        bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
         freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
         stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm
         n = o.n
@@ -72,7 +77,8 @@ class HudSnapshot {
         }
     }
 
-    companion object { const val MAX = 12 }
+    /** The most fighters a match can hold (the Training Area is the biggest, at 19). */
+    companion object { const val MAX = 32 }
 }
 
 /** Lock-protected hand-off between render thread (writer) and UI thread (reader). */

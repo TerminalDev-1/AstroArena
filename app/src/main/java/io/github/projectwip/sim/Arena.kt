@@ -224,6 +224,25 @@ class Arena(
             return Arena(name, tw, th, t, listOf(bottom, top))
         }
 
+        /**
+         * Builds an arena from a full, hand-drawn map (no mirroring), for layouts that aren't symmetric.
+         * Besides the usual tiles, letters mark spawn points on floor: `P` is the player; every other letter in
+         * [enemyMarkers] is an enemy spawn, listed in the order of that string and then in reading order.
+         */
+        fun fromMap(name: String, rows: List<String>, enemyMarkers: String): Arena {
+            val w = rows.first().length
+            require(rows.all { it.length == w }) { "Map rows must have equal length" }
+            val tiles = Array(w * rows.size) { Tile.FLOOR }
+            val player = ArrayList<Spawn>()
+            val enemies = enemyMarkers.associateWith { ArrayList<Spawn>() }
+            for ((y, row) in rows.withIndex()) for ((x, ch) in row.withIndex()) {
+                tiles[y * w + x] = when (ch) { '#' -> Tile.WALL; 'g' -> Tile.THICKET; '~' -> Tile.WATER; 'c' -> Tile.CRATE; else -> Tile.FLOOR }
+                if (ch == 'P') player += Spawn(x + 0.5f, y + 0.5f)
+                enemies[ch]?.add(Spawn(x + 0.5f, y + 0.5f))
+            }
+            return Arena(name, w, rows.size, tiles, listOf(player, enemyMarkers.flatMap { enemies.getValue(it) }))
+        }
+
         /** A square free-for-all arena with [count] spawns on a ring around the centre. */
         fun freeForAll(name: String, quadrant: List<String>, count: Int, ringFraction: Float): Arena {
             val (w, h, tiles) = mirror(quadrant)
@@ -286,6 +305,49 @@ object Arenas {
         val bossSpot = open(w * 0.5f, h * 0.16f, 1.3f)
         return base.withSpawns(listOf(listOf(open(w * 0.5f, h - 1.5f, 0.5f)), listOf(bossSpot)))
     }
+
+    /**
+     * "Training Area". You start at the bottom. Four dummies (`d`) stand in the lower corners, the boss (`B`)
+     * sits in the middle between four bushes with a coolant pool below it, the sentry (`T`) is on an island of
+     * coolant to the right (it can shoot out, you can't walk in), and the swarm (`m`) is lined up at the top.
+     * Enemy spawns come out in the order dummies, boss, sentry, swarm.
+     */
+    fun trainingArea(): Arena = Arena.fromMap(
+        name = "Training Area",
+        rows = listOf(
+            //01234567890123456789
+            "....................",
+            "..m.m.m.m.m.m.......",
+            "....................",
+            "..m.m.m.m.m.m.......",
+            "....................",
+            "..##............##..",
+            "..##............##..",
+            "....................",
+            "......g.g....~~~....",
+            ".......B.....~T~....",
+            "......g.g....~~~....",
+            "......~~~...........",
+            "......~~~...........",
+            "....................",
+            "..gg............gg..",
+            "..gg............gg..",
+            "....................",
+            "....##........##....",
+            "....##........##....",
+            "....................",
+            "....................",
+            ".d................d.",
+            "....................",
+            "........gggg........",
+            "........gggg........",
+            ".d................d.",
+            "....................",
+            ".........P..........",
+            "....................",
+        ),
+        enemyMarkers = "dBTm",
+    )
 
     /** "Static Canyon" — 10-fighter Last Spark. Large and square, lots of cover and grass to ambush from. */
     fun staticCanyon(): Arena = Arena.freeForAll(

@@ -103,7 +103,7 @@ fun MatchIntro(match: Match, onDone: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             PlainText(
                 if (match.freeForAll) "Last one standing wins"
-                else if (match.bossMode) "Knock out the giant before it knocks you out ${match.world.rules.enemyKoTarget} times"
+                else if (match.bossMode) "Knock out the giant. You have unlimited lives"
                 else "First team to ${match.world.rules.koTarget} knockouts wins",
                 Type.Label, color = Color.White,
             )

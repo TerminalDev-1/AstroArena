@@ -85,6 +85,7 @@ object SparkCapsules {
             GameMode.KNOCKOUT_RUSH -> report.outcome == MatchOutcome.VICTORY
             // The boss never gets tougher, so beating it can't be a way to farm drops.
             GameMode.BOSS -> false
+            GameMode.TRAINING -> false
         }
 
     /** Highest luck the debug menu offers (shown as x15). */

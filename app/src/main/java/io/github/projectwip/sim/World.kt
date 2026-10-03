@@ -26,14 +26,17 @@ data class MatchRules(
     val enemyKoTarget: Int = koTarget,
     /** Boss Mode: one giant against the player; shown differently on the HUD. */
     val boss: Boolean = false,
+    /** Training Area: no clock and no score to reach, so it only ends when the player leaves. */
+    val practice: Boolean = false,
 ) {
     val respawn get() = !freeForAll
 
     companion object {
         fun knockoutRush() = MatchRules()
         fun lastSpark() = MatchRules(freeForAll = true, durationSeconds = Float.MAX_VALUE)
-        /** The player wins with one knockout (the boss); the boss wins by knocking the player out [Balance.BOSS_LIVES] times. */
-        fun bossMode() = MatchRules(koTarget = 1, enemyKoTarget = Balance.BOSS_LIVES, durationSeconds = Float.MAX_VALUE, boss = true)
+        /** The player wins by knocking out the boss, and has unlimited lives to do it. */
+        fun bossMode() = MatchRules(koTarget = 1, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, boss = true)
+        fun training() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, practice = true)
     }
 }
 
@@ -190,8 +193,8 @@ class World(
         if (f.isDashing) {
             stepDash(f, dt)
         } else {
-            var mx = c.moveX
-            var my = c.moveY
+            var mx = if (f.rooted) 0f else c.moveX
+            var my = if (f.rooted) 0f else c.moveY
             val len = hypot(mx, my)
             if (len > 1f) { mx /= len; my /= len }
             val speed = f.def.moveSpeed
@@ -318,7 +321,7 @@ class World(
                 }
             }
             SuperKind.PIERCE -> spawnProjectile(f, baseAng, s.speed, s.radius, f.superDamage, s.range, true, true, ShotStyle.LANCE)
-            SuperKind.RAM -> {
+            SuperKind.RAM -> if (!f.rooted) {
                 f.dashTime = s.range / s.speed
                 f.dashDirX = dx
                 f.dashDirY = dy
@@ -362,7 +365,7 @@ class World(
             if (hypot(o.x - f.x, o.y - f.y) < f.radius + o.radius + 0.25f) {
                 f.dashHits += o.id
                 damage(o, f, f.superDamage, true, o.x, o.y)
-                if (o.alive) {
+                if (o.alive && !o.rooted) {
                     arena.moveCircle(o.x, o.y, o.radius, f.dashDirX * 1.6f, f.dashDirY * 1.6f, tmp)
                     o.x = tmp[0]; o.y = tmp[1]
                 }

@@ -90,6 +90,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             when (startScreen) {
                 "match" -> Screen.Match(startMatchConfig(repo.save.value))
                 "boss" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
+                "train" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.TRAINING))
                 "fighters" -> Screen.Fighters()
                 "kito" -> Screen.Fighters(FighterId.KITO)
                 "shop" -> Screen.Shop
@@ -223,8 +224,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.Settings -> SettingsScreen(save, repo, go)
                     is Screen.Match -> MatchScreen(s.config, save.settings, sfx, save.matchesPlayed,
                         onFinish = { summary ->
-                            val rewards = repo.applyMatch(summary.report)
-                            screen = Screen.Result(summary, rewards)
+                            // The Training Area is practice: nothing to record, straight back to the lobby.
+                            if (summary.report.mode == io.github.projectwip.data.GameMode.TRAINING) screen = Screen.Home
+                            else {
+                                val rewards = repo.applyMatch(summary.report)
+                                screen = Screen.Result(summary, rewards)
+                            }
                         })
                     is Screen.Result -> ResultScreen(s.summary, s.rewards, save, go)
                 }

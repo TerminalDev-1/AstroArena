@@ -89,10 +89,10 @@ class MatchRenderer(
     private val rng = Random(11)
 
     private val anim = FighterAnim()
-    private val shownFacing = FloatArray(16)
-    private val shownMoving = FloatArray(16)
+    private val shownFacing = FloatArray(io.github.projectwip.match.HudSnapshot.MAX)
+    private val shownMoving = FloatArray(io.github.projectwip.match.HudSnapshot.MAX)
     /** 0..1 how solid each fighter is drawn: eases toward what the player's team can see, so cover fades rather than pops. */
-    private val shownVis = FloatArray(16)
+    private val shownVis = FloatArray(io.github.projectwip.match.HudSnapshot.MAX)
 
     private var fpsFrames = 0
     private var fpsTime = 0f
@@ -806,7 +806,9 @@ class MatchRenderer(
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
         s.freeForAll = w.rules.freeForAll
         s.bossMode = w.rules.boss
-        s.livesLeft = (w.rules.enemyKoTarget - w.score[1 - p.team]).coerceAtLeast(0)
+        s.timesDown = p.deaths
+        s.practice = w.rules.practice
+        s.damage = p.damageDealt
         val giant = if (w.rules.boss) w.fighters.firstOrNull { it.team != p.team } else null
         s.bossHp = giant?.hp ?: 0; s.bossMaxHp = giant?.maxHp ?: 1; s.bossName = giant?.name
         s.aliveCount = w.aliveCount
