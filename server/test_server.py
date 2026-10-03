@@ -71,7 +71,8 @@ class Rules(unittest.TestCase):
         self.assertGreater(rules.odds(5.0)[5], rules.odds()[5] * 20)
         rng = random.Random(7)
         self.assertTrue(all(rules.roll_pieces(rng) in (1, 2, 4, 8) for _ in range(500)))
-        self.assertEqual({rules.roll_pieces(rng, rules.MAX_LUCK) for _ in range(50)}, {8})
+        # At full luck a drop nearly always splits, and one that splits always goes all the way to eight.
+        self.assertEqual({rules.roll_pieces(rng, rules.MAX_LUCK) for _ in range(200)}, {1, 8})
 
     def test_drops_never_give_what_is_owned(self):
         rng = random.Random(11)
@@ -294,8 +295,7 @@ class Api(unittest.TestCase):
         _, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "difficulty": "ELITE"}, me["token"])
         self.assertEqual(plan["difficulty"], "ELITE")
         _, drop = self.call("POST", "/v1/drops/open", {"luck": 14, "free": True}, me["token"])
-        self.assertEqual(drop["pieces"], 8)
-        self.assertEqual(drop["account"]["drops"], 6 + 7)
+        self.assertEqual(drop["account"]["drops"], 6 + drop["pieces"] - 1)  # free: none used up
         # Someone else is still an ordinary player.
         other = self.player("Other")
         self.assertFalse(self.call("GET", "/v1/me", token=other["token"])[1]["account"]["developer"])
