@@ -77,7 +77,7 @@ class FighterModels {
     private fun MeshBuilder.alongZ(block: MeshBuilder.() -> Unit) = with { rotate(90f, 1f, 0f, 0f); block() }
     private fun MeshBuilder.octa(rx: Float, ry: Float, rz: Float) = ellipsoid(rx, ry, rz, 2, 4)
 
-    // ------------------------------------------------------------------ Juno Flint — courier with coil blaster
+    // ------------------------------------------------------------------ Juno — courier with coil blaster
 
     private fun buildJuno(): FighterModel {
         val a = Assembler()
@@ -148,7 +148,7 @@ class FighterModels {
         return a.build(rig)
     }
 
-    // ------------------------------------------------------------------ Mira Vale — prism sniper
+    // ------------------------------------------------------------------ Mira — prism sniper
 
     private fun buildMira(): FighterModel {
         val a = Assembler()

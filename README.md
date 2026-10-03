@@ -19,7 +19,7 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 |---|---|
 | **Modes** | **Last Spark** — 10-fighter free-for-all, last one standing; break Spark Crates for stacking Power Cells (+10% health & damage each) while the Static Storm closes in. **Knockout Rush** — 3v3, first team to 10 KOs, your team starts at the bottom |
 | **Arenas** | *Static Canyon* (44×44, free-for-all) and *Foundry Yard* (vertical 3v3): walls, tall-grass thickets (hide inside), coolant pools (block movement, not shots), destructible crates |
-| **Fighters** | **Juno Flint** (burst skirmisher, starter) · **Brakk** (shotgun tank, ram super) · **Mira Vale** (sniper, piercing super) |
+| **Fighters** | **Juno** (burst skirmisher, starter) · **Brakk** (shotgun tank, ram super) · **Mira** (sniper, piercing super) |
 | **Graphics** | Custom OpenGL ES 3.0: toon lighting, real-time shadows, inked outlines, 4× MSAA, up to 120 Hz |
 | **Controls** | Floating/fixed move stick · drag-to-aim attack stick (tap anywhere on it = auto-aim that locks the nearest enemy and leads moving targets; visible target marker; drag back to centre = cancel) · super stick · optional aim assist · camera centred on you |
 | **Bots** | Easy / Normal / Hard / Elite — behaviour only (reaction, aim, leading, dodging, spacing, targeting, supers) |

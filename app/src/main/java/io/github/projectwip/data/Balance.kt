@@ -166,7 +166,7 @@ object Balance {
     val fighters: List<FighterDef> = listOf(
         FighterDef(
             id = FighterId.JUNO,
-            name = "Juno Flint",
+            name = "Juno",
             title = "Spark Courier",
             role = "Skirmisher",
             lore = "Delivers parcels and bad news at the same speed. Her coil blaster was a toaster once.",
@@ -211,7 +211,7 @@ object Balance {
         ),
         FighterDef(
             id = FighterId.MIRA,
-            name = "Mira Vale",
+            name = "Mira",
             title = "Prism Sniper",
             role = "Marksman",
             lore = "Bends starlight through a cut crystal. Never misses twice — usually never once.",
