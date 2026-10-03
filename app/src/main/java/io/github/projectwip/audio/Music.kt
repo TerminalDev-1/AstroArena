@@ -19,6 +19,9 @@ class Music(private val context: Context) {
     private var wanted = false
     private var foreground = true
     private var released = false
+    /** True once the music is loaded, or has failed to load (for the loading screen). */
+    @Volatile var ready = false
+        private set
 
     var volume = 0.5f
         set(v) { field = v.coerceIn(0f, 1f); synchronized(lock) { track?.setVolume(field); apply() } }
@@ -46,7 +49,7 @@ class Music(private val context: Context) {
                 t.write(pcm, 0, pcm.size)
                 t.setLoopPoints(0, pcm.size / 2, -1)
                 synchronized(lock) {
-                    if (released) { t.release(); return@Thread }
+                    if (released) { t.release(); ready = true; return@Thread }
                     t.setVolume(volume)
                     track = t
                     apply()
@@ -54,6 +57,7 @@ class Music(private val context: Context) {
             } catch (e: Exception) {
                 Log.e("Music", "lobby music unavailable", e)
             }
+            ready = true
         }, "music-synth").start()
     }
 

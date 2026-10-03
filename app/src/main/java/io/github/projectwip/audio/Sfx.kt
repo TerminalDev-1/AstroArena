@@ -23,6 +23,9 @@ class Sfx(private val context: Context) {
         .build()
     private val ids = IntArray(Sound.entries.size)
     @Volatile private var loaded = false
+    /** 0..1: how much of the sound set is ready (for the loading screen). */
+    @Volatile var progress = 0f
+        private set
     @Volatile var volume = 0.8f
     @Volatile var hapticsEnabled = true
 
@@ -46,6 +49,7 @@ class Sfx(private val context: Context) {
                     tmp.renameTo(f)
                 }
                 ids[s.ordinal] = pool.load(f.absolutePath, 1)
+                progress = (s.ordinal + 1f) / Sound.entries.size
             }
             loaded = true
         }, "sfx-synth").start()

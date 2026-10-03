@@ -286,4 +286,15 @@ class ProgressionTest {
         assertFalse(rewards.capsuleEarned)
         assertEquals(0, after.capsules)
     }
+
+    @Test fun versionsCompareByNumber() {
+        val v = io.github.projectwip.data.Versions
+        assertTrue(v.isNewer("v0.4.2-preview", "0.4.1-preview"))
+        assertTrue(v.isNewer("v0.10.0-preview", "0.9.9-preview"))
+        assertTrue(v.isNewer("1.0", "0.99.99-preview"))
+        assertFalse("the same version is not an update", v.isNewer("v0.4.2-preview", "0.4.2-preview"))
+        assertFalse("an older release is not an update", v.isNewer("v0.3.3-preview", "0.4.2-preview"))
+        assertFalse("garbage is never an update", v.isNewer("latest", "0.4.2-preview"))
+        assertFalse(v.isNewer("v0.4.3", "not-a-version"))
+    }
 }

@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import io.github.projectwip.audio.Sfx
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import io.github.projectwip.data.CapsuleResult
 import io.github.projectwip.data.CapsuleTier
 import io.github.projectwip.data.FighterId
@@ -114,6 +116,44 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         })
     }
 
+    // ---- start-up: load sounds and music, and ask GitHub whether a newer release exists
+    var booting by remember { mutableStateOf(true) }
+    var bootProgress by remember { mutableStateOf(0f) }
+    var bootStatus by remember { mutableStateOf("Checking for updates…") }
+    var update by remember {
+        // Debug: `--es screen update` shows the update screen with made-up details.
+        mutableStateOf(if (startScreen == "update") io.github.projectwip.net.UpdateInfo("9.9.9-preview", "## New\n- Example note one\n- Example note two", REPO_RELEASES, REPO_RELEASES) else null)
+    }
+    LaunchedEffect(Unit) {
+        val checked = java.util.concurrent.atomic.AtomicBoolean(false)
+        // Debug: `--es screen updatecheck` runs the real check pretending to be a very old version.
+        val running = if (startScreen == "updatecheck") "0.0.1" else io.github.projectwip.BuildConfig.VERSION_NAME
+        launch(kotlinx.coroutines.Dispatchers.IO) {
+            val found = io.github.projectwip.net.Updater.check(running)
+            if (found != null) update = found
+            checked.set(true)
+        }
+        val started = System.currentTimeMillis()
+        while (true) {
+            val waited = System.currentTimeMillis() - started
+            val target = 0.2f * (if (checked.get()) 1f else (waited / 4000f).coerceAtMost(0.9f)) + 0.6f * sfx.progress + 0.2f * (if (music.ready) 1f else 0f)
+            // The bar only ever moves forward, and eases toward the real figure so it doesn't jump.
+            bootProgress = maxOf(bootProgress, bootProgress + (target - bootProgress) * 0.2f)
+            bootStatus = when {
+                !checked.get() -> "Checking for updates…"
+                sfx.progress < 1f -> "Building sound effects…"
+                !music.ready -> "Composing the lobby music…"
+                else -> "Ready!"
+            }
+            val done = checked.get() && sfx.progress >= 1f && music.ready
+            // Stay up long enough to be read; never hang forever if something fails to load.
+            if ((done && waited > 1200 && bootProgress > 0.985f) || waited > 15000) break
+            delay(40)
+        }
+        bootProgress = 1f
+        booting = false
+    }
+
     LaunchedEffect(save.settings) {
         sfx.volume = if (save.settings.muted) 0f else save.settings.sfxVolume
         sfx.hapticsEnabled = save.settings.haptics
@@ -122,7 +162,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
 
     // Lobby music plays in the menus and makes way for the match.
     val inMatch = screen is Screen.Match
-    LaunchedEffect(inMatch) { music.setWanted(!inMatch) }
+    LaunchedEffect(inMatch, booting, update) { music.setWanted(!inMatch && !booting && update == null) }
 
     val go: (Screen) -> Unit = { if (it !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f); screen = it }
     val showReward: (RewardReveal) -> Unit = { reveal = it }
@@ -192,6 +232,11 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 io.github.projectwip.ui.screens.DebugButton(Modifier.align(Alignment.BottomStart)) { debugMenu = true }
             }
             if (debugMenu) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
+            // On top of everything: the loading screen, then (if a newer release exists) the update screen.
+            if (!booting) update?.let { io.github.projectwip.ui.screens.UpdateScreen(it) { update = null } }
+            AnimatedVisibility(booting, enter = fadeIn(tween(0)), exit = fadeOut(tween(250))) {
+                io.github.projectwip.ui.screens.LoadingScreen(bootProgress, bootStatus)
+            }
             AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
                 capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, onNext = openCapsule, onDone = { capsule = null }) }
             }
@@ -210,6 +255,8 @@ private fun previewResult(save: io.github.projectwip.data.SaveData): Screen {
     }
     return Screen.Result(MatchSummary(report, players, 1), MatchRewards(save.cups, 8, 32, 10, emptyList(), capsuleEarned = true, capsulesLeftToday = 2))
 }
+
+private const val REPO_RELEASES = "https://github.com/TerminalDev-1/AstroArena/releases"
 
 fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
     val p = save.progress(save.selectedFighter)

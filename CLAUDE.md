@@ -33,6 +33,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Changed a sound: bump `CACHE` in `audio/Sfx.kt`, or devices keep the old WAVs.
 - Mesh triangle winding matters (outlines are inverted hulls). Sim (x, y) maps to world (x, 0, y).
 - The lobby `TextureView` must be removed during matches.
+- The game checks GitHub releases at start-up (`net/Updater.kt`) and blocks on an update screen if a newer one with
+  an APK exists. So a release with a broken APK locks every player out: never publish one that wasn't built from
+  the tagged commit with tests passing. Debug: `--es screen update` (fake) or `updatecheck` (real check as v0.0.1).
 
 ## Git
 
