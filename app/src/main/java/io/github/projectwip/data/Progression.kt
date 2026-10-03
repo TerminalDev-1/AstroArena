@@ -103,16 +103,23 @@ object Progression {
     fun levelCapped(save: SaveData, id: FighterId): Boolean =
         save.progress(id).level >= Balance.MAX_LEVEL && !save.settings.debugNoLevelCap
 
+    /** The debug menu's upgrade-cost slider goes from free up to this many times the normal price. */
+    const val MAX_COST_FACTOR = 3f
+
+    /** What the next upgrade of [id] costs right now (the balance table, times the debug cost factor). */
+    fun upgradeCost(save: SaveData, id: FighterId): Int =
+        Math.round(Balance.upgradeCostFrom(save.progress(id).level) * save.settings.debugUpgradeCost)
+
     fun canUpgrade(save: SaveData, id: FighterId): Boolean {
         val p = save.progress(id)
-        val cost = Balance.upgradeCostFrom(p.level)
+        val cost = upgradeCost(save, id)
         return p.unlocked && !levelCapped(save, id) && save.bolts >= cost
     }
 
     fun upgrade(save: SaveData, id: FighterId): SaveData? {
         if (!canUpgrade(save, id)) return null
         val p = save.progress(id)
-        val cost = Balance.upgradeCostFrom(p.level)
+        val cost = upgradeCost(save, id)
         return save.copy(
             bolts = save.bolts - cost,
             fighters = save.fighters + (id to p.copy(level = p.level + 1)),

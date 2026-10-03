@@ -184,7 +184,16 @@ class HudView(
         val panelW = dp(260f)
         val panelH = dp(58f)
         chamfer(c, cx - panelW / 2, top, cx + panelW / 2, top + panelH, dp(13f), Color.argb(235, 34, 22, 84), INK)
-        if (s.freeForAll) {
+        if (s.practice) {
+            // Knockouts so far + running damage total: this is a practice ground, so show the numbers.
+            chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
+            text.textSize = dp(30f)
+            outlined(c, s.myScore.toString(), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
+            text.textSize = dp(17f)
+            outlined(c, "FREE ROAM", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
+            text.textSize = dp(12f)
+            outlined(c, "%,d DAMAGE".format(s.damage), cx + dp(40f), top + dp(46f), Color.rgb(255, 214, 64), dp(3f))
+        } else if (s.freeForAll) {
             // Fighters left + mode name
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(200, 40, 64), null)
             text.textSize = dp(30f)
@@ -254,7 +263,7 @@ class HudView(
             text.textSize = dp(96f) * big
             outlined(c, n.toString(), cx, h * 0.45f, Color.WHITE, dp(9f))
             text.textSize = dp(21f)
-            outlined(c, if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
+            outlined(c, if (s.practice) "FREE ROAM · PRACTICE, NOTHING AT STAKE" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
         } else if (s.phase == Phase.PLAYING && s.phaseTime < 0.9f) {
             text.textSize = dp(80f) * big
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))

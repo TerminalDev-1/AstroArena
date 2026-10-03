@@ -95,6 +95,7 @@ class SaveStore(context: Context) {
                 put("debugLuck", st.debugLuck.toDouble())
                 put("debugInfiniteCapsules", st.debugInfiniteCapsules)
                 put("debugNoLevelCap", st.debugNoLevelCap)
+                put("debugUpgradeCost", st.debugUpgradeCost.toDouble())
                 put("musicVolume", st.musicVolume.toDouble())
                 val l = st.controlLayout
                 put("controlLayout", JSONArray(listOf(l.moveX, l.moveY, l.attackX, l.attackY, l.superX, l.superY).map { it.toDouble() }))
@@ -134,6 +135,7 @@ class SaveStore(context: Context) {
                 debugLuck = so.optDouble("debugLuck", 0.0).toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, SparkCapsules.MAX_LUCK) },
                 debugInfiniteCapsules = so.optBoolean("debugInfiniteCapsules", false),
                 debugNoLevelCap = so.optBoolean("debugNoLevelCap", false),
+                debugUpgradeCost = so.optDouble("debugUpgradeCost", 1.0).toFloat().let { if (it.isNaN()) 1f else it.coerceIn(0f, Progression.MAX_COST_FACTOR) },
                 musicVolume = so.optDouble("musicVolume", sd.musicVolume.toDouble()).toFloat().let { if (it.isNaN()) sd.musicVolume else it.coerceIn(0f, 1f) },
                 controlLayout = so.optJSONArray("controlLayout")?.takeIf { it.length() == 6 }?.let { a ->
                     fun f(i: Int) = a.optDouble(i, -1.0).toFloat().let { if (it.isNaN()) -1f else it.coerceIn(-1f, 1f) }

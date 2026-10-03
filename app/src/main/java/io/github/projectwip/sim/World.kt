@@ -22,12 +22,15 @@ data class MatchRules(
     val koTarget: Int = Balance.KO_TARGET,
     val durationSeconds: Float = Balance.MATCH_SECONDS,
     val countdownSeconds: Float = 3f,
+    /** Free Roam: respawns, no clock and no score to reach, so the match only ends when the player leaves. */
+    val practice: Boolean = false,
 ) {
     val respawn get() = !freeForAll
 
     companion object {
         fun knockoutRush() = MatchRules()
         fun lastSpark() = MatchRules(freeForAll = true, durationSeconds = Float.MAX_VALUE)
+        fun freeRoam() = MatchRules(koTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, practice = true)
     }
 }
 

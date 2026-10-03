@@ -82,6 +82,8 @@ enum class MatchOutcome { VICTORY, DEFEAT, DRAW }
 enum class GameMode(val title: String, val tagline: String, val players: Int) {
     LAST_SPARK("Last Spark", "10-fighter free-for-all · last one standing", 10),
     KNOCKOUT_RUSH("Knockout Rush", "3v3 · first team to 10 KOs", 6),
+    /** Practice: no timer, no score to reach, nothing won or lost. */
+    FREE_ROAM("Free Roam", "Practice ground · dummies and a giant boss", 6),
 }
 
 object Balance {
@@ -246,6 +248,24 @@ object Balance {
     )
 
     fun fighter(id: FighterId): FighterDef = fighters.first { it.id == id }
+
+    // ---- Free Roam (practice) ----
+    /** A target dummy: stands still, soaks up damage, and regenerates like anyone else. */
+    val dummy: FighterDef = fighter(FighterId.JUNO).copy(name = "Dummy", health = StatLine(4000, 200))
+
+    /**
+     * The Titan: a giant version of the scrapyard bruiser. More than double the size, a mountain of health, slow,
+     * with a wider and longer-reaching cannon. It is drawn at the size of its collision radius.
+     */
+    val boss: FighterDef = fighter(FighterId.BRAKK).let { b ->
+        b.copy(
+            name = "Titan", title = "Proving Ground Boss",
+            health = StatLine(14000, 700), attackDamage = StatLine(120, 6), superDamage = StatLine(520, 26),
+            moveSpeed = 2.1f, radius = 1.05f, reloadSeconds = 1.9f, superChargePerHit = 0.035f,
+            attack = b.attack.copy(projectiles = 7, spreadDegrees = 46f, range = 6.2f, radius = 0.24f),
+            superSpec = b.superSpec.copy(range = 7f, speed = 13f),
+        )
+    }
 
     /** How a locked fighter can be obtained. */
     fun unlockPrismPrice(id: FighterId): Int? = when (id) {

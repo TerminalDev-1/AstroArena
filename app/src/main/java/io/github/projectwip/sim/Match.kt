@@ -31,6 +31,8 @@ class Match(val config: MatchConfig) {
     val brains: List<BotBrain>
     private val pathfinder: Pathfinder
     val freeForAll = config.mode == GameMode.LAST_SPARK
+    /** Free Roam: nothing at stake, and it never ends on its own. */
+    val practice = config.mode == GameMode.FREE_ROAM
 
     /** Seconds since the match became "over" for the player (ended, or eliminated in free-for-all). */
     var overFor = 0f
@@ -46,16 +48,20 @@ class Match(val config: MatchConfig) {
         // Bots use the same level as the player — difficulty comes from behaviour, never from stats.
         if (freeForAll) {
             repeat(config.mode.players - 1) { roster += botFighter(id, team = id, names.next()); id++ }
+        } else if (practice) {
+            // Four dummies to shoot at and one giant to fight. Order matters: it matches the arena's spawn list.
+            repeat(4) { roster += Fighter(id++, Balance.dummy, config.playerLevel, 0, 1, "Dummy ${it + 1}", isBot = true, dummy = true) }
+            roster += Fighter(id++, Balance.boss, config.playerLevel, 2, 1, Balance.boss.name, isBot = true)
         } else {
             repeat(2) { roster += botFighter(id++, 0, names.next()) }
             repeat(3) { roster += botFighter(id++, 1, names.next()) }
         }
-        val arena = if (freeForAll) Arenas.staticCanyon() else Arenas.foundryYard()
-        val rules = if (freeForAll) MatchRules.lastSpark() else MatchRules.knockoutRush()
+        val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.provingGround() else Arenas.foundryYard()
+        val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.freeRoam() else MatchRules.knockoutRush()
         world = World(arena, roster, rules, Random(rng.nextLong()))
         pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
-        brains = roster.filter { it.isBot }.map { BotBrain(it, profile, world, pathfinder, Random(rng.nextLong())) }
+        brains = roster.filter { it.isBot && !it.dummy }.map { BotBrain(it, profile, world, pathfinder, Random(rng.nextLong())) }
         for (b in brains) b.others = brains
     }
 
@@ -72,6 +78,8 @@ class Match(val config: MatchConfig) {
         for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
         world.step(dt)
         if (isOver) overFor += dt
+        // Nobody steers a dummy, so make sure it never keeps an old input.
+        for (f in world.fighters) if (f.dummy) f.control.clear()
     }
 
     /** True once the result is decided for the player. */

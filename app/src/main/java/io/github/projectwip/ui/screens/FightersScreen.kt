@@ -188,7 +188,7 @@ private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int, capped
                 }
             }
             Spacer(Modifier.height(6.dp))
-            PlainText(if (capped) "Level $level · fully upgraded" else "Level $level of ${maxOf(level, Balance.MAX_LEVEL)} · the next level costs ${"%,d".format(Balance.upgradeCostFrom(level))} Bolts", Type.Small)
+            PlainText(if (capped) "Level $level · fully upgraded" else "Level $level of ${maxOf(level, Balance.MAX_LEVEL)}", Type.Small)
         }
     }
 }
@@ -280,7 +280,7 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
         }
         return
     }
-    val cost = Balance.upgradeCostFrom(p.level)
+    val cost = Progression.upgradeCost(save, id)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (save.selectedFighter != id) {
             ChunkyButton({ repo.selectFighter(id) }, Modifier.width(110.dp).height(68.dp), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }

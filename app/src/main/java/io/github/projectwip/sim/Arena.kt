@@ -47,6 +47,9 @@ class Arena(
 
     fun inThicket(x: Float, y: Float) = tileAt(x, y) == Tile.THICKET
 
+    /** The same map with different team spawn points. */
+    fun withSpawns(spawns: List<List<Spawn>>): Arena = Arena(name, width, height, tiles.copyOf(), spawns, ffaSpawns)
+
     /**
      * Moves a circle by (dx, dy), sliding along blocking tiles. Returns the new position in [out].
      * Returns true if the move was obstructed.
@@ -256,6 +259,39 @@ object Arenas {
         spawnYs = listOf(6.5f, 10f, 13.5f),
         spawnInset = 1.5f,
     )
+
+    /**
+     * "Proving Ground" — Free Roam. Wide open with a little cover; you start at the bottom, four dummies stand
+     * around the middle and the Titan waits at the top. Enemy spawns are listed dummies first, boss last.
+     */
+    fun provingGround(): Arena {
+        val base = Arena.fromQuadrant(
+            name = "Proving Ground",
+            quadrant = listOf(
+                //0123456789AB
+                "............",
+                "..##........",
+                "..##....gg..",
+                "........gg..",
+                "............",
+                ".....~~.....",
+                ".....~~.....",
+                "..gg........",
+                "..gg........",
+            ),
+            spawnYs = listOf(9f),
+            spawnInset = 1.5f,
+        )
+        val w = base.width.toFloat()
+        val h = base.height.toFloat()
+        fun open(x: Float, y: Float, r: Float) = base.nearestOpen(x, y, r)
+        val enemies = listOf(
+            open(w * 0.25f, h * 0.6f, 0.5f), open(w * 0.75f, h * 0.6f, 0.5f),
+            open(w * 0.32f, h * 0.38f, 0.5f), open(w * 0.68f, h * 0.38f, 0.5f),
+            open(w * 0.5f, h * 0.16f, 1.1f),
+        )
+        return base.withSpawns(listOf(listOf(open(w * 0.5f, h - 1.5f, 0.5f)), enemies))
+    }
 
     /** "Static Canyon" — 10-fighter Last Spark. Large and square, lots of cover and grass to ambush from. */
     fun staticCanyon(): Arena = Arena.freeForAll(

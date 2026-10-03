@@ -263,4 +263,15 @@ class ProgressionTest {
         val juno = Balance.fighter(FighterId.JUNO)
         assertEquals(juno.health.base + juno.health.perLevel * 60, juno.health.at(61))
     }
+
+    @Test fun debugUpgradeCostScalesThePrice() {
+        val normal = SaveData(bolts = 1000)
+        assertEquals(Balance.upgradeCost[0], Progression.upgradeCost(normal, FighterId.JUNO))
+        val free = normal.copy(bolts = 0, settings = io.github.projectwip.data.Settings(debugUpgradeCost = 0f))
+        assertEquals(0, Progression.upgradeCost(free, FighterId.JUNO))
+        assertEquals("free upgrades need no Bolts", 2, Progression.upgrade(free, FighterId.JUNO)!!.progress(FighterId.JUNO).level)
+        val triple = normal.copy(settings = io.github.projectwip.data.Settings(debugUpgradeCost = 3f))
+        val up = Progression.upgrade(triple, FighterId.JUNO)!!
+        assertEquals(1000 - Balance.upgradeCost[0] * 3, up.bolts)
+    }
 }

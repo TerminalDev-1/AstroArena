@@ -71,6 +71,7 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
     // The slider's own position while it is being dragged, so the number and the odds follow the thumb;
     // the save is only written when it is let go.
     var luck by remember { mutableFloatStateOf(s.debugLuck) }
+    var costFactor by remember { mutableFloatStateOf(s.debugUpgradeCost) }
     fun snap(v: Float) = (v * 10).toInt() / 10f
     SectionTitle("DEBUG MENU", "Cheats for trying things out. They change your real save.")
     ToggleRow("INFINITE DROPS", "The drop button always works and opening one never uses it up.", s.debugInfiniteCapsules) { v ->
@@ -89,6 +90,13 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
     val odds = SparkCapsules.odds(luck)
     PlainText(CapsuleTier.entries.joinToString("  ·  ") { "${it.label} ${"%.1f".format(odds[it.ordinal] * 100)}%" }, Type.Body, color = Color.White)
     PlainText("Chance a drop splits: ${"%.0f".format(SparkCapsules.splitChance(luck) * 100)}%, then ${"%.0f".format(SparkCapsules.resplitChance(luck) * 100)}% to split again (up to ${SparkCapsules.MAX_PIECES})",
+        Type.Body, color = Color.White)
+    SliderRow("UPGRADE COST", if (costFactor <= 0f) "FREE" else "×${"%.1f".format(costFactor)}", s.debugUpgradeCost, 0f, io.github.projectwip.data.Progression.MAX_COST_FACTOR,
+        onDrag = { costFactor = snap(it) }) { v ->
+        costFactor = snap(v)
+        repo.updateSettings { it.copy(debugUpgradeCost = snap(v)) }
+    }
+    PlainText("Multiplies the price of every fighter upgrade. A level 1 upgrade now costs ${Math.round(io.github.projectwip.data.Balance.upgradeCostFrom(1) * costFactor)} Bolts, level 9 costs ${Math.round(io.github.projectwip.data.Balance.upgradeCostFrom(9) * costFactor)}.",
         Type.Body, color = Color.White)
     SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.cups)} Cups, ${"%,d".format(save.bolts)} Bolts, ${"%,d".format(save.prisms)} Prisms and ${save.capsules} drops.")
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -138,6 +138,7 @@ fun HomeScreen(
             }
         }
 
+        androidx.activity.compose.BackHandler(enabled = picking) { picking = false }
         AnimatedVisibility(picking, enter = fadeIn(tween(160)), exit = fadeOut(tween(140))) {
             ModePicker(save, repo) { picking = false }
         }
@@ -250,9 +251,9 @@ private fun CapsuleButton(count: Int, leftToday: Int, onOpen: () -> Unit) {
 
 // ---------------------------------------------------------------------------------------------- mode
 
-fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS }
+fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS; GameMode.FREE_ROAM -> IconKind.SKULL }
 
-fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard() }
+fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.FREE_ROAM -> Arenas.provingGround() }
 
 @Composable
 private fun ModeChip(mode: GameMode, d: BotDifficulty, onClick: () -> Unit) {
@@ -317,7 +318,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GameIcon(modeIcon(m), Modifier.size(34.dp))
                 Spacer(Modifier.width(8.dp))
-                GameText(m.title.uppercase(), Type.Title, outline = 3.dp)
+                GameText(m.title.uppercase(), Type.Heading, outline = 3.dp)
             }
             PlainText(m.tagline, Type.Label, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center)
             Spacer(Modifier.height(6.dp))
@@ -332,6 +333,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 when (m) {
                     GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. 1st place: +${Balance.placementCups[0]} Cups"
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win: +${io.github.projectwip.data.BotDifficulty.NORMAL.cupBonus} Cups (Normal)"
+                    GameMode.FREE_ROAM -> "Practise on four dummies and fight the Titan, a giant boss. No timer, no Cups, no rewards: leave whenever you like."
                 },
                 Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center,
             )

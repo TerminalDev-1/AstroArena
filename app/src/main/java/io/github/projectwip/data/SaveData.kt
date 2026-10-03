@@ -43,6 +43,8 @@ data class Settings(
     val debugInfiniteCapsules: Boolean = false,
     /** Debug menu (dev builds only): fighters can be upgraded past [Balance.MAX_LEVEL]. */
     val debugNoLevelCap: Boolean = false,
+    /** Debug menu: multiplies what every upgrade costs (1 = normal, 0 = free). */
+    val debugUpgradeCost: Float = 1f,
 )
 
 data class FighterProgress(

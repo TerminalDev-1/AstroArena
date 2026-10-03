@@ -68,7 +68,7 @@ fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed
     var view by remember { mutableStateOf<MatchView?>(null) }
     var done by remember { mutableStateOf(false) }
     /** The line-up is showing; the match waits behind it. */
-    var intro by remember { mutableStateOf(true) }
+    var intro by remember { mutableStateOf(!match.practice) }
     val context = LocalContext.current
 
     LaunchedEffect(Unit) { (context as? MainActivity)?.applyRefreshRate(settings.highFrameRate) }
@@ -92,7 +92,7 @@ fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed
                 MatchView(ctx, match, settings, sfx, matchesPlayed,
                     onPauseRequested = { if (!done && !intro) { paused = true; view?.paused = true } },
                     onFinished = { report -> finish(report) },
-                ).also { view = it; it.paused = true }
+                ).also { view = it; it.paused = intro }
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -102,7 +102,7 @@ fun MatchScreen(config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed
                 Panel(cut = 20.dp) {
                     Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         GameText("PAUSED", Type.Display, outline = 4.dp)
-                        PlainText("Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
+                        PlainText(if (match.practice) "Nothing is at stake in Free Roam. Leave whenever you like." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
                         ChunkyButton({ paused = false; view?.resumeGame() }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN) { GameText("RESUME", Type.Title) }
                         ChunkyButton({ finish(match.report().copy(outcome = MatchOutcome.DEFEAT)) }, Modifier.size(260.dp, 54.dp), ButtonStyle.RED) {

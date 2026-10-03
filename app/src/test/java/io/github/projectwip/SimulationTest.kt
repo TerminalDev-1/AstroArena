@@ -169,6 +169,32 @@ class SimulationTest {
         assertTrue("fighters were mobbed by 4+ bots in $mobbed of $samples samples", mobbed < samples / 200)
     }
 
+    /** Free Roam: dummies stay put, the boss is a giant, and the match never ends by itself. */
+    @Test fun freeRoamIsAnEndlessPracticeGround() {
+        val a = Arenas.provingGround()
+        assertEquals(1, a.spawns[0].size)
+        assertEquals(5, a.spawns[1].size)
+        for (s in a.spawns[1].dropLast(1)) assertFalse("dummy spawn $s blocked", a.circleBlocked(s.x, s.y, 0.5f))
+        assertFalse("the boss needs room", a.circleBlocked(a.spawns[1].last().x, a.spawns[1].last().y, Balance.boss.radius))
+
+        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.FREE_ROAM, humanPlayer = false, seed = 9L))
+        val dummies = m.world.fighters.filter { it.dummy }
+        val boss = m.world.fighters.last()
+        assertEquals(4, dummies.size)
+        assertEquals("Titan", boss.name)
+        assertTrue("the boss is drawn more than twice normal size", boss.scale > 2f)
+        assertTrue(boss.maxHp > m.player.maxHp * 8)
+        val start = dummies.map { it.x to it.y }
+        var t = 0f
+        while (t < 90f) { m.step(Match.STEP); t += Match.STEP }
+        assertEquals("no clock and no score target: it keeps going", Phase.PLAYING, m.world.phase)
+        assertFalse(m.isOver)
+        assertEquals("dummies never move on their own", start, dummies.map { it.x to it.y })
+        assertTrue("dummies never attack", dummies.all { it.damageDealt == 0 })
+        assertTrue("someone got hurt in ninety seconds", m.world.fighters.sumOf { it.damageDealt } > 0)
+        for (f in m.world.fighters) assertFalse(m.world.arena.circleBlocked(f.x, f.y, f.radius * 0.9f))
+    }
+
     @Test fun circleNeverEntersWalls() {
         val a = Arenas.foundryYard()
         val out = FloatArray(2)

@@ -351,7 +351,7 @@ class MatchRenderer(
         lit.f("uEmissive", 0.6f)
         for (f in world.fighters) {
             if (f.shield <= 0f || !shown(f)) continue
-            setModel(lerp(f.prevX, f.x, alpha), 0.7f, lerp(f.prevY, f.y, alpha), 0.95f, 0.95f, 0.95f)
+            setModel(lerp(f.prevX, f.x, alpha), 0.7f * f.scale, lerp(f.prevY, f.y, alpha), 0.95f * f.scale, 0.95f * f.scale, 0.95f * f.scale)
             lit.v4("uTint", 0.55f, 0.9f, 1f, 0.22f + 0.06f * sin(time * 6f))
             sphere.draw()
         }
@@ -392,7 +392,7 @@ class MatchRenderer(
         anim.flash = (f.hitFlash / 0.12f).coerceIn(0f, 1f) * 0.8f
         anim.time = time + i * 0.7f
         anim.jump = if (f.isDashing) 0.12f else 0f
-        anim.scale = FIGHTER_SCALE
+        anim.scale = FIGHTER_SCALE * f.scale
     }
 
     /** Fighters slipping into or out of cover: colour and outline through the dissolve shader. */
@@ -605,7 +605,7 @@ class MatchRenderer(
         if (t != null || runner.autoCrate >= 0) {
             val ax = if (t != null) lerp(t.prevX, t.x, alpha) else runner.autoCrate % world.arena.width + 0.5f
             val az = if (t != null) lerp(t.prevY, t.y, alpha) else runner.autoCrate / world.arena.width + 0.5f
-            val ay = if (t != null) headHeight(t.def.id) + 0.9f else 1.7f
+            val ay = if (t != null) headHeight(t.def.id) * t.scale + 0.9f else 1.7f
             lit.i("uMode", 0)
             lit.f("uEmissive", 0.7f)
             lit.v4("uTint", 1f, 0.8f, 0.2f, 1f)
@@ -805,6 +805,8 @@ class MatchRenderer(
         System.arraycopy(viewProj, 0, s.viewProj, 0, 16)
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
         s.freeForAll = w.rules.freeForAll
+        s.practice = w.rules.practice
+        s.damage = p.damageDealt
         s.aliveCount = w.aliveCount
         s.placement = if (p.placement > 0) p.placement else if (w.phase == Phase.ENDED && w.rules.freeForAll) 1 else 0
         s.stormElapsed = w.storm?.elapsed ?: -1f
@@ -824,7 +826,7 @@ class MatchRenderer(
             val vis = shown(f)
             var onScreen = false
             if (vis) {
-                v4[0] = lerp(f.prevX, f.x, alpha); v4[1] = headHeight(f.def.id); v4[2] = lerp(f.prevY, f.y, alpha); v4[3] = 1f
+                v4[0] = lerp(f.prevX, f.x, alpha); v4[1] = headHeight(f.def.id) * f.scale; v4[2] = lerp(f.prevY, f.y, alpha); v4[3] = 1f
                 Matrix.multiplyMV(o4, 0, viewProj, 0, v4, 0)
                 if (o4[3] > 0f) {
                     s.sx[i] = (o4[0] / o4[3] * 0.5f + 0.5f) * width

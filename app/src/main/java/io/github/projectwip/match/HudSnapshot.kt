@@ -30,6 +30,10 @@ class HudSnapshot {
     var matchesPlayed = 0
     var fps = 0
     var freeForAll = false
+    /** Free Roam: no clock, no target. */
+    var practice = false
+    /** Damage the player has dealt so far. */
+    var damage = 0
     var aliveCount = 0
     var placement = 0
     var stormElapsed = -1f
@@ -56,6 +60,7 @@ class HudSnapshot {
         myScore = o.myScore; theirScore = o.theirScore; koTarget = o.koTarget; winningTeam = o.winningTeam; playerTeam = o.playerTeam
         playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; ammo = o.ammo; ammoMax = o.ammoMax; superCharge = o.superCharge
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
+        practice = o.practice; damage = o.damage
         freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
         stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm
         n = o.n
