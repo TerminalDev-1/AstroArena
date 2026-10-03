@@ -96,7 +96,9 @@ fun HomeScreen(
             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 ProfileAndCups(save, claimable) { go(Screen.CupTrack) }
                 Spacer(Modifier.width(10.dp))
-                val rank = remember(save.cups, repo.today) { io.github.projectwip.data.Leaderboard.rank(save.cups, repo.today) }
+                // The player's place among the real accounts on the server; unknown while offline.
+                val status = io.github.projectwip.ui.LocalServer.current?.status?.collectAsState()?.value
+                val rank = status?.account?.takeIf { status.online }?.rank?.toString() ?: "?"
                 ChunkyButton({ go(Screen.Leaderboard) }, Modifier.size(104.dp, 58.dp), ButtonStyle.GLASS, lip = 4.dp) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         GameText("#$rank", Type.Heading, color = Palette.Gold, outline = 2.5.dp)

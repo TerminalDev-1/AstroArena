@@ -26,8 +26,9 @@ server never locks anyone out.
 | **Notices** | `notices.cfg` holds short messages shown on the home screen |
 | **Bots** | `bots.cfg` sets how bots behave at each difficulty; `game.cfg` sets which difficulty players get |
 | **Developers** | `game.cfg` lists the players who get the debug menu and the difficulty choice |
-| **Accounts** | each install registers once and gets an id and a secret token |
-| **Cups** | the server works out what each match is worth and keeps the total; the leaderboard ranks by it |
+| **Accounts** | a new player picks a name, then the install registers once and gets an id and a secret token |
+| **Cups** | the server works out what each match is worth and keeps the total |
+| **Leaderboard** | the real accounts on this server, ranked by Cups; there are no made-up names |
 | **Spark Drops** | the server decides when one is earned (three a day) and rolls what comes out when it is opened |
 | **Matches** | the server plans each match (seed, bot names, difficulty) and checks the result it is sent |
 | **Saves** | the game uploads its save after every change; a fresh install restores it |
@@ -98,7 +99,7 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `POST /v1/dev/grant` * `{cups, drops}` | `{account}` (developers only) |
 | `GET /v1/leaderboard?limit=50` | `{players: [{id, name, cups, fighter}]}` |
 
-`account` is `{id, name, developer, cups, drops, dropsLeftToday, difficulty}`.
+`account` is `{id, name, developer, cups, rank, players, drops, dropsLeftToday, difficulty}`.
 
 Traffic is plain HTTP, which is fine on a home network and not fine on the open internet. Put it behind HTTPS
 before exposing it beyond your own network.

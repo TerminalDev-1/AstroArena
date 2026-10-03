@@ -66,11 +66,14 @@ class Game:
     def account(self, player_id: str) -> dict:
         """A player as the server sees them: what the client shows and is allowed to do."""
         player = self.store.player(player_id)
+        rank, players = self.store.rank(player_id)
         return {
             "id": player["id"],
             "name": player["name"],
             "developer": self.config.is_developer(player["id"]),
             "cups": player["cups"],
+            "rank": rank,
+            "players": players,
             "drops": player["drops"],
             "dropsLeftToday": self.store.drops_left_today(player),
             "difficulty": self.config.default_difficulty(),

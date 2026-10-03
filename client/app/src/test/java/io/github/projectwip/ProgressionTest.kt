@@ -191,19 +191,6 @@ class ProgressionTest {
         assertEquals(io.github.projectwip.data.Settings(playerName = "Ace"), Progression.withoutCheats(cheating))
     }
 
-    @Test fun leaderboardRanksByCups() {
-        val day = 20000L
-        val low = io.github.projectwip.data.Leaderboard.standings("Me", 0, FighterId.JUNO, day)
-        assertEquals(io.github.projectwip.data.Leaderboard.RIVALS + 1, low.size)
-        assertEquals(1, low.count { it.isPlayer })
-        assertEquals((1..low.size).toList(), low.map { it.rank })
-        assertTrue(low.zipWithNext().all { (a, b) -> a.cups >= b.cups })
-        val mid = io.github.projectwip.data.Leaderboard.rank(400, day)
-        assertTrue("more Cups, better rank", mid < low.first { it.isPlayer }.rank)
-        assertEquals("enough Cups tops the ladder", 1, io.github.projectwip.data.Leaderboard.rank(5000, day))
-        assertEquals("same day, same ladder", low, io.github.projectwip.data.Leaderboard.standings("Me", 0, FighterId.JUNO, day))
-    }
-
     @Test fun levelsNeverRunOut() {
         // The price follows the table, then keeps climbing by a fixed step, and never drops.
         assertEquals(Balance.upgradeCost[0], Balance.upgradeCostFrom(1))
@@ -291,13 +278,5 @@ class ProgressionTest {
         assertTrue(Progression.isFresh(SaveData()))
         assertFalse(Progression.isFresh(SaveData(cups = 5, bestCups = 5)))
         assertFalse(Progression.isFresh(Progression.applyMatch(SaveData(), report(MatchOutcome.DEFEAT), today = 1, verdict = null).first))
-
-        // Real players from the server slot into the ladder by Cups and are marked.
-        val others = listOf(io.github.projectwip.data.LeaderboardEntry(0, "Rival", 900, FighterId.MIRA, false))
-        val ladder = io.github.projectwip.data.Leaderboard.standings("Me", 100, FighterId.JUNO, 20000L, others)
-        assertEquals(io.github.projectwip.data.Leaderboard.RIVALS + 2, ladder.size)
-        val rival = ladder.single { it.online }
-        assertEquals("Rival", rival.name)
-        assertTrue(rival.rank < ladder.first { it.isPlayer }.rank)
     }
 }

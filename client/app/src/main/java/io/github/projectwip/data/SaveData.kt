@@ -35,6 +35,8 @@ data class Settings(
     val highFrameRate: Boolean = true,
     val showFps: Boolean = false,
     val playerName: String = "Player",
+    /** The player has picked their name (new players are asked before their account is made). */
+    val nameChosen: Boolean = false,
     val controlLayout: ControlLayout = ControlLayout(),
     /** Address of the game server, e.g. http://192.168.1.103:8765. Blank = the address this build was made with. */
     val serverUrl: String = "",

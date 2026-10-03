@@ -26,6 +26,9 @@ data class Account(
     /** The server lists this player as a developer: the debug menu and the difficulty choice are theirs. */
     val developer: Boolean,
     val cups: Int,
+    /** Place on the server's leaderboard (1 = top), out of [players] accounts. */
+    val rank: Int,
+    val players: Int,
     /** Unopened Spark Drops. */
     val drops: Int,
     val dropsLeftToday: Int,
@@ -80,6 +83,9 @@ class GameServer(context: Context) {
     private val token: String? get() = prefs.getString("token@$baseUrl", null)
     private val usable get() = _status.value.online && _status.value.supported
 
+    /** Has this install already got an account on the server at [url]? */
+    fun hasAccount(url: String): Boolean = prefs.contains("token@" + url.trim().trimEnd('/'))
+
     private class Reply(val code: Int, val body: JSONObject?)
 
     /** One request. Null means the server couldn't be reached at all. */
@@ -114,7 +120,7 @@ class GameServer(context: Context) {
 
     private fun noteAccount(o: JSONObject) {
         val account = Account(
-            id = o.optString("id"), developer = o.optBoolean("developer"), cups = o.optInt("cups"), drops = o.optInt("drops"),
+            id = o.optString("id"), developer = o.optBoolean("developer"), cups = o.optInt("cups"), rank = o.optInt("rank"), players = o.optInt("players"), drops = o.optInt("drops"),
             dropsLeftToday = o.optInt("dropsLeftToday"),
             difficulty = BotDifficulty.entries.firstOrNull { it.name == o.optString("difficulty") } ?: BotDifficulty.EASY,
         )
@@ -277,7 +283,7 @@ class GameServer(context: Context) {
     }
 
     /** Real players by Cups, or null when the server can't be asked. */
-    fun leaderboard(limit: Int = 50): List<RemotePlayer>? {
+    fun leaderboard(limit: Int = 200): List<RemotePlayer>? {
         if (!_status.value.online) return null
         val players = call("GET", "/v1/leaderboard?limit=$limit")?.body?.optJSONArray("players") ?: return null
         return (0 until players.length()).mapNotNull { i ->

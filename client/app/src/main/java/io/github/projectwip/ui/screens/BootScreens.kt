@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,30 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
             GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
         }
         PlainText("v${BuildConfig.VERSION_NAME.removePrefix("v")}", Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
+    }
+}
+
+/**
+ * A new player's first screen: choose the name other players will see. Their account is made on the server
+ * under this name as soon as they confirm (or later, if the server can't be reached yet).
+ */
+@Composable
+fun NameScreen(onDone: (String) -> Unit) {
+    var name by remember { androidx.compose.runtime.mutableStateOf("") }
+    Box(
+        Modifier.fillMaxSize().background(Color(0xFF0B0620)).clickable(remember { MutableInteractionSource() }, null) { },
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        // Near the top, so the keyboard doesn't cover it.
+        Panel(Modifier.widthIn(max = 640.dp).padding(18.dp), cut = 20.dp) {
+            Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                GameText("WHAT'S YOUR NAME?", Type.Display, color = Palette.Gold, outline = 4.dp)
+                PlainText("This is the name other players see. Up to 16 letters and numbers; you can change it later in Settings.",
+                    Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 3)
+                NameField("") { name = it }
+                ChunkyButton({ onDone(name.trim()) }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN, enabled = name.isNotBlank()) { GameText("LET'S GO", Type.Heading) }
+            }
+        }
     }
 }
 

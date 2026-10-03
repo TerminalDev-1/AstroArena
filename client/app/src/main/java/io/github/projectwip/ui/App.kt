@@ -131,13 +131,19 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     var bootStatus by remember { mutableStateOf("Connecting to server…") }
     var connection by remember { mutableStateOf(Connection.CONNECTING) }
     var connectAttempt by remember { mutableStateOf(0) }
+    // A new player picks their name first; only then is an account made for them on the server.
+    var needsName by remember {
+        val settings = repo.save.value.settings
+        mutableStateOf(!settings.nameChosen && !server.hasAccount(settings.serverUrl.ifBlank { io.github.projectwip.BuildConfig.SERVER_URL }))
+    }
     var update by remember {
         // Debug: `--es screen update` shows the update screen with made-up details.
         mutableStateOf(if (startScreen == "update") io.github.projectwip.net.UpdateInfo("9.9.9-preview", "## New\n- Example note one\n- Example note two", REPO_RELEASES, REPO_RELEASES) else null)
     }
     // The server: is this version welcome, sign in, fetch live settings, and sync the save. The game keeps trying
     // for a minute; after that the player chooses between trying again and offline mode.
-    LaunchedEffect(connectAttempt) {
+    LaunchedEffect(connectAttempt, needsName) {
+        if (needsName) return@LaunchedEffect
         val started = System.currentTimeMillis()
         connection = Connection.CONNECTING
         while (true) {
@@ -281,7 +287,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.Home -> HomeScreen(save, repo, go, showReward, openCapsule)
                     is Screen.Fighters -> FightersScreen(save, repo, s.focus ?: save.selectedFighter, go)
                     Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
-                    Screen.Leaderboard -> io.github.projectwip.ui.screens.LeaderboardScreen(save, repo.today, go)
+                    Screen.Leaderboard -> io.github.projectwip.ui.screens.LeaderboardScreen(save, go)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
                     is Screen.Match -> MatchScreen(
@@ -330,6 +336,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 // Dev builds don't have to sit through the minute of trying.
                 io.github.projectwip.ui.screens.LoadingScreen(bootProgress, bootStatus,
                     onSkip = if (io.github.projectwip.BuildConfig.DEBUG && connection == Connection.CONNECTING) ({ connection = Connection.SETTLED }) else null)
+            }
+            if (needsName) io.github.projectwip.ui.screens.NameScreen { name ->
+                repo.updateSettings { it.copy(playerName = name, nameChosen = true) }
+                needsName = false
             }
             if (booting && connection == Connection.FAILED) {
                 io.github.projectwip.ui.screens.ConnectFailedScreen(

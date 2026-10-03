@@ -50,6 +50,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Developers = debug builds, plus the player ids in `server/game.cfg`. Only they see the debug menu and the
   difficulty choice; the server ignores luck, free drops, difficulty and hand-outs from anyone else. The tablet's
   id is listed there. Everyone else plays on the difficulty in `game.cfg` (Easy).
+- The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
+  is asked for a name before their account is made (`NameScreen`).
 - A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py`. A change to the Cup table goes in
   `rules.py` (the client has no copy).
 - The match itself runs on the device, so the server can't catch a client that plays with cheats, only one that

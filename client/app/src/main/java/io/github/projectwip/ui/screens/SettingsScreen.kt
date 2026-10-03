@@ -137,7 +137,7 @@ private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
         }
     }
     SectionTitle("PLAYER NAME", "Shown above your fighter in matches.")
-    NameField(s.playerName) { n -> set { it.copy(playerName = n) } }
+    NameField(s.playerName) { n -> set { it.copy(playerName = n, nameChosen = true) } }
 }
 
 /** Where the game server lives. Empty means "use the address this build was made with" (shown as the hint). */
@@ -170,8 +170,10 @@ private fun ServerField(value: String, hint: String, onChange: (String) -> Unit)
 }
 
 @Composable
-private fun NameField(value: String, onChange: (String) -> Unit) {
-    var text by remember(value) { mutableStateOf(value) }
+internal fun NameField(value: String, onChange: (String) -> Unit) {
+    // The whole field state (text, cursor and the keyboard's composing region) is kept, not just the string:
+    // handing the keyboard back a bare string makes some keyboards repeat the first letter.
+    var field by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(value, androidx.compose.ui.text.TextRange(value.length))) }
     Box(
         Modifier.width(320.dp).height(52.dp).drawBehind {
             val o = plateShape(10.dp, 4.dp).createOutline(size, layoutDirection, this)
@@ -182,10 +184,10 @@ private fun NameField(value: String, onChange: (String) -> Unit) {
         contentAlignment = Alignment.CenterStart,
     ) {
         BasicTextField(
-            text,
+            field,
             onValueChange = { v ->
-                val clean = v.filter { it.isLetterOrDigit() || it == ' ' || it == '_' || it == '-' }.take(16)
-                text = clean
+                val clean = v.text.filter { it.isLetterOrDigit() || it == ' ' || it == '_' || it == '-' }.take(16)
+                field = if (clean == v.text) v else androidx.compose.ui.text.input.TextFieldValue(clean, androidx.compose.ui.text.TextRange(clean.length))
                 if (clean.isNotBlank()) onChange(clean.trim())
             },
             singleLine = true,

@@ -136,6 +136,16 @@ class Store:
                 "UPDATE players SET cups = MAX(0, cups + ?), drops = MAX(0, drops + ?) WHERE id = ?", (int(cups), int(drops), player_id)
             )
 
+    def rank(self, player_id: str) -> tuple[int, int]:
+        """Where a player stands by Cups (1 = top; ties go to the older account), and how many players there are."""
+        with self._lock:
+            me = self._db.execute("SELECT cups, created_at FROM players WHERE id = ?", (player_id,)).fetchone()
+            total = self._db.execute("SELECT COUNT(*) FROM players").fetchone()[0]
+            ahead = self._db.execute(
+                "SELECT COUNT(*) FROM players WHERE cups > ? OR (cups = ? AND created_at < ?)", (me["cups"], me["cups"], me["created_at"])
+            ).fetchone()[0]
+        return ahead + 1, total
+
     def drops_left_today(self, player: sqlite3.Row) -> int:
         return rules.DROPS_PER_DAY - (player["drops_today"] if player["drops_day"] == today() else 0)
 

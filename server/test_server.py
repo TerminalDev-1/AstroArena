@@ -181,6 +181,13 @@ class Api(unittest.TestCase):
         self.assertEqual(body["bots"]["ELITE"]["reactiontime"], 0.12)
         self.assertIs(body["bots"]["EASY"]["shotdiscipline"], False)
 
+    def test_a_new_player_is_saved_under_the_name_they_chose(self):
+        _, me = self.call("POST", "/v1/players", {"name": "  Nova_Fox!!  ", "version": VERSION})
+        account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]
+        self.assertEqual((account["name"], account["rank"], account["players"]), ("Nova_Fox", 1, 1))
+        self.assertEqual(self.store.player(me["id"])["name"], "Nova_Fox")
+        self.assertEqual(self.call("GET", "/v1/leaderboard")[1]["players"], [{"id": me["id"], "name": "Nova_Fox", "cups": 0, "fighter": "JUNO"}])
+
     def test_accounts_saves_and_leaderboard(self):
         self.assertEqual(self.call("GET", "/v1/save")[0], 401)
         self.assertEqual(self.call("GET", "/v1/save", token="nope")[0], 401)
@@ -245,6 +252,11 @@ class Api(unittest.TestCase):
         self.assertEqual((body["account"]["cups"], body["account"]["drops"], body["account"]["dropsLeftToday"]), (32, 4, 0))
         _, board = self.call("GET", "/v1/leaderboard")
         self.assertEqual((board["players"][0]["name"], board["players"][0]["cups"]), ("Player", 32))
+        # The leaderboard is the real accounts and nobody else, and each account knows its place on it.
+        self.assertEqual(len(board["players"]), 2)
+        self.assertEqual((body["account"]["rank"], body["account"]["players"]), (1, 2))
+        theirs = self.call("GET", "/v1/me", token=other["token"])[1]["account"]
+        self.assertEqual((theirs["rank"], theirs["players"]), (2, 2))
 
     def test_a_claimed_instant_win_is_refused(self):
         me = self.player()
