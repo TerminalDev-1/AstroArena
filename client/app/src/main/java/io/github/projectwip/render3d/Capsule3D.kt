@@ -19,7 +19,6 @@ import kotlin.random.Random
  */
 class Capsule3D {
     private val shell: Mesh
-    private val collarTop: Mesh
     private val base: Mesh
     private val core: Mesh
     private val light: Mesh
@@ -80,8 +79,6 @@ class Capsule3D {
             }
         }
         shell = MeshBuilder().apply { color(1f, 1f, 1f); starHalf(front = true) }.build()
-        // A glint on the upper-left of the face.
-        collarTop = MeshBuilder().apply { color(1f, 1f, 1f); with { translate(-0.2f, 0.26f, 0.3f); rotate(35f, 0f, 0f, 1f); ellipsoid(0.13f, 0.05f, 0.03f, 6, 10) } }.build()
         base = MeshBuilder().apply { color(1f, 1f, 1f); starHalf(front = false) }.build()
         // A thin glowing halo that circles the star. (The face of the star is plain: nothing sits on it.)
         core = MeshBuilder().apply {
@@ -345,8 +342,6 @@ class Capsule3D {
         lit.mat4("uModel", model)
         if (outline) lit.v4("uTint", Toon.INK[0], Toon.INK[1], Toon.INK[2], 1f) else lit.v4("uTint", tint[0], tint[1], tint[2], 1f)
         shell.draw()
-        // The glint is a paler shade of the drop.
-        if (!outline) { lit.v4("uTint", 0.5f + tint[0] * 0.5f, 0.5f + tint[1] * 0.5f, 0.5f + tint[2] * 0.5f, 1f); collarTop.draw() }
         System.arraycopy(root, 0, model, 0, 16)
         Matrix.translateM(model, 0, gap * 0.35f, -gap * 0.15f, -gap * 0.6f)
         Matrix.rotateM(model, 0, -halfSpin, 0.3f, 1f, 0.5f)

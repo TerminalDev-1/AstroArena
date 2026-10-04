@@ -278,6 +278,14 @@ fun Badge(text: String, modifier: Modifier = Modifier, color: Color = Palette.Re
 
 // ---------------------------------------------------------------------------------------------- currency
 
+/** A wallet total, short enough to fit its counter whatever it grows to: 98,765 · 123.4K · 60.3M · 1.2B. */
+fun compactNumber(n: Int): String = when {
+    n < 100_000 -> "%,d".format(n)
+    n < 1_000_000 -> "%.1fK".format(Math.floor(n / 100.0) / 10)
+    n < 1_000_000_000 -> "%.1fM".format(Math.floor(n / 100_000.0) / 10)
+    else -> "%.1fB".format(Math.floor(n / 100_000_000.0) / 10)
+}
+
 @Composable
 fun CurrencyPill(icon: IconKind, value: Int, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val shown by animateIntAsState(value, tween(700), label = "currency")
@@ -301,7 +309,7 @@ fun CurrencyPill(icon: IconKind, value: Int, modifier: Modifier = Modifier, onCl
                 .then(if (onClick != null) Modifier.clickable(remember { MutableInteractionSource() }, null) { onClick() } else Modifier)
                 .padding(start = 28.dp, end = 12.dp),
             contentAlignment = Alignment.CenterEnd,
-        ) { GameText("%,d".format(shown), Type.Heading, outline = 2.5.dp) }
+        ) { GameText(compactNumber(shown), Type.Heading, outline = 2.5.dp) }
         GameIcon(icon, Modifier.size(40.dp))
     }
 }
