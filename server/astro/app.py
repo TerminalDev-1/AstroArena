@@ -19,7 +19,8 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/shop/gift                  claim the daily gift -> {reward}                      (token)
     POST /v1/shop/deals/<id>/buy        buy a deal -> {reward}                                (token)
     POST /v1/track/claim    {cups}      claim a Cup Track reward -> {reward}                  (token)
-    POST /v1/road/unlock                spend Credits on the next Spark Road fighter -> {reward}  (token)
+    POST /v1/road/unlock                claim the Spark Road fighter the Credits have covered -> {reward}  (token)
+    POST /v1/road/target    {fighter}   pick which fighter the Credits go toward              (token)
     POST /v1/pass/claim     {tier}      claim a Spark Pass tier -> {reward}                   (token)
     POST /v1/shop/daily/<n>/buy {day}   buy one of today's offers -> {reward}                 (token)
     POST /v1/settings/difficulty {difficulty}  choose the bot difficulty; the server says yes or no  (token)
@@ -118,7 +119,11 @@ class Game:
             "difficulties": list(rules.DIFFICULTIES) if developer else self.config.allowed_difficulties(),
             "profile": profile,
             # The Spark Road (fighters in order, and the Credits each takes) and this season's Spark Pass.
-            "road": [{"fighter": name, "cost": cost} for name, cost in economy.SPARK_ROAD],
+            "road": {
+                "steps": [{"fighter": name, "cost": cost, "rarity": economy.FIGHTER_RARITY[name]} for name, cost in economy.SPARK_ROAD],
+                "choices": economy.road_choices(profile),
+                "target": (economy.road_next(profile) or ("", 0))[0],
+            },
             "pass": {
                 **economy.pass_view(profile, time_now["day"]), "endsAt": season_ends_ms(time_now["day"]),
                 "tierPoints": economy.PASS_TIER_POINTS,
@@ -262,6 +267,8 @@ def make_handler(game: Game, quiet: bool = False):
                 return self._act(lambda p, d: {"reward": game.store.claim_milestone(p["id"], int(d.get("cups") or 0))})
             if url.path == "/v1/road/unlock":
                 return self._act(lambda p, d: {"reward": game.store.road_unlock(p["id"])})
+            if url.path == "/v1/road/target":
+                return self._act(lambda p, d: game.store.set_road_target(p["id"], str(d.get("fighter") or "")))
             if url.path == "/v1/pass/claim":
                 return self._act(lambda p, d: {"reward": game.store.claim_pass(p["id"], int(d.get("tier") or 0))})
             if url.path == "/v1/reset":

@@ -170,7 +170,9 @@ private fun ProfileAndCups(save: SaveData, claimable: Int, onCups: () -> Unit) {
             Row(Modifier.padding(start = 66.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.width(110.dp)) {
                     GameText(save.settings.playerName, Type.Label, outline = 2.dp)
-                    PlainText("${save.victories} wins", Type.Small)
+                    // With every fighter unlocked, the Glory rank takes the place of the win count.
+                    if (io.github.projectwip.data.SparkRoad.next(save) == null) PlainText(io.github.projectwip.data.Glory.rank(save.glory).title, Type.Small, color = Palette.Gold, maxLines = 1)
+                    else PlainText("${save.victories} wins", Type.Small)
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.width(130.dp)) {

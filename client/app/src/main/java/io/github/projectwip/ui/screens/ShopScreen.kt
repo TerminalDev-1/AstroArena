@@ -86,7 +86,7 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("SHOP", { go(Screen.Home) }, save.bolts, save.prisms, credits = save.credits)
+            ScreenHeader("SHOP", { go(Screen.Home) }, save.bolts, save.prisms)
             LazyRow(
                 Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 18.dp, top = 4.dp),
@@ -138,7 +138,7 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                     }
                 }
                 item {
-                    // Credits unlock fighters on the Spark Road; these are the quick way to more of them.
+                    // Credits go straight onto the Spark Road, toward the fighter being unlocked; these are the quick way to more.
                     Section("CREDITS") {
                         Shop.creditPacks.forEachIndexed { i, c ->
                             OfferCard(cardW, c.pricePrisms, owned = false, tag = if (i == 2) "BEST VALUE" else null, onBuy = { pending = c }) {

@@ -212,6 +212,8 @@ def apply_reward(save: dict, reward: dict) -> None:
         save["prisms"] = int(save.get("prisms") or 0) + int(reward["amount"])
     elif kind == "credits":
         save["credits"] = int(save.get("credits") or 0) + int(reward["amount"])
+    elif kind == "glory":
+        save["glory"] = int(save.get("glory") or 0) + int(reward["amount"])
     elif kind in ("fighter", "skin"):
         fighters = save.setdefault("fighters", {})
         if not isinstance(fighters, dict):

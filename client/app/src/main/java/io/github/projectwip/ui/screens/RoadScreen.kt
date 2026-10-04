@@ -77,88 +77,127 @@ fun ProgressBar(fraction: Float, modifier: Modifier = Modifier, color: Color = C
 }
 
 /**
- * The Spark Road: the fighters in the order they are unlocked, strung along a road. Credits fill the next one's
- * bar; when it is full the player unlocks it (the server spends the Credits), and the one after becomes next.
+ * The Spark Road. Credits are not held anywhere: whatever is earned goes straight into the road, toward the
+ * fighter the player picked. The road shows every fighter, the cheapest rarity first; the ones on offer can be
+ * picked, the picked one has the bar the Credits are filling, and when it is full the fighter is claimed. With
+ * every fighter unlocked the road is finished and Credits are earned as Glory instead.
  */
 @Composable
 fun RoadScreen(save: SaveData, go: (Screen) -> Unit, showReward: (RewardReveal) -> Unit) {
     val ask = LocalServerCall.current
     val ui = LocalUi.current
     val next = SparkRoad.next(save)
-    val cardW = if (ui.roomy) 150.dp else 128.dp
+    val choices = SparkRoad.choices(save).map { it.fighter }
+    val cardW = if (ui.roomy) 158.dp else 132.dp
+    val stops = listOf<io.github.projectwip.data.RoadStep?>(null) + SparkRoad.steps // null = the starting fighter
+    val list = rememberLazyListState()
+    LaunchedEffect(Unit) { list.scrollToItem((stops.indexOfFirst { it != null && it == next } - 1).coerceAtLeast(0)) }
     Box(Modifier.fillMaxSize()) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         Box(Modifier.fillMaxSize().background(SCRIM))
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("SPARK ROAD", { go(Screen.Fighters()) }, null, save.prisms, credits = save.credits)
-            Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
-                // The road itself: a wide band that winds from one stop to the next, with a dashed line down the middle.
+            ScreenHeader("SPARK ROAD", { go(Screen.Fighters()) }, null, null)
+            RoadSummary(save, next, Modifier.fillMaxWidth().padding(horizontal = 22.dp))
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                // The road itself: a wide band behind the stops, with a dashed line down the middle.
                 Canvas(Modifier.fillMaxSize()) {
-                    val road = Path().apply {
-                        val mid = size.height * 0.5f
-                        val swing = 26.dp.toPx()
-                        moveTo(0f, mid + swing)
-                        val stops = SparkRoad.steps.size + 1
-                        for (i in 0 until stops) {
-                            val x0 = size.width * i / stops; val x1 = size.width * (i + 1) / stops
-                            val y0 = mid + if (i % 2 == 0) swing else -swing; val y1 = mid + if (i % 2 == 0) -swing else swing
-                            cubicTo(x0 + (x1 - x0) * 0.5f, y0, x0 + (x1 - x0) * 0.5f, y1, x1, y1)
-                        }
-                    }
-                    drawPath(road, Palette.Ink, style = Stroke(58.dp.toPx(), cap = StrokeCap.Round))
-                    drawPath(road, Color(0xFF5B45C8), style = Stroke(48.dp.toPx(), cap = StrokeCap.Round))
-                    drawPath(road, CREDIT.copy(alpha = 0.8f), style = Stroke(4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(18.dp.toPx(), 14.dp.toPx()))))
+                    val mid = size.height * 0.5f
+                    drawLine(Palette.Ink, Offset(0f, mid), Offset(size.width, mid), 58.dp.toPx())
+                    drawLine(Color(0xFF5B45C8), Offset(0f, mid), Offset(size.width, mid), 48.dp.toPx())
+                    drawLine(CREDIT.copy(alpha = 0.8f), Offset(0f, mid), Offset(size.width, mid), 4.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(18.dp.toPx(), 14.dp.toPx())))
                 }
-                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                    RoadStop(FighterId.JUNO, cardW, Modifier.offset(y = 22.dp), unlocked = true) { Badge("START", color = Palette.CyanDeep) }
-                    SparkRoad.steps.forEachIndexed { i, step ->
-                        val unlocked = save.progress(step.fighter).unlocked
-                        val isNext = step == next
-                        RoadStop(step.fighter, cardW, Modifier.offset(y = if (i % 2 == 0) (-22).dp else 22.dp), unlocked, highlight = isNext) {
-                            when {
-                                unlocked -> Badge("UNLOCKED", color = Palette.GreenDeep)
-                                isNext -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    ProgressBar(save.credits.toFloat() / step.cost, Modifier.fillMaxWidth())
-                                    PlainText("${"%,d".format(minOf(save.credits, step.cost))} / ${step.cost}", Type.Small, color = Color.White)
-                                    Spacer(Modifier.height(4.dp))
-                                    ChunkyButton(
-                                        { ask({ roadUnlock() }) { showReward(RewardReveal("Spark Road", it)) } },
-                                        Modifier.fillMaxWidth().height(46.dp), ButtonStyle.GREEN, enabled = save.credits >= step.cost, lip = 4.dp,
-                                    ) {
+                LazyRow(
+                    Modifier.fillMaxSize(), list,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 24.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(26.dp), verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    items(stops.size) { i ->
+                        val step = stops[i]
+                        val lift = Modifier.offset(y = if (i % 2 == 0) 14.dp else (-14).dp)
+                        if (step == null) RoadStop(FighterId.JUNO, cardW, lift, unlocked = true) { Badge("START", color = Palette.CyanDeep) }
+                        else {
+                            val unlocked = save.progress(step.fighter).unlocked
+                            val picked = step == next
+                            RoadStop(step.fighter, cardW, lift, unlocked, highlight = picked) {
+                                when {
+                                    unlocked -> Badge("UNLOCKED", color = Palette.GreenDeep)
+                                    picked -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        ProgressBar(save.credits.toFloat() / step.cost, Modifier.fillMaxWidth())
+                                        PlainText("${"%,d".format(minOf(save.credits, step.cost))} / ${"%,d".format(step.cost)}", Type.Small, color = Color.White)
+                                        Spacer(Modifier.height(4.dp))
+                                        ChunkyButton(
+                                            { ask({ roadUnlock() }) { showReward(RewardReveal("Spark Road", it)) } },
+                                            Modifier.fillMaxWidth().height(46.dp), ButtonStyle.GREEN, enabled = save.credits >= step.cost, lip = 4.dp,
+                                        ) { GameText(if (save.credits >= step.cost) "CLAIM!" else "FILLING…", Type.Label, outline = 2.dp) }
+                                    }
+                                    step.fighter in choices -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            GameText("UNLOCK ", Type.Label, outline = 2.dp)
                                             GameIcon(IconKind.CREDIT, Modifier.size(20.dp))
-                                            GameText(" ${step.cost}", Type.Label, outline = 2.dp)
+                                            GameText(" ${"%,d".format(step.cost)}", Type.Label, outline = 2.dp)
+                                        }
+                                        Spacer(Modifier.height(4.dp))
+                                        // Sends the Credits this way instead; what is already on the road comes along.
+                                        ChunkyButton({ ask({ setRoadTarget(step.fighter) }) }, Modifier.fillMaxWidth().height(46.dp), ButtonStyle.CYAN, lip = 4.dp) {
+                                            GameText("CHOOSE", Type.Label, outline = 2.dp)
                                         }
                                     }
-                                }
-                                else -> Row(verticalAlignment = Alignment.CenterVertically) {
-                                    GameIcon(IconKind.LOCK, Modifier.size(20.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    GameIcon(IconKind.CREDIT, Modifier.size(20.dp))
-                                    GameText(" ${step.cost}", Type.Label, outline = 2.dp)
+                                    else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                        GameIcon(IconKind.LOCK, Modifier.size(20.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        GameIcon(IconKind.CREDIT, Modifier.size(20.dp))
+                                        GameText(" ${"%,d".format(step.cost)}", Type.Label, outline = 2.dp)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            PlainText(
-                if (next == null) "Every fighter is unlocked. Credits you earn from here on are paid as Power Ups, ten for each."
-                else "Credits come from matches, Spark Drops, the Cup Track, the Spark Pass and the shop. They unlock the fighters in this order.",
-                Type.Body, Modifier.fillMaxWidth().padding(start = 130.dp, end = 130.dp, bottom = 14.dp), align = TextAlign.Center, maxLines = 2,
-            )
         }
     }
 }
 
-/** One fighter on the road, on a plate: its picture (a silhouette until it is unlocked), its name, and [footer]. */
+/** Above the road: which fighter the Credits are filling and how far along it is; or, the road finished, the Glory rank. */
+@Composable
+private fun RoadSummary(save: SaveData, next: io.github.projectwip.data.RoadStep?, modifier: Modifier) {
+    Panel(modifier, cut = 14.dp) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (next != null) {
+                GameIcon(IconKind.CREDIT, Modifier.size(46.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    GameText("CREDITS GO TO ${Balance.fighter(next.fighter).name.substringBefore(' ').uppercase()}", Type.Label, color = Palette.Gold, outline = 2.dp)
+                    ProgressBar(save.credits.toFloat() / next.cost, Modifier.fillMaxWidth(), height = 18.dp)
+                    PlainText("Every Credit you earn goes straight here: matches, Spark Drops, the Cup Track, the Spark Pass, the shop.", Type.Small, color = Color.White, maxLines = 1)
+                }
+                Spacer(Modifier.width(14.dp))
+                GameText("${"%,d".format(save.credits)} / ${"%,d".format(next.cost)}", Type.Title, outline = 3.dp)
+            } else {
+                val rank = io.github.projectwip.data.Glory.rank(save.glory)
+                GameIcon(IconKind.GLORY, Modifier.size(46.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    GameText("GLORY · ${rank.title.uppercase()}", Type.Label, color = Palette.Gold, outline = 2.dp)
+                    ProgressBar(rank.into.toFloat() / rank.size, Modifier.fillMaxWidth(), Palette.Gold, 18.dp)
+                    PlainText("Every fighter is unlocked. Credits are earned as Glory now: a rank for your name, which buys nothing.", Type.Small, color = Color.White, maxLines = 1)
+                }
+                Spacer(Modifier.width(14.dp))
+                GameText("%,d".format(save.glory), Type.Title, outline = 3.dp)
+            }
+        }
+    }
+}
+
+/** One fighter on the road, on a plate: its picture (a silhouette until it is unlocked), its name and rarity, and [footer]. */
 @Composable
 private fun RoadStop(id: FighterId, width: Dp, modifier: Modifier, unlocked: Boolean, highlight: Boolean = false, footer: @Composable () -> Unit) {
     val def = Balance.fighter(id)
+    val rarity = Color(def.rarity.color)
     val top = if (highlight) CREDIT_DEEP else if (unlocked) Palette.PanelLight else Palette.Panel
-    Panel(modifier.width(width).fillMaxHeight(0.78f), color = top, colorBottom = lerp(top, Color.Black, 0.55f), cut = 14.dp) {
+    Panel(modifier.width(width).fillMaxHeight(0.86f), color = top, colorBottom = lerp(top, Color.Black, 0.55f), cut = 14.dp) {
         Column(Modifier.fillMaxSize().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Badge(def.rarity.label.uppercase(), color = lerp(rarity, Color.Black, 0.35f))
             FighterView(def, 0, Modifier.weight(1f).fillMaxWidth(), pedestal = false, rays = highlight, locked = !unlocked)
             GameText(def.name.substringBefore(' ').uppercase(), Type.Heading, outline = 2.5.dp)
             PlainText(def.role, Type.Small, maxLines = 1)
@@ -183,7 +222,7 @@ fun PassScreen(save: SaveData, go: (Screen) -> Unit, showReward: (RewardReveal) 
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         Box(Modifier.fillMaxSize().background(SCRIM))
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("SPARK PASS", { go(Screen.Home) }, save.bolts, save.prisms, credits = save.credits)
+            ScreenHeader("SPARK PASS", { go(Screen.Home) }, save.bolts, save.prisms)
             if (pass == null || pass.tiers.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     PlainText("The Spark Pass is kept by the server. It will be here when you're back online.", Type.Body, align = TextAlign.Center)

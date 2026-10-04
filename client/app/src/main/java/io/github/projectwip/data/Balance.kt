@@ -17,6 +17,19 @@ enum class FighterId { JUNO, BRAKK, MIRA, KITO }
 
 enum class AttackShape { BURST, SPREAD, LANCE }
 
+/**
+ * How rare a fighter is. Rarer fighters take more Credits on the Spark Road ([roadCost]; the server's own table
+ * in `economy.py` is the one that counts). The fighter everyone starts with has no rarity of its own.
+ */
+enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
+    STARTER("Starter", 0xFF9BE7FF, 0),
+    RARE("Rare", 0xFF4ED36A, 160),
+    EPIC("Epic", 0xFFA66BFF, 420),
+    MYTHIC("Mythic", 0xFFFF4F6D, 900),
+    LEGENDARY("Legendary", 0xFFFFD23F, 1600),
+    ULTRA("Ultra", 0xFF29F0FF, 2600),
+}
+
 enum class SuperKind { VOLLEY, RAM, PIERCE }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
@@ -67,6 +80,7 @@ data class FighterDef(
     val superChargePerHit: Float,
     val radius: Float = 0.42f,
     val skins: List<Skin>,
+    val rarity: Rarity = Rarity.RARE,
 )
 
 enum class BotDifficulty(val label: String, val blurb: String, val cupBonus: Int, val boltMultiplier: Float) {
@@ -148,6 +162,7 @@ object Balance {
     val fighters: List<FighterDef> = listOf(
         FighterDef(
             id = FighterId.JUNO,
+            rarity = Rarity.STARTER,
             name = "Juno",
             title = "Spark Courier",
             role = "Skirmisher",
@@ -170,6 +185,7 @@ object Balance {
         ),
         FighterDef(
             id = FighterId.BRAKK,
+            rarity = Rarity.RARE,
             name = "Brakk",
             title = "Scrapyard Bruiser",
             role = "Tank",
@@ -193,6 +209,7 @@ object Balance {
         ),
         FighterDef(
             id = FighterId.MIRA,
+            rarity = Rarity.EPIC,
             name = "Mira",
             title = "Prism Sniper",
             role = "Marksman",
@@ -216,6 +233,7 @@ object Balance {
         ),
         FighterDef(
             id = FighterId.KITO,
+            rarity = Rarity.MYTHIC,
             name = "Kito",
             title = "Arc Blade",
             role = "Assassin",

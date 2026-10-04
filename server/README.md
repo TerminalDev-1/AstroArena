@@ -34,7 +34,8 @@ server never locks anyone out.
 | **Developers** | `game.cfg` lists the players who can switch on the debug menu, make shop deals and reset an account |
 | **Accounts** | a new player picks a name, then the install registers once and gets an id and a secret token |
 | **Cups** | the server works out what each match is worth and keeps the total |
-| **Credits and the Spark Road** | Credits (from matches, drops, the Cup Track, the Spark Pass and the shop) unlock fighters in a fixed order; once every fighter is unlocked, Credits are paid as Bolts |
+| **Credits and the Spark Road** | Credits (from matches, drops, the Cup Track, the Spark Pass and the shop) are not a wallet: they go straight into the Spark Road, toward the fighter the player picked among those on offer (the cheapest rarity first) |
+| **Glory** | once every fighter is unlocked, Credits are earned as Glory instead: a rank shown beside the player's name, which buys nothing |
 | **Spark Pass** | a 28-day season of 30 tiers; matches earn pass points, each tier has a reward to claim |
 | **Bolts and Prisms** | kept by the server: match pay, upgrades, shop purchases, the daily gift and Cup Track rewards all happen there |
 | **Deals** | shop offers made by developers in the game's Offer Creator, stored here and shown to every player |
@@ -124,7 +125,8 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `POST /v1/shop/gift` * | `{reward, account}`; 409 once claimed today |
 | `POST /v1/shop/deals/<id>/buy` * | `{reward, account}` |
 | `POST /v1/track/claim` * `{cups}` | `{reward, account}` |
-| `POST /v1/road/unlock` * | `{reward, account}`: spends Credits on the next Spark Road fighter; 402 if there aren't enough, 409 when the road is finished |
+| `POST /v1/road/unlock` * | `{reward, account}`: claims the Spark Road fighter the Credits have covered; 402 if they haven't yet, 409 when the road is finished |
+| `POST /v1/road/target` * `{fighter}` | `{account}`: picks which of the fighters on offer the Credits go toward; 409 if it isn't on offer |
 | `POST /v1/pass/claim` * `{tier}` | `{reward, account}`: a Spark Pass tier; 409 if not reached or already claimed |
 | `POST /v1/shop/daily/<n>/buy` * `{day}` | `{reward, account}`: one of today's offers; 409 if bought already or the day has changed |
 | `POST /v1/settings/difficulty` * `{difficulty}` | `{ok, account}`, or 403 if the server doesn't allow it |
@@ -132,7 +134,7 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `POST /v1/dev/grant` * `{cups, drops, bolts, prisms}` | `{account}` (developers only) |
 | `POST /v1/dev/deals` * `{title, bolts, prisms, fighter, skinFighter, skinIndex, currency, price, wasPrice, expiresAt, limit, theme}` | `{id, account}` (developers only) |
 | `POST /v1/dev/deals/<id>/delete` * | `{deleted, account}` (developers only) |
-| `GET /v1/leaderboard?limit=50` | `{players: [{id, name, cups, fighter}]}` |
+| `GET /v1/leaderboard?limit=50` | `{players: [{id, name, cups, fighter, glory}]}` |
 
 `account` is `{id, name, developer, cups, rank, players, drops, dropsLeftToday, difficulty, difficulties, profile,
 deals, dailyOffers, giftAvailable, time}`; `time` is `{now, day, dayEndsAt}` on the server's clock.

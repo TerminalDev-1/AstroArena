@@ -80,7 +80,7 @@ data class MatchPlan(
 )
 
 /** A real player on the server's leaderboard. */
-data class RemotePlayer(val id: String, val name: String, val cups: Int, val fighter: FighterId)
+data class RemotePlayer(val id: String, val name: String, val cups: Int, val fighter: FighterId, val glory: Int = 0)
 
 /**
  * The game's connection to the AstroArena server (see the `server/` directory of the repository).
@@ -192,6 +192,7 @@ class GameServer(context: Context) {
         val fighters = o.optJSONObject("fighters")
         return ServerProfile(
             bolts = o.optInt("bolts"), prisms = o.optInt("prisms"), bestCups = o.optInt("bestCups"), credits = o.optInt("credits"),
+            glory = o.optInt("glory"), roadTarget = fighterNamed(o.optString("roadTarget")),
             fighters = FighterId.entries.associateWith { id ->
                 val f = fighters?.optJSONObject(id.name)
                 FighterProgress(
@@ -240,7 +241,10 @@ class GameServer(context: Context) {
     /** Claims the Cup Track reward at [cups]. What comes back is what was actually given (owned things are paid out instead). */
     fun claimMilestone(cups: Int): Reward? = act("/v1/track/claim", JSONObject().put("cups", cups))?.optJSONObject("reward")?.let { reward(it) }
 
-    /** Spends Credits on the next fighter along the Spark Road. Null if there aren't enough (see [lastError]). */
+    /** Picks which of the fighters on offer the Credits go toward. */
+    fun setRoadTarget(fighter: FighterId): Boolean? = act("/v1/road/target", JSONObject().put("fighter", fighter.name))?.let { true }
+
+    /** Claims the Spark Road fighter the Credits have covered. Null if they haven't yet (see [lastError]). */
     fun roadUnlock(): Reward? = act("/v1/road/unlock")?.optJSONObject("reward")?.let { reward(it) }
 
     /** Claims the reward at Spark Pass tier [tier] (1-based). */
@@ -401,7 +405,7 @@ class GameServer(context: Context) {
         }
         return ServerVerdict(
             o.optInt("cupDelta"), o.optInt("cups"), o.optBoolean("drop"), account?.optInt("drops") ?: 0, account?.optInt("dropsLeftToday") ?: 0,
-            bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"), credits = o.optInt("credits"), passPoints = o.optInt("passPoints"), judged = judged,
+            bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"), credits = o.optInt("credits"), passPoints = o.optInt("passPoints"), glory = o.optInt("glory"), judged = judged,
         )
     }
 
@@ -443,6 +447,7 @@ class GameServer(context: Context) {
             "bolts" -> Reward.Bolts(o.optInt("amount").coerceAtLeast(0))
             "prisms" -> Reward.Prisms(o.optInt("amount").coerceAtLeast(0))
             "credits" -> Reward.Credits(o.optInt("amount").coerceAtLeast(0))
+            "glory" -> Reward.Glory(o.optInt("amount").coerceAtLeast(0))
             "fighter" -> fighter()?.let { Reward.UnlockFighter(it) }
             "skin" -> fighter()?.let { Reward.SkinReward(it, o.optInt("skin")) }
             "bundle" -> o.optJSONArray("items")?.let { a -> Reward.Bundle((0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { reward(it) } }) }
@@ -459,6 +464,7 @@ class GameServer(context: Context) {
             RemotePlayer(
                 p.optString("id"), p.optString("name", "Player"), p.optInt("cups"),
                 FighterId.entries.firstOrNull { it.name == p.optString("fighter") } ?: FighterId.JUNO,
+                p.optInt("glory"),
             )
         }
     }

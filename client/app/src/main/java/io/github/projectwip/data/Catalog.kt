@@ -4,8 +4,10 @@ package io.github.projectwip.data
 sealed interface Reward {
     data class Bolts(val amount: Int) : Reward
     data class Prisms(val amount: Int) : Reward
-    /** Credits: what the Spark Road takes to unlock a fighter. */
+    /** Credits: progress along the Spark Road, toward the fighter the player picked. Not something held in a wallet. */
     data class Credits(val amount: Int) : Reward
+    /** What Credits are earned as once every fighter is unlocked: a rank to climb, which buys nothing. */
+    data class Glory(val amount: Int) : Reward
     data class UnlockFighter(val fighter: FighterId) : Reward
     data class SkinReward(val fighter: FighterId, val skinIndex: Int) : Reward
     /** Several rewards at once (custom shop offers). */
@@ -109,14 +111,42 @@ data class Milestone(val cups: Int, val reward: Reward)
 data class RoadStep(val fighter: FighterId, val cost: Int)
 
 /**
- * The Spark Road: fighters are unlocked along it one after another, with Credits. The server spends the Credits
- * and unlocks the fighter (`server/astro/economy.py`, SPARK_ROAD); this copy is for showing the road.
+ * The Spark Road. Credits are not kept in a wallet: whatever is earned goes straight into the road, toward the
+ * fighter the player picked from those on offer (the locked ones of the cheapest rarity that has any). When
+ * that fighter's cost is covered it is theirs to claim. The server does all of it (`server/astro/economy.py`);
+ * this copy is for showing the road.
  */
 object SparkRoad {
-    val steps = listOf(RoadStep(FighterId.BRAKK, 160), RoadStep(FighterId.MIRA, 420), RoadStep(FighterId.KITO, 900))
+    /** Every fighter on the road, the cheapest rarity first. */
+    val steps: List<RoadStep> = Balance.fighters.filter { it.rarity != Rarity.STARTER }.map { RoadStep(it.id, it.rarity.roadCost) }.sortedBy { it.cost }
 
-    /** The next fighter to unlock, or null when the road is finished. */
-    fun next(save: SaveData): RoadStep? = steps.firstOrNull { !save.progress(it.fighter).unlocked }
+    /** The fighters the player may put their Credits toward right now. */
+    fun choices(save: SaveData): List<RoadStep> {
+        val locked = steps.filter { !save.progress(it.fighter).unlocked }
+        return locked.filter { it.cost == locked.first().cost }
+    }
+
+    /** The fighter the Credits are filling, or null when the road is finished. */
+    fun next(save: SaveData): RoadStep? = choices(save).let { on -> on.firstOrNull { it.fighter == save.roadTarget } ?: on.firstOrNull() }
+}
+
+/** A Glory rank: its title, and how far into it the player is. */
+data class GloryRank(val title: String, val into: Int, val size: Int)
+
+/**
+ * Glory: what Credits turn into once every fighter is unlocked. It buys nothing; it is a rank shown beside the
+ * player's name, climbed for its own sake.
+ */
+object Glory {
+    /** Glory from one rank to the next. */
+    const val STEP = 250
+    private val TITLES = listOf("Rookie", "Contender", "Challenger", "Star", "Icon", "Legend")
+    private val NUMERALS = listOf("I", "II", "III")
+
+    fun rank(glory: Int): GloryRank {
+        val index = (glory.coerceAtLeast(0) / STEP).coerceAtMost(TITLES.size * NUMERALS.size - 1)
+        return GloryRank("${TITLES[index / NUMERALS.size]} ${NUMERALS[index % NUMERALS.size]}", glory.coerceAtLeast(0) - index * STEP, STEP)
+    }
 }
 
 /** This season's Spark Pass as the server holds it: points earned by playing, and a reward to claim at every tier. */

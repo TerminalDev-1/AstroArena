@@ -2,17 +2,18 @@
 
 A player's *profile* is the part of their progress the server is in charge of:
 
-    {"bolts", "prisms", "credits", "bestCups", "fighters": {ID: {"unlocked", "level", "ownedSkins"}},
+    {"bolts", "prisms", "credits", "glory", "roadTarget", "bestCups", "fighters": {ID: {"unlocked", "level", "ownedSkins"}},
      "claimedMilestones": [cups, ...], "lastDailyGiftDay", "lastFirstWinDay",
      "pass": {"season", "points", "claimed": [tier, ...]}}
 
-Players see Bolts as "Power Ups" and Prisms as "Crystals". Credits unlock fighters on the Spark Road.
+Players see Bolts as "Power Ups" and Prisms as "Crystals". Credits are progress along the Spark Road toward the
+fighter in "roadTarget"; once every fighter is unlocked they are earned as Glory instead.
 
 The keys are the ones the game's save file uses, so a profile can be started from a save and sent back to the
 game as it is. Every number here used to live in the client's `Balance.kt` / `Catalog.kt`; the client still has
 copies of the prices for showing them, so keep the two in step.
 
-Rewards are small dicts: {"type": "bolts"|"prisms"|"credits", "amount"}, {"type": "fighter", "fighter"},
+Rewards are small dicts: {"type": "bolts"|"prisms"|"credits"|"glory", "amount"}, {"type": "fighter", "fighter"},
 {"type": "skin", "fighter", "skin"}, {"type": "bundle", "items": [...]}.
 """
 
@@ -123,25 +124,46 @@ CUP_TRACK = {
 }
 
 
-# ---------------------------------------------------------------------------- Credits and the Spark Road
+# ---------------------------------------------------------------------------- Credits, the Spark Road and Glory
 
-# The fighters along the road, in order, and the Credits each one takes. Fighters are unlocked here (or bought
-# in the shop with Prisms); nothing else hands one out.
-SPARK_ROAD = [("BRAKK", 160), ("MIRA", 420), ("KITO", 900)]
-# Once the road is finished there is nothing for Credits to do, so any that are earned are paid in Bolts instead.
-BOLTS_PER_SPARE_CREDIT = 10
+# Credits are not a wallet: whatever is earned goes straight into the Spark Road, toward the fighter the player
+# has picked. When that fighter's cost is covered it is theirs to claim, and what is left over stays on the road.
+# Fighters have a rarity; a rarer one takes more Credits. (Fighters are also sold in the shop for Prisms.)
+RARITIES = ["RARE", "EPIC", "MYTHIC", "LEGENDARY", "ULTRA"]
+ROAD_COST = {"RARE": 160, "EPIC": 420, "MYTHIC": 900, "LEGENDARY": 1600, "ULTRA": 2600}
+FIGHTER_RARITY = {"BRAKK": "RARE", "MIRA": "EPIC", "KITO": "MYTHIC"}  # the starting fighter has none
+# Every fighter on the road with what it costs, the cheapest rarity first.
+SPARK_ROAD = sorted(((name, ROAD_COST[rarity]) for name, rarity in FIGHTER_RARITY.items()), key=lambda step: step[1])
+
+
+def _locked(profile: dict) -> list[tuple[str, int]]:
+    return [(name, cost) for name, cost in SPARK_ROAD if not profile["fighters"].get(name, {}).get("unlocked")]
+
+
+def road_choices(profile: dict) -> list[str]:
+    """The fighters the player may put their Credits toward: the locked ones of the cheapest rarity that has any."""
+    locked = _locked(profile)
+    return [name for name, cost in locked if cost == locked[0][1]]
 
 
 def road_next(profile: dict) -> tuple[str, int] | None:
-    """The next fighter on the road and what it costs, or None when every one is unlocked."""
-    for name, cost in SPARK_ROAD:
-        if not profile["fighters"].get(name, {}).get("unlocked"):
-            return name, cost
-    return None
+    """The fighter the Credits are filling and what it costs, or None when every one is unlocked. It is the one
+    the player picked, while that is still a choice; otherwise the first choice."""
+    choices = road_choices(profile)
+    if not choices:
+        return None
+    name = profile.get("roadTarget") if profile.get("roadTarget") in choices else choices[0]
+    return name, dict(SPARK_ROAD)[name]
+
+
+def set_road_target(profile: dict, fighter: str) -> None:
+    if fighter not in road_choices(profile):
+        raise Refused(409, "that fighter isn't on offer on the Spark Road yet")
+    profile["roadTarget"] = fighter
 
 
 def road_unlock(profile: dict) -> dict:
-    """Spends Credits on the next fighter along the road and returns the reward."""
+    """Claims the fighter the Credits have been filling, once they cover it, and returns the reward."""
     step = road_next(profile)
     if step is None:
         raise Refused(409, "the Spark Road is finished")
@@ -149,7 +171,13 @@ def road_unlock(profile: dict) -> dict:
     if profile["credits"] < cost:
         raise Refused(402, "not enough Credits")
     profile["credits"] -= cost
-    return grant(profile, _f(name))
+    profile["roadTarget"] = ""
+    reward = grant(profile, _f(name))
+    # The road has just been finished: Credits left on it have nowhere to go, so they become Glory.
+    if road_next(profile) is None and profile["credits"] > 0:
+        profile["glory"] += profile["credits"]
+        profile["credits"] = 0
+    return reward
 
 
 def match_credits(mode: str, outcome: str, placement: int) -> int:
@@ -226,7 +254,7 @@ def claim_pass(profile: dict, tier: int, day: int) -> dict:
 
 def new_profile() -> dict:
     return {
-        "bolts": STARTING_BOLTS, "prisms": STARTING_PRISMS, "credits": 0, "bestCups": 0,
+        "bolts": STARTING_BOLTS, "prisms": STARTING_PRISMS, "credits": 0, "glory": 0, "roadTarget": "", "bestCups": 0,
         "fighters": {name: {"unlocked": name == rules.STARTING_FIGHTER, "level": 1, "ownedSkins": [0]} for name in rules.FIGHTER_SKINS},
         "claimedMilestones": [], "lastDailyGiftDay": -1, "lastFirstWinDay": -1,
     }
@@ -235,6 +263,8 @@ def new_profile() -> dict:
 def complete(profile: dict) -> dict:
     """Fills in what a profile stored by an older server doesn't have yet."""
     profile.setdefault("credits", 0)
+    profile.setdefault("glory", 0)
+    profile.setdefault("roadTarget", "")
     return profile
 
 
@@ -299,8 +329,10 @@ def grant(profile: dict, reward: dict) -> dict:
     if reward.get("type") == "bundle":
         return {"type": "bundle", "items": [grant(profile, item) for item in reward.get("items", [])]}
     actual = compensation(reward) if owns(profile, reward) else reward
+    # With every fighter unlocked the road is finished, and Credits earned from then on are Glory: a rank to
+    # climb for its own sake, which buys nothing.
     if actual.get("type") == "credits" and road_next(profile) is None:
-        actual = _b(int(actual["amount"]) * BOLTS_PER_SPARE_CREDIT)
+        actual = {"type": "glory", "amount": int(actual["amount"])}
     rules.apply_reward(profile, actual)
     return actual
 

@@ -66,7 +66,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`; a new fighter
   also needs a place on the Spark Road (`SPARK_ROAD` in `economy.py`, `SparkRoad` in `Catalog.kt`).
 - Fighters are unlocked on the Spark Road with Credits (or bought with Crystals): drops and the Cup Track pay
-  Credits, never a fighter. The Spark Pass (seasons, tiers, rewards) is entirely the server's; the client has no
+  Credits, never a fighter. Credits are not a wallet and must never be shown as one: they go straight onto the
+  road toward the fighter the player picked (rarity decides the cost), and become Glory, a cosmetic rank, once
+  every fighter is unlocked. The Spark Pass (seasons, tiers, rewards) is entirely the server's; the client has no
   copy of its table and shows what the account says.
 - The Spark Road and Spark Pass are our own take on a familiar idea. Keep their names, art and layout original.
 - Matches: the device plays the match and records the player's `Control` on every tick (`sim/InputLog`). The

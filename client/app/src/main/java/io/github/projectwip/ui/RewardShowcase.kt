@@ -58,7 +58,9 @@ fun RewardShowcase(
     /** Wallet totals with this reward already included, so the counters can run up to them. */
     boltsNow: Int, prismsNow: Int,
     note: String? = null,
-    creditsNow: Int = 0,
+    /** The Spark Road meter with this reward included: Credits toward [roadGoal], or Glory when the goal is 0. */
+    roadNow: Int = 0,
+    roadGoal: Int = 0,
     buttons: @Composable () -> Unit,
 ) {
     val sfx = LocalSfx.current
@@ -79,9 +81,10 @@ fun RewardShowcase(
 
     fun bolts(r: Reward) = (r as? Reward.Bolts)?.amount ?: 0
     fun prisms(r: Reward) = (r as? Reward.Prisms)?.amount ?: 0
-    fun credits(r: Reward) = (r as? Reward.Credits)?.amount ?: 0
-    /** Power Ups, Crystals and Credits are counted into the wallet; fighters and colourways are revealed. */
-    fun currency(r: Reward) = r is Reward.Bolts || r is Reward.Prisms || r is Reward.Credits
+    /** Credits and Glory both go to the Spark Road's meter. */
+    fun credits(r: Reward) = (r as? Reward.Credits)?.amount ?: (r as? Reward.Glory)?.amount ?: 0
+    /** Power Ups and Crystals are counted into the wallet and Credits onto the road; fighters and colourways are revealed. */
+    fun currency(r: Reward) = r is Reward.Bolts || r is Reward.Prisms || r is Reward.Credits || r is Reward.Glory
     val item = items[index]
 
     LaunchedEffect(reward, index) {
@@ -96,7 +99,7 @@ fun RewardShowcase(
             }
             // The flyers reach the wallet from about here on. Each handful that lands sounds like what it is:
             // Power Ups charge with a rising blip, Crystals chime like glass.
-            val landing = when (item) { is Reward.Bolts -> Sound.BOLT_LAND; is Reward.Prisms -> Sound.PRISM_LAND; else -> Sound.CHING }
+            val landing = when (item) { is Reward.Bolts -> Sound.BOLT_LAND; is Reward.Prisms -> Sound.PRISM_LAND; is Reward.Credits -> Sound.CREDIT_LAND; else -> Sound.CHING }
             launch { delay(620); repeat(7) { sfx?.play(landing, 0.85f, 0.92f + it * 0.04f); sfx?.buzz(12, 90); delay(110) } }
             launch { fly.animateTo(1f, tween(1500, easing = LinearEasing)) }
             count.animateTo(1f, tween(900))
@@ -120,7 +123,7 @@ fun RewardShowcase(
     val landed = ((fly.value - 0.42f) / 0.5f).coerceIn(0f, 1f)
     val boltsShown = if (settled) boltsNow else boltsNow - items.sumOf { bolts(it) } + items.take(index).sumOf { bolts(it) } + (bolts(item) * landed).toInt()
     val prismsShown = if (settled) prismsNow else prismsNow - items.sumOf { prisms(it) } + items.take(index).sumOf { prisms(it) } + (prisms(item) * landed).toInt()
-    val creditsShown = if (settled) creditsNow else creditsNow - items.sumOf { credits(it) } + items.take(index).sumOf { credits(it) } + (credits(item) * landed).toInt()
+    val creditsShown = if (settled) roadNow else roadNow - items.sumOf { credits(it) } + items.take(index).sumOf { credits(it) } + (credits(item) * landed).toInt()
     val big = if (ui.roomy) 170.dp else 120.dp
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -128,8 +131,8 @@ fun RewardShowcase(
         Row(Modifier.align(Alignment.TopEnd).padding(horizontal = 18.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             CurrencyPill(IconKind.BOLT, boltsShown, Modifier.onGloballyPositioned { boltSpot = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
             CurrencyPill(IconKind.PRISM, prismsShown, Modifier.onGloballyPositioned { prismSpot = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
-            // The Credit counter is only there when Credits are part of what is being handed over.
-            if (items.any { it is Reward.Credits }) CurrencyPill(IconKind.CREDIT, creditsShown, Modifier.onGloballyPositioned { creditSpot = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
+            // Credits aren't kept in the wallet: they go to the Spark Road, whose meter is here when some are being handed over.
+            if (items.any { it is Reward.Credits || it is Reward.Glory }) RoadMeter(creditsShown, roadGoal, Modifier.onGloballyPositioned { creditSpot = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             GameText(title.uppercase(), Type.Title, color = titleColor, outline = 3.5.dp)
@@ -143,13 +146,13 @@ fun RewardShowcase(
                     }
                 }
             } else when (item) {
-                is Reward.Bolts, is Reward.Prisms, is Reward.Credits -> {
+                is Reward.Bolts, is Reward.Prisms, is Reward.Credits, is Reward.Glory -> {
                     val amount = bolts(item) + prisms(item) + credits(item)
-                    GameIcon(when (item) { is Reward.Bolts -> IconKind.BOLT; is Reward.Prisms -> IconKind.PRISM; else -> IconKind.CREDIT },
+                    GameIcon(when (item) { is Reward.Bolts -> IconKind.BOLT; is Reward.Prisms -> IconKind.PRISM; is Reward.Glory -> IconKind.GLORY; else -> IconKind.CREDIT },
                         Modifier.size(big).graphicsLayer { scaleX = pop.value; scaleY = pop.value; rotationZ = (1f - pop.value) * -50f })
                     Spacer(Modifier.height(6.dp))
                     val bump = 1f + 0.12f * sin(count.value * 40f) * (1f - count.value)
-                    GameText("+${"%,d".format((amount * count.value).toInt())} ${when (item) { is Reward.Bolts -> "Power Ups"; is Reward.Prisms -> "Crystals"; else -> "Credits" }}", Type.Display, outline = 4.dp,
+                    GameText("+${"%,d".format((amount * count.value).toInt())} ${when (item) { is Reward.Bolts -> "Power Ups"; is Reward.Prisms -> "Crystals"; is Reward.Glory -> "Glory"; else -> "Credits" }}", Type.Display, outline = 4.dp,
                         modifier = Modifier.graphicsLayer { scaleX = bump; scaleY = bump })
                 }
                 else -> {
@@ -181,7 +184,7 @@ fun RewardShowcase(
 
         // The spray of icons: burst out of the reward, hang for a beat, then race to the wallet.
         if (currency(item) && fly.value > 0f && fly.value < 1f && !settled) {
-            val kind = when (item) { is Reward.Bolts -> IconKind.BOLT; is Reward.Prisms -> IconKind.PRISM; else -> IconKind.CREDIT }
+            val kind = when (item) { is Reward.Bolts -> IconKind.BOLT; is Reward.Prisms -> IconKind.PRISM; is Reward.Glory -> IconKind.GLORY; else -> IconKind.CREDIT }
             val target = when (item) { is Reward.Bolts -> boltSpot; is Reward.Prisms -> prismSpot; else -> creditSpot }
             Canvas(Modifier.fillMaxSize()) {
                 if (target == Offset.Unspecified) return@Canvas
@@ -195,7 +198,9 @@ fun RewardShowcase(
                     val burst = from + Offset(cos(a) * reach * out, sin(a) * reach * out * 0.8f)
                     val p = burst + (target - burst) * home
                     val s = 30.dp.toPx() * (1f - 0.35f * home) * out.coerceAtLeast(0.2f)
-                    withTransform({ translate(p.x - s / 2, p.y - s / 2); scale(s, s, Offset.Zero) }) { drawIconUnit(kind, null) }
+                    // Credits are thin cards: they turn over and over as they fly, edge-on for a moment each time.
+                    val turn = if (kind == IconKind.CREDIT) kotlin.math.abs(cos(fly.value * 22f + i * 1.3f)).coerceAtLeast(0.12f) else 1f
+                    withTransform({ translate(p.x - s * turn / 2, p.y - s / 2); scale(s * turn, s, Offset.Zero) }) { drawIconUnit(kind, null) }
                 }
             }
         }

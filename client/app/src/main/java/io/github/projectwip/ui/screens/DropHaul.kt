@@ -119,14 +119,14 @@ fun GlitchBars(time: Float, color: Color, strength: Float) {
 
 private fun boltsIn(r: Reward): Int = when (r) { is Reward.Bolts -> r.amount; is Reward.Bundle -> r.items.sumOf { boltsIn(it) }; else -> 0 }
 private fun prismsIn(r: Reward): Int = when (r) { is Reward.Prisms -> r.amount; is Reward.Bundle -> r.items.sumOf { prismsIn(it) }; else -> 0 }
-private fun creditsIn(r: Reward): Int = when (r) { is Reward.Credits -> r.amount; is Reward.Bundle -> r.items.sumOf { creditsIn(it) }; else -> 0 }
+private fun creditsIn(r: Reward): Int = when (r) { is Reward.Credits -> r.amount; is Reward.Glory -> r.amount; is Reward.Bundle -> r.items.sumOf { creditsIn(it) }; else -> 0 }
 private fun unlocksIn(r: Reward): Int = when (r) { is Reward.UnlockFighter, is Reward.SkinReward -> 1; is Reward.Bundle -> r.items.sumOf { unlocksIn(it) }; else -> 0 }
 
 /** One icon on its way from a card to the wallet (to counter number [purse]: 0 Power Ups, 1 Crystals, 2 Credits). The first of each handful carries the amount, paid in when it lands. */
 private class Flyer(val from: Offset, val purse: Int, val born: Float, val seed: Int, val amount: Int)
 
 private val PURSE_ICON = listOf(IconKind.BOLT, IconKind.PRISM, IconKind.CREDIT)
-private val PURSE_SOUND = listOf(Sound.BOLT_LAND, Sound.PRISM_LAND, Sound.CHING)
+private val PURSE_SOUND = listOf(Sound.BOLT_LAND, Sound.PRISM_LAND, Sound.CREDIT_LAND)
 
 /** Seconds a flyer takes from its card to the wallet. */
 private const val FLIGHT = 0.8f
@@ -139,6 +139,7 @@ private fun shortLabel(r: Reward): String = when (r) {
     is Reward.Bolts -> "+%,d".format(r.amount)
     is Reward.Prisms -> "+%,d".format(r.amount)
     is Reward.Credits -> "+%,d".format(r.amount)
+    is Reward.Glory -> "+%,d".format(r.amount)
     is Reward.UnlockFighter -> Balance.fighter(r.fighter).name.substringBefore(' ').uppercase()
     is Reward.SkinReward -> Balance.fighter(r.fighter).skins[r.skinIndex].name.uppercase()
     is Reward.Bundle -> "JACKPOT"
@@ -151,7 +152,7 @@ private fun shortLabel(r: Reward): String = when (r) {
  * arrive; and the totals slam in underneath. It is all saved already: this only shows it.
  */
 @Composable
-fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int, creditsNow: Int, onDone: () -> Unit) = key(results) {
+fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int, roadNow: Int, roadGoal: Int, onDone: () -> Unit) = key(results) {
     val sfx = LocalSfx.current
     val lobby = LocalLobby.current
     val time by rememberAnimTime()
@@ -303,14 +304,14 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
                     val totals = listOf(
                         if (stage == 2) boltsNow else boltsNow - bolts + unseenBolts + boltsIn,
                         if (stage == 2) prismsNow else prismsNow - prisms + unseenPrisms + prismsIn,
-                        if (stage == 2) creditsNow else creditsNow - credits + unseenCredits + creditsIn,
+                        if (stage == 2) roadNow else roadNow - credits + unseenCredits + creditsIn,
                     )
-                    // The Credit counter is only there when the haul has Credits in it.
+                    // Credits go to the Spark Road, not the wallet: its meter is here when the haul has some.
                     for (purse in 0..2) if (purse < 2 || credits > 0) {
                         if (purse > 0) Spacer(Modifier.width(10.dp))
-                        CurrencyPill(PURSE_ICON[purse], totals[purse],
-                            Modifier.graphicsLayer { scaleX = bumps[purse].value; scaleY = bumps[purse].value }
-                                .onGloballyPositioned { spots[purse] = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
+                        val place = Modifier.graphicsLayer { scaleX = bumps[purse].value; scaleY = bumps[purse].value }
+                            .onGloballyPositioned { spots[purse] = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) }
+                        if (purse < 2) CurrencyPill(PURSE_ICON[purse], totals[purse], place) else io.github.projectwip.ui.RoadMeter(totals[purse], roadGoal, place)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -325,7 +326,7 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
                     ) {
                         if (bolts > 0) Total(IconKind.BOLT, "+%,d".format(bolts))
                         if (prisms > 0) Total(IconKind.PRISM, "+%,d".format(prisms))
-                        if (credits > 0) Total(IconKind.CREDIT, "+%,d".format(credits))
+                        if (credits > 0) Total(if (roadGoal > 0) IconKind.CREDIT else IconKind.GLORY, "+%,d".format(credits))
                         if (unlocks > 0) Total(IconKind.FIGHTERS, "$unlocks NEW")
                         ChunkyButton(onDone, Modifier.size(190.dp, 60.dp), ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
                     }
@@ -345,7 +346,9 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
                     val burst = f.from + Offset(kotlin.math.cos(a) * reach * out, kotlin.math.sin(a) * reach * out)
                     val p = burst + (target - burst) * home
                     val s = 34.dp.toPx() * (1f - 0.45f * home) * out.coerceAtLeast(0.3f)
-                    withTransform({ translate(p.x - s / 2, p.y - s / 2); scale(s, s, Offset.Zero) }) { drawIconUnit(PURSE_ICON[f.purse], null) }
+                    // Credits are thin cards: they turn over and over as they fly.
+                    val turn = if (f.purse == 2) kotlin.math.abs(kotlin.math.cos(t * 16f + f.seed)).coerceAtLeast(0.12f) else 1f
+                    withTransform({ translate(p.x - s * turn / 2, p.y - s / 2); scale(s * turn, s, Offset.Zero) }) { drawIconUnit(PURSE_ICON[f.purse], null) }
                 }
             }
         }

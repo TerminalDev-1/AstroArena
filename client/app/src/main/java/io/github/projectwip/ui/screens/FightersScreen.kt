@@ -98,12 +98,11 @@ fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId?, go
 @Composable
 private fun FighterGrid(save: SaveData, go: (Screen) -> Unit, open: (FighterId) -> Unit) {
     val ui = LocalUi.current
-    val next = io.github.projectwip.data.SparkRoad.next(save)
     Box(Modifier.fillMaxSize()) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("FIGHTERS", { go(Screen.Home) }, save.bolts, save.prisms, credits = save.credits) {
+            ScreenHeader("FIGHTERS", { go(Screen.Home) }, save.bolts, save.prisms) {
                 // The Spark Road is where fighters are unlocked.
                 ChunkyButton({ go(Screen.Road) }, Modifier.size(170.dp, 46.dp), ButtonStyle.GREEN, lip = 4.dp) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -120,7 +119,7 @@ private fun FighterGrid(save: SaveData, go: (Screen) -> Unit, open: (FighterId) 
             ) {
                 items(Balance.fighters.size) { i ->
                     val id = Balance.fighters[i].id
-                    FighterCard(save, id, next?.takeIf { it.fighter == id }?.cost ?: io.github.projectwip.data.SparkRoad.steps.firstOrNull { it.fighter == id }?.cost) { open(id) }
+                    FighterCard(save, id, io.github.projectwip.data.SparkRoad.steps.firstOrNull { it.fighter == id }?.cost) { open(id) }
                 }
             }
         }
@@ -140,6 +139,7 @@ private fun FighterCard(save: SaveData, id: FighterId, roadCost: Int?, onClick: 
                 FighterView(def, p.skin, Modifier.weight(1f).fillMaxWidth(), pedestal = false, locked = !p.unlocked)
                 GameText(def.name.substringBefore(' ').uppercase(), Type.Heading, outline = 2.5.dp)
                 PlainText(def.role, Type.Small, color = Color.White.copy(alpha = 0.85f), maxLines = 1)
+                Badge(def.rarity.label.uppercase(), color = androidx.compose.ui.graphics.lerp(Color(def.rarity.color), Color.Black, 0.35f))
                 Spacer(Modifier.height(4.dp))
                 if (p.unlocked) {
                     GameText(if (Progression.levelCapped(save, id)) "MAX · LV ${p.level}" else "LEVEL ${p.level}", Type.Label, color = if (inUse) Color.White else Palette.Gold, outline = 2.dp)
@@ -208,7 +208,11 @@ private fun FighterPage(save: SaveData, repo: GameRepository, id: FighterId, go:
                 // ---------------- the fighter
                 Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                     GameText(def.name.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.2f), outline = 5.dp)
-                    PlainText("${def.title} · ${def.role}", Type.Label, color = Palette.Cyan)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Badge(def.rarity.label.uppercase(), color = androidx.compose.ui.graphics.lerp(Color(def.rarity.color), Color.Black, 0.35f))
+                        Spacer(Modifier.width(8.dp))
+                        PlainText("${def.title} · ${def.role}", Type.Label, color = Palette.Cyan)
+                    }
                     // The live 3D fighter from the lobby stands here.
                     Box(Modifier.weight(1f).fillMaxWidth().lobbyAnchor(), contentAlignment = Alignment.Center) {
                         UpgradeBurst(upgradeCount, accent)

@@ -157,7 +157,8 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             (if (rewards.cupDelta >= 0) "+" else "") + rewards.cupDelta,
                             if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
                         if (row++ < rowsShown) RewardRow(IconKind.BOLT, "Power Ups", "+${rewards.bolts}", Palette.CyanDeep)
-                        if (rewards.credits > 0 && row++ < rowsShown) RewardRow(IconKind.CREDIT, "Credits", "+${rewards.credits}", Palette.GreenDeep)
+                        if (rewards.credits > 0 && row++ < rowsShown) RewardRow(IconKind.CREDIT, "Spark Road", "+${rewards.credits}", Palette.GreenDeep)
+                        if (rewards.glory > 0 && row++ < rowsShown) RewardRow(IconKind.GLORY, "Glory", "+${rewards.glory}", Palette.OrangeDeep)
                         if (rewards.passPoints > 0 && row++ < rowsShown) RewardRow(IconKind.STAR, "Spark Pass", "+${rewards.passPoints}", Palette.OrangeDeep)
                         if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
                         if (rewards.capsuleEarned && row++ < rowsShown) RewardRow(IconKind.CAPSULE, "Spark Drop", "+1", Palette.CyanDeep)
@@ -202,7 +203,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
 
 /** How many rows the rewards panel will show, so each one gets its own pop. */
 private fun rewardRowCount(rewards: MatchRewards, mvpBonus: Boolean) =
-    2 + (if (rewards.credits > 0) 1 else 0) + (if (rewards.passPoints > 0) 1 else 0) + (if (rewards.firstWinPrisms > 0) 1 else 0) + (if (rewards.capsuleEarned) 1 else 0) + (if (mvpBonus) 1 else 0)
+    2 + (if (rewards.credits > 0 || rewards.glory > 0) 1 else 0) + (if (rewards.passPoints > 0) 1 else 0) + (if (rewards.firstWinPrisms > 0) 1 else 0) + (if (rewards.capsuleEarned) 1 else 0) + (if (mvpBonus) 1 else 0)
 
 @Composable
 private fun RewardRow(icon: IconKind, label: String, value: String, chip: Color) {

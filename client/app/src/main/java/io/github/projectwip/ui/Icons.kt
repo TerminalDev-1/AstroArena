@@ -19,7 +19,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE, CREDIT, HEART }
+enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE, CREDIT, HEART, GLORY }
 
 /** Original vector icon set. Each icon is drawn in a 0..1 unit square with an ink outline. */
 @Composable
@@ -145,13 +145,37 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             outline(heart)
         }
         IconKind.CREDIT -> {
-            // A Credit: a green token stamped with a four-pointed spark.
-            drawCircle(INK, 0.47f, Offset(0.5f, 0.52f))
-            drawCircle(Brush.verticalGradient(listOf(Color(0xFFD2FFDD), Color(0xFF3FE08A), Color(0xFF159A5E)), 0.08f, 0.96f), 0.41f, Offset(0.5f, 0.52f))
-            drawArc(Color.White.copy(alpha = 0.45f), 200f, 100f, false, Offset(0.16f, 0.18f), Size(0.68f, 0.68f), style = Stroke(0.045f, cap = StrokeCap.Round))
-            val spark = poly(0.5f, 0.2f, 0.58f, 0.44f, 0.82f, 0.52f, 0.58f, 0.6f, 0.5f, 0.84f, 0.42f, 0.6f, 0.18f, 0.52f, 0.42f, 0.44f)
-            drawPath(spark, Color.White)
-            outline(spark, 0.045f)
+            // A Credit: a thin green card with a white stripe and a small spark, tilted, with another tucked behind it.
+            withTransform({ rotate(-14f, Offset(0.5f, 0.5f)) }) {
+                val round = androidx.compose.ui.geometry.CornerRadius(0.08f)
+                drawRoundRect(INK, Offset(0.2f, 0.17f), Size(0.72f, 0.5f), round)
+                drawRoundRect(Color(0xFF159A5E), Offset(0.245f, 0.215f), Size(0.63f, 0.41f), androidx.compose.ui.geometry.CornerRadius(0.05f))
+                drawRoundRect(INK, Offset(0.07f, 0.31f), Size(0.8f, 0.55f), round)
+                drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFD2FFDD), Color(0xFF3FE08A), Color(0xFF1FAE6C)), 0.33f, 0.86f),
+                    Offset(0.115f, 0.355f), Size(0.71f, 0.46f), androidx.compose.ui.geometry.CornerRadius(0.05f))
+                drawRect(Color.White.copy(alpha = 0.9f), Offset(0.115f, 0.44f), Size(0.71f, 0.085f))
+                val spark = poly(0.66f, 0.57f, 0.69f, 0.65f, 0.77f, 0.68f, 0.69f, 0.71f, 0.66f, 0.79f, 0.63f, 0.71f, 0.55f, 0.68f, 0.63f, 0.65f)
+                drawPath(spark, Color.White)
+                drawRoundRect(INK.copy(alpha = 0.55f), Offset(0.17f, 0.62f), Size(0.24f, 0.05f), androidx.compose.ui.geometry.CornerRadius(0.025f))
+                drawRoundRect(INK.copy(alpha = 0.55f), Offset(0.17f, 0.71f), Size(0.16f, 0.05f), androidx.compose.ui.geometry.CornerRadius(0.025f))
+            }
+        }
+        IconKind.GLORY -> {
+            // Glory: a gold pennant-shield with a white star.
+            val shield = poly(0.5f, 0.04f, 0.9f, 0.2f, 0.9f, 0.56f, 0.5f, 0.96f, 0.1f, 0.56f, 0.1f, 0.2f)
+            drawPath(shield, Brush.verticalGradient(listOf(Color(0xFFFFF3A0), Palette.Gold, Palette.GoldDeep), 0.05f, 0.95f))
+            drawPath(poly(0.5f, 0.04f, 0.9f, 0.2f, 0.9f, 0.36f, 0.1f, 0.36f, 0.1f, 0.2f), Color.White.copy(alpha = 0.3f))
+            outline(shield)
+            val star = Path()
+            for (i in 0 until 10) {
+                val a = -PI / 2 + i * PI / 5
+                val r = if (i % 2 == 0) 0.25f else 0.11f
+                val x = 0.5f + (cos(a) * r).toFloat(); val y = 0.47f + (sin(a) * r).toFloat()
+                if (i == 0) star.moveTo(x, y) else star.lineTo(x, y)
+            }
+            star.close()
+            drawPath(star, Color.White)
+            outline(star, 0.04f)
         }
         IconKind.PRISM -> {
             val outer = poly(0.5f, 0.06f, 0.88f, 0.4f, 0.5f, 0.95f, 0.12f, 0.4f)

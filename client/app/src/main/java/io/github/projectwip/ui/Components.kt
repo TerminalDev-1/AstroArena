@@ -5,6 +5,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -286,6 +288,26 @@ fun compactNumber(n: Int): String = when {
     else -> "%.1fB".format(Math.floor(n / 100_000_000.0) / 10)
 }
 
+/**
+ * Where Credits go. They are not held in a wallet: this shows how far along the Spark Road the fighter being
+ * unlocked is ([value] of [goal]). With the road finished ([goal] 0) it shows the Glory earned instead.
+ */
+@Composable
+fun RoadMeter(value: Int, goal: Int, modifier: Modifier = Modifier) {
+    val shown by animateIntAsState(value, tween(500), label = "road")
+    val shape = plateShape(8.dp, 3.dp)
+    Box(modifier.height(40.dp), contentAlignment = Alignment.CenterStart) {
+        Box(
+            Modifier.padding(start = 16.dp).widthIn(min = 96.dp).height(32.dp)
+                .background(Palette.PanelInset, shape).border(2.5.dp, Palette.Ink, shape).padding(start = 30.dp, end = 12.dp),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            GameText(if (goal > 0) "${"%,d".format(shown)} / ${"%,d".format(goal)}" else compactNumber(shown), Type.Label, outline = 2.dp)
+        }
+        GameIcon(if (goal > 0) IconKind.CREDIT else IconKind.GLORY, Modifier.size(40.dp))
+    }
+}
+
 @Composable
 fun CurrencyPill(icon: IconKind, value: Int, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val shown by animateIntAsState(value, tween(700), label = "currency")
@@ -441,7 +463,7 @@ fun ProgressBar(
 
 /** Header row used by every sub-screen: back button, title, and wallet. */
 @Composable
-fun ScreenHeader(title: String, onBack: () -> Unit, bolts: Int?, prisms: Int?, modifier: Modifier = Modifier, credits: Int? = null, extra: @Composable () -> Unit = {}) {
+fun ScreenHeader(title: String, onBack: () -> Unit, bolts: Int?, prisms: Int?, modifier: Modifier = Modifier, extra: @Composable () -> Unit = {}) {
     Row(modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         ChunkyButton(onBack, Modifier.size(52.dp, 50.dp), ButtonStyle.PURPLE, sound = Sound.UI_BACK) { GameIcon(IconKind.BACK, Modifier.size(26.dp)) }
         Spacer(Modifier.width(14.dp))
@@ -452,7 +474,6 @@ fun ScreenHeader(title: String, onBack: () -> Unit, bolts: Int?, prisms: Int?, m
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (bolts != null) CurrencyPill(IconKind.BOLT, bolts)
             if (prisms != null) CurrencyPill(IconKind.PRISM, prisms)
-            if (credits != null) CurrencyPill(IconKind.CREDIT, credits)
         }
     }
 }

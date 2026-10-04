@@ -349,7 +349,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             }
 
             AnimatedVisibility(reveal != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                reveal?.let { RewardRevealOverlay(it, save.bolts, save.prisms, save.credits) { reveal = null } }
+                reveal?.let { RewardRevealOverlay(it, save.bolts, save.prisms, roadNow(save), roadGoal(save)) { reveal = null } }
             }
             // The debug menu hides behind a small "D" in the corner of every menu screen.
             // Developers only, and only if they switched it on in Settings > Developer.
@@ -390,10 +390,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 )
             }
             AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, save.credits, onNext = openCapsule, onOpenAll = openAll, onDone = { capsule = null }) }
+                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, roadNow(save), roadGoal(save), onNext = openCapsule, onOpenAll = openAll, onDone = { capsule = null }) }
             }
             AnimatedVisibility(haul != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                haul?.let { io.github.projectwip.ui.screens.DropHaulOverlay(it, save.bolts, save.prisms, save.credits) { haul = null } }
+                haul?.let { io.github.projectwip.ui.screens.DropHaulOverlay(it, save.bolts, save.prisms, roadNow(save), roadGoal(save)) { haul = null } }
             }
         }
     }
@@ -447,6 +447,7 @@ fun rewardLabel(r: Reward): String = when (r) {
     is Reward.Bolts -> "+${r.amount} Power Ups"
     is Reward.Prisms -> "+${r.amount} Crystals"
     is Reward.Credits -> "+${r.amount} Credits"
+    is Reward.Glory -> "+${r.amount} Glory"
     is Reward.UnlockFighter -> "${Balance.fighter(r.fighter).name} unlocked!"
     is Reward.SkinReward -> "${Balance.fighter(r.fighter).skins[r.skinIndex].name} colorway"
     is Reward.Bundle -> r.items.joinToString(", ") { rewardLabel(it) }
@@ -458,6 +459,7 @@ fun RewardVisual(r: Reward, modifier: Modifier = Modifier) {
         is Reward.Bolts -> GameIcon(IconKind.BOLT, modifier)
         is Reward.Prisms -> GameIcon(IconKind.PRISM, modifier)
         is Reward.Credits -> GameIcon(IconKind.CREDIT, modifier)
+        is Reward.Glory -> GameIcon(IconKind.GLORY, modifier)
         is Reward.UnlockFighter -> FighterView(Balance.fighter(r.fighter), 0, modifier, pedestal = false)
         is Reward.SkinReward -> FighterView(Balance.fighter(r.fighter), r.skinIndex, modifier, pedestal = false)
         is Reward.Bundle -> GameIcon(IconKind.GIFT, modifier)
@@ -465,17 +467,23 @@ fun RewardVisual(r: Reward, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RewardRevealOverlay(r: RewardReveal, boltsNow: Int, prismsNow: Int, creditsNow: Int, onDismiss: () -> Unit) {
+private fun RewardRevealOverlay(r: RewardReveal, boltsNow: Int, prismsNow: Int, roadNow: Int, roadGoal: Int, onDismiss: () -> Unit) {
     Box(
         // Swallows taps so nothing underneath is pressed while the reward plays out.
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).clickable(remember { MutableInteractionSource() }, null) { },
         contentAlignment = Alignment.Center,
     ) {
-        RewardShowcase(r.title, Palette.Gold, r.reward, boltsNow, prismsNow, creditsNow = creditsNow) {
+        RewardShowcase(r.title, Palette.Gold, r.reward, boltsNow, prismsNow, roadNow = roadNow, roadGoal = roadGoal) {
             ChunkyButton(onDismiss, Modifier.size(200.dp, 60.dp), ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
         }
     }
 }
+
+/** What the Spark Road is asking for the fighter being unlocked; 0 once the road is finished (Credits are Glory from then on). */
+fun roadGoal(save: io.github.projectwip.data.SaveData): Int = io.github.projectwip.data.SparkRoad.next(save)?.cost ?: 0
+
+/** What a [RoadMeter] shows: the Credits on the road, or (road finished) the Glory earned. */
+fun roadNow(save: io.github.projectwip.data.SaveData): Int = if (roadGoal(save) > 0) save.credits else save.glory
 
 /** Confirm dialog in game style. */
 @Composable

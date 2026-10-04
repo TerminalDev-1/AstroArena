@@ -261,6 +261,9 @@ class Store:
     def road_unlock(self, player_id: str) -> dict:
         return self._change(player_id, economy.road_unlock)
 
+    def set_road_target(self, player_id: str, fighter: str) -> None:
+        return self._change(player_id, lambda p: economy.set_road_target(p, fighter))
+
     def claim_pass(self, player_id: str, tier: int) -> dict:
         return self._change(player_id, lambda p: economy.claim_pass(p, tier, today()))
 
@@ -441,15 +444,15 @@ class Store:
             if prisms:
                 profile["lastFirstWinDay"] = day
             profile["bestCups"] = max(profile["bestCups"], cups)
-            # Credits for the Spark Road (paid in Bolts once it is finished) and points for the Spark Pass.
+            # Credits for the Spark Road (Glory once it is finished) and points for the Spark Pass.
             paid = economy.grant(profile, {"type": "credits", "amount": economy.match_credits(mode, outcome, placement)})
-            credits = paid["amount"] if paid["type"] == "credits" else 0
             points = economy.pass_points(mode, outcome, placement)
             economy.add_pass_points(profile, points, day)
             self._keep(player_id, profile)
             return {
-                "cupDelta": cups - player["cups"], "cups": cups, "drop": drop, "bolts": bolts + (paid["amount"] if paid["type"] == "bolts" else 0),
-                "firstWinPrisms": prisms, "credits": credits, "passPoints": points,
+                "cupDelta": cups - player["cups"], "cups": cups, "drop": drop, "bolts": bolts, "firstWinPrisms": prisms,
+                "credits": paid["amount"] if paid["type"] == "credits" else 0, "glory": paid["amount"] if paid["type"] == "glory" else 0,
+                "passPoints": points,
             }
 
     # ------------------------------------------------------------------ Spark Drops
@@ -500,9 +503,16 @@ class Store:
     def leaderboard(self, limit: int) -> list[dict]:
         with self._lock:
             rows = self._db.execute(
-                "SELECT id, name, cups, fighter FROM players ORDER BY cups DESC, created_at ASC LIMIT ?", (max(1, min(limit, 200)),)
+                "SELECT id, name, cups, fighter, profile FROM players ORDER BY cups DESC, created_at ASC LIMIT ?", (max(1, min(limit, 200)),)
             ).fetchall()
-        return [dict(r) for r in rows]
+        # Glory is shown beside a player's name; it lives in their profile.
+        board = []
+        for r in rows:
+            row = dict(r)
+            stored = row.pop("profile")
+            row["glory"] = int((json.loads(stored) if stored else {}).get("glory") or 0)
+            board.append(row)
+        return board
 
     def stats(self) -> dict:
         with self._lock:

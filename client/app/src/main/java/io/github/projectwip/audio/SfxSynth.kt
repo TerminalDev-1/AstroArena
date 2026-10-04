@@ -15,7 +15,7 @@ enum class Sound {
     SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
-    UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH,
+    UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
 }
 
 /**
@@ -63,6 +63,7 @@ object SfxSynth {
         Sound.BOLT_LAND -> boltLand().finish(0.7f)
         Sound.PRISM_LAND -> prismLand().finish(0.62f)
         Sound.GLITCH -> glitch().finish(0.45f)
+        Sound.CREDIT_LAND -> creditLand().finish(0.66f)
     }
 
     const val LOBBY_BPM = 124f
@@ -707,6 +708,15 @@ object SfxSynth {
         for (i in 0 until 3) osc(Wave.SQUARE, i * 0.02f, 0.012f, { 3136f + i * 800f }, { hold(it, 0.0005f, 0.008f, 0.002f) * 0.12f })
         noise(261, 0f, 0.04f, Band.HIGH, { 9500f }, 0.7f, { perc(it, 0.0005f, 0.01f) * 0.18f })
         reverb(0.3f, 0.75f)
+    }
+
+    /** A Credit reaching the road: a card flicked onto a pile. A papery swish, a soft knock as it lands, two wooden notes. */
+    private fun creditLand() = Clip(0.42f).apply {
+        noise(271, 0f, 0.07f, Band.BAND, { glide(it, 0.06f, 6500f, 2200f) }, 1.4f, { perc(it, 0.004f, 0.02f) * 0.5f })
+        osc(Wave.SINE, 0.05f, 0.08f, { glide(it, 0.04f, 300f, 170f) }, { perc(it, 0.001f, 0.02f) * 0.5f })
+        fm(0.055f, 0.25f, { hz(84) }, 4f, { 1.2f * exp(-it / 0.012f) }, { perc(it, 0.001f, 0.06f) * 0.4f })
+        fm(0.115f, 0.25f, { hz(91) }, 4f, { 1.2f * exp(-it / 0.012f) }, { perc(it, 0.001f, 0.07f) * 0.35f })
+        reverb(0.14f, 0.45f)
     }
 
     /** A Spark Drop tearing: a stutter of square-wave blips that jump about in pitch, over chopped static. */

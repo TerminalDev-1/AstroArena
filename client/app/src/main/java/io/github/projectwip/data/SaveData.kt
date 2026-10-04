@@ -66,8 +66,12 @@ data class SaveData(
     val bestCups: Int = 0,
     val bolts: Int = Balance.STARTING_BOLTS,
     val prisms: Int = Balance.STARTING_PRISMS,
-    /** Credits for the Spark Road. Like the other currencies, a copy of what the server holds. */
+    /** Credits on the Spark Road, toward [roadTarget]; a copy of what the server holds. Not a wallet: they can only become that fighter. */
     val credits: Int = 0,
+    /** The fighter the player picked for their Credits to go toward, if they picked one. */
+    val roadTarget: FighterId? = null,
+    /** What Credits are earned as once every fighter is unlocked. */
+    val glory: Int = 0,
     val fighters: Map<FighterId, FighterProgress> = defaultFighters(),
     val selectedFighter: FighterId = FighterId.JUNO,
     val selectedMode: GameMode = GameMode.LAST_SPARK,
