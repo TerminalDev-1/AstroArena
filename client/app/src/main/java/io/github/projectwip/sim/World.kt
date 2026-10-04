@@ -76,6 +76,9 @@ class World(
 ) {
     val projectiles = ArrayList<Projectile>(64)
     val pickups = ArrayList<Pickup>()
+    /** Marked patches of ground waiting to go off (Boss Mode). */
+    val hazards = ArrayList<Hazard>()
+    private val bossScripts = HashMap<Int, BossScript>()
     /** Remaining health of each crate, keyed by tile index (y * width + x). */
     val crateHp = HashMap<Int, Int>()
     val events = ArrayList<GameEvent>(32)
@@ -149,8 +152,10 @@ class World(
         }
 
         for (f in fighters) stepFighter(f, dt)
+        if (rules.boss) for (f in fighters) if (f.def.boss != null && f.alive) bossScripts.getOrPut(f.id) { BossScript(this, f) }.step(dt)
         stepConcealment(dt)
         stepProjectiles(dt)
+        stepHazards(dt)
         stepPickups(dt)
         storm?.let { stepStorm(it, dt) }
 
@@ -401,6 +406,38 @@ class World(
     }
 
     // ------------------------------------------------------------------ projectiles
+
+    // What a boss's script uses to act on the world.
+    internal val rng get() = random
+    internal fun announce(e: GameEvent) { events += e }
+    internal fun bossShot(f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float, pierce: Boolean, style: ShotStyle) =
+        spawnProjectile(f, ang, speed, radius, damage, range, pierce, true, style)
+
+    internal fun startDash(f: Fighter, dx: Float, dy: Float) {
+        val s = f.def.superSpec
+        f.dashTime = s.range / s.speed
+        f.dashDirX = dx
+        f.dashDirY = dy
+        f.dashHits.clear()
+        events += GameEvent.Dash(f.id)
+    }
+
+    private fun stepHazards(dt: Float) {
+        var i = 0
+        while (i < hazards.size) {
+            val h = hazards[i]
+            h.age += dt
+            if (h.age < h.delay) { i++; continue }
+            hazards.removeAt(i)
+            events += GameEvent.Blast(h.x, h.y, h.radius, h.kind)
+            val owner = fighter(h.ownerId)
+            for (f in fighters) {
+                if (f.team == h.team || !f.alive) continue
+                // Caught if the middle of the fighter is inside the mark (a little is forgiven at the very edge).
+                if (hypot(f.x - h.x, f.y - h.y) < h.radius + f.radius * 0.3f) damage(f, owner, h.damage, true, f.x, f.y)
+            }
+        }
+    }
 
     private fun stepProjectiles(dt: Float) {
         val it = projectiles.iterator()

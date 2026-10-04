@@ -429,7 +429,9 @@ fun FighterView(
             }
         } else {
             val images by Portraits.images.collectAsState()
-            images[def.id to skin.coerceIn(0, def.skins.lastIndex)]?.let { bmp ->
+            // A boss has no portrait of its own: it is shown as a skull until it is met in the arena.
+            if (def.boss != null) GameIcon(IconKind.SKULL, Modifier.fillMaxSize().padding(6.dp))
+            else images[def.id to skin.coerceIn(0, def.skins.lastIndex)]?.let { bmp ->
                 Image(
                     bmp.asImageBitmap(), contentDescription = def.name, modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,

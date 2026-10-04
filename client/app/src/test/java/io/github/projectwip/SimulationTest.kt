@@ -176,13 +176,14 @@ class SimulationTest {
         assertEquals(1, a.spawns[1].size)
         assertFalse("the boss needs room", a.circleBlocked(a.spawns[1][0].x, a.spawns[1][0].y, 1.25f))
 
-        // Any fighter can be the boss, and its strength ignores the player's level.
-        for (id in FighterId.entries) {
-            val low = Match(MatchConfig(FighterId.JUNO, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = id))
-            val high = Match(MatchConfig(FighterId.JUNO, 60, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = id))
+        // Each boss is its own thing, and its strength ignores the player's level.
+        for (kind in io.github.projectwip.data.BossKind.entries) {
+            val low = Match(MatchConfig(FighterId.JUNO, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = kind))
+            val high = Match(MatchConfig(FighterId.JUNO, 60, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = kind))
             val b1 = low.world.fighters.single { it.team != low.player.team }
             val b2 = high.world.fighters.single { it.team != high.player.team }
-            assertEquals(id, b1.def.id)
+            assertEquals(kind, b1.def.boss)
+            assertEquals(io.github.projectwip.data.Balance.boss(kind).name, b1.name)
             assertEquals("the boss does not scale with the player", b1.maxHp, b2.maxHp)
             assertEquals(b1.attackDamage, b2.attackDamage)
             assertTrue("drawn at two and a half times normal size", b1.scale > 2.4f)
@@ -200,6 +201,48 @@ class SimulationTest {
         }
         println("boss fights won inside four minutes: $wins of 6")
         assertTrue("a strong fighter should be able to beat it", wins >= 1)
+    }
+
+    /** Each boss fights with moves of its own: marked ground that goes off, and shots no fighter fires. */
+    @Test fun bossesHaveMovesOfTheirOwn() {
+        for (kind in io.github.projectwip.data.BossKind.entries) {
+            val m = Match(MatchConfig(FighterId.BRAKK, 10, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 7L, boss = kind))
+            var marks = 0; var blasts = 0; var shots = 0; var dashes = 0
+            var t = 0f
+            while (!m.isOver && t < 40f) {
+                val before = m.world.hazards.size
+                m.step(Match.STEP); t += Match.STEP
+                marks += maxOf(0, m.world.hazards.size - before)
+                for (e in m.world.events) when (e) {
+                    is io.github.projectwip.sim.GameEvent.Blast -> blasts++
+                    is io.github.projectwip.sim.GameEvent.Dash -> dashes++
+                    else -> Unit
+                }
+                m.world.events.clear()
+                shots = maxOf(shots, m.world.projectiles.count { it.team != m.player.team })
+            }
+            println("$kind: $marks marks, $blasts blasts, $shots shots in the air at once, $dashes charges")
+            assertTrue("$kind marks the ground", marks > 0)
+            assertEquals("every mark goes off", marks, blasts + m.world.hazards.size)
+            when (kind) {
+                io.github.projectwip.data.BossKind.BARRAGE -> assertTrue(shots >= 8)
+                io.github.projectwip.data.BossKind.SWEEPER -> assertTrue(shots >= 12)
+                io.github.projectwip.data.BossKind.STAMPEDE -> assertTrue(dashes > 0)
+            }
+        }
+        // A mark hurts whoever is still standing in it when it goes off, and nobody outside it.
+        val m = Match(MatchConfig(FighterId.JUNO, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 3L, boss = io.github.projectwip.data.BossKind.BARRAGE))
+        while (m.world.phase != Phase.PLAYING) m.step(Match.STEP)
+        val boss = m.world.fighters.first { it.def.boss != null }
+        val me = m.player
+        val full = me.hp
+        m.world.hazards.clear()
+        m.world.hazards += io.github.projectwip.sim.Hazard(boss.id, boss.team, me.x + 6f, me.y, 1f, 0.05f, 500, io.github.projectwip.sim.HazardKind.ROCKET)
+        repeat(6) { m.world.step(Match.STEP) }
+        assertEquals("outside the mark: untouched", full, me.hp)
+        m.world.hazards += io.github.projectwip.sim.Hazard(boss.id, boss.team, me.x, me.y, 1f, 0.02f, 500, io.github.projectwip.sim.HazardKind.ROCKET)
+        m.world.step(Match.STEP); m.world.step(Match.STEP)
+        assertTrue("inside it: hurt", me.hp + me.shieldHp < full || !me.alive)
     }
 
     /** Training Area: nineteen fighters, the targets never leave their spots, and it never ends by itself. */

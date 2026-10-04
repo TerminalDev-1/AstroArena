@@ -15,6 +15,7 @@ import io.github.projectwip.match.HudChannel
 import io.github.projectwip.match.MatchRunner
 import io.github.projectwip.sim.Fighter
 import io.github.projectwip.sim.GameEvent
+import io.github.projectwip.sim.HazardKind
 import io.github.projectwip.sim.Phase
 import io.github.projectwip.sim.ShotStyle
 import kotlin.math.atan2
@@ -569,6 +570,17 @@ class MatchRenderer(
             dashRing.draw()
         }
 
+        // Marked ground (Boss Mode): where something is about to land. The patch fills in as its time runs out.
+        for (h in world.hazards) {
+            val t = (h.age / h.delay).coerceIn(0f, 1f)
+            lit.v4("uTint", 1f, 0.16f, 0.12f, 0.26f + 0.1f * sin(time * 14f))
+            setModel(h.x, 0.046f, h.y, h.radius, 1f, h.radius); sector(360f).draw()
+            lit.v4("uTint", 1f, 0.3f, 0.16f, 0.7f)
+            setModel(h.x, 0.05f, h.y, h.radius * t, 1f, h.radius * t); sector(360f).draw()
+            lit.v4("uTint", 1f, 1f, 1f, 0.95f)
+            setModel(h.x, 0.054f, h.y, h.radius, 1f, h.radius); ring.draw()
+        }
+
         // Aim indicator
         val inp = runner.input
         if (p.alive && (inp.aimingAttack || inp.aimingSuper)) {
@@ -663,6 +675,24 @@ class MatchRenderer(
                     val big = pr.style == ShotStyle.LANCE
                     setModel(x, 0.75f, z, if (big) 0.85f else 0.42f, pr.radius * 0.9f, pr.radius * 0.9f, yaw); octa.draw()
                 }
+            }
+        }
+        // What is about to land on the marked ground: a rocket dropping out of the sky, or a mine blinking where it lies.
+        for (h in world.hazards) {
+            val t = (h.age / h.delay).coerceIn(0f, 1f)
+            when (h.kind) {
+                HazardKind.ROCKET -> {
+                    val y = 0.5f + 11f * (1f - t) * (1f - t)
+                    tint(0xFFFF7A1FL)
+                    setModel(h.x, y, h.y, 0.24f, 0.7f, 0.24f); octa.draw()
+                    tint(0xFFFFE066L)
+                    setModel(h.x, y + 0.7f, h.y, 0.16f, 0.4f, 0.16f); sphere.draw()
+                }
+                HazardKind.MINE -> {
+                    tint(if ((time * (4f + 10f * t)).toInt() % 2 == 0) 0xFFFF4FA3L else 0xFFFFFFFFL)
+                    setModel(h.x, 0.22f, h.y, 0.3f, 0.2f, 0.3f); sphere.draw()
+                }
+                HazardKind.SLAM -> Unit
             }
         }
         lit.f("uEmissive", 0f)
@@ -783,6 +813,21 @@ class MatchRenderer(
                 }
             }
             is GameEvent.Dash -> shake = max(shake, 0.1f)
+            is GameEvent.Blast -> {
+                particles.spawn(e.x, 0.5f, e.y, 0f, 0f, 0f, 0.3f, e.radius * 2.6f, 0xFFFFFFFF.toInt(), 0.9f)
+                repeat((14 * e.radius).toInt()) {
+                    val a = rng.nextFloat() * 6.28f
+                    val sp = (2f + rng.nextFloat() * 5f) * e.radius
+                    particles.spawn(e.x, 0.4f, e.y, cos(a) * sp, 2f + rng.nextFloat() * 5f, sin(a) * sp, 0.5f + rng.nextFloat() * 0.3f, 0.14f,
+                        if (e.kind == HazardKind.MINE) 0xFFFF4FA3.toInt() else 0xFFFF8A1F.toInt(), 1f, grav = 12f)
+                }
+                repeat(5) {
+                    particles.spawn(e.x + (rng.nextFloat() - 0.5f) * e.radius, 0.4f, e.y + (rng.nextFloat() - 0.5f) * e.radius, 0f, 1.2f + rng.nextFloat(), 0f,
+                        1f, 0.5f, 0xFF3C3250.toInt(), 0.5f, growth = 0.9f, add = false)
+                }
+                val away = hypot(e.x - match.player.x, e.y - match.player.y)
+                shake = max(shake, (0.3f - away * 0.03f).coerceAtLeast(0f))
+            }
             is GameEvent.CrateHit -> crateHitAt[e.ty * world.arena.width + e.tx] = time
             is GameEvent.CrateBroken -> {
                 val x = e.tx + 0.5f; val z = e.ty + 0.5f

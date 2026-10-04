@@ -17,6 +17,9 @@ enum class FighterId { JUNO, BRAKK, MIRA, KITO }
 
 enum class AttackShape { BURST, SPREAD, LANCE }
 
+/** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
+enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
+
 /**
  * How rare a fighter is. Rarer fighters take more Credits on the Spark Road ([roadCost]; the server's own table
  * in `economy.py` is the one that counts). The fighter everyone starts with has no rarity of its own.
@@ -81,6 +84,8 @@ data class FighterDef(
     val radius: Float = 0.42f,
     val skins: List<Skin>,
     val rarity: Rarity = Rarity.RARE,
+    /** Set for a Boss Mode boss: which one it is. Null for every fighter. */
+    val boss: BossKind? = null,
 )
 
 enum class BotDifficulty(val label: String, val blurb: String, val cupBonus: Int, val boltMultiplier: Float) {
@@ -267,23 +272,34 @@ object Balance {
 
     // ---- Boss Mode ----
     /**
-     * The giant version of any fighter, as fought in Boss Mode: two and a half times the size, a mountain of
-     * health, slower on its feet, hitting harder and reaching further. Its stats are FIXED: a boss is always
-     * created at level 1 and none of these lines grow, so it does not get tougher as the player levels up.
+     * A Boss Mode boss. Two and a half times a fighter's size with a mountain of health; its stats are fixed and
+     * never follow the player's level. What it does in a fight is in `sim/Boss.kt`: the attack and super lines
+     * here only tell the bot brain how far to stand off, and set the speed and damage of a charge.
      */
-    fun boss(id: FighterId): FighterDef {
-        val f = fighter(id)
-        return f.copy(
-            name = "Titan ${f.name}", title = "Boss",
-            health = StatLine(f.health.base * 16, 0),
-            attackDamage = StatLine(Math.round(f.attackDamage.base * 1.5f), 0),
-            superDamage = StatLine(Math.round(f.superDamage.base * 1.5f), 0),
-            moveSpeed = f.moveSpeed * 0.62f, radius = f.radius * 2.5f,
-            reloadSeconds = f.reloadSeconds * 1.15f, superChargePerHit = f.superChargePerHit * 0.5f,
-            attack = f.attack.copy(range = f.attack.range * 1.25f, radius = f.attack.radius * 1.5f),
-            superSpec = f.superSpec.copy(range = f.superSpec.range * 1.25f, radius = f.superSpec.radius * 1.5f),
+    private fun bossDef(kind: BossKind, name: String, title: String, lore: String, health: Int, speed: Float, standOff: Float, skin: Skin) = FighterDef(
+        id = FighterId.JUNO, rarity = Rarity.STARTER, boss = kind,
+        name = name, title = title, role = "Boss", lore = lore, attackName = "",
+        health = StatLine(health, 0), attackDamage = StatLine(400, 0), superDamage = StatLine(1300, 0),
+        moveSpeed = speed,
+        attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 30f, range = standOff, speed = 14f, radius = 0.24f, burstInterval = 0f),
+        superSpec = SuperSpec(SuperKind.RAM, "Charge", "", range = 9f, speed = 15f, radius = 0.9f),
+        ammoMax = 3, reloadSeconds = 1.5f, superChargePerHit = 0f,
+        radius = fighter(FighterId.JUNO).radius * 2.5f,
+        skins = listOf(skin),
+    )
+
+    val bosses: List<FighterDef> by lazy {
+        listOf(
+            bossDef(BossKind.BARRAGE, "Hailstorm", "Rocket Platform", "A walking launch pad. Whatever it points at is about to have a very bad few seconds.",
+                60000, 2.1f, 8f, Skin("Launch Grey", 0xFF6C7A89, 0xFFFF6A1F, 0xFFFFD23F, 0)),
+            bossDef(BossKind.SWEEPER, "Lighthouse", "Beam Sweeper", "Built to guide ships home. Nobody is sure who taught it to turn the light all the way up.",
+                52000, 2.3f, 7f, Skin("Harbour", 0xFFE8EEF5, 0xFF2EC4F1, 0xFFFF4FA3, 0)),
+            bossDef(BossKind.STAMPEDE, "Ramrod", "Wrecking Bull", "Head down, eyes shut, straight ahead. It has never once gone round anything.",
+                70000, 2.7f, 3f, Skin("Oxblood", 0xFF9B2D30, 0xFFE9D8A6, 0xFFFFC145, 0)),
         )
     }
+
+    fun boss(kind: BossKind): FighterDef = bosses.first { it.boss == kind }
 
     // ---- Training Area ----
     // Everything here is created at level 1 with flat stat lines, like the boss: it is a fixed yardstick.

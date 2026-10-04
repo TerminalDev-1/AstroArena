@@ -21,8 +21,8 @@ data class MatchConfig(
     /** When false, the player's slot is also a bot (used by tests and attract mode). */
     val humanPlayer: Boolean = true,
     val seed: Long = System.nanoTime(),
-    /** Boss Mode: which fighter the giant is. Null picks one at random. */
-    val boss: FighterId? = null,
+    /** Boss Mode: which boss it is. Null picks one at random. */
+    val boss: io.github.projectwip.data.BossKind? = null,
     /** Names for the bots, when the game server set this match up. Any shortfall is filled from the built-in list. */
     val botNames: List<String> = emptyList(),
     /** The server's id for this match (0 = set up on the device). */
@@ -63,13 +63,13 @@ class Match(val config: MatchConfig) {
             val a = Arenas.trainingArea()
             val dummies = a.spawns[1].size - 2 - TRAINING_MINIS
             repeat(dummies) { roster += Fighter(id++, Balance.dummy, 1, 0, 1, "Dummy ${it + 1}", isBot = true, rooted = true).also { d -> passive += d } }
-            val giant = Balance.boss(config.boss ?: FighterId.entries[rng.nextInt(FighterId.entries.size)])
+            val giant = Balance.boss(config.boss ?: Balance.bosses[rng.nextInt(Balance.bosses.size)].boss!!)
             roster += Fighter(id++, giant, 1, giant.skins.lastIndex, 1, giant.name, isBot = true, rooted = true).also { passive += it }
             roster += Fighter(id++, Balance.sentry, 1, 1, 1, "Sentry", isBot = true, rooted = true)
             repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true).also { m -> passive += m } }
         } else if (bossMode) {
-            // One giant, always level 1: its stats are fixed and never follow the player's level.
-            val def = Balance.boss(config.boss ?: FighterId.entries[rng.nextInt(FighterId.entries.size)])
+            // One boss, always level 1: its stats are fixed and never follow the player's level.
+            val def = Balance.boss(config.boss ?: Balance.bosses[rng.nextInt(Balance.bosses.size)].boss!!)
             roster += Fighter(id++, def, 1, def.skins.lastIndex, 1, def.name, isBot = true)
         } else {
             repeat(2) { roster += botFighter(id++, 0, names.next()) }
@@ -99,6 +99,8 @@ class Match(val config: MatchConfig) {
         // Rotate who goes first so the same bot doesn't always get the tick's one path search.
         turn++
         for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
+        // A boss's brain only walks it about: what it does to the player is its script's business (see World).
+        for (f in world.fighters) if (f.def.boss != null) { f.control.attack = false; f.control.superAttack = false }
         world.step(dt)
         if (isOver) overFor += dt
     }

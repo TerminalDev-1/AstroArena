@@ -198,6 +198,12 @@ class MatchRunner(
                 val p = match.player
                 sfx.play(Sound.CRATE_BREAK, 1f / (1f + hypot(e.tx + 0.5f - p.x, e.ty + 0.5f - p.y) * 0.2f))
             }
+            is GameEvent.Blast -> {
+                val p = match.player
+                val near = 1f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)
+                sfx.play(Sound.CRATE_BREAK, near, 0.7f)
+                sfx.play(Sound.SHOOT_HEAVY, near * 0.8f, 0.6f)
+            }
             is GameEvent.SuperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY); sfx.buzz(25, 120) }
             is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }
             is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop }

@@ -48,15 +48,21 @@ enum class Pass { SHADOW, COLOR, OUTLINE, SILHOUETTE }
  */
 class FighterModels {
     private val models = HashMap<FighterId, FighterModel>()
+    private val bossModels = HashMap<io.github.projectwip.data.BossKind, FighterModel>()
 
     init {
         models[FighterId.JUNO] = buildJuno()
         models[FighterId.BRAKK] = buildBrakk()
         models[FighterId.MIRA] = buildMira()
         models[FighterId.KITO] = buildKito()
+        bossModels[io.github.projectwip.data.BossKind.BARRAGE] = buildHailstorm()
+        bossModels[io.github.projectwip.data.BossKind.SWEEPER] = buildLighthouse()
+        bossModels[io.github.projectwip.data.BossKind.STAMPEDE] = buildRamrod()
     }
 
     fun model(id: FighterId) = models.getValue(id)
+    /** A fighter's model, or a boss's own. */
+    fun model(def: FighterDef) = def.boss?.let { bossModels.getValue(it) } ?: models.getValue(def.id)
 
     // ------------------------------------------------------------------ construction helpers
 
@@ -215,6 +221,97 @@ class FighterModels {
         return a.build(rig)
     }
 
+    // ------------------------------------------------------------------ Hailstorm — a walking launch pad
+
+    private fun buildHailstorm(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 0.98f, hipY = 0.36f, hipZ = 0.3f, shoulder = floatArrayOf(0.1f, 0.62f, 0f), shoulderL = floatArrayOf(0f, 0.9f, -0.56f))
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.DARK) { at(0f, -0.14f, 0f) { roundedBox(0.34f, 0.32f, 0.3f, 0.1f) } }
+            a.add(bone, Slot.METAL) { at(0.06f, -0.32f, 0f) { roundedBox(0.46f, 0.12f, 0.36f, 0.05f) } }
+        }
+        // A squat hull with a warning stripe and a dark waist.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.72f, 0f) { roundedBox(0.86f, 0.5f, 0.98f, 0.18f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0f, 0.6f, 0f) { roundedBox(0.88f, 0.1f, 1.0f, 0.04f) } }
+        a.add(Bone.BODY, Slot.DARK) { at(0f, 0.48f, 0f) { roundedBox(0.7f, 0.12f, 0.8f, 0.05f) } }
+        // A rocket pod on each shoulder: a box of tubes tipped up at the sky, a warhead showing in each.
+        for (z in listOf(0.5f, -0.5f)) {
+            a.add(Bone.BODY, Slot.METAL) { at(-0.08f, 1.12f, z) { rotate(28f, 0f, 0f, 1f); roundedBox(0.62f, 0.4f, 0.4f, 0.07f) } }
+            a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) {
+                for (dy in listOf(0.09f, -0.09f)) for (dz in listOf(0.09f, -0.09f)) at(0.19f, 1.27f + dy, z + dz) { sphere(0.07f, 6, 8) }
+            }
+        }
+        // A low head between the pods: one wide visor.
+        a.add(Bone.HEAD, Slot.DARK) { at(0.04f, 0.06f, 0f) { roundedBox(0.4f, 0.26f, 0.44f, 0.11f) } }
+        a.add(Bone.HEAD, Slot.SECONDARY, outline = false, emissive = true) { at(0.22f, 0.08f, 0f) { roundedBox(0.06f, 0.08f, 0.34f, 0.03f) } }
+        // The flak gun in its chest: a ring of short barrels.
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.36f, 0f, 0f) { alongX { cylinder(0.2f, 0.24f, 14) } } }
+        a.add(Bone.WEAPON, Slot.METAL) { for (k in 0 until 6) { val t = k * 1.047f; at(0.52f, sin(t) * 0.11f, kotlin.math.cos(t) * 0.11f) { alongX { cylinder(0.04f, 0.22f, 6) } } } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.1f, 0f) { capsule(0.12f, 0.12f) } }
+        a.add(Bone.ARM, Slot.METAL) { at(0.02f, -0.3f, 0f) { roundedBox(0.24f, 0.22f, 0.22f, 0.08f) } }
+        return a.build(rig)
+    }
+
+    // ------------------------------------------------------------------ Lighthouse — a tower with a lamp for a head
+
+    private fun buildLighthouse(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 1.22f, hipY = 0.26f, hipZ = 0.2f, shoulder = floatArrayOf(0.12f, 1.36f, 0f), shoulderL = floatArrayOf(0f, 0.8f, -0.4f), floatY = 1.42f)
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.DARK) { at(0f, -0.1f, 0f) { capsule(0.1f, 0.1f) } }
+            a.add(bone, Slot.METAL) { at(0.04f, -0.24f, 0f) { roundedBox(0.3f, 0.1f, 0.24f, 0.04f) } }
+        }
+        // A tapering tower in bands, on a wide foot, with a gallery near the top.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.72f, 0f) { cylinder(0.42f, 1.0f, 18, topRadius = 0.26f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { for ((y, r) in listOf(0.5f to 0.4f, 0.86f to 0.33f)) at(0f, y, 0f) { cylinder(r, 0.16f, 18, topRadius = r - 0.025f) } }
+        a.add(Bone.BODY, Slot.DARK) { at(0f, 0.2f, 0f) { cylinder(0.5f, 0.12f, 18) } }
+        a.add(Bone.BODY, Slot.METAL) { at(0f, 1.22f, 0f) { torus(0.34f, 0.045f, 20, 6) } }
+        // The lamp room: a glowing lens under a cap.
+        a.add(Bone.HEAD, Slot.DARK) { at(0f, 0.02f, 0f) { cylinder(0.3f, 0.06f, 14) } }
+        a.add(Bone.HEAD, Slot.ACCENT, emissive = true) { at(0f, 0.2f, 0f) { sphere(0.24f, 10, 14) } }
+        a.add(Bone.HEAD, Slot.METAL) { at(0f, 0.44f, 0f) { cylinder(0.32f, 0.2f, 14, topRadius = 0.04f) } }
+        // A ring of light that turns round the lamp.
+        a.add(Bone.FLOAT, Slot.SECONDARY, emissive = true) {
+            torus(0.44f, 0.03f, 24, 6)
+            for (k in 0 until 4) { val t = k * 1.571f; at(kotlin.math.cos(t) * 0.44f, 0f, sin(t) * 0.44f) { sphere(0.07f, 6, 8) } }
+        }
+        // The beam's nozzle, pointing where it is about to sweep.
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.3f, 0f, 0f) { alongX { cylinder(0.11f, 0.3f, 12, topRadius = 0.16f) } } }
+        a.add(Bone.WEAPON, Slot.ACCENT, emissive = true) { at(0.47f, 0f, 0f) { sphere(0.1f, 8, 10) } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.08f, 0f) { capsule(0.07f, 0.1f) } }
+        return a.build(rig)
+    }
+
+    // ------------------------------------------------------------------ Ramrod — a bull made for knocking walls down
+
+    private fun buildRamrod(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 0.74f, hipY = 0.36f, hipZ = 0.3f, shoulder = floatArrayOf(0.44f, 0.56f, 0f), shoulderL = floatArrayOf(-0.2f, 0.8f, -0.5f))
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.PRIMARY) { at(0f, -0.14f, 0f) { roundedBox(0.3f, 0.3f, 0.28f, 0.1f) } }
+            a.add(bone, Slot.DARK) { at(0.03f, -0.32f, 0f) { roundedBox(0.36f, 0.1f, 0.32f, 0.04f) } }
+        }
+        // A long barrel of a body, heavy at the shoulders, with a hump and a stub of a tail.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(-0.05f, 0.68f, 0f) { roundedBox(1.0f, 0.56f, 0.86f, 0.24f) } }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0.18f, 0.98f, 0f) { ellipsoid(0.32f, 0.2f, 0.36f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0.12f, 0.7f, 0f) { roundedBox(0.12f, 0.6f, 0.9f, 0.05f) } }
+        a.add(Bone.BODY, Slot.DARK) { at(-0.62f, 0.78f, 0f) { rotate(40f, 0f, 0f, 1f); capsule(0.05f, 0.24f) } }
+        a.add(Bone.BODY, Slot.METAL, outline = false) { for (z in listOf(0.44f, -0.44f)) for (x in listOf(-0.3f, 0f, 0.3f)) at(x, 0.9f, z) { sphere(0.05f, 6, 8) } }
+        // Head held low: glowing eyes, a ring through the nose, two long horns swept forward.
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(0.3f, 0.06f, 0f) { roundedBox(0.44f, 0.36f, 0.46f, 0.15f) } }
+        a.add(Bone.HEAD, Slot.DARK) { at(0.52f, -0.04f, 0f) { roundedBox(0.14f, 0.2f, 0.34f, 0.07f) } }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { for (z in listOf(0.13f, -0.13f)) at(0.5f, 0.12f, z) { sphere(0.05f, 6, 8) } }
+        a.add(Bone.HEAD, Slot.ACCENT) { at(0.6f, -0.14f, 0f) { alongZ { torus(0.07f, 0.02f, 12, 5) } } }
+        for (z in listOf(0.26f, -0.26f)) {
+            a.add(Bone.HEAD, Slot.SECONDARY) { at(0.34f, 0.28f, z) { rotate(if (z > 0f) 60f else -60f, 1f, 0f, 0f); rotate(-35f, 0f, 0f, 1f); cylinder(0.09f, 0.5f, 8, topRadius = 0f) } }
+        }
+        // The ram: a steel plate carried in front of everything else.
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.42f, 0f, 0f) { roundedBox(0.14f, 0.5f, 0.9f, 0.05f) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { for (z in listOf(0.26f, 0f, -0.26f)) at(0.5f, 0f, z) { octa(0.09f, 0.09f, 0.07f) } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.1f, 0f) { capsule(0.11f, 0.12f) } }
+        return a.build(rig)
+    }
+
     // ------------------------------------------------------------------ drawing
 
     private val root = FloatArray(16)
@@ -227,7 +324,7 @@ class FighterModels {
      * 0 = +X, π/2 = +Z). The caller has already bound [prog] and set camera/light uniforms.
      */
     fun draw(prog: Program, def: FighterDef, skinIndex: Int, x: Float, z: Float, facing: Float, anim: FighterAnim, pass: Pass, ink: FloatArray = INK) {
-        val model = model(def.id)
+        val model = model(def)
         val rig = model.rig
         val skin = def.skins[skinIndex.coerceIn(0, def.skins.lastIndex)]
         val t = anim.time

@@ -148,6 +148,8 @@ sealed interface GameEvent {
     data class CellPicked(val fighterId: Int, val x: Float, val y: Float) : GameEvent
     data class SuperReady(val fighterId: Int) : GameEvent
     data class Dash(val fighterId: Int) : GameEvent
+    /** A marked patch of ground went off. */
+    data class Blast(val x: Float, val y: Float, val radius: Float, val kind: HazardKind) : GameEvent
     data object CountdownTick : GameEvent
     data object MatchStart : GameEvent
     data class MatchEnd(val winningTeam: Int) : GameEvent
