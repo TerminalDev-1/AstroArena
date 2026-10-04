@@ -46,6 +46,8 @@ data class PlayerLine(
     val kos: Int, val deaths: Int, val damage: Int, val isPlayer: Boolean, val isMvp: Boolean, val isBot: Boolean,
     /** Free-for-all finishing place; 0 = still fighting when your match ended. */
     val placement: Int = 0,
+    /** Set when this line is a Boss Mode boss rather than a fighter. */
+    val boss: io.github.projectwip.data.BossKind? = null,
 )
 
 data class MatchSummary(
@@ -67,7 +69,7 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
         report,
         match.world.fighters.map {
             PlayerLine(it.name, it.def.id, it.skin, it.team, it.kos, it.deaths, it.damageDealt, it === match.player, it === mvp, it.isBot,
-                placement = if (it === match.player) report.placement else it.placement)
+                placement = if (it === match.player) report.placement else it.placement, boss = it.def.boss)
         },
         match.player.team,
         match.config.serverMatchId,

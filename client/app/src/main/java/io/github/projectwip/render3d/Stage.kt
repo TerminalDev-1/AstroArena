@@ -32,6 +32,8 @@ import kotlin.random.Random
 /** What the stage should show. Written from the UI thread, read by the GL thread. */
 class StageParams {
     @Volatile var fighter = FighterId.JUNO
+    /** Set to show a Boss Mode boss instead of [fighter]. */
+    @Volatile var boss: io.github.projectwip.data.BossKind? = null
     @Volatile var skin = 0
     @Volatile var locked = false
     @Volatile var pedestal = true
@@ -81,7 +83,7 @@ class StageScene(private val withPedestal: Boolean) {
     }
 
     fun render(width: Int, height: Int, p: StageParams, time: Float, dt: Float, framing: Float = 1f, targetFbo: Int = 0) {
-        val def = Balance.fighter(p.fighter)
+        val def = p.boss?.let { Balance.boss(it) } ?: Balance.fighter(p.fighter)
         val skin = def.skins[p.skin.coerceIn(0, def.skins.lastIndex)]
         val aspect = width.toFloat() / height
         Matrix.perspectiveM(proj, 0, 30f / framing.coerceAtLeast(0.3f), aspect, 0.5f, 40f)
@@ -262,6 +264,9 @@ class FighterStageView(context: Context) : TextureView(context), TextureView.Sur
 object Portraits {
     private val _images = MutableStateFlow<Map<Pair<FighterId, Int>, Bitmap>>(emptyMap())
     val images: StateFlow<Map<Pair<FighterId, Int>, Bitmap>> = _images.asStateFlow()
+    private val _bosses = MutableStateFlow<Map<io.github.projectwip.data.BossKind, Bitmap>>(emptyMap())
+    /** The bosses of Boss Mode, for the line-up before a fight and the result after it. */
+    val bosses: StateFlow<Map<io.github.projectwip.data.BossKind, Bitmap>> = _bosses.asStateFlow()
     @Volatile private var started = false
 
     fun start() {
@@ -300,8 +305,12 @@ object Portraits {
         val params = StageParams().apply { pedestal = false }
         val buf = ByteBuffer.allocateDirect(size * size * 4).order(ByteOrder.nativeOrder())
         val out = HashMap<Pair<FighterId, Int>, Bitmap>()
-        for (def in Balance.fighters) for (skin in def.skins.indices) {
+        val bossOut = HashMap<io.github.projectwip.data.BossKind, Bitmap>()
+        // Every fighter in every colourway, then the bosses.
+        val subjects = Balance.fighters.flatMap { def -> def.skins.indices.map { def to it } } + Balance.bosses.map { it to 0 }
+        for ((def, skin) in subjects) {
             params.fighter = def.id
+            params.boss = def.boss
             params.skin = skin
             scene.render(size, size, params, time = 0.6f, dt = 0f, framing = 1.05f, targetFbo = msFbo)
             GLES30.glBindFramebuffer(GLES30.GL_READ_FRAMEBUFFER, msFbo)
@@ -314,9 +323,11 @@ object Portraits {
             val raw = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             raw.copyPixelsFromBuffer(buf)
             val flip = android.graphics.Matrix().apply { preScale(1f, -1f) }
-            out[def.id to skin] = Bitmap.createBitmap(raw, 0, 0, size, size, flip, false)
+            val picture = Bitmap.createBitmap(raw, 0, 0, size, size, flip, false)
             raw.recycle()
-            _images.value = HashMap(out)
+            val kind = def.boss
+            if (kind != null) { bossOut[kind] = picture; _bosses.value = HashMap(bossOut) }
+            else { out[def.id to skin] = picture; _images.value = HashMap(out) }
         }
         egl.destroySurface(pb)
         egl.release()

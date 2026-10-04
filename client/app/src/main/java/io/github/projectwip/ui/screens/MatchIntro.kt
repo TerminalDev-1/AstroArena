@@ -103,7 +103,7 @@ fun MatchIntro(match: Match, onDone: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             PlainText(
                 if (match.freeForAll) "Last one standing wins"
-                else if (match.bossMode) "Knock out the giant. You have unlimited lives"
+                else if (match.bossMode) "Knock out the boss. Watch the marked ground. You have unlimited lives"
                 else "First team to ${match.world.rules.koTarget} knockouts wins",
                 Type.Label, color = Color.White,
             )
@@ -115,7 +115,8 @@ fun MatchIntro(match: Match, onDone: () -> Unit) {
 private fun TeamColumn(title: String, fighters: List<Fighter>, me: Fighter, plate: Color, accent: Color, modifier: Modifier) {
     Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         GameText(title, Type.Title, color = accent, outline = 3.dp)
-        for (f in fighters) FighterCard(f, f === me, plate, Modifier.weight(1f).fillMaxWidth())
+        // One fighter on a side (Boss Mode) gets the whole card: a big portrait with the name underneath.
+        for (f in fighters) FighterCard(f, f === me, plate, Modifier.weight(1f).fillMaxWidth(), tall = fighters.size == 1)
     }
 }
 
@@ -128,7 +129,7 @@ private fun FighterCard(f: Fighter, isMe: Boolean, plate: Color, modifier: Modif
             Column(Modifier.fillMaxSize().padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 FighterView(f.def, f.skin, Modifier.weight(1f).fillMaxWidth(), pedestal = false)
                 GameText(f.name, Type.Label, color = if (isMe) Palette.Gold else Color.White, outline = 2.dp)
-                PlainText("${f.def.name} · LV ${f.level}", Type.Small, color = Color.White, maxLines = 1)
+                PlainText(if (f.def.boss != null) "${f.def.title} · ${"%,d".format(f.maxHp)} HP" else "${f.def.name} · LV ${f.level}", Type.Small, color = Color.White, maxLines = 1)
             }
             return@Panel
         }

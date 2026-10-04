@@ -102,7 +102,7 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
     LAST_SPARK("Last Spark", "10-fighter free-for-all · last one standing", 10),
     KNOCKOUT_RUSH("Knockout Rush", "3v3 · first team to 10 KOs", 6),
     /** You against one giant, with as many lives as it takes. */
-    BOSS("Boss Mode", "You against a giant · unlimited lives", 2),
+    BOSS("Boss Mode", "You against a boss · unlimited lives", 2),
     /** Practice: dummies, a swarm and a boss that just stand there, plus one sentry gun. No timer, nothing won or lost. */
     TRAINING("Training Area", "Dummies, a swarm, a sentry and a boss · no stakes", 19),
 }

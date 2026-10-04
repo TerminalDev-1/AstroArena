@@ -245,7 +245,7 @@ private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, mo
                             color = if (p.placement == 1) Palette.Gold else Color.White, outline = 2.dp, modifier = Modifier.width(44.dp))
                     }
                     Box(Modifier.fillMaxHeight().width(46.dp)) {
-                        FighterView(Balance.fighter(p.fighter), p.skin, Modifier.fillMaxSize(), pedestal = false)
+                        FighterView(p.boss?.let { Balance.boss(it) } ?: Balance.fighter(p.fighter), p.skin, Modifier.fillMaxSize(), pedestal = false)
                     }
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
