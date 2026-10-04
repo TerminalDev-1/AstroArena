@@ -70,7 +70,9 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
     var creating by remember { mutableStateOf(false) }
     val sfx = LocalSfx.current
     val ui = LocalUi.current
-    val cardW = if (ui.roomy) 210.dp else 176.dp
+    // Cards keep their shape: the row is as tall as the screen allows (less the header and the section titles),
+    // so the width follows the height instead of being one fixed number that looks squashed on a tablet.
+    val cardW = ((ui.heightDp - 120f) * 0.62f).coerceIn(176f, 300f).dp
     val dev = io.github.projectwip.ui.LocalDev.current
     val ask = io.github.projectwip.ui.LocalServerCall.current
     // Today's offers and the clock they run on come from the server; offline there are none to show.

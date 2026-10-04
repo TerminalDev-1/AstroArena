@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -91,7 +92,9 @@ fun CustomOfferCard(o: CustomOffer, width: Dp, canDelete: Boolean, onBuy: () -> 
             Column(Modifier.fillMaxSize().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 GameText(o.title.uppercase(), Type.Heading, outline = 2.5.dp, align = TextAlign.Center)
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    RewardVisual(o.reward, Modifier.fillMaxSize(0.8f))
+                    // Bolts, Prisms and bundles are icons, which stretch to whatever they are given: keep them square.
+                    val fighter = o.reward is io.github.projectwip.data.Reward.UnlockFighter || o.reward is io.github.projectwip.data.Reward.SkinReward
+                    RewardVisual(o.reward, if (fighter) Modifier.fillMaxSize(0.8f) else Modifier.aspectRatio(1f).fillMaxSize(0.8f))
                 }
                 PlainText(o.contents.joinToString(", ") { rewardLabel(it) }, Type.Label, color = Color.White, align = TextAlign.Center, maxLines = 3)
                 if (o.expiresAt > 0) {

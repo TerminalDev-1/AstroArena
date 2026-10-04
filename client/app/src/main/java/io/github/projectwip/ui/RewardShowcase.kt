@@ -48,7 +48,7 @@ private const val FLYERS = 14
 
 /**
  * A reward being handed over, played out rather than just shown. Currencies pop out, count up, and a spray of
- * icons arcs into the wallet in the corner with a ching for each handful. Fighters and colourways appear as a
+ * icons arcs into the wallet in the corner, clanking (Bolts) or chiming (Prisms) as each handful lands. Fighters and colourways appear as a
  * silhouette that swells, flashes and is revealed under a banner. Bundles do this for each thing in turn, then
  * lay everything out together. [buttons] appear once it has all settled.
  */
@@ -89,8 +89,10 @@ fun RewardShowcase(
                 var n = 0
                 while (true) { sfx?.play(Sound.COUNT, 0.5f, 0.85f + minOf(n, 12) * 0.05f); n++; delay(70) }
             }
-            // The flyers reach the wallet from about here on: a ching for each handful that lands.
-            launch { delay(620); repeat(5) { sfx?.play(Sound.CHING, 0.85f, 0.94f + it * 0.05f); sfx?.buzz(12, 90); delay(125) } }
+            // The flyers reach the wallet from about here on. Each handful that lands sounds like what it is:
+            // Bolts clank like steel nuts, Prisms chime like glass.
+            val landing = if (item is Reward.Bolts) Sound.BOLT_LAND else Sound.PRISM_LAND
+            launch { delay(620); repeat(7) { sfx?.play(landing, 0.85f, 0.92f + it * 0.04f); sfx?.buzz(12, 90); delay(110) } }
             launch { fly.animateTo(1f, tween(1500, easing = LinearEasing)) }
             count.animateTo(1f, tween(900))
             ticking.cancel()
