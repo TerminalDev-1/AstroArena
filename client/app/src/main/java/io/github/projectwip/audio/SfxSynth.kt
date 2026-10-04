@@ -683,25 +683,29 @@ object SfxSynth {
         osc(Wave.TRI, 0f, 0.05f, { 784f }, { perc(it, 0.001f, 0.01f) * 0.3f })
     }
 
-    /** A Bolt landing in the wallet: a steel nut dropped on the pile, with a hard clank, a dull body and one small bounce. */
-    private fun boltLand() = Clip(0.4f).apply {
-        for ((i, at) in floatArrayOf(0f, 0.085f).withIndex()) {
-            val g = if (i == 0) 1f else 0.4f
-            noise(221 + i, at, 0.02f, Band.BAND, { 3800f }, 1.8f, { perc(it, 0.0004f, 0.006f) * 0.6f * g })
-            fm(at, 0.16f, { 1480f + i * 240f }, 2.76f, { 2.4f * exp(-it / 0.02f) }, { perc(it, 0.0005f, 0.035f) * 0.55f * g })
-            fm(at, 0.12f, { 2210f + i * 300f }, 1.19f, { 1.2f }, { perc(it, 0.0005f, 0.02f) * 0.25f * g })
-        }
-        osc(Wave.SINE, 0f, 0.1f, { glide(it, 0.05f, 330f, 190f) }, { perc(it, 0.001f, 0.025f) * 0.5f })
-        reverb(0.1f, 0.4f)
+    /** A Power Up landing in the wallet: a quick charge. A blip that jumps up a fifth over a rising whine, a fizz of static, a soft thump. */
+    private fun boltLand() = Clip(0.36f).apply {
+        osc(Wave.SQUARE, 0f, 0.07f, { 660f }, { hold(it, 0.002f, 0.05f, 0.01f) * 0.3f })
+        osc(Wave.SQUARE, 0.06f, 0.14f, { 990f }, { perc(it, 0.002f, 0.045f) * 0.35f })
+        osc(Wave.SINE, 0f, 0.22f, { glide(it, 0.12f, 500f, 1500f) }, { perc(it, 0.004f, 0.05f) * 0.4f })
+        noise(251, 0.05f, 0.06f, Band.HIGH, { 6000f }, 0.8f, { perc(it, 0.001f, 0.015f) * 0.2f })
+        osc(Wave.SINE, 0f, 0.1f, { glide(it, 0.06f, 220f, 120f) }, { perc(it, 0.001f, 0.03f) * 0.4f })
+        filter(Band.LOW, 0.8f) { 5000f }
+        reverb(0.12f, 0.4f)
     }
 
-    /** A Prism landing in the wallet: glass, not metal. A quick upward glint, then high partials that ring and shimmer. */
-    private fun prismLand() = Clip(0.8f).apply {
-        osc(Wave.SINE, 0f, 0.08f, { glide(it, 0.06f, 2600f, 5200f) }, { perc(it, 0.002f, 0.02f) * 0.25f })
-        for ((i, n) in intArrayOf(100, 107, 112).withIndex()) bell(i * 0.03f, n, 0.32f - i * 0.06f, 0.12f)
-        // A second sine a hair off the first makes the tail beat slowly, like light in a crystal.
-        osc(Wave.SINE, 0f, 0.5f, { hz(100) * 1.004f }, { perc(it, 0.001f, 0.14f) * 0.15f })
-        noise(231, 0f, 0.05f, Band.HIGH, { 9000f }, 0.7f, { perc(it, 0.0005f, 0.012f) * 0.2f })
+    /**
+     * A Crystal landing in the wallet: four glass notes tumbling upward, each doubled a hair sharp so the tail
+     * shimmers, behind a tiny digital stutter (Crystals glitch).
+     */
+    private fun prismLand() = Clip(0.75f).apply {
+        for ((i, n) in intArrayOf(96, 103, 108, 115).withIndex()) {
+            val at = i * 0.028f
+            fm(at, 0.4f, { hz(n) }, 3.01f, { 1.8f * exp(-it / 0.03f) }, { perc(it, 0.0008f, 0.09f) * (0.34f - i * 0.05f) })
+            osc(Wave.SINE, at, 0.3f, { hz(n) * 1.006f }, { perc(it, 0.001f, 0.07f) * 0.1f })
+        }
+        for (i in 0 until 3) osc(Wave.SQUARE, i * 0.02f, 0.012f, { 3136f + i * 800f }, { hold(it, 0.0005f, 0.008f, 0.002f) * 0.12f })
+        noise(261, 0f, 0.04f, Band.HIGH, { 9500f }, 0.7f, { perc(it, 0.0005f, 0.01f) * 0.18f })
         reverb(0.3f, 0.75f)
     }
 

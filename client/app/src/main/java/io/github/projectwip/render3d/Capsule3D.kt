@@ -83,10 +83,9 @@ class Capsule3D {
         // A glint on the upper-left of the face.
         collarTop = MeshBuilder().apply { color(1f, 1f, 1f); with { translate(-0.2f, 0.26f, 0.3f); rotate(35f, 0f, 0f, 1f); ellipsoid(0.13f, 0.05f, 0.03f, 6, 10) } }.build()
         base = MeshBuilder().apply { color(1f, 1f, 1f); starHalf(front = false) }.build()
-        // The glowing heart of the star (seen from both sides), and a thin halo that circles it.
+        // A thin glowing halo that circles the star. (The face of the star is plain: nothing sits on it.)
         core = MeshBuilder().apply {
             color(1f, 1f, 1f)
-            for (z in listOf(0.3f, -0.3f)) with { translate(0f, 0f, z); ellipsoid(0.2f, 0.2f, 0.12f, 8, 12) }
             with { rotate(72f, 1f, 0f, 0.2f); torus(1.08f, 0.022f, 44, 6) }
         }.build()
         light = MeshBuilder().apply { color(1f, 1f, 1f); sphere(0.4f, 10, 14) }.build()
@@ -293,8 +292,7 @@ class Capsule3D {
         // Seam glow, and the light that pours out as the halves part.
         lit.mat4("uModel", root)
         lit.f("uEmissive", 1f)
-        // The heart and its halo glow in the drop's own colour, not white.
-        lit.v4("uTint", 0.12f + tint[0] * 0.88f, 0.12f + tint[1] * 0.88f, 0.12f + tint[2] * 0.88f, 1f)
+        lit.v4("uTint", 0.5f + tint[0] * 0.5f, 0.5f + tint[1] * 0.5f, 0.5f + tint[2] * 0.5f, 1f)
         if (gap < 0.2f) core.draw()
         if (gap > 0f) {
             System.arraycopy(root, 0, model, 0, 16)

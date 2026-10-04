@@ -90,7 +90,7 @@ fun RewardShowcase(
                 while (true) { sfx?.play(Sound.COUNT, 0.5f, 0.85f + minOf(n, 12) * 0.05f); n++; delay(70) }
             }
             // The flyers reach the wallet from about here on. Each handful that lands sounds like what it is:
-            // Bolts clank like steel nuts, Prisms chime like glass.
+            // Power Ups charge with a rising blip, Crystals chime like glass.
             val landing = if (item is Reward.Bolts) Sound.BOLT_LAND else Sound.PRISM_LAND
             launch { delay(620); repeat(7) { sfx?.play(landing, 0.85f, 0.92f + it * 0.04f); sfx?.buzz(12, 90); delay(110) } }
             launch { fly.animateTo(1f, tween(1500, easing = LinearEasing)) }
@@ -137,7 +137,7 @@ fun RewardShowcase(
             } else when (item) {
                 is Reward.Bolts, is Reward.Prisms -> {
                     val amount = bolts(item) + prisms(item)
-                    CurrencyIcon(if (item is Reward.Bolts) IconKind.BOLT else IconKind.PRISM,
+                    GameIcon(if (item is Reward.Bolts) IconKind.BOLT else IconKind.PRISM,
                         Modifier.size(big).graphicsLayer { scaleX = pop.value; scaleY = pop.value; rotationZ = (1f - pop.value) * -50f })
                     Spacer(Modifier.height(6.dp))
                     val bump = 1f + 0.12f * sin(count.value * 40f) * (1f - count.value)

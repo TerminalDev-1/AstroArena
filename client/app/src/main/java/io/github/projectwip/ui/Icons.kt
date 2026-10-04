@@ -24,6 +24,8 @@ enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK
 /** Original vector icon set. Each icon is drawn in a 0..1 unit square with an ink outline. */
 @Composable
 fun GameIcon(kind: IconKind, modifier: Modifier = Modifier, tint: Color? = null) {
+    // Crystals are unstable: their icon glitches wherever it is shown, however small.
+    if (kind == IconKind.PRISM) { GlitchIcon(kind, modifier, tint); return }
     Canvas(modifier) {
         withTransform({ scale(size.width, size.height, Offset.Zero) }) {
             drawIconUnit(kind, tint)
@@ -64,12 +66,6 @@ fun GlitchIcon(kind: IconKind, modifier: Modifier = Modifier, tint: Color? = nul
         val jump = if (torn) (iconScramble(frame + 3) - 0.5f) * 0.12f * size.width else 0f
         withTransform({ translate(jump, 0f); scale(size.width, size.height, Offset.Zero) }) { drawIconUnit(kind, tint) }
     }
-}
-
-/** A currency's icon. Crystals are unstable, so theirs glitches. */
-@Composable
-fun CurrencyIcon(kind: IconKind, modifier: Modifier = Modifier) {
-    if (kind == IconKind.PRISM) GlitchIcon(kind, modifier) else GameIcon(kind, modifier)
 }
 
 private val INK = Palette.Ink
@@ -124,13 +120,16 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             drawPath(bolt, Color(0xFF2EE6D6)); outline(bolt, 0.03f)
         }
         IconKind.BOLT -> {
-            // A hex nut — the soft currency.
-            val hex = hexagon(0.5f, 0.52f, 0.42f, pointy = false)
-            drawPath(hex, Brush.verticalGradient(listOf(Color(0xFFDDF7FF), Palette.Bolt, Palette.BoltDeep), 0.1f, 0.95f))
-            outline(hex)
-            drawCircle(Palette.Ink, 0.17f, Offset(0.5f, 0.52f))
-            drawCircle(Color(0xFF2B5D8A), 0.12f, Offset(0.5f, 0.52f))
-            drawArc(Color.White.copy(alpha = 0.7f), 200f, 70f, false, Offset(0.25f, 0.27f), Size(0.5f, 0.5f), style = Stroke(0.05f, cap = StrokeCap.Round))
+            // A Power Up, the soft currency (the code still calls it a bolt): a charged cell with two chevrons climbing it.
+            val cell = poly(0.3f, 0.06f, 0.7f, 0.06f, 0.92f, 0.28f, 0.92f, 0.74f, 0.7f, 0.96f, 0.3f, 0.96f, 0.08f, 0.74f, 0.08f, 0.28f)
+            drawPath(cell, Brush.verticalGradient(listOf(Color(0xFFDDF7FF), Palette.Bolt, Palette.BoltDeep), 0.05f, 0.98f))
+            drawPath(poly(0.3f, 0.06f, 0.7f, 0.06f, 0.92f, 0.28f, 0.08f, 0.28f), Color.White.copy(alpha = 0.3f))
+            outline(cell)
+            for (y in floatArrayOf(0.2f, 0.47f)) {
+                val chevron = poly(0.5f, y, 0.76f, y + 0.23f, 0.76f, y + 0.38f, 0.5f, y + 0.15f, 0.24f, y + 0.38f, 0.24f, y + 0.23f)
+                drawPath(chevron, Color.White)
+                outline(chevron, 0.045f)
+            }
         }
         IconKind.PRISM -> {
             val outer = poly(0.5f, 0.06f, 0.88f, 0.4f, 0.5f, 0.95f, 0.12f, 0.4f)

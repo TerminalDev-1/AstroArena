@@ -264,6 +264,14 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
         slam.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium))
     }
     LaunchedEffect(landed) { if (landed > 0) grid.scrollToItem(landed - 1) }
+    // The ring of drops stutters for as long as it is there.
+    LaunchedEffect(stage) {
+        val pace = kotlin.random.Random(results.size)
+        while (stage == 0) {
+            sfx?.play(Sound.GLITCH, 0.3f, 0.7f + pace.nextFloat() * 0.8f)
+            delay(300L + pace.nextInt(300))
+        }
+    }
 
     val tint = Color(CapsuleTier.entries[charge].color)
 

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -95,6 +96,14 @@ fun CapsuleOpenOverlay(
         lobby.capsuleGlitch = 0.2f
         lobby.capsuleShown = true
         onDispose { lobby.capsuleShown = false }
+    }
+    // The drop never sits quietly: it stutters for as long as it is closed.
+    LaunchedEffect(opened) {
+        val pace = Random(result.hashCode() + 3)
+        while (!opened) {
+            sfx?.play(Sound.GLITCH, 0.3f, 0.7f + pace.nextFloat() * 0.8f)
+            delay(360L + pace.nextInt(380))
+        }
     }
     // "Open all" makes sense when there is a known number of others waiting (the debug menu's endless drops are not).
     val others = remaining in 1..1_000_000
