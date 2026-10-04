@@ -443,18 +443,21 @@ class Store:
         return results[0] if results else None
 
     def open_all_drops(self, player_id: str, luck: float = 0.0) -> list[dict]:
-        """Opens every Spark Drop the player has, one after another, including the pieces that split off on the
-        way (up to `rules.MAX_OPEN_ALL`). The results come back in the order they were opened; empty if there
-        were none."""
-        return self._open_drops(player_id, luck, False, rules.MAX_OPEN_ALL)
+        """Opens every Spark Drop the player holds right now, one after another (up to `rules.MAX_OPEN_ALL`). The
+        pieces that split off on the way are left for them to open next. The results come back in the order they
+        were opened; empty if there were none."""
+        return self._open_drops(player_id, luck, False, None)
 
-    def _open_drops(self, player_id: str, luck: float, free: bool, most: int) -> list[dict]:
+    def _open_drops(self, player_id: str, luck: float, free: bool, most: int | None) -> list[dict]:
+        """`most`: how many to open, or None for as many as the player holds."""
         results = []
         with self._lock, self._db:
             player = self._db.execute("SELECT drops, boosted FROM players WHERE id = ?", (player_id,)).fetchone()
             if player is None:
                 return results
             drops, boosted_left = player["drops"], player["boosted"]
+            if most is None:
+                most = min(drops, rules.MAX_OPEN_ALL)
             profile = self._profile(player_id)
             rng = secrets.SystemRandom()
             while len(results) < most and (drops > 0 or (free and not results)):

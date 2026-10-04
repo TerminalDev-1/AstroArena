@@ -209,7 +209,7 @@ def upgrade(profile: dict, fighter: str, factor: float = 1.0, no_cap: bool = Fal
         raise Refused(409, "that fighter is at the top level")
     cost = upgrade_cost(level, factor)
     if profile["bolts"] < cost:
-        raise Refused(402, "not enough Bolts")
+        raise Refused(402, "not enough Power Ups")
     profile["bolts"] -= cost
     entry["level"] = level + 1
     return cost
@@ -226,7 +226,7 @@ def buy(profile: dict, key: str) -> dict:
     if reward["type"] == "skin" and not profile["fighters"][reward["fighter"]]["unlocked"]:
         raise Refused(409, "unlock the fighter first")
     if profile["prisms"] < price:
-        raise Refused(402, "not enough Prisms")
+        raise Refused(402, "not enough Crystals")
     profile["prisms"] -= price
     return grant(profile, reward)
 
@@ -300,7 +300,7 @@ def buy_deal(profile: dict, deal: dict, purchased: int, now_ms: int) -> dict:
     wallet = {"BOLTS": "bolts", "PRISMS": "prisms"}.get(deal["currency"])
     if wallet:
         if profile[wallet] < deal["price"]:
-            raise Refused(402, "not enough " + wallet.capitalize())
+            raise Refused(402, "not enough " + ("Power Ups" if wallet == "bolts" else "Crystals"))
         profile[wallet] -= deal["price"]
     return grant(profile, deal_reward(deal))
 

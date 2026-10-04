@@ -155,9 +155,9 @@ sealed interface ShopItem {
 
 object Shop {
     val boltCrates = listOf(
-        ShopItem.BoltCrate("crate_s", "Bolt Pouch", bolts = 400, pricePrisms = 10),
-        ShopItem.BoltCrate("crate_m", "Bolt Crate", bolts = 1200, pricePrisms = 25),
-        ShopItem.BoltCrate("crate_l", "Bolt Vault", bolts = 3000, pricePrisms = 50),
+        ShopItem.BoltCrate("crate_s", "Power Up Pouch", bolts = 400, pricePrisms = 10),
+        ShopItem.BoltCrate("crate_m", "Power Up Crate", bolts = 1200, pricePrisms = 25),
+        ShopItem.BoltCrate("crate_l", "Power Up Vault", bolts = 3000, pricePrisms = 50),
     )
 
     val fighterOffers: List<ShopItem.FighterOffer> =

@@ -156,7 +156,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         if (row++ < rowsShown) RewardRow(IconKind.CUP, "%,d".format(cupsShown.value.toInt()),
                             (if (rewards.cupDelta >= 0) "+" else "") + rewards.cupDelta,
                             if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
-                        if (row++ < rowsShown) RewardRow(IconKind.BOLT, "Bolts", "+${rewards.bolts}", Palette.CyanDeep)
+                        if (row++ < rowsShown) RewardRow(IconKind.BOLT, "Power Ups", "+${rewards.bolts}", Palette.CyanDeep)
                         if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
                         if (rewards.capsuleEarned && row++ < rowsShown) RewardRow(IconKind.CAPSULE, "Spark Drop", "+1", Palette.CyanDeep)
                         if (r.mvp && r.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH && row++ < rowsShown) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)

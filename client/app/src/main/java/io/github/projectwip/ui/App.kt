@@ -438,8 +438,8 @@ fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
 }
 
 fun rewardLabel(r: Reward): String = when (r) {
-    is Reward.Bolts -> "+${r.amount} Bolts"
-    is Reward.Prisms -> "+${r.amount} Prisms"
+    is Reward.Bolts -> "+${r.amount} Power Ups"
+    is Reward.Prisms -> "+${r.amount} Crystals"
     is Reward.UnlockFighter -> "${Balance.fighter(r.fighter).name} unlocked!"
     is Reward.SkinReward -> "${Balance.fighter(r.fighter).skins[r.skinIndex].name} colorway"
     is Reward.Bundle -> r.items.joinToString(", ") { rewardLabel(it) }

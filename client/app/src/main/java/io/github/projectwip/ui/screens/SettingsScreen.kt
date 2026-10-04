@@ -130,7 +130,7 @@ private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
                         Spacer(Modifier.height(4.dp))
                         PlainText(d.blurb, Type.Small, color = Color.White.copy(alpha = 0.9f), maxLines = 5, align = androidx.compose.ui.text.style.TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
-                        PlainText("Win +${d.cupBonus} Cups · Bolts ×${d.boltMultiplier}", Type.Small, color = Palette.Gold, align = androidx.compose.ui.text.style.TextAlign.Center)
+                        PlainText("Win +${d.cupBonus} Cups · Power Ups ×${d.boltMultiplier}", Type.Small, color = Palette.Gold, align = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                 }
             }
@@ -255,7 +255,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     SectionTitle("SERVER", when {
         status == null -> "No server connection in this build."
         !status.supported -> "The server at ${status.url} doesn't support this version."
-        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Spark Drops, Bolts, Prisms and fighters, sets matches up and decides their results."
+        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Spark Drops, Power Ups, Crystals and fighters, sets matches up and decides their results."
         else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You can still play against bots for practice; nothing is earned or spent until you're back online."
     })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

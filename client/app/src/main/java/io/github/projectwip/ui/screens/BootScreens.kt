@@ -95,7 +95,7 @@ val TIPS = listOf(
     "Tip: stay out of the fight for a few seconds and you start to heal.",
     "Tip: in Last Spark, break crates for Power Cells before the storm closes in.",
     "Tip: a top-four finish or a win earns a Spark Drop, up to three a day.",
-    "Tip: upgrades raise a fighter's health and damage. Bolts pay for them.",
+    "Tip: upgrades raise a fighter's health and damage. Power Ups pay for them.",
     "Tip: you can move every control in Settings > Controls.",
 )
 
@@ -141,7 +141,7 @@ fun ConnectFailedScreen(url: String, onRetry: () -> Unit, onOffline: () -> Unit)
                     Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 4,
                 )
                 PlainText(
-                    "In offline mode you can still play every mode against bots, for practice. Cups, Bolts, Prisms and Spark Drops are only earned online, and the shop, upgrades and drops wait until you are back.",
+                    "In offline mode you can still play every mode against bots, for practice. Cups, Power Ups, Crystals and Spark Drops are only earned online, and the shop, upgrades and drops wait until you are back.",
                     Type.Small, align = TextAlign.Center, maxLines = 4,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {

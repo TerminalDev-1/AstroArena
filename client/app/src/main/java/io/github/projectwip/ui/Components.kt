@@ -302,7 +302,7 @@ fun CurrencyPill(icon: IconKind, value: Int, modifier: Modifier = Modifier, onCl
                 .padding(start = 28.dp, end = 12.dp),
             contentAlignment = Alignment.CenterEnd,
         ) { GameText("%,d".format(shown), Type.Heading, outline = 2.5.dp) }
-        GameIcon(icon, Modifier.size(40.dp))
+        CurrencyIcon(icon, Modifier.size(40.dp))
     }
 }
 

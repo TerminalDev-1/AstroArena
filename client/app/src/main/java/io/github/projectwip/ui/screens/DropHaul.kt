@@ -30,7 +30,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +42,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -62,6 +69,7 @@ import io.github.projectwip.ui.Panel
 import io.github.projectwip.ui.PlainText
 import io.github.projectwip.ui.RewardVisual
 import io.github.projectwip.ui.Type
+import io.github.projectwip.ui.drawIconUnit
 import io.github.projectwip.ui.rememberAnimTime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -113,6 +121,15 @@ private fun boltsIn(r: Reward): Int = when (r) { is Reward.Bolts -> r.amount; is
 private fun prismsIn(r: Reward): Int = when (r) { is Reward.Prisms -> r.amount; is Reward.Bundle -> r.items.sumOf { prismsIn(it) }; else -> 0 }
 private fun unlocksIn(r: Reward): Int = when (r) { is Reward.UnlockFighter, is Reward.SkinReward -> 1; is Reward.Bundle -> r.items.sumOf { unlocksIn(it) }; else -> 0 }
 
+/** One icon on its way from a card to the wallet. The first of each handful carries the amount, paid in when it lands. */
+private class Flyer(val from: Offset, val bolt: Boolean, val born: Float, val seed: Int, val amount: Int)
+
+/** Seconds a flyer takes from its card to the wallet. */
+private const val FLIGHT = 0.8f
+
+/** The most cards a haul lays out. A bigger one shows its best; the totals still count everything. */
+private const val MOST_CARDS = 150
+
 /** What a card says under its picture: the amount, or the name of what was unlocked. */
 private fun shortLabel(r: Reward): String = when (r) {
     is Reward.Bolts -> "+%,d".format(r.amount)
@@ -124,19 +141,23 @@ private fun shortLabel(r: Reward): String = when (r) {
 
 /**
  * "Open all": every drop the player had, opened at once. A ring of drops charges up through every tier and
- * overloads; then everything that came out lands on the screen one card after another, the best last, while
- * the wallet counts up; and the totals slam in underneath. It is all saved already: this only shows it.
+ * overloads; then everything that came out lands on the screen one card after another, the best last. Each
+ * card's Power Ups and Crystals burst out of it and race to their own counter, which jumps and counts up as they
+ * arrive; and the totals slam in underneath. It is all saved already: this only shows it.
  */
 @Composable
 fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int, onDone: () -> Unit) = key(results) {
     val sfx = LocalSfx.current
     val lobby = LocalLobby.current
     val time by rememberAnimTime()
-    // The best come last.
-    val cards = remember { results.sortedBy { it.tier.ordinal } }
-    val bolts = remember { cards.sumOf { boltsIn(it.reward) } }
-    val prisms = remember { cards.sumOf { prismsIn(it.reward) } }
-    val unlocks = remember { cards.sumOf { unlocksIn(it.reward) } }
+    // The best come last. Of a very big haul only the best are laid out as cards.
+    val cards = remember { results.sortedBy { it.tier.ordinal }.takeLast(MOST_CARDS) }
+    val bolts = remember { results.sumOf { boltsIn(it.reward) } }
+    val prisms = remember { results.sumOf { prismsIn(it.reward) } }
+    val unlocks = remember { results.sumOf { unlocksIn(it.reward) } }
+    // What the drops without a card gave: it is in the wallet from the start, and the cards fly the rest in.
+    val unseenBolts = remember { bolts - cards.sumOf { boltsIn(it.reward) } }
+    val unseenPrisms = remember { prisms - cards.sumOf { prismsIn(it.reward) } }
     /** 0 = the drops overload, 1 = the cards land, 2 = the totals. */
     var stage by remember { mutableIntStateOf(0) }
     var landed by remember { mutableIntStateOf(0) }
@@ -144,6 +165,51 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
     val flash = remember { Animatable(0f) }
     val slam = remember { Animatable(2.6f) }
     val grid = rememberLazyGridState()
+    val scope = rememberCoroutineScope()
+    val flyers = remember { mutableStateListOf<Flyer>() }
+    val sent = remember { HashSet<Int>() }
+    var boltsIn by remember { mutableIntStateOf(0) }
+    var prismsIn by remember { mutableIntStateOf(0) }
+    var boltSpot by remember { mutableStateOf(Offset.Unspecified) }
+    var prismSpot by remember { mutableStateOf(Offset.Unspecified) }
+    val boltBump = remember { Animatable(1f) }
+    val prismBump = remember { Animatable(1f) }
+    var lastClink by remember { mutableStateOf(0f) }
+    var clinks by remember { mutableIntStateOf(0) }
+
+    // A card has landed at [from]: its currency bursts out of it and heads for the wallet.
+    fun send(index: Int, from: Offset) {
+        if (!sent.add(index)) return
+        val reward = cards[index].reward
+        val handful = 3 + cards[index].tier.ordinal
+        for ((amount, bolt) in listOf(boltsIn(reward) to true, prismsIn(reward) to false)) {
+            if (amount > 0) repeat(handful) { i -> flyers += Flyer(from, bolt, time + i * 0.035f, index * 31 + i * 7 + (if (bolt) 0 else 3), if (i == 0) amount else 0) }
+        }
+    }
+    // Flyers that have arrived: the counter takes the amount, jumps, and clinks.
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { }
+            val now = time
+            val done = flyers.filter { now - it.born >= FLIGHT }
+            if (done.isEmpty()) continue
+            flyers.removeAll(done)
+            for (bolt in listOf(true, false)) {
+                val mine = done.filter { it.bolt == bolt }
+                if (mine.isEmpty()) continue
+                if (bolt) boltsIn += mine.sumOf { it.amount } else prismsIn += mine.sumOf { it.amount }
+                val bump = if (bolt) boltBump else prismBump
+                scope.launch { bump.snapTo(1.28f); bump.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
+                if (now - lastClink > 0.055f) {
+                    lastClink = now
+                    clinks++
+                    // Each clink a little higher than the last, so a long haul climbs.
+                    sfx?.play(if (bolt) Sound.BOLT_LAND else Sound.PRISM_LAND, 0.7f, 0.85f + 0.45f * (clinks % 24) / 24f)
+                    sfx?.buzz(10, 80)
+                }
+            }
+        }
+    }
 
     DisposableEffect(Unit) {
         lobby.capsuleOpenAt = 0L
@@ -187,6 +253,8 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
             if (t >= CapsuleTier.OVERCLOCKED.ordinal) { sfx?.play(Sound.CHING, 0.8f, 0.9f + 0.06f * t); sfx?.buzz(18, 160) }
             delay(if (t >= CapsuleTier.OVERCLOCKED.ordinal) gap + 160 else gap)
         }
+        // The totals wait for the last of it to reach the wallet.
+        while (flyers.isNotEmpty()) delay(40)
         delay(300)
         stage = 2
         sfx?.play(Sound.BANNER)
@@ -197,8 +265,6 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
     }
     LaunchedEffect(landed) { if (landed > 0) grid.scrollToItem(landed - 1) }
 
-    val shownBolts = remember(landed) { cards.take(landed).sumOf { boltsIn(it.reward) } }
-    val shownPrisms = remember(landed) { cards.take(landed).sumOf { prismsIn(it.reward) } }
     val tint = Color(CapsuleTier.entries[charge].color)
 
     Box(
@@ -208,21 +274,28 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
     ) {
         if (stage == 0) {
             Column(Modifier.fillMaxSize().padding(top = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                GameText("OPENING ${cards.size} SPARK DROPS", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
+                GameText("OPENING ${"%,d".format(results.size)} SPARK DROPS", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
                 GlitchText(CapsuleTier.entries[charge].label.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), tint, 5.dp, time, 1f)
             }
             GlitchBars(time, tint, 1f)
         } else {
             Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    GlitchText("OPENED ${cards.size} DROPS", Type.Title, Palette.Gold, 3.5.dp, time, 0.5f, Modifier.weight(1f))
-                    CurrencyPill(IconKind.BOLT, boltsNow - bolts + shownBolts)
+                    Column(Modifier.weight(1f)) {
+                        GlitchText("OPENED ${"%,d".format(results.size)} DROPS", Type.Title, Palette.Gold, 3.5.dp, time, 0.5f)
+                        if (results.size > cards.size) PlainText("Showing the best ${cards.size}. The totals count them all.", Type.Small)
+                    }
+                    CurrencyPill(IconKind.BOLT, if (stage == 2) boltsNow else boltsNow - bolts + unseenBolts + boltsIn,
+                        Modifier.graphicsLayer { scaleX = boltBump.value; scaleY = boltBump.value }
+                            .onGloballyPositioned { boltSpot = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
                     Spacer(Modifier.width(10.dp))
-                    CurrencyPill(IconKind.PRISM, prismsNow - prisms + shownPrisms)
+                    CurrencyPill(IconKind.PRISM, if (stage == 2) prismsNow else prismsNow - prisms + unseenPrisms + prismsIn,
+                        Modifier.graphicsLayer { scaleX = prismBump.value; scaleY = prismBump.value }
+                            .onGloballyPositioned { prismSpot = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
                 }
                 Spacer(Modifier.height(8.dp))
                 LazyVerticalGrid(GridCells.Adaptive(104.dp), Modifier.weight(1f).fillMaxWidth(), grid, horizontalArrangement = Arrangement.Center) {
-                    items(landed) { i -> HaulCard(cards[i]) }
+                    items(landed) { i -> HaulCard(cards[i]) { send(i, it) } }
                 }
                 // The totals keep their room from the start, so the cards above don't jump when they arrive.
                 Box(Modifier.fillMaxWidth().height(84.dp), contentAlignment = Alignment.Center) {
@@ -238,6 +311,22 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
                 }
             }
             if (stage == 1) GlitchBars(time, Palette.Gold, 0.5f)
+            // The flyers: each bursts out of its card, hangs for a beat, then races to its counter, shrinking as it goes.
+            if (flyers.isNotEmpty()) Canvas(Modifier.fillMaxSize()) {
+                for (f in flyers) {
+                    val target = if (f.bolt) boltSpot else prismSpot
+                    val t = (time - f.born) / FLIGHT
+                    if (t < 0f || t >= 1f || target == Offset.Unspecified) continue
+                    val a = scramble(f.seed) * 6.283f
+                    val reach = (30f + 70f * scramble(f.seed + 1)).dp.toPx()
+                    val out = (t / 0.3f).coerceIn(0f, 1f).let { 1f - (1f - it) * (1f - it) }
+                    val home = ((t - 0.3f) / 0.7f).coerceIn(0f, 1f).let { it * it * it }
+                    val burst = f.from + Offset(kotlin.math.cos(a) * reach * out, kotlin.math.sin(a) * reach * out)
+                    val p = burst + (target - burst) * home
+                    val s = 34.dp.toPx() * (1f - 0.45f * home) * out.coerceAtLeast(0.3f)
+                    withTransform({ translate(p.x - s / 2, p.y - s / 2); scale(s, s, Offset.Zero) }) { drawIconUnit(if (f.bolt) IconKind.BOLT else IconKind.PRISM, null) }
+                }
+            }
         }
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value * 0.85f)))
     }
@@ -254,12 +343,15 @@ private fun Total(icon: IconKind, text: String) {
 
 /** One opened drop: what came out, on a plate in its tier's colour. It springs into place when it first appears. */
 @Composable
-private fun HaulCard(result: CapsuleResult) {
+private fun HaulCard(result: CapsuleResult, onLanded: (Offset) -> Unit) {
     val pop = remember { Animatable(0f) }
     LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium)) }
     val c = Color(result.tier.color)
     Panel(
-        Modifier.padding(4.dp).aspectRatio(0.8f).graphicsLayer { scaleX = pop.value; scaleY = pop.value; rotationZ = (1f - pop.value) * -25f },
+        Modifier.padding(4.dp).aspectRatio(0.8f)
+            // Says where it is (its middle, on the whole screen) so its currency can fly out of it.
+            .onGloballyPositioned { onLanded(it.positionInRoot() + Offset(it.size.width / 2f, it.size.height / 2f)) }
+            .graphicsLayer { scaleX = pop.value; scaleY = pop.value; rotationZ = (1f - pop.value) * -25f },
         color = lerp(c, Color.Black, 0.35f), colorBottom = lerp(c, Color.Black, 0.72f), cut = 10.dp,
     ) {
         Column(Modifier.fillMaxSize().padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {

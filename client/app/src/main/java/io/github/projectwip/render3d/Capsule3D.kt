@@ -293,7 +293,8 @@ class Capsule3D {
         // Seam glow, and the light that pours out as the halves part.
         lit.mat4("uModel", root)
         lit.f("uEmissive", 1f)
-        lit.v4("uTint", 0.5f + tint[0] * 0.5f, 0.5f + tint[1] * 0.5f, 0.5f + tint[2] * 0.5f, 1f)
+        // The heart and its halo glow in the drop's own colour, not white.
+        lit.v4("uTint", 0.12f + tint[0] * 0.88f, 0.12f + tint[1] * 0.88f, 0.12f + tint[2] * 0.88f, 1f)
         if (gap < 0.2f) core.draw()
         if (gap > 0f) {
             System.arraycopy(root, 0, model, 0, 16)
@@ -346,7 +347,8 @@ class Capsule3D {
         lit.mat4("uModel", model)
         if (outline) lit.v4("uTint", Toon.INK[0], Toon.INK[1], Toon.INK[2], 1f) else lit.v4("uTint", tint[0], tint[1], tint[2], 1f)
         shell.draw()
-        if (!outline) { lit.v4("uTint", 1f, 1f, 1f, 1f); collarTop.draw() }
+        // The glint is a paler shade of the drop.
+        if (!outline) { lit.v4("uTint", 0.5f + tint[0] * 0.5f, 0.5f + tint[1] * 0.5f, 0.5f + tint[2] * 0.5f, 1f); collarTop.draw() }
         System.arraycopy(root, 0, model, 0, 16)
         Matrix.translateM(model, 0, gap * 0.35f, -gap * 0.15f, -gap * 0.6f)
         Matrix.rotateM(model, 0, -halfSpin, 0.3f, 1f, 0.5f)

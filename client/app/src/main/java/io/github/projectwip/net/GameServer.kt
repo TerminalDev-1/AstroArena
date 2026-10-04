@@ -203,10 +203,10 @@ class GameServer(context: Context) {
     )
 
     /** A request that changes this player's account. The reply (which carries the new account) or null if it was refused or never arrived. */
-    private fun act(path: String, body: JSONObject = JSONObject()): JSONObject? {
+    private fun act(path: String, body: JSONObject = JSONObject(), timeoutMs: Int = 3000): JSONObject? {
         lastError = ""
         if (!usable) return null
-        val r = call("POST", path, body, auth = true)
+        val r = call("POST", path, body, auth = true, timeoutMs = timeoutMs)
         if (r == null) lost()
         if (r != null && r.code != 200) lastError = r.body?.optString("error").orEmpty()
         return if (r?.code == 200) r.body else null
@@ -405,12 +405,13 @@ class GameServer(context: Context) {
     }
 
     /**
-     * Opens every Spark Drop the player has, and the pieces that split off on the way, in one go. The server
-     * rolls them all; the answer is what came out of each, in the order they were opened. Null if it couldn't
-     * be reached or there were none.
+     * Opens every Spark Drop the player holds, in one go; pieces that split off on the way are left to open
+     * next. The server rolls them all; the answer is what came out of each, in the order they were opened. Null
+     * if it couldn't be reached or there were none.
      */
     fun openAllDrops(luck: Float = 0f): List<CapsuleResult>? {
-        val results = act("/v1/drops/open-all", JSONObject().put("luck", luck.toDouble()))?.optJSONArray("results") ?: return null
+        // Thousands of drops make a long answer, so this one is given more time than the rest.
+        val results = act("/v1/drops/open-all", JSONObject().put("luck", luck.toDouble()), timeoutMs = 20_000)?.optJSONArray("results") ?: return null
         return (0 until results.length()).mapNotNull { i -> results.optJSONObject(i)?.let { capsuleResult(it) } }.takeIf { it.isNotEmpty() }
     }
 

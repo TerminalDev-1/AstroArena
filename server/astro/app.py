@@ -13,7 +13,7 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/matches/<id>/result {inputs}  hand in the match's inputs; the server replays it and
                                         answers with the result and what it earned            (token)
     POST /v1/drops/open     {...}       open a Spark Drop -> {tier, pieces, reward, account}  (token)
-    POST /v1/drops/open-all {...}       open every Spark Drop -> {results: [{tier, pieces, reward}], account}  (token)
+    POST /v1/drops/open-all {...}       open every Spark Drop held -> {results: [{tier, pieces, reward}], account}  (token)
     POST /v1/fighters/upgrade {fighter} level a fighter up with Bolts                         (token)
     POST /v1/shop/buy       {item}      buy a standing shop item with Prisms -> {reward}      (token)
     POST /v1/shop/gift                  claim the daily gift -> {reward}                      (token)

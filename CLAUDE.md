@@ -2,7 +2,7 @@
 
 AstroArena (the package id is still `io.github.projectwip`, so saves carry over): original mobile 3D arena brawler for Android (landscape, touch, bots), with an optional Python game server. Kotlin + Compose
 menus + custom OpenGL ES 3.0 renderer, no engine. All art and sound is generated in code and must stay
-original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Spark Drops"; the code still calls them capsules.
+original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Spark Drops", "Power Ups" and "Crystals"; the code (and the server's files and API) still call them capsules, bolts and prisms.
 
 ## Build
 

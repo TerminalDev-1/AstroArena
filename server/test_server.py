@@ -394,11 +394,11 @@ class Api(unittest.TestCase):
         status, body = self.call("POST", "/v1/drops/open-all", {"luck": 14}, me["token"])
         self.assertEqual(status, 200)
         results = body["results"]
-        # `luck` was ignored (no developer). All five were opened, and every piece that split off along the way,
-        # unless a long run of splits reached the most one request opens; what is left is still the player's.
-        left = 5 + sum(r["pieces"] - 1 for r in results) - len(results)
+        # `luck` was ignored (no developer). The five drops they held were opened; the pieces that split off on
+        # the way are theirs to open next.
+        self.assertEqual(len(results), 5)
+        left = sum(r["pieces"] - 1 for r in results)
         self.assertEqual(body["account"]["drops"], left)
-        self.assertTrue(left == 0 or len(results) == rules.MAX_OPEN_ALL)
         # Everything that came out is in the profile the server keeps.
         expected = economy.profile_from_save(save)
         for r in results:

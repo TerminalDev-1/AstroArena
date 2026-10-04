@@ -97,7 +97,7 @@ fun CapsuleOpenOverlay(
         onDispose { lobby.capsuleShown = false }
     }
     // "Open all" makes sense when there is a known number of others waiting (the debug menu's endless drops are not).
-    val others = remaining in 1..100_000
+    val others = remaining in 1..1_000_000
     val shown = CapsuleTier.entries[tier]
     val color = Color(shown.color)
 
@@ -183,7 +183,7 @@ fun CapsuleOpenOverlay(
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
                     if (remaining > 0) ChunkyButton(onNext, Modifier.size(220.dp, 60.dp), ButtonStyle.GREEN) { GameText(if (remaining > 999) "OPEN NEXT" else "OPEN NEXT ($remaining)", Type.Heading) }
-                    if (others && remaining > 1) ChunkyButton({ onOpenAll(null) }, Modifier.size(220.dp, 60.dp), ButtonStyle.GOLD) { GameText("OPEN ALL ($remaining)", Type.Heading) }
+                    if (others && remaining > 1) ChunkyButton({ onOpenAll(null) }, Modifier.size(220.dp, 60.dp), ButtonStyle.GOLD) { GameText("OPEN ALL (${"%,d".format(remaining)})", Type.Heading) }
                 }
             }
         }
@@ -191,7 +191,7 @@ fun CapsuleOpenOverlay(
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value * 0.85f)))
         // Skips the knocking: this drop and every other one are opened and shown together.
         if (!opened && others && taps < TAPS) ChunkyButton({ onOpenAll(result) }, Modifier.align(Alignment.TopEnd).padding(18.dp).size(230.dp, 58.dp), ButtonStyle.GOLD) {
-            GameText("OPEN ALL (${remaining + 1})", Type.Heading)
+            GameText("OPEN ALL (${"%,d".format(remaining + 1)})", Type.Heading)
         }
         if (!opened) PlainText("Drops charge up at random, and now and then one splits — into two, four or even eight — and the pieces roll better. The result is locked in when you open one.", Type.Small,
             Modifier.align(Alignment.BottomCenter).graphicsLayer { translationY = -14.dp.toPx() }, align = TextAlign.Center)

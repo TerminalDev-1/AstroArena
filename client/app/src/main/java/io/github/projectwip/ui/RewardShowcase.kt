@@ -137,11 +137,11 @@ fun RewardShowcase(
             } else when (item) {
                 is Reward.Bolts, is Reward.Prisms -> {
                     val amount = bolts(item) + prisms(item)
-                    GameIcon(if (item is Reward.Bolts) IconKind.BOLT else IconKind.PRISM,
+                    CurrencyIcon(if (item is Reward.Bolts) IconKind.BOLT else IconKind.PRISM,
                         Modifier.size(big).graphicsLayer { scaleX = pop.value; scaleY = pop.value; rotationZ = (1f - pop.value) * -50f })
                     Spacer(Modifier.height(6.dp))
                     val bump = 1f + 0.12f * sin(count.value * 40f) * (1f - count.value)
-                    GameText("+${"%,d".format((amount * count.value).toInt())} ${if (item is Reward.Bolts) "Bolts" else "Prisms"}", Type.Display, outline = 4.dp,
+                    GameText("+${"%,d".format((amount * count.value).toInt())} ${if (item is Reward.Bolts) "Power Ups" else "Crystals"}", Type.Display, outline = 4.dp,
                         modifier = Modifier.graphicsLayer { scaleX = bump; scaleY = bump })
                 }
                 else -> {

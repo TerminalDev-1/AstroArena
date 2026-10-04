@@ -238,7 +238,9 @@ private fun CapsuleButton(count: Int, leftToday: Int, online: Boolean, onOpen: (
     Box {
         ChunkyButton(onOpen, Modifier.fillMaxWidth().height(62.dp), ButtonStyle.CYAN, enabled = count > 0, cut = 14.dp, lip = 4.dp) {
             Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                GameIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = if (count > 0) Palette.Gold else Palette.Grey)
+                // A drop waiting to be opened glitches, like the real thing does when it is.
+                if (count > 0) io.github.projectwip.ui.GlitchIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = Palette.Gold)
+                else GameIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = Palette.Grey)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     GameText(if (count > 0) "OPEN DROP" else "SPARK DROPS", Type.Heading, outline = 2.5.dp)
@@ -347,7 +349,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 when (m) {
                     GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. The higher you finish, the more Cups."
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win to earn Cups."
-                    GameMode.BOSS -> "A giant version of a random fighter. Knock it out to win; you have unlimited lives. Its strength never changes. Pays Bolts only."
+                    GameMode.BOSS -> "A giant version of a random fighter. Knock it out to win; you have unlimited lives. Its strength never changes. Pays Power Ups only."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a boss that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },
                 Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 5,

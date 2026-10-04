@@ -31,6 +31,47 @@ fun GameIcon(kind: IconKind, modifier: Modifier = Modifier, tint: Color? = null)
     }
 }
 
+/** A fixed scramble of [n] into 0..1, so a glitch frame looks the same however often it is redrawn. */
+private fun iconScramble(n: Int): Float {
+    var x = n * 374761393 + 668265263
+    x = (x xor (x ushr 13)) * 1274126177
+    return ((x xor (x ushr 16)) and 0xFFFF) / 65535f
+}
+
+/**
+ * An icon that glitches. Three ghosts of it, each a single colour that runs round the rainbow, circle just behind
+ * it; every so often it tears, and for a few frames the ghosts are thrown wide and the icon itself jumps.
+ * The clock is read while drawing, so only the drawing is redone each frame.
+ */
+@Composable
+fun GlitchIcon(kind: IconKind, modifier: Modifier = Modifier, tint: Color? = null) {
+    val time = rememberAnimTime()
+    val paint = androidx.compose.runtime.remember { androidx.compose.ui.graphics.Paint() }
+    Canvas(modifier) {
+        val t = time.value
+        val frame = (t * 20f).toInt()
+        val torn = iconScramble(frame / 4 * 13 + kind.ordinal) < 0.3f
+        val reach = if (torn) 0.07f + 0.16f * iconScramble(frame) else 0.035f
+        val room = androidx.compose.ui.geometry.Rect(-size.width, -size.height, size.width * 2, size.height * 2)
+        for (k in 0 until 3) {
+            val a = t * 2.4f + k * 2.094f
+            paint.colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.hsv((t * 140f + k * 120f) % 360f, 0.9f, 1f), androidx.compose.ui.graphics.BlendMode.SrcIn)
+            paint.alpha = if (torn) 0.9f else 0.65f
+            drawContext.canvas.saveLayer(room, paint)
+            withTransform({ translate(cos(a) * reach * size.width, sin(a) * reach * size.height * 0.5f); scale(size.width, size.height, Offset.Zero) }) { drawIconUnit(kind, tint) }
+            drawContext.canvas.restore()
+        }
+        val jump = if (torn) (iconScramble(frame + 3) - 0.5f) * 0.12f * size.width else 0f
+        withTransform({ translate(jump, 0f); scale(size.width, size.height, Offset.Zero) }) { drawIconUnit(kind, tint) }
+    }
+}
+
+/** A currency's icon. Crystals are unstable, so theirs glitches. */
+@Composable
+fun CurrencyIcon(kind: IconKind, modifier: Modifier = Modifier) {
+    if (kind == IconKind.PRISM) GlitchIcon(kind, modifier) else GameIcon(kind, modifier)
+}
+
 private val INK = Palette.Ink
 private const val W = 0.07f
 

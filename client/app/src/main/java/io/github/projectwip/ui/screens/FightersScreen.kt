@@ -304,7 +304,7 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
             }
         }
     }
-    if (!Progression.levelCapped(save, id) && save.bolts < cost) PlainText("Need ${cost - save.bolts} more Bolts — win matches or visit the Shop.", Type.Small, color = Palette.Red)
+    if (!Progression.levelCapped(save, id) && save.bolts < cost) PlainText("Need ${cost - save.bolts} more Power Ups — win matches or visit the Shop.", Type.Small, color = Palette.Red)
 }
 
 @Composable

@@ -102,8 +102,9 @@ MAX_PIECES = 8
 SPLIT_LUCK = 0.6
 # Every Bolt and Prism amount a drop gives is multiplied by this (3 = the amounts below, plus 200%).
 DROP_BUFF = 3
-# The most drops one "open all" goes through (splits made along the way count).
-MAX_OPEN_ALL = 300
+# "Open all" opens the drops the player holds at that moment; the pieces that split off wait for the next one.
+# (Chasing the splits has no end when luck makes every drop split.) This is the most one request goes through.
+MAX_OPEN_ALL = 10000
 
 # Every fighter and how many colourways it has (index 0 is the one it comes with). Keep in step with Balance.kt.
 FIGHTER_SKINS = {"JUNO": 3, "BRAKK": 3, "MIRA": 3, "KITO": 3}
