@@ -19,7 +19,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE, CREDIT }
+enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE, CREDIT, HEART }
 
 /** Original vector icon set. Each icon is drawn in a 0..1 unit square with an ink outline. */
 @Composable
@@ -130,6 +130,19 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
                 drawPath(chevron, Color.White)
                 outline(chevron, 0.045f)
             }
+        }
+        IconKind.HEART -> {
+            // Health.
+            val heart = Path().apply {
+                moveTo(0.5f, 0.9f)
+                cubicTo(0.08f, 0.62f, 0.02f, 0.3f, 0.26f, 0.18f)
+                cubicTo(0.4f, 0.12f, 0.48f, 0.22f, 0.5f, 0.3f)
+                cubicTo(0.52f, 0.22f, 0.6f, 0.12f, 0.74f, 0.18f)
+                cubicTo(0.98f, 0.3f, 0.92f, 0.62f, 0.5f, 0.9f)
+                close()
+            }
+            drawPath(heart, Brush.verticalGradient(listOf(Color(0xFFFF9AA8), Palette.Red, Palette.RedDeep), 0.1f, 0.9f))
+            outline(heart)
         }
         IconKind.CREDIT -> {
             // A Credit: a green token stamped with a four-pointed spark.

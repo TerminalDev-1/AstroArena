@@ -6,6 +6,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -74,18 +75,33 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
-@Composable
-fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId, go: (Screen) -> Unit) {
-    var focus by remember { mutableStateOf(initial) }
-    var upgradeCount by remember { mutableIntStateOf(0) }
-    val ui = LocalUi.current
-    val sfx = LocalSfx.current
-    val def = Balance.fighter(focus)
-    val prog = save.progress(focus)
+/** What an upgrade changed, for the level-up moment: the level reached, and each stat before ([StatPreview.current]) and after ([StatPreview.next]). */
+private class UpgradeMoment(val level: Int, val rows: List<StatPreview>)
 
-    io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.FIGHTER, focus, prog.skin, locked = !prog.unlocked, celebrateKey = upgradeCount)
+private val STAT_ICONS = listOf(IconKind.HEART, IconKind.SWORDS, IconKind.STAR)
+
+/**
+ * The fighters. It opens on a grid of every fighter ([initial] null); tapping one opens that fighter's own page,
+ * where it is upgraded. Opened straight onto a fighter (from the home screen), back goes home rather than to the grid.
+ */
+@Composable
+fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId?, go: (Screen) -> Unit) {
+    var focus by remember { mutableStateOf(initial) }
+    val id = focus
+    if (id == null) FighterGrid(save, go) { focus = it }
+    else {
+        androidx.activity.compose.BackHandler(enabled = initial == null) { focus = null }
+        FighterPage(save, repo, id, go) { if (initial == null) focus = null else go(Screen.Home) }
+    }
+}
+
+@Composable
+private fun FighterGrid(save: SaveData, go: (Screen) -> Unit, open: (FighterId) -> Unit) {
+    val ui = LocalUi.current
+    val next = io.github.projectwip.data.SparkRoad.next(save)
     Box(Modifier.fillMaxSize()) {
-        io.github.projectwip.ui.LobbyVignette(0.8f)
+        io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
+        Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("FIGHTERS", { go(Screen.Home) }, save.bolts, save.prisms, credits = save.credits) {
                 // The Spark Road is where fighters are unlocked.
@@ -96,51 +112,138 @@ fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId, go:
                     }
                 }
             }
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                androidx.compose.foundation.lazy.grid.GridCells.Adaptive(if (ui.roomy) 170.dp else 138.dp),
+                Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(Balance.fighters.size) { i ->
+                    val id = Balance.fighters[i].id
+                    FighterCard(save, id, next?.takeIf { it.fighter == id }?.cost ?: io.github.projectwip.data.SparkRoad.steps.firstOrNull { it.fighter == id }?.cost) { open(id) }
+                }
+            }
+        }
+    }
+}
+
+/** One fighter in the grid: portrait, name, role, and either its level or (locked) what the Spark Road asks for it. */
+@Composable
+private fun FighterCard(save: SaveData, id: FighterId, roadCost: Int?, onClick: () -> Unit) {
+    val def = Balance.fighter(id)
+    val p = save.progress(id)
+    val inUse = save.selectedFighter == id
+    Box {
+        ChunkyButton(onClick, Modifier.fillMaxWidth().aspectRatio(0.72f).padding(top = 6.dp),
+            if (inUse) ButtonStyle.GOLD else if (p.unlocked) ButtonStyle.PURPLE else ButtonStyle.GREY, cut = 16.dp, lip = 5.dp) {
+            Column(Modifier.fillMaxSize().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                FighterView(def, p.skin, Modifier.weight(1f).fillMaxWidth(), pedestal = false, locked = !p.unlocked)
+                GameText(def.name.substringBefore(' ').uppercase(), Type.Heading, outline = 2.5.dp)
+                PlainText(def.role, Type.Small, color = Color.White.copy(alpha = 0.85f), maxLines = 1)
+                Spacer(Modifier.height(4.dp))
+                if (p.unlocked) {
+                    GameText(if (Progression.levelCapped(save, id)) "MAX · LV ${p.level}" else "LEVEL ${p.level}", Type.Label, color = if (inUse) Color.White else Palette.Gold, outline = 2.dp)
+                    LevelPips(p.level, Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp))
+                } else Row(verticalAlignment = Alignment.CenterVertically) {
+                    GameIcon(IconKind.LOCK, Modifier.size(20.dp))
+                    Spacer(Modifier.width(4.dp))
+                    GameIcon(IconKind.CREDIT, Modifier.size(20.dp))
+                    GameText(" ${roadCost ?: "-"}", Type.Label, outline = 2.dp)
+                }
+            }
+        }
+        when {
+            inUse -> Badge("IN USE", Modifier.align(Alignment.TopEnd).offset(x = 4.dp), color = Palette.CyanDeep)
+            Progression.canUpgrade(save, id) -> Badge("UPGRADE", Modifier.align(Alignment.TopEnd).offset(x = 4.dp), color = Palette.GreenDeep)
+        }
+    }
+}
+
+/** The level as a bar of segments, one for each level up to the top one: filled for the levels reached. */
+@Composable
+private fun LevelPips(level: Int, modifier: Modifier = Modifier, height: androidx.compose.ui.unit.Dp = 10.dp) {
+    Canvas(modifier.height(height)) {
+        val n = Balance.MAX_LEVEL
+        val gap = 2.5.dp.toPx()
+        val w = (size.width - gap * (n - 1)) / n
+        for (i in 0 until n) {
+            val x = i * (w + gap)
+            val r = androidx.compose.ui.geometry.CornerRadius(size.height * 0.3f)
+            drawRoundRect(Palette.Ink, Offset(x, 0f), androidx.compose.ui.geometry.Size(w, size.height), r)
+            val inset = 1.5.dp.toPx()
+            drawRoundRect(if (i < level) Palette.Orange else Palette.PanelInset, Offset(x + inset, inset),
+                androidx.compose.ui.geometry.Size(w - inset * 2, size.height - inset * 2), r)
+        }
+    }
+}
+
+/**
+ * One fighter's page. The live 3D fighter stands on the left under its name; on the right are its level (as a bar
+ * that fills toward the top level), its stats, and one wide button to upgrade it. An upgrade takes over the
+ * whole page for a moment (see [LevelUpMoment]).
+ */
+@Composable
+private fun FighterPage(save: SaveData, repo: GameRepository, id: FighterId, go: (Screen) -> Unit, onBack: () -> Unit) {
+    var upgradeCount by remember { mutableIntStateOf(0) }
+    var moment by remember { mutableStateOf<UpgradeMoment?>(null) }
+    val ui = LocalUi.current
+    val sfx = LocalSfx.current
+    val ask = io.github.projectwip.ui.LocalServerCall.current
+    val def = Balance.fighter(id)
+    val prog = save.progress(id)
+    val capped = Progression.levelCapped(save, def.id)
+    val accent = Color(def.skins[prog.skin].accent)
+
+    io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.FIGHTER, id, prog.skin, locked = !prog.unlocked, celebrateKey = upgradeCount)
+    Box(Modifier.fillMaxSize()) {
+        io.github.projectwip.ui.LobbyVignette(0.8f)
+        val showing = moment
+        if (showing != null) {
+            LevelUpMoment(def, showing, accent) { moment = null }
+            return@Box
+        }
+        Column(Modifier.fillMaxSize()) {
+            ScreenHeader("FIGHTERS", onBack, save.bolts, save.prisms)
             Row(Modifier.weight(1f).fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
-                // ---------------- roster
-                Column(
-                    Modifier.width(if (ui.roomy) 168.dp else 140.dp).fillMaxHeight().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    for (f in Balance.fighters) RosterCard(save, f.id, f.id == focus) { focus = f.id }
-                }
-
-                // ---------------- hero
-                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        // The live 3D fighter from the lobby stands here.
-                        Box(Modifier.weight(1f).fillMaxWidth().lobbyAnchor(), contentAlignment = Alignment.Center) {
-                            UpgradeBurst(upgradeCount, Color(def.skins[prog.skin].accent))
-                            if (!prog.unlocked) GameIcon(IconKind.LOCK, Modifier.size(80.dp))
-                        }
-                        GameText(def.name.uppercase(), Type.Display, outline = 4.dp)
-                        PlainText("${def.title} · ${def.role}", Type.Label, color = Palette.Cyan)
-                        if (ui.roomy) {
-                            Spacer(Modifier.height(4.dp))
-                            PlainText(def.lore, Type.Body, modifier = Modifier.width(380.dp), align = androidx.compose.ui.text.style.TextAlign.Center)
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        SkinRow(save, focus, repo, go)
+                // ---------------- the fighter
+                Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    GameText(def.name.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.2f), outline = 5.dp)
+                    PlainText("${def.title} · ${def.role}", Type.Label, color = Palette.Cyan)
+                    // The live 3D fighter from the lobby stands here.
+                    Box(Modifier.weight(1f).fillMaxWidth().lobbyAnchor(), contentAlignment = Alignment.Center) {
+                        UpgradeBurst(upgradeCount, accent)
+                        if (!prog.unlocked) GameIcon(IconKind.LOCK, Modifier.size(80.dp))
                     }
+                    if (ui.roomy) {
+                        PlainText(def.lore, Type.Body, modifier = Modifier.width(400.dp), align = androidx.compose.ui.text.style.TextAlign.Center)
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    SkinRow(save, id, repo, go)
                 }
 
-                // ---------------- stats + upgrade
-                Panel(Modifier.width(if (ui.wide) 380.dp else 330.dp).fillMaxHeight(), cut = 18.dp) {
+                // ---------------- level, stats, upgrade
+                Panel(Modifier.width(if (ui.wide) 390.dp else 330.dp).fillMaxHeight(), cut = 18.dp) {
                     Column(Modifier.fillMaxSize().padding(16.dp)) {
-                        LevelHeader(prog.level, prog.unlocked, upgradeCount, Progression.levelCapped(save, def.id))
+                        LevelHeader(prog.level, prog.unlocked, upgradeCount, capped)
                         Spacer(Modifier.height(10.dp))
                         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val rows = Progression.statPreview(def, prog.level, Progression.levelCapped(save, def.id))
-                            androidx.compose.runtime.key(focus) {
-                                rows.forEachIndexed { i, r -> StatRow(r, i, prog.unlocked) }
+                            val rows = Progression.statPreview(def, prog.level, capped)
+                            androidx.compose.runtime.key(id) {
+                                rows.forEachIndexed { i, r -> StatRow(r, i, prog.unlocked, STAT_ICONS[i % STAT_ICONS.size]) }
                             }
                             Spacer(Modifier.height(4.dp))
                             FixedStats(def)
                         }
                         Spacer(Modifier.height(10.dp))
-                        ActionButtons(save, focus, repo, go) {
-                            upgradeCount++
-                            sfx?.buzz(70, 200)
+                        ActionButtons(save, id, repo, go) {
+                            // What the stats are now, and are about to become: the level-up moment counts between them.
+                            val before = Progression.statPreview(def, prog.level, capped)
+                            val reached = prog.level + 1
+                            ask({ upgrade(id, save.settings.debugUpgradeCost, save.settings.debugNoLevelCap) }) {
+                                upgradeCount++
+                                sfx?.buzz(70, 200)
+                                moment = UpgradeMoment(reached, before)
+                            }
                         }
                     }
                 }
@@ -149,27 +252,71 @@ fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId, go:
     }
 }
 
+/**
+ * The level-up moment: everything else on the page steps aside. The fighter cheers in a burst of light, "LEVEL
+ * UP!" slams in with the new level, and each stat counts up from what it was to what it is. A tap ends it.
+ */
 @Composable
-private fun RosterCard(save: SaveData, id: FighterId, focused: Boolean, onClick: () -> Unit) {
-    val def = Balance.fighter(id)
-    val p = save.progress(id)
-    val ui = LocalUi.current
-    Box {
-        ChunkyButton(onClick, Modifier.fillMaxWidth().height(if (ui.roomy) 96.dp else 76.dp),
-            if (focused) ButtonStyle.GOLD else if (p.unlocked) ButtonStyle.PURPLE else ButtonStyle.GREY, cut = 14.dp, lip = 4.dp) {
-            Row(Modifier.fillMaxSize().padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.fillMaxHeight().aspectRatio(0.8f)) {
-                    FighterView(def, p.skin, Modifier.fillMaxSize(), pedestal = false)
+private fun LevelUpMoment(def: io.github.projectwip.data.FighterDef, m: UpgradeMoment, accent: Color, onDone: () -> Unit) {
+    val sfx = LocalSfx.current
+    val slam = remember { Animatable(3f) }
+    val count = remember { Animatable(0f) }
+    var ready by remember { mutableStateOf(false) }
+    var burst by remember { mutableIntStateOf(0) }
+    LaunchedEffect(m) {
+        burst++
+        sfx?.play(Sound.BANNER)
+        slam.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium))
+        val ticking = launch {
+            var n = 0
+            while (true) { sfx?.play(Sound.COUNT, 0.5f, 0.85f + minOf(n, 12) * 0.05f); n++; kotlinx.coroutines.delay(70) }
+        }
+        count.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
+        ticking.cancel()
+        sfx?.play(Sound.CHING, 0.9f, 1.1f)
+        sfx?.buzz(40, 200)
+        kotlinx.coroutines.delay(350)
+        ready = true
+    }
+    Row(
+        Modifier.fillMaxSize().clickable(remember { MutableInteractionSource() }, null) { if (ready) onDone() }.padding(horizontal = 28.dp, vertical = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // The fighter keeps its place on the left, cheering.
+        Box(Modifier.weight(1f).fillMaxHeight().lobbyAnchor(), contentAlignment = Alignment.Center) { UpgradeBurst(burst, accent) }
+        Column(Modifier.width(400.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            GameText("LEVEL UP!", Type.Display.copy(fontSize = Type.Display.fontSize * 1.35f), color = Palette.Gold, outline = 5.dp,
+                modifier = Modifier.graphicsLayer { scaleX = slam.value; scaleY = slam.value; alpha = (3f - slam.value).coerceIn(0f, 1f) })
+            GameText(def.name.uppercase(), Type.Title, outline = 3.5.dp)
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.size(104.dp), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.fillMaxSize()) {
+                    drawCircle(Palette.Ink)
+                    drawCircle(Palette.OrangeDeep, size.minDimension / 2 - 4.dp.toPx())
+                    drawCircle(Palette.Orange, size.minDimension / 2 - 10.dp.toPx())
                 }
-                Column(Modifier.weight(1f)) {
-                    GameText(def.name.substringBefore(' ').uppercase(), Type.Label, outline = 2.dp)
-                    if (p.unlocked) GameText("LV ${p.level}", Type.Heading, color = if (focused) Color.White else Palette.Gold, outline = 2.dp)
-                    else GameIcon(IconKind.LOCK, Modifier.size(24.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    PlainText("LEVEL", Type.Small, color = Color.White)
+                    GameText(m.level.toString(), Type.Display, outline = 4.dp)
                 }
             }
+            Spacer(Modifier.height(8.dp))
+            LevelPips(m.level, Modifier.fillMaxWidth(), 14.dp)
+            Spacer(Modifier.height(12.dp))
+            m.rows.forEachIndexed { i, r ->
+                val to = r.next ?: r.current
+                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                    GameIcon(STAT_ICONS[i % STAT_ICONS.size], Modifier.size(26.dp))
+                    Spacer(Modifier.width(8.dp))
+                    PlainText(r.label.uppercase(), Type.Label, Modifier.weight(1f), color = Color.White, maxLines = 1)
+                    GameText("%,d".format(r.current + ((to - r.current) * count.value).toInt()) + r.suffix, Type.Title, outline = 3.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Badge("+${to - r.current}", color = Palette.GreenDeep)
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            GameText("TAP TO CONTINUE", Type.Heading, color = Palette.Gold, outline = 2.5.dp, modifier = Modifier.graphicsLayer { alpha = if (ready) 1f else 0f })
         }
-        if (save.selectedFighter == id) Badge("IN USE", Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-6).dp), color = Palette.CyanDeep)
-        else if (Progression.canUpgrade(save, id)) Badge("UP", Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-6).dp), color = Palette.GreenDeep)
     }
 }
 
@@ -194,15 +341,18 @@ private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int, capped
                 if (unlocked && !capped) {
                     GameText("  →  ${level + 1}", Type.Heading, color = Palette.Positive, outline = 2.5.dp)
                 }
+                Spacer(Modifier.weight(1f))
+                PlainText(if (capped) "fully upgraded" else "max ${maxOf(level, Balance.MAX_LEVEL)}", Type.Small)
             }
             Spacer(Modifier.height(6.dp))
-            PlainText(if (capped) "Level $level · fully upgraded" else "Level $level of ${maxOf(level, Balance.MAX_LEVEL)}", Type.Small)
+            // The level as a bar: one segment for each level up to the top one.
+            LevelPips(level, Modifier.fillMaxWidth(), 12.dp)
         }
     }
 }
 
 @Composable
-private fun StatRow(r: StatPreview, index: Int, unlocked: Boolean) {
+private fun StatRow(r: StatPreview, index: Int, unlocked: Boolean, icon: IconKind) {
     val shown by animateIntAsState(r.current, tween(700, delayMillis = index * 90), label = "stat")
     // Highlight flash + floating "+N" after an upgrade.
     val flash = remember { Animatable(0f) }
@@ -234,7 +384,11 @@ private fun StatRow(r: StatPreview, index: Int, unlocked: Boolean) {
         }.padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Column {
-            PlainText(r.label.uppercase(), Type.Small, color = Palette.TextDim)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                GameIcon(icon, Modifier.size(16.dp))
+                Spacer(Modifier.width(5.dp))
+                PlainText(r.label.uppercase(), Type.Small, color = Palette.TextDim)
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GameText("%,d".format(shown) + r.suffix, Type.Title, outline = 2.5.dp)
                 if (r.next != null && unlocked) {
@@ -273,18 +427,24 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
 }
 
 @Composable
-private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, go: (Screen) -> Unit, onUpgraded: () -> Unit) {
-    val ask = io.github.projectwip.ui.LocalServerCall.current
+private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, go: (Screen) -> Unit, onUpgrade: () -> Unit) {
     val p = save.progress(id)
     if (!p.unlocked) {
-        val track = CupTrack.milestones.firstOrNull { it.reward == Reward.UnlockFighter(id) }
-        if (track != null) PlainText("Free on the Cup Track at ${track.cups} Cups", Type.Small, color = Palette.Gold)
-        Spacer(Modifier.height(6.dp))
-        ChunkyButton({ go(Screen.Shop) }, Modifier.fillMaxWidth().height(64.dp), ButtonStyle.CYAN) {
+        // Fighters are unlocked on the Spark Road with Credits; the shop sells them for Crystals as a shortcut.
+        val step = io.github.projectwip.data.SparkRoad.steps.firstOrNull { it.fighter == id }
+        ChunkyButton({ go(Screen.Road) }, Modifier.fillMaxWidth().height(60.dp), ButtonStyle.GREEN) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                GameText("UNLOCK  ", Type.Heading)
-                GameIcon(IconKind.PRISM, Modifier.size(26.dp))
-                GameText(" ${Balance.unlockPrismPrice(id) ?: "-"}", Type.Heading)
+                GameText("SPARK ROAD  ", Type.Heading)
+                GameIcon(IconKind.CREDIT, Modifier.size(26.dp))
+                GameText(" ${step?.cost ?: "-"}", Type.Heading)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        ChunkyButton({ go(Screen.Shop) }, Modifier.fillMaxWidth().height(50.dp), ButtonStyle.CYAN, lip = 4.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                GameText("OR BUY  ", Type.Label, outline = 2.dp)
+                GameIcon(IconKind.PRISM, Modifier.size(22.dp))
+                GameText(" ${Balance.unlockPrismPrice(id) ?: "-"}", Type.Label, outline = 2.dp)
             }
         }
         return
@@ -292,22 +452,19 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
     val cost = Progression.upgradeCost(save, id)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (save.selectedFighter != id) {
-            ChunkyButton({ repo.selectFighter(id) }, Modifier.width(110.dp).height(68.dp), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }
+            ChunkyButton({ repo.selectFighter(id) }, Modifier.width(110.dp).height(72.dp), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }
         }
         if (Progression.levelCapped(save, id)) {
-            ChunkyButton({}, Modifier.weight(1f).height(68.dp), ButtonStyle.GOLD, enabled = true) { GameText("MAXED OUT", Type.Heading) }
+            ChunkyButton({}, Modifier.weight(1f).height(72.dp), ButtonStyle.GOLD, enabled = true) { GameText("MAX LEVEL", Type.Heading) }
         } else {
             val afford = save.bolts >= cost
-            ChunkyButton(
-                { ask({ upgrade(id, save.settings.debugUpgradeCost, save.settings.debugNoLevelCap) }) { onUpgraded() } },
-                Modifier.weight(1f).height(68.dp), ButtonStyle.GREEN, enabled = afford, sound = Sound.UPGRADE,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    GameText("UPGRADE", Type.Heading)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        GameIcon(IconKind.BOLT, Modifier.size(20.dp))
-                        GameText(" $cost", Type.Label, color = if (afford) Color.White else Palette.Red)
-                    }
+            // One wide button: what it does on the left, what it costs on the right.
+            ChunkyButton(onUpgrade, Modifier.weight(1f).height(72.dp), ButtonStyle.GREEN, enabled = afford, sound = Sound.UPGRADE) {
+                Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    GameText("UPGRADE", Type.Title, outline = 3.dp)
+                    Spacer(Modifier.weight(1f))
+                    GameIcon(IconKind.BOLT, Modifier.size(30.dp))
+                    GameText(" %,d".format(cost), Type.Title, color = if (afford) Color.White else Palette.Red, outline = 3.dp)
                 }
             }
         }

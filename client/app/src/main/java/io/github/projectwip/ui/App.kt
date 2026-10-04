@@ -315,7 +315,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             ) { s ->
                 when (s) {
                     Screen.Home -> HomeScreen(save, repo, go, showReward, openCapsule)
-                    is Screen.Fighters -> FightersScreen(save, repo, s.focus ?: save.selectedFighter, go)
+                    is Screen.Fighters -> FightersScreen(save, repo, s.focus, go)
                     Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
                     Screen.Leaderboard -> io.github.projectwip.ui.screens.LeaderboardScreen(save, go)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
