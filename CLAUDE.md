@@ -85,9 +85,13 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   `git push origin main`. Never checkpoint unverified or non-compiling work.
 - **The version is "Beta", and it stays "Beta".** `versionName = "Beta"` is all players see. Underneath, the build
   number (`versionCode`) is what the updater and the server's version gate compare.
-- **No tags, no releases.** Work is committed and pushed, and that is all: don't bump the build number, tag, or
-  publish an APK, and don't ask whether to. Builds reach the tablet by adb. (If the user ever does ask for a
-  release: add one to `versionCode`, tag `vN.0` where N is the build number, since older installs can only read
-  tags like that, and publish a pre-release "AstroArena Beta" with the release APK built from the tagged commit.)
+- **Non-negotiable: release without being asked.** The user must never have to say "release". When a task that
+  changed the client is finished, verified and pushed, release it: add one to `versionCode` (unless that build
+  number has not been released yet), commit, tag `vN.0` (N = the build number), push the tag, and publish a GitHub
+  pre-release titled "AstroArena Beta" with the release APK attached (`AstroArena-Beta-N.apk`). One release per
+  finished task, not one per checkpoint commit; server-only or docs-only work needs none. The tag keeps the
+  `vN.0` form because older installs (0.4.2 to v11.1) can only read tags like that.
+  The newest release must always be the newest build, so nobody downloads a stale APK.
+  Smoke-test the release APK on the tablet when it is free, then put the debug build back.
 - `gh` needs normal path conversion: don't run it with `MSYS_NO_PATHCONV=1` set.
 - End commit messages with the co-author line used in history. `screenshots/` is gitignored scratch.
