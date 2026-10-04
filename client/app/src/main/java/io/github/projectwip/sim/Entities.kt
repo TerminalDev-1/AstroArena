@@ -63,6 +63,10 @@ class Fighter(
     var alive = true
     var respawnTimer = 0f
     var shield = 0f
+    /** Shield points on top of health. They build up, out of combat, once health is full, and take damage first. */
+    var shieldHp = 0
+    /** Fighters build a shield; giants and the Training Area's fixed targets don't. */
+    val canShield get() = scale == 1f && !rooted
     var sinceDamaged = 99f
     var sinceAttack = 99f
     /** While > 0 the fighter is visible even inside a thicket. */

@@ -264,12 +264,26 @@ class World(
         regenerate(f, dt)
     }
 
-    /** Healing when out of combat. The giant in Boss Mode never heals: damage done to it stays done. */
+    /**
+     * Healing when out of combat. Health comes back first; once it is full the same trickle builds a shield on top
+     * of it, up to [Balance.SHIELD_MAX]. A giant (Boss Mode, or the Training Area's) never heals: damage done to
+     * it stays done.
+     */
     fun regenerate(f: Fighter, dt: Float) {
-        if (rules.boss && f.scale > 1f) return
-        if (f.sinceDamaged > Balance.REGEN_DELAY_SECONDS && f.sinceAttack > Balance.REGEN_DELAY_SECONDS && f.hp < f.maxHp) {
-            f.hp = (f.hp + (f.maxHp * Balance.REGEN_FRACTION_PER_SECOND * dt).toInt().coerceAtLeast(1)).coerceAtMost(f.maxHp)
-        }
+        if (f.scale > 1f) return
+        if (f.sinceDamaged <= Balance.REGEN_DELAY_SECONDS || f.sinceAttack <= Balance.REGEN_DELAY_SECONDS) return
+        val gain = (f.maxHp * Balance.REGEN_FRACTION_PER_SECOND * dt).toInt().coerceAtLeast(1)
+        if (f.hp < f.maxHp) f.hp = (f.hp + gain).coerceAtMost(f.maxHp)
+        else if (f.canShield && f.shieldHp < Balance.SHIELD_MAX) f.shieldHp = (f.shieldHp + gain).coerceAtMost(Balance.SHIELD_MAX)
+    }
+
+    /** Takes [amount] off a fighter: the shield goes first, then health. Returns how much landed. */
+    private fun wound(f: Fighter, amount: Int): Int {
+        val dealt = minOf(amount, f.shieldHp + f.hp)
+        val blocked = minOf(dealt, f.shieldHp)
+        f.shieldHp -= blocked
+        f.hp -= dealt - blocked
+        return dealt
     }
 
     /** Tracks who is tucked away in a thicket and which teams have spotted them up close. */
@@ -428,8 +442,7 @@ class World(
             events += GameEvent.Blocked(x, y)
             return
         }
-        val dealt = minOf(amount, target.hp)
-        target.hp -= dealt
+        val dealt = wound(target, amount)
         target.sinceDamaged = 0f
         target.hitFlash = 0.12f
         target.revealTimer = maxOf(target.revealTimer, 1.0f)
@@ -453,7 +466,8 @@ class World(
         victim.respawnTimer = Balance.RESPAWN_SECONDS
         victim.pending.clear()
         victim.dashTime = 0f
-        victim.superCharge *= 0.5f
+        victim.shieldHp = 0
+        // The super charge is kept: whatever was charged is still there after the respawn.
         events += GameEvent.Ko(killer?.id ?: -1, victim.id, victim.x, victim.y)
         killer?.let { it.kos++ }
         if (rules.freeForAll) {
@@ -523,8 +537,7 @@ class World(
             if (f.stormTick > 0f) continue
             f.stormTick = 0.5f
             val dmg = (f.maxHp * st.damageFraction() * 0.5f).toInt().coerceAtLeast(1)
-            val dealt = minOf(dmg, f.hp)
-            f.hp -= dealt
+            wound(f, dmg)
             f.sinceDamaged = 0f
             f.hitFlash = 0.12f
             events += GameEvent.StormHit(f.id, dmg, f.x, f.y)
@@ -536,6 +549,7 @@ class World(
         placeAtSpawn(f)
         f.alive = true
         f.hp = f.maxHp
+        f.shieldHp = 0
         f.ammo = f.def.ammoMax.toFloat()
         f.shield = Balance.SPAWN_SHIELD_SECONDS
         f.sinceDamaged = 99f

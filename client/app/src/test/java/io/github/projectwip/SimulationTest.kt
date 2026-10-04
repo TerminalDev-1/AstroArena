@@ -292,6 +292,32 @@ class SimulationTest {
         m.world.regenerate(boss, 1f); m.world.regenerate(me, 1f)
         assertEquals("the boss stays hurt", boss.maxHp / 2, boss.hp)
         assertTrue("the player still heals", me.hp > me.maxHp / 2)
+        // The Training Area's giant doesn't heal either.
+        val t = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, humanPlayer = false, seed = 4L))
+        val giant = t.world.fighters.first { it.scale > 1f }
+        giant.hp = giant.maxHp / 2; giant.sinceDamaged = 60f; giant.sinceAttack = 60f
+        t.world.regenerate(giant, 1f)
+        assertEquals(giant.maxHp / 2, giant.hp)
+    }
+
+    @Test fun aShieldBuildsOnTopOfFullHealth() {
+        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
+        val boss = m.world.fighters.first { it.scale > 1f }
+        val me = m.world.fighters.first { it.scale == 1f }
+        me.hp = me.maxHp - 1; me.sinceDamaged = 60f; me.sinceAttack = 60f
+        boss.sinceDamaged = 60f; boss.sinceAttack = 60f
+        m.world.regenerate(me, 1f)
+        assertEquals("health is topped up before any shield", me.maxHp to 0, me.hp to me.shieldHp)
+        m.world.regenerate(me, 1f)
+        assertTrue("then the shield starts", me.shieldHp > 0)
+        repeat(200) { m.world.regenerate(me, 1f); m.world.regenerate(boss, 1f) }
+        assertEquals("up to its cap", io.github.projectwip.data.Balance.SHIELD_MAX, me.shieldHp)
+        assertEquals(me.maxHp, me.hp)
+        assertEquals("giants have none", 0, boss.shieldHp)
+        // Still in a fight: nothing builds.
+        me.shieldHp = 0; me.sinceDamaged = 1f
+        m.world.regenerate(me, 1f)
+        assertEquals(0, me.shieldHp)
     }
 
     /** Difficulty must come from behaviour: Elite bots should beat Easy bots with identical stats. */

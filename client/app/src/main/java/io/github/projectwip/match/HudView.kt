@@ -122,6 +122,21 @@ class HudView(
             }
             text.textSize = bh * 0.95f
             outlined(c, s.hp[i].toString(), x, rect.bottom - bh * 0.15f, Color.WHITE, dp(2.5f))
+            if (s.shield[i] > 0) {
+                // The shield, to the right of the health bar: a small shield and how many points it holds.
+                val cx = rect.right + dp(13f)
+                val cy = rect.centerY()
+                for ((r, color) in listOf(dp(8.5f) to INK, dp(6f) to Color.rgb(110, 205, 255))) {
+                    path.rewind()
+                    path.moveTo(cx - r, cy - r); path.lineTo(cx + r, cy - r); path.lineTo(cx + r, cy + r * 0.15f)
+                    path.lineTo(cx, cy + r * 1.2f); path.lineTo(cx - r, cy + r * 0.15f); path.close()
+                    fill.color = color
+                    c.drawPath(path, fill)
+                }
+                // The number sits to the right of the icon; its middle is half its own width further along.
+                val label = s.shield[i].toString()
+                outlined(c, label, cx + dp(12f) + text.measureText(label) / 2, rect.bottom - bh * 0.15f, Color.rgb(170, 228, 255), dp(2.5f))
+            }
             if (s.relation[i] == 0) {
                 val segW = (bw - dp(4f)) / s.ammoMax
                 val ay = rect.bottom + dp(5f)

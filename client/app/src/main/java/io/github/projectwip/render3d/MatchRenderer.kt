@@ -585,11 +585,11 @@ class MatchRenderer(
                 val pulse = 0.5f + 0.5f * sin(time * 7f)
                 fun tint(layer: Int) = when {
                     layer == 0 -> lit.v4("uTint", 0.06f, 0.03f, 0.16f, 0.45f)
-                    layer == 2 -> lit.v4("uTint", 1f, 1f, 1f, 1f)
-                    // The fill has a colour of its own, so it stands out from pale floors as well as dark ones:
-                    // bright cyan for the attack, gold for the super.
+                    // The solid mark: white on the gold super, ink on the white attack so it still shows.
+                    layer == 2 -> if (inp.aimingSuper) lit.v4("uTint", 1f, 1f, 1f, 1f) else lit.v4("uTint", 0.06f, 0.03f, 0.16f, 0.85f)
+                    // Bright white for the attack, gold for the super. Nearly solid, so it shows on pale floors too.
                     inp.aimingSuper -> lit.v4("uTint", 1f, 0.78f, 0.1f, 0.7f + 0.15f * pulse)
-                    else -> lit.v4("uTint", 0.15f, 0.85f, 1f, 0.62f + 0.15f * pulse)
+                    else -> lit.v4("uTint", 1f, 1f, 1f, 0.8f + 0.12f * pulse)
                 }
                 fun beam(length: Float, width: Float) {
                     tint(0); setModel(px - dx * 0.06f, 0.045f, pz - dz * 0.06f, length + 0.12f, 1f, width + 0.16f, yaw); rect.draw()
@@ -856,7 +856,7 @@ class MatchRenderer(
                 }
             }
             s.visible[i] = vis && onScreen
-            s.hp[i] = f.hp; s.maxHp[i] = f.maxHp
+            s.hp[i] = f.hp; s.maxHp[i] = f.maxHp; s.shield[i] = f.shieldHp
             s.relation[i] = if (f === p) 0 else if (f.team == p.team) 1 else 2
             s.names[i] = f.name
             s.superReady[i] = f.superReady

@@ -54,6 +54,8 @@ class HudSnapshot {
     val visible = BooleanArray(MAX)
     val hp = IntArray(MAX)
     val maxHp = IntArray(MAX)
+    /** Shield points on top of health (0 = none). */
+    val shield = IntArray(MAX)
     /** 0 = you, 1 = ally, 2 = enemy */
     val relation = IntArray(MAX)
     val names = arrayOfNulls<String>(MAX)
@@ -73,7 +75,7 @@ class HudSnapshot {
         n = o.n
         for (i in 0 until n) {
             ids[i] = o.ids[i]; sx[i] = o.sx[i]; sy[i] = o.sy[i]; visible[i] = o.visible[i]
-            hp[i] = o.hp[i]; maxHp[i] = o.maxHp[i]; relation[i] = o.relation[i]; names[i] = o.names[i]; superReady[i] = o.superReady[i]; cells[i] = o.cells[i]
+            hp[i] = o.hp[i]; maxHp[i] = o.maxHp[i]; shield[i] = o.shield[i]; relation[i] = o.relation[i]; names[i] = o.names[i]; superReady[i] = o.superReady[i]; cells[i] = o.cells[i]
         }
     }
 

@@ -126,6 +126,8 @@ object Balance {
     const val MATCH_SECONDS = 150f
     const val RESPAWN_SECONDS = 3f
     const val SPAWN_SHIELD_SECONDS = 2f
+    /** The most shield a fighter can build up on top of full health. Damage comes off the shield first. */
+    const val SHIELD_MAX = 6300
     const val REGEN_DELAY_SECONDS = 3f
     const val REGEN_FRACTION_PER_SECOND = 0.12f
 
