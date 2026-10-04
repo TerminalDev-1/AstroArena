@@ -83,7 +83,7 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
             GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
         }
         PlainText(TIPS[(time / 4f).toInt() % TIPS.size], Type.Body, Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp), color = Color.White, align = TextAlign.Center)
-        PlainText("v${BuildConfig.VERSION_NAME.removePrefix("v")}", Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
+        PlainText(BuildConfig.VERSION_NAME, Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
     }
 }
 
@@ -169,7 +169,7 @@ fun UpdateScreen(update: UpdateInfo, onSkip: () -> Unit) {
             Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 GameText("UPDATE REQUIRED", Type.Display, color = Palette.Gold, outline = 4.dp)
                 PlainText(
-                    "You have version ${BuildConfig.VERSION_NAME}. Version ${update.version} is out, and this version is no longer supported, " +
+                    "A newer ${BuildConfig.VERSION_NAME} build is out, and this one is no longer supported, " +
                         "so the game won't start until you update. Your progress is kept.",
                     Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 4,
                 )
@@ -206,7 +206,7 @@ fun UnsupportedScreen(message: String, releasesUrl: String, onSkip: () -> Unit) 
                 GameText("VERSION NOT SUPPORTED", Type.Display, color = Palette.Gold, outline = 4.dp)
                 PlainText(message.ifBlank { "This version of the game is no longer supported. Please update to keep playing." },
                     Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 5)
-                PlainText("You have version ${BuildConfig.VERSION_NAME}. Your progress is kept.", Type.Small, align = TextAlign.Center)
+                PlainText("Your progress is kept.", Type.Small, align = TextAlign.Center)
                 ChunkyButton({
                     try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releasesUrl))) } catch (_: Exception) { }
                 }, Modifier.size(320.dp, 64.dp), ButtonStyle.GREEN) { GameText("GET THE LATEST VERSION", Type.Heading) }

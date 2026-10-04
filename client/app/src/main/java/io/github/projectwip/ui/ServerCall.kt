@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 
 /** Takes on what the server holds for this player: Cups, drops, currencies, fighters, claims and shop deals. */
 fun GameRepository.sync(account: Account) =
-    syncAccount(account.cups, account.drops, account.dropsLeftToday, account.profile, account.deals, account.day.takeIf { it >= 0 })
+    syncAccount(account.cups, account.drops, account.dropsLeftToday, account.profile, account.deals, account.difficulty, account.day.takeIf { it >= 0 })
 
 /**
  * How the menus ask the game server to do something (buy, upgrade, claim...). The request runs off the main

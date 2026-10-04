@@ -81,6 +81,7 @@ PLAYER_COLUMNS = [
     ("imported", "INTEGER NOT NULL DEFAULT 0"),    # 1 once the starting Cups and drops have been settled
     ("flags", "INTEGER NOT NULL DEFAULT 0"),       # results the server refused to believe
     ("profile", "TEXT"),                           # Bolts, Prisms, fighters, claimed rewards (economy.py); NULL until started
+    ("difficulty", "TEXT"),                        # the bot difficulty this player picked (and the server approved); NULL = the default
 ]
 
 MATCH_COLUMNS = [
@@ -177,6 +178,10 @@ class Store:
             profile["bolts"] = max(0, profile["bolts"] + int(bolts))
             profile["prisms"] = max(0, profile["prisms"] + int(prisms))
             self._keep(player_id, profile)
+
+    def set_difficulty(self, player_id: str, difficulty: str) -> None:
+        with self._lock, self._db:
+            self._db.execute("UPDATE players SET difficulty = ? WHERE id = ?", (difficulty, player_id))
 
     def buy_daily(self, player_id: str, offers: list[dict], index: int, day: int) -> dict:
         """Buys one of the day's offers. `day` is the day the player saw it on: after midnight it no longer counts."""

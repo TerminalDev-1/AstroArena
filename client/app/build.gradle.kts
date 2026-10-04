@@ -12,8 +12,9 @@ android {
         applicationId = "io.github.projectwip"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "11.1"
+        // Players see "Beta". The build number is what the updater and the server's version gate compare.
+        versionCode = 20
+        versionName = "Beta"
         // Where the game looks for its server unless the player sets another address in Settings.
         // Override at build time with -Pastro.server=http://host:port
         buildConfigField("String", "SERVER_URL", "\"${(project.findProperty("astro.server") as String?) ?: "http://192.168.1.103:8765"}\"")

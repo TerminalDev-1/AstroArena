@@ -116,12 +116,14 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
 
 @Composable
 private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
-    SectionTitle("BOT DIFFICULTY", "Changes how bots think — reaction time, aim, dodging, positioning, target choice and super timing. Never their health or damage.")
+    // The server has to approve the choice: tapping one asks it, and what it approves is what shows as selected.
+    val ask = io.github.projectwip.ui.LocalServerCall.current
+    SectionTitle("BOT DIFFICULTY", "Changes how bots think — reaction time, aim, dodging, positioning, target choice and super timing. Never their health or damage. The server confirms your choice.")
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         for (d in BotDifficulty.entries) {
             val selected = d == s.botDifficulty
             Box(Modifier.weight(1f)) {
-                ChunkyButton({ set { it.copy(botDifficulty = d) } }, Modifier.fillMaxWidth().height(150.dp),
+                ChunkyButton({ ask({ setDifficulty(d) }) }, Modifier.fillMaxWidth().height(150.dp),
                     if (selected) ButtonStyle.ORANGE else ButtonStyle.PURPLE, cut = 14.dp, sound = Sound.UI_SELECT) {
                     Column(Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         GameText(d.label.uppercase(), Type.Heading, color = if (selected) Color.White else difficultyColor(d), outline = 2.5.dp)
@@ -268,7 +270,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     PlainText("Leave the address empty to use the built-in one. Start the server on your computer with server/run.bat; it prints the address to type here.",
         Type.Small, color = Palette.TextDim.copy(alpha = 0.8f))
     Spacer(Modifier.height(10.dp))
-    SectionTitle("ABOUT", "AstroArena v${BuildConfig.VERSION_NAME}. Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
+    SectionTitle("ABOUT", "AstroArena ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE}). Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
     val context = androidx.compose.ui.platform.LocalContext.current
     ChunkyButton({
         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(REPO_URL)))

@@ -157,7 +157,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     LaunchedEffect(Unit) {
         val checked = java.util.concurrent.atomic.AtomicBoolean(false)
         // Debug: `--es screen updatecheck` runs the real check pretending to be a very old version.
-        val running = if (startScreen == "updatecheck") "0.0.1" else io.github.projectwip.BuildConfig.VERSION_NAME
+        val running = if (startScreen == "updatecheck") "0.0.1" else io.github.projectwip.BuildConfig.VERSION_CODE.toString()
         launch(kotlinx.coroutines.Dispatchers.IO) {
             val found = io.github.projectwip.net.Updater.check(running)
             if (found != null) update = found
@@ -294,7 +294,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
                     is Screen.Match -> MatchScreen(
-                        // The difficulty is the player's pick (it is kept in the settings); the server plans the match with it.
+                        // The difficulty is the one the server last approved (it is kept in the settings), and the
+                        // server's match plan has the final word.
                         s.config,
                         save.settings, sfx, save.matchesPlayed, server,
                         onCancel = { screen = Screen.Home },
@@ -395,7 +396,7 @@ private enum class Connection { CONNECTING, FAILED, SETTLED }
 fun connectToServer(server: io.github.projectwip.net.GameServer, repo: GameRepository) {
     val save = repo.save.value
     val url = save.settings.serverUrl.ifBlank { io.github.projectwip.BuildConfig.SERVER_URL }
-    val stored = server.connect(url, io.github.projectwip.BuildConfig.VERSION_NAME, save.settings.playerName)
+    val stored = server.connect(url, io.github.projectwip.BuildConfig.VERSION_CODE.toString(), save.settings.playerName)
     val status = server.status.value
     if (!status.online || !status.supported) return
     val restored = stored?.let { runCatching { io.github.projectwip.data.SaveStore.fromJson(it) }.getOrNull() }

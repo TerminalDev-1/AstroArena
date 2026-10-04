@@ -289,6 +289,7 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty?, onClick: () -> Unit) {
 @Composable
 private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit) {
     val ui = LocalUi.current
+    val ask = io.github.projectwip.ui.LocalServerCall.current
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
             .clickable(remember { MutableInteractionSource() }, null, onClick = onClose),
@@ -309,7 +310,8 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
                     Spacer(Modifier.width(6.dp))
                     for (d in BotDifficulty.entries) {
                         val sel = d == save.settings.botDifficulty
-                        ChunkyButton({ repo.updateSettings { it.copy(botDifficulty = d) } }, Modifier.size(118.dp, 50.dp),
+                        // The server has to agree; its answer (the approved difficulty) is what gets shown.
+                        ChunkyButton({ ask({ setDifficulty(d) }) }, Modifier.size(118.dp, 50.dp),
                             if (sel) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
                             GameText(d.label.uppercase(), Type.Label, color = if (sel) Color.White else difficultyColor(d), outline = 2.dp)
                         }
