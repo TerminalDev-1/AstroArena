@@ -116,17 +116,28 @@ fun HomeScreen(
             }
 
             Row(Modifier.weight(1f).fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 16.dp)) {
-                // ---------------- left rail
-                Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
-                    NavTile("SHOP", IconKind.SHOP, if (giftReady) "FREE" else null, Palette.Green) { go(Screen.Shop) }
-                    NavTile("FIGHTERS", IconKind.FIGHTERS, if (canUpgradeAny) "UP" else null, Palette.Green) { go(Screen.Fighters()) }
-                    NavTile("CUP TRACK", IconKind.TRACK, if (claimable > 0) claimable.toString() else null, Palette.Red) { go(Screen.CupTrack) }
-                }
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Row(Modifier.weight(1f).fillMaxWidth()) {
+                        // ---------------- left rail
+                        Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)) {
+                            NavTile("SHOP", IconKind.SHOP, if (giftReady) "FREE" else null, Palette.Green) { go(Screen.Shop) }
+                            NavTile("FIGHTERS", IconKind.FIGHTERS, if (canUpgradeAny) "UP" else null, Palette.Green) { go(Screen.Fighters()) }
+                            NavTile("CUP TRACK", IconKind.TRACK, if (claimable > 0) claimable.toString() else null, Palette.Red) { go(Screen.CupTrack) }
+                        }
 
-                // ---------------- hero (the 3D fighter stands here; this column is see-through)
-                Box(Modifier.weight(1f).fillMaxHeight().lobbyAnchor(), contentAlignment = Alignment.BottomCenter) {
-                    NamePlate(save) { go(Screen.Fighters(save.selectedFighter)) }
+                        // ---------------- hero (the 3D fighter stands here; this column is see-through)
+                        Box(Modifier.weight(1f).fillMaxHeight().lobbyAnchor(), contentAlignment = Alignment.BottomCenter) {
+                            NamePlate(save) { go(Screen.Fighters(save.selectedFighter)) }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    // ---------------- bottom left: the Spark Pass, and the Spark Road beside it
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        PassButton(serverStatus?.account?.takeIf { online }?.pass, Modifier.width(if (ui.wide) 220.dp else 190.dp)) { go(Screen.Pass) }
+                        RoadButton(save, Modifier.width(if (ui.wide) 220.dp else 190.dp)) { go(Screen.Road) }
+                    }
                 }
+                Spacer(Modifier.width(12.dp))
 
                 // ---------------- mode + play
                 Column(
@@ -134,8 +145,6 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.End,
                 ) {
-                    PassButton(serverStatus?.account?.takeIf { online }?.pass) { go(Screen.Pass) }
-                    Spacer(Modifier.height(10.dp))
                     CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online, openCapsule)
                     Spacer(Modifier.height(10.dp))
                     ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
@@ -239,8 +248,8 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
 /** Spark Capsules waiting to be opened, or how to earn the next one. The server earns and opens them, so offline they wait. */
 /** The way into the Spark Pass: the tier the player is on, the bar toward the next, and a badge when a reward is waiting. */
 @Composable
-private fun PassButton(pass: io.github.projectwip.data.PassState?, onClick: () -> Unit) {
-    Box {
+private fun PassButton(pass: io.github.projectwip.data.PassState?, modifier: Modifier, onClick: () -> Unit) {
+    Box(modifier) {
         ChunkyButton(onClick, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.GLASS, cut = 14.dp, lip = 4.dp, sound = Sound.UI_OPEN) {
             Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 GameIcon(IconKind.STAR, Modifier.size(36.dp))
@@ -257,6 +266,36 @@ private fun PassButton(pass: io.github.projectwip.data.PassState?, onClick: () -
         }
         val waiting = pass?.claimable ?: 0
         if (waiting > 0) Badge(waiting.toString(), Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp))
+    }
+}
+
+/**
+ * The way onto the Spark Road: the fighter the Credits are filling (still a silhouette), how far along it is, and a
+ * badge when it is ready to claim. With the road finished it shows the Glory rank instead.
+ */
+@Composable
+private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) {
+    val next = io.github.projectwip.data.SparkRoad.next(save)
+    Box(modifier) {
+        ChunkyButton(onClick, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.GLASS, cut = 14.dp, lip = 4.dp, sound = Sound.UI_OPEN) {
+            Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (next != null) io.github.projectwip.ui.FighterView(Balance.fighter(next.fighter), 0, Modifier.size(42.dp), pedestal = false, locked = true)
+                else GameIcon(IconKind.GLORY, Modifier.size(38.dp))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    GameText("SPARK ROAD", Type.Label, color = Palette.Green, outline = 2.dp)
+                    if (next != null) {
+                        PlainText("${Balance.fighter(next.fighter).name} · ${"%,d".format(minOf(save.credits, next.cost))} / ${"%,d".format(next.cost)}", Type.Small, color = Color.White, maxLines = 1)
+                        ProgressBar(save.credits.toFloat() / next.cost, Modifier.fillMaxWidth(), Palette.Green, 9.dp)
+                    } else {
+                        val rank = io.github.projectwip.data.Glory.rank(save.glory)
+                        PlainText("Glory · ${rank.title}", Type.Small, color = Color.White, maxLines = 1)
+                        ProgressBar(rank.into.toFloat() / rank.size, Modifier.fillMaxWidth(), Palette.Gold, 9.dp)
+                    }
+                }
+            }
+        }
+        if (next != null && save.credits >= next.cost) Badge("CLAIM", Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp), color = Palette.GreenDeep)
     }
 }
 

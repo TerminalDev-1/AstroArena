@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -77,18 +78,18 @@ fun ProgressBar(fraction: Float, modifier: Modifier = Modifier, color: Color = C
 }
 
 /**
- * The Spark Road. Credits are not held anywhere: whatever is earned goes straight into the road, toward the
- * fighter the player picked. The road shows every fighter, the cheapest rarity first; the ones on offer can be
- * picked, the picked one has the bar the Credits are filling, and when it is full the fighter is claimed. With
- * every fighter unlocked the road is finished and Credits are earned as Glory instead.
+ * The Spark Road. Credits are not held anywhere: whatever is earned goes straight into the road, toward the next
+ * fighter along it. The road is drawn as one: every fighter stands on it in the order they are unlocked, the
+ * stretch already travelled is lit, and the stretch to the next fighter fills as the Credits come in. When it
+ * is full the fighter is claimed. With every fighter unlocked the road is finished and Credits are earned as
+ * Glory instead.
  */
 @Composable
 fun RoadScreen(save: SaveData, go: (Screen) -> Unit, showReward: (RewardReveal) -> Unit) {
     val ask = LocalServerCall.current
     val ui = LocalUi.current
     val next = SparkRoad.next(save)
-    val choices = SparkRoad.choices(save).map { it.fighter }
-    val cardW = if (ui.roomy) 158.dp else 132.dp
+    val stopW = if (ui.roomy) 190.dp else 158.dp
     val stops = listOf<io.github.projectwip.data.RoadStep?>(null) + SparkRoad.steps // null = the starting fighter
     val list = rememberLazyListState()
     LaunchedEffect(Unit) { list.scrollToItem((stops.indexOfFirst { it != null && it == next } - 1).coerceAtLeast(0)) }
@@ -96,59 +97,33 @@ fun RoadScreen(save: SaveData, go: (Screen) -> Unit, showReward: (RewardReveal) 
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         Box(Modifier.fillMaxSize().background(SCRIM))
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("SPARK ROAD", { go(Screen.Fighters()) }, null, null)
+            ScreenHeader("SPARK ROAD", { go(Screen.Home) }, null, null)
             RoadSummary(save, next, Modifier.fillMaxWidth().padding(horizontal = 22.dp))
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                // The road itself: a wide band behind the stops, with a dashed line down the middle.
-                Canvas(Modifier.fillMaxSize()) {
-                    val mid = size.height * 0.5f
-                    drawLine(Palette.Ink, Offset(0f, mid), Offset(size.width, mid), 58.dp.toPx())
-                    drawLine(Color(0xFF5B45C8), Offset(0f, mid), Offset(size.width, mid), 48.dp.toPx())
-                    drawLine(CREDIT.copy(alpha = 0.8f), Offset(0f, mid), Offset(size.width, mid), 4.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(18.dp.toPx(), 14.dp.toPx())))
-                }
-                LazyRow(
-                    Modifier.fillMaxSize(), list,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 24.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(26.dp), verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    items(stops.size) { i ->
-                        val step = stops[i]
-                        val lift = Modifier.offset(y = if (i % 2 == 0) 14.dp else (-14).dp)
-                        if (step == null) RoadStop(FighterId.JUNO, cardW, lift, unlocked = true) { Badge("START", color = Palette.CyanDeep) }
-                        else {
-                            val unlocked = save.progress(step.fighter).unlocked
-                            val picked = step == next
-                            RoadStop(step.fighter, cardW, lift, unlocked, highlight = picked) {
-                                when {
-                                    unlocked -> Badge("UNLOCKED", color = Palette.GreenDeep)
-                                    picked -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        ProgressBar(save.credits.toFloat() / step.cost, Modifier.fillMaxWidth())
-                                        PlainText("${"%,d".format(minOf(save.credits, step.cost))} / ${"%,d".format(step.cost)}", Type.Small, color = Color.White)
-                                        Spacer(Modifier.height(4.dp))
-                                        ChunkyButton(
-                                            { ask({ roadUnlock() }) { showReward(RewardReveal("Spark Road", it)) } },
-                                            Modifier.fillMaxWidth().height(46.dp), ButtonStyle.GREEN, enabled = save.credits >= step.cost, lip = 4.dp,
-                                        ) { GameText(if (save.credits >= step.cost) "CLAIM!" else "FILLING…", Type.Label, outline = 2.dp) }
-                                    }
-                                    step.fighter in choices -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            GameIcon(IconKind.CREDIT, Modifier.size(20.dp))
-                                            GameText(" ${"%,d".format(step.cost)}", Type.Label, outline = 2.dp)
-                                        }
-                                        Spacer(Modifier.height(4.dp))
-                                        // Sends the Credits this way instead; what is already on the road comes along.
-                                        ChunkyButton({ ask({ setRoadTarget(step.fighter) }) }, Modifier.fillMaxWidth().height(46.dp), ButtonStyle.CYAN, lip = 4.dp) {
-                                            GameText("CHOOSE", Type.Label, outline = 2.dp)
-                                        }
-                                    }
-                                    else -> Row(verticalAlignment = Alignment.CenterVertically) {
-                                        GameIcon(IconKind.LOCK, Modifier.size(20.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        GameIcon(IconKind.CREDIT, Modifier.size(20.dp))
-                                        GameText(" ${"%,d".format(step.cost)}", Type.Label, outline = 2.dp)
-                                    }
-                                }
+            LazyRow(Modifier.weight(1f).fillMaxWidth(), list, contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp)) {
+                items(stops.size) { i ->
+                    val step = stops[i]
+                    val unlocked = step == null || save.progress(step.fighter).unlocked
+                    val isNext = step != null && step == next
+                    // How much of this stop's stretch of road is lit: all of it once the fighter is unlocked; for the
+                    // next one, the half that leads up to it fills with the Credits; none beyond.
+                    val lit = when { unlocked -> 1f; isNext -> 0.5f * (save.credits.toFloat() / step!!.cost).coerceIn(0f, 1f); else -> 0f }
+                    RoadStop(step?.fighter ?: FighterId.JUNO, stopW, lit, unlocked, isNext, first = i == 0, last = i == stops.lastIndex) {
+                        when {
+                            step == null -> Badge("START", color = Palette.CyanDeep)
+                            unlocked -> Badge("UNLOCKED", color = Palette.GreenDeep)
+                            isNext -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                PlainText("${"%,d".format(minOf(save.credits, step.cost))} / ${"%,d".format(step.cost)}", Type.Label, color = Color.White)
+                                Spacer(Modifier.height(4.dp))
+                                ChunkyButton(
+                                    { ask({ roadUnlock() }) { showReward(RewardReveal("Spark Road", it)) } },
+                                    Modifier.width(150.dp).height(48.dp), ButtonStyle.GREEN, enabled = save.credits >= step.cost, lip = 4.dp,
+                                ) { GameText(if (save.credits >= step.cost) "CLAIM!" else "NEXT UP", Type.Label, outline = 2.dp) }
+                            }
+                            else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                GameIcon(IconKind.LOCK, Modifier.size(20.dp))
+                                Spacer(Modifier.width(4.dp))
+                                GameIcon(IconKind.CREDIT, Modifier.size(22.dp))
+                                GameText(" ${"%,d".format(step.cost)}", Type.Label, outline = 2.dp)
                             }
                         }
                     }
@@ -167,12 +142,12 @@ private fun RoadSummary(save: SaveData, next: io.github.projectwip.data.RoadStep
                 GameIcon(IconKind.CREDIT, Modifier.size(46.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    GameText("CREDITS GO TO ${Balance.fighter(next.fighter).name.substringBefore(' ').uppercase()}", Type.Label, color = Palette.Gold, outline = 2.dp)
+                    GameText("NEXT: ${Balance.fighter(next.fighter).name.substringBefore(' ').uppercase()}", Type.Label, color = Palette.Gold, outline = 2.dp)
                     ProgressBar(save.credits.toFloat() / next.cost, Modifier.fillMaxWidth(), height = 18.dp)
-                    PlainText("Every Credit you earn goes straight here: matches, Spark Drops, the Cup Track, the Spark Pass, the shop.", Type.Small, color = Color.White, maxLines = 1)
+                    PlainText("Every Credit you earn goes straight onto the road: matches, Spark Drops, the Cup Track, the Spark Pass, the shop.", Type.Small, color = Color.White, maxLines = 1)
                 }
                 Spacer(Modifier.width(14.dp))
-                GameText("${"%,d".format(save.credits)} / ${"%,d".format(next.cost)}", Type.Title, outline = 3.dp)
+                GameText("${"%,d".format(minOf(save.credits, next.cost))} / ${"%,d".format(next.cost)}", Type.Title, outline = 3.dp)
             } else {
                 val rank = io.github.projectwip.data.Glory.rank(save.glory)
                 GameIcon(IconKind.GLORY, Modifier.size(46.dp))
@@ -189,18 +164,41 @@ private fun RoadSummary(save: SaveData, next: io.github.projectwip.data.RoadStep
     }
 }
 
-/** One fighter on the road, on a plate: its picture (a silhouette until it is unlocked), its name and rarity, and [footer]. */
+/**
+ * One stop on the road. The fighter (a silhouette until unlocked) stands on a marker set into the road; its
+ * name, rarity and [footer] are underneath. The road runs straight through behind it, lit for [lit] of the way.
+ */
 @Composable
-private fun RoadStop(id: FighterId, width: Dp, modifier: Modifier, unlocked: Boolean, highlight: Boolean = false, footer: @Composable () -> Unit) {
+private fun RoadStop(id: FighterId, width: Dp, lit: Float, unlocked: Boolean, isNext: Boolean, first: Boolean, last: Boolean, footer: @Composable () -> Unit) {
     val def = Balance.fighter(id)
     val rarity = Color(def.rarity.color)
-    val top = if (highlight) CREDIT_DEEP else if (unlocked) Palette.PanelLight else Palette.Panel
-    Panel(modifier.width(width).fillMaxHeight(0.86f), color = top, colorBottom = lerp(top, Color.Black, 0.55f), cut = 14.dp) {
-        Column(Modifier.fillMaxSize().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        Modifier.width(width).fillMaxHeight().drawBehind {
+            // The road: a band through the stop at marker height, starting at the first marker and ending at the last.
+            val y = size.height * 0.56f
+            val from = if (first) size.width / 2 else 0f
+            val to = if (last) size.width / 2 else size.width
+            drawLine(Palette.Ink, Offset(from, y), Offset(to, y), 34.dp.toPx())
+            drawLine(Color(0xFF4A3AA8), Offset(from, y), Offset(to, y), 25.dp.toPx())
+            val litTo = (size.width * lit).coerceIn(from, to)
+            if (litTo > from) drawLine(CREDIT, Offset(from, y), Offset(litTo, y), 25.dp.toPx())
+            drawLine(Color.White.copy(alpha = 0.55f), Offset(from, y), Offset(to, y), 3.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(14.dp.toPx(), 12.dp.toPx())))
+            // The marker the fighter stands on: in its rarity's colour once reached, dark before.
+            val c = Offset(size.width / 2, y)
+            drawOval(Palette.Ink, Offset(c.x - 50.dp.toPx(), c.y - 22.dp.toPx()), androidx.compose.ui.geometry.Size(100.dp.toPx(), 44.dp.toPx()))
+            drawOval(if (unlocked || isNext) rarity else Palette.PanelInset, Offset(c.x - 44.dp.toPx(), c.y - 17.dp.toPx()), androidx.compose.ui.geometry.Size(88.dp.toPx(), 34.dp.toPx()))
+            drawOval(Color.White.copy(alpha = if (isNext) 0.45f else 0.2f), Offset(c.x - 30.dp.toPx(), c.y - 10.dp.toPx()), androidx.compose.ui.geometry.Size(60.dp.toPx(), 16.dp.toPx()))
+        },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // The fighter fills the space above the road, its feet on the marker.
+        Box(Modifier.weight(0.56f).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+            FighterView(def, 0, Modifier.fillMaxHeight(if (isNext) 1f else 0.82f).fillMaxWidth(), pedestal = false, rays = isNext, locked = !unlocked)
+        }
+        Column(Modifier.weight(0.44f).fillMaxWidth().padding(top = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            GameText(def.name.substringBefore(' ').uppercase(), if (isNext) Type.Title else Type.Heading, outline = 3.dp)
             Badge(def.rarity.label.uppercase(), color = lerp(rarity, Color.Black, 0.35f))
-            FighterView(def, 0, Modifier.weight(1f).fillMaxWidth(), pedestal = false, rays = highlight, locked = !unlocked)
-            GameText(def.name.substringBefore(' ').uppercase(), Type.Heading, outline = 2.5.dp)
-            PlainText(def.role, Type.Small, maxLines = 1)
             Spacer(Modifier.height(6.dp))
             footer()
         }

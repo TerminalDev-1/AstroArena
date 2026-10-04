@@ -44,7 +44,6 @@ class SaveStore(context: Context) {
             put("prisms", s.prisms)
             put("credits", s.credits)
             put("glory", s.glory)
-            put("roadTarget", s.roadTarget?.name ?: "")
             put("selectedFighter", s.selectedFighter.name)
             put("selectedMode", s.selectedMode.name)
             put("claimedMilestones", JSONArray(s.claimedMilestones.sorted()))
@@ -159,7 +158,6 @@ class SaveStore(context: Context) {
                 prisms = o.optInt("prisms", d.prisms).coerceAtLeast(0),
                 credits = o.optInt("credits", d.credits).coerceAtLeast(0),
                 glory = o.optInt("glory", d.glory).coerceAtLeast(0),
-                roadTarget = FighterId.entries.firstOrNull { it.name == o.optString("roadTarget") },
                 fighters = fighters,
                 selectedFighter = if (fighters[selected]?.unlocked == true) selected else FighterId.JUNO,
                 selectedMode = enumOr(o.optString("selectedMode"), d.selectedMode),

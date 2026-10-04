@@ -105,15 +105,7 @@ private fun FighterGrid(save: SaveData, go: (Screen) -> Unit, open: (FighterId) 
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("FIGHTERS", { go(Screen.Home) }, save.bolts, save.prisms) {
-                // The Spark Road is where fighters are unlocked.
-                ChunkyButton({ go(Screen.Road) }, Modifier.size(170.dp, 46.dp), ButtonStyle.GREEN, lip = 4.dp) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        GameIcon(IconKind.CREDIT, Modifier.size(22.dp))
-                        GameText(" SPARK ROAD", Type.Label, outline = 2.dp)
-                    }
-                }
-            }
+            ScreenHeader("FIGHTERS", { go(Screen.Home) }, save.bolts, save.prisms)
             androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                 androidx.compose.foundation.lazy.grid.GridCells.Adaptive(if (ui.roomy) 170.dp else 138.dp),
                 Modifier.weight(1f).fillMaxWidth(),

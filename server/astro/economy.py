@@ -2,12 +2,12 @@
 
 A player's *profile* is the part of their progress the server is in charge of:
 
-    {"bolts", "prisms", "credits", "glory", "roadTarget", "bestCups", "fighters": {ID: {"unlocked", "level", "ownedSkins"}},
+    {"bolts", "prisms", "credits", "glory", "bestCups", "fighters": {ID: {"unlocked", "level", "ownedSkins"}},
      "claimedMilestones": [cups, ...], "lastDailyGiftDay", "lastFirstWinDay",
      "pass": {"season", "points", "claimed": [tier, ...]}}
 
 Players see Bolts as "Power Ups" and Prisms as "Crystals". Credits are progress along the Spark Road toward the
-fighter in "roadTarget"; once every fighter is unlocked they are earned as Glory instead.
+next fighter on it; once every fighter is unlocked they are earned as Glory instead.
 
 The keys are the ones the game's save file uses, so a profile can be started from a save and sent back to the
 game as it is. Every number here used to live in the client's `Balance.kt` / `Catalog.kt`; the client still has
@@ -133,12 +133,12 @@ CUP_TRACK = {
 
 # ---------------------------------------------------------------------------- Credits, the Spark Road and Glory
 
-# Credits are not a wallet: whatever is earned goes straight into the Spark Road, toward the fighter the player
-# has picked. When that fighter's cost is covered it is theirs to claim, and what is left over stays on the road.
+# Credits are not a wallet: whatever is earned goes straight into the Spark Road, toward the next fighter along
+# it. When that fighter's cost is covered it is theirs to claim, and what is left over stays on the road.
 # Fighters have a rarity; a rarer one takes more Credits. (Fighters are also sold in the shop for Prisms.)
 RARITIES = ["RARE", "EPIC", "MYTHIC", "LEGENDARY", "ULTRA"]
 ROAD_COST = {"RARE": 160, "EPIC": 420, "MYTHIC": 900, "LEGENDARY": 1600, "ULTRA": 2600}
-# Every fighter on the road with what it costs, the cheapest rarity first.
+# The road: every fighter in the order it is unlocked (the cheapest rarity first) with what it costs.
 SPARK_ROAD = sorted(((name, ROAD_COST[rarity]) for name, rarity in FIGHTER_RARITY.items()), key=lambda step: step[1])  # stable: the order above within a rarity
 
 
@@ -146,26 +146,11 @@ def _locked(profile: dict) -> list[tuple[str, int]]:
     return [(name, cost) for name, cost in SPARK_ROAD if not profile["fighters"].get(name, {}).get("unlocked")]
 
 
-def road_choices(profile: dict) -> list[str]:
-    """The fighters the player may put their Credits toward: the locked ones of the cheapest rarity that has any."""
-    locked = _locked(profile)
-    return [name for name, cost in locked if cost == locked[0][1]]
-
-
 def road_next(profile: dict) -> tuple[str, int] | None:
-    """The fighter the Credits are filling and what it costs, or None when every one is unlocked. It is the one
-    the player picked, while that is still a choice; otherwise the first choice."""
-    choices = road_choices(profile)
-    if not choices:
-        return None
-    name = profile.get("roadTarget") if profile.get("roadTarget") in choices else choices[0]
-    return name, dict(SPARK_ROAD)[name]
-
-
-def set_road_target(profile: dict, fighter: str) -> None:
-    if fighter not in road_choices(profile):
-        raise Refused(409, "that fighter isn't on offer on the Spark Road yet")
-    profile["roadTarget"] = fighter
+    """The fighter the Credits are filling and what it costs, or None when every one is unlocked. The road has a
+    fixed order: the first fighter along it that is still locked."""
+    locked = _locked(profile)
+    return locked[0] if locked else None
 
 
 def road_unlock(profile: dict) -> dict:
@@ -177,7 +162,6 @@ def road_unlock(profile: dict) -> dict:
     if profile["credits"] < cost:
         raise Refused(402, "not enough Credits")
     profile["credits"] -= cost
-    profile["roadTarget"] = ""
     reward = grant(profile, _f(name))
     # The road has just been finished: Credits left on it have nowhere to go, so they become Glory.
     if road_next(profile) is None and profile["credits"] > 0:
@@ -260,7 +244,7 @@ def claim_pass(profile: dict, tier: int, day: int) -> dict:
 
 def new_profile() -> dict:
     return {
-        "bolts": STARTING_BOLTS, "prisms": STARTING_PRISMS, "credits": 0, "glory": 0, "roadTarget": "", "bestCups": 0,
+        "bolts": STARTING_BOLTS, "prisms": STARTING_PRISMS, "credits": 0, "glory": 0, "bestCups": 0,
         "fighters": {name: {"unlocked": name == rules.STARTING_FIGHTER, "level": 1, "ownedSkins": [0]} for name in rules.FIGHTER_SKINS},
         "claimedMilestones": [], "lastDailyGiftDay": -1, "lastFirstWinDay": -1,
     }
@@ -270,7 +254,7 @@ def complete(profile: dict) -> dict:
     """Fills in what a profile stored by an older server doesn't have yet."""
     profile.setdefault("credits", 0)
     profile.setdefault("glory", 0)
-    profile.setdefault("roadTarget", "")
+    profile.pop("roadTarget", None)  # the road was briefly pick-your-own
     return profile
 
 

@@ -261,9 +261,6 @@ class Store:
     def road_unlock(self, player_id: str) -> dict:
         return self._change(player_id, economy.road_unlock)
 
-    def set_road_target(self, player_id: str, fighter: str) -> None:
-        return self._change(player_id, lambda p: economy.set_road_target(p, fighter))
-
     def claim_pass(self, player_id: str, tier: int) -> dict:
         return self._change(player_id, lambda p: economy.claim_pass(p, tier, today()))
 

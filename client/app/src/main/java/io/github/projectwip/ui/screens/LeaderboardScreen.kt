@@ -55,7 +55,7 @@ fun LeaderboardScreen(save: SaveData, go: (Screen) -> Unit) {
     LaunchedEffect(save.cups, save.settings.playerName) {
         val players = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server?.leaderboard() }
         // The server sends them best first.
-        standings = players.orEmpty().mapIndexed { i, p -> LeaderboardEntry(i + 1, p.name, p.cups, p.fighter, p.id == server?.playerId) }
+        standings = players.orEmpty().mapIndexed { i, p -> LeaderboardEntry(i + 1, p.name, p.cups, p.fighter, p.id == server?.playerId, p.glory) }
     }
     val rows = standings
     val me = rows?.firstOrNull { it.isPlayer }
@@ -111,6 +111,13 @@ private fun LeaderRow(e: LeaderboardEntry) {
         Spacer(Modifier.width(10.dp))
         GameText(e.name, Type.Heading, color = if (e.isPlayer) Palette.Gold else Color.White, outline = 2.5.dp)
         if (e.isPlayer) { Spacer(Modifier.width(8.dp)); Badge("YOU", color = Palette.GreenDeep) }
+        // Glory: the rank a player climbs once every fighter is theirs.
+        if (e.glory > 0) {
+            Spacer(Modifier.width(10.dp))
+            GameIcon(IconKind.GLORY, Modifier.size(26.dp))
+            Spacer(Modifier.width(4.dp))
+            PlainText(io.github.projectwip.data.Glory.rank(e.glory).title, Type.Label, color = Palette.Gold, maxLines = 1)
+        }
         Spacer(Modifier.weight(1f))
         GameIcon(IconKind.CUP, Modifier.size(32.dp))
         Spacer(Modifier.width(6.dp))

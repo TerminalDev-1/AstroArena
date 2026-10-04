@@ -145,19 +145,21 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             outline(heart)
         }
         IconKind.CREDIT -> {
-            // A Credit: a thin green card with a white stripe and a small spark, tilted, with another tucked behind it.
-            withTransform({ rotate(-14f, Offset(0.5f, 0.5f)) }) {
-                val round = androidx.compose.ui.geometry.CornerRadius(0.08f)
-                drawRoundRect(INK, Offset(0.2f, 0.17f), Size(0.72f, 0.5f), round)
-                drawRoundRect(Color(0xFF159A5E), Offset(0.245f, 0.215f), Size(0.63f, 0.41f), androidx.compose.ui.geometry.CornerRadius(0.05f))
-                drawRoundRect(INK, Offset(0.07f, 0.31f), Size(0.8f, 0.55f), round)
-                drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFD2FFDD), Color(0xFF3FE08A), Color(0xFF1FAE6C)), 0.33f, 0.86f),
-                    Offset(0.115f, 0.355f), Size(0.71f, 0.46f), androidx.compose.ui.geometry.CornerRadius(0.05f))
-                drawRect(Color.White.copy(alpha = 0.9f), Offset(0.115f, 0.44f), Size(0.71f, 0.085f))
-                val spark = poly(0.66f, 0.57f, 0.69f, 0.65f, 0.77f, 0.68f, 0.69f, 0.71f, 0.66f, 0.79f, 0.63f, 0.71f, 0.55f, 0.68f, 0.63f, 0.65f)
-                drawPath(spark, Color.White)
-                drawRoundRect(INK.copy(alpha = 0.55f), Offset(0.17f, 0.62f), Size(0.24f, 0.05f), androidx.compose.ui.geometry.CornerRadius(0.025f))
-                drawRoundRect(INK.copy(alpha = 0.55f), Offset(0.17f, 0.71f), Size(0.16f, 0.05f), androidx.compose.ui.geometry.CornerRadius(0.025f))
+            // A Credit: a pass card seen from the front. A spark emblem in a window on the left, two tabs on the right.
+            val round = androidx.compose.ui.geometry.CornerRadius(0.09f)
+            drawRoundRect(INK, Offset(0.03f, 0.17f), Size(0.94f, 0.68f), round)
+            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFC9FFE2), Color(0xFF3FE08A), Color(0xFF17A568)), 0.2f, 0.84f),
+                Offset(0.085f, 0.225f), Size(0.83f, 0.57f), androidx.compose.ui.geometry.CornerRadius(0.055f))
+            drawRect(Color.White.copy(alpha = 0.35f), Offset(0.085f, 0.225f), Size(0.83f, 0.1f))
+            // The window with the emblem.
+            drawRoundRect(INK, Offset(0.13f, 0.28f), Size(0.44f, 0.46f), androidx.compose.ui.geometry.CornerRadius(0.07f))
+            drawRoundRect(Color(0xFF0E6E49), Offset(0.165f, 0.315f), Size(0.37f, 0.39f), androidx.compose.ui.geometry.CornerRadius(0.045f))
+            val spark = poly(0.35f, 0.34f, 0.395f, 0.465f, 0.51f, 0.51f, 0.395f, 0.555f, 0.35f, 0.68f, 0.305f, 0.555f, 0.19f, 0.51f, 0.305f, 0.465f)
+            drawPath(spark, Color.White)
+            // The tabs.
+            for (y in floatArrayOf(0.34f, 0.56f)) {
+                drawRoundRect(INK, Offset(0.62f, y - 0.035f), Size(0.26f, 0.17f), androidx.compose.ui.geometry.CornerRadius(0.04f))
+                drawRoundRect(Color(0xFFE9FFF3), Offset(0.65f, y - 0.005f), Size(0.2f, 0.11f), androidx.compose.ui.geometry.CornerRadius(0.025f))
             }
         }
         IconKind.GLORY -> {

@@ -192,7 +192,7 @@ class GameServer(context: Context) {
         val fighters = o.optJSONObject("fighters")
         return ServerProfile(
             bolts = o.optInt("bolts"), prisms = o.optInt("prisms"), bestCups = o.optInt("bestCups"), credits = o.optInt("credits"),
-            glory = o.optInt("glory"), roadTarget = fighterNamed(o.optString("roadTarget")),
+            glory = o.optInt("glory"),
             fighters = FighterId.entries.associateWith { id ->
                 val f = fighters?.optJSONObject(id.name)
                 FighterProgress(
@@ -240,9 +240,6 @@ class GameServer(context: Context) {
 
     /** Claims the Cup Track reward at [cups]. What comes back is what was actually given (owned things are paid out instead). */
     fun claimMilestone(cups: Int): Reward? = act("/v1/track/claim", JSONObject().put("cups", cups))?.optJSONObject("reward")?.let { reward(it) }
-
-    /** Picks which of the fighters on offer the Credits go toward. */
-    fun setRoadTarget(fighter: FighterId): Boolean? = act("/v1/road/target", JSONObject().put("fighter", fighter.name))?.let { true }
 
     /** Claims the Spark Road fighter the Credits have covered. Null if they haven't yet (see [lastError]). */
     fun roadUnlock(): Reward? = act("/v1/road/unlock")?.optJSONObject("reward")?.let { reward(it) }

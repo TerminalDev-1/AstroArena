@@ -112,22 +112,15 @@ data class RoadStep(val fighter: FighterId, val cost: Int)
 
 /**
  * The Spark Road. Credits are not kept in a wallet: whatever is earned goes straight into the road, toward the
- * fighter the player picked from those on offer (the locked ones of the cheapest rarity that has any). When
- * that fighter's cost is covered it is theirs to claim. The server does all of it (`server/astro/economy.py`);
- * this copy is for showing the road.
+ * next fighter along it. The order is fixed, the cheapest rarity first. When that fighter's cost is covered it
+ * is theirs to claim. The server does all of it (`server/astro/economy.py`); this copy is for showing the road.
  */
 object SparkRoad {
-    /** Every fighter on the road, the cheapest rarity first. */
+    /** Every fighter on the road, in the order they are unlocked. */
     val steps: List<RoadStep> = Balance.fighters.filter { it.rarity != Rarity.STARTER }.map { RoadStep(it.id, it.rarity.roadCost) }.sortedBy { it.cost }
 
-    /** The fighters the player may put their Credits toward right now. */
-    fun choices(save: SaveData): List<RoadStep> {
-        val locked = steps.filter { !save.progress(it.fighter).unlocked }
-        return locked.filter { it.cost == locked.first().cost }
-    }
-
-    /** The fighter the Credits are filling, or null when the road is finished. */
-    fun next(save: SaveData): RoadStep? = choices(save).let { on -> on.firstOrNull { it.fighter == save.roadTarget } ?: on.firstOrNull() }
+    /** The fighter the Credits are filling: the first one along the road that is still locked. Null when the road is finished. */
+    fun next(save: SaveData): RoadStep? = steps.firstOrNull { !save.progress(it.fighter).unlocked }
 }
 
 /** A Glory rank: its title, and how far into it the player is. */

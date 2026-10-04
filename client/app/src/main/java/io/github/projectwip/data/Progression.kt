@@ -75,7 +75,6 @@ data class ServerProfile(
     val bestCups: Int,
     val credits: Int = 0,
     val glory: Int = 0,
-    val roadTarget: FighterId? = null,
     /** [FighterProgress.skin] is not the server's business: which colourway is worn is chosen on the device. */
     val fighters: Map<FighterId, FighterProgress>,
     val claimedMilestones: Set<Int>,
@@ -141,7 +140,7 @@ object Progression {
         }
         return base.copy(
             bolts = profile.bolts.coerceAtLeast(0), prisms = profile.prisms.coerceAtLeast(0), credits = profile.credits.coerceAtLeast(0),
-            glory = profile.glory.coerceAtLeast(0), roadTarget = profile.roadTarget,
+            glory = profile.glory.coerceAtLeast(0),
             bestCups = maxOf(profile.bestCups, cups),
             fighters = fighters,
             selectedFighter = if (fighters[save.selectedFighter]?.unlocked == true) save.selectedFighter else FighterId.JUNO,

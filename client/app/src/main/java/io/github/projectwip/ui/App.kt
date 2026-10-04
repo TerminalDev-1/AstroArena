@@ -356,7 +356,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             // Developers only, and only if they switched it on in Settings > Developer.
             val devMenu = dev && save.settings.devMenu
             if (devMenu && screen !is Screen.Match && capsule == null && haul == null && reveal == null) {
-                io.github.projectwip.ui.screens.DebugButton(Modifier.align(Alignment.BottomStart)) { debugMenu = true }
+                // On the home screen the bottom-left corner belongs to the Spark Pass and Spark Road cards.
+                io.github.projectwip.ui.screens.DebugButton(if (screen is Screen.Home) Modifier.align(Alignment.TopStart).padding(start = 96.dp, top = 58.dp) else Modifier.align(Alignment.BottomStart)) { debugMenu = true }
             }
             if (debugMenu && devMenu) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
             // On top of everything: the loading screen, then (if a newer release exists) the update screen.
@@ -364,7 +365,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             if (screen !is Screen.Match && capsule == null && haul == null && reveal == null) {
                 PlainText(
                     if (serverStatus.online) "● ONLINE" else "● OFFLINE MODE · practice only", Type.Small,
-                    Modifier.align(Alignment.BottomStart).padding(start = if (devMenu) 48.dp else 14.dp, bottom = 12.dp),
+                    if (screen is Screen.Home) Modifier.align(Alignment.TopStart).padding(start = 22.dp, top = 68.dp)
+                    else Modifier.align(Alignment.BottomStart).padding(start = if (devMenu) 48.dp else 14.dp, bottom = 12.dp),
                     color = if (serverStatus.online) Palette.Positive else Palette.TextDim,
                 )
             }
