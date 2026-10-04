@@ -369,7 +369,18 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     for (m in GameMode.entries) {
-                        ModeCard(m, m == save.selectedMode, Modifier.weight(1f), showMap = ui.roomy) { repo.selectMode(m) }
+                        // With Boss Mode picked the cards are a little shorter, to leave room for the row of bosses underneath.
+                        ModeCard(m, m == save.selectedMode, Modifier.weight(1f), showMap = ui.roomy, short = save.selectedMode == GameMode.BOSS) { repo.selectMode(m) }
+                    }
+                }
+                if (save.selectedMode == GameMode.BOSS) {
+                    // Boss Mode: which boss to fight, or leave it to chance.
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GameText("BOSS", Type.Heading, outline = 2.5.dp)
+                        Spacer(Modifier.width(6.dp))
+                        BossChoice("RANDOM", "Any of them", null, save.selectedBoss == null, Modifier.weight(1f)) { repo.selectBoss(null) }
+                        for (b in Balance.bosses) BossChoice(b.name.uppercase(), b.title, b, save.selectedBoss == b.boss, Modifier.weight(1f)) { repo.selectBoss(b.boss) }
                     }
                 }
                 Spacer(Modifier.height(14.dp))
@@ -392,10 +403,28 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
     }
 }
 
+/** One boss to pick in the mode picker: its portrait (a skull for "random"), name and what it is. */
 @Composable
-private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap: Boolean, onClick: () -> Unit) {
+private fun BossChoice(name: String, title: String, def: io.github.projectwip.data.FighterDef?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    ChunkyButton(onClick, modifier.height(56.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, lip = 4.dp, cut = 12.dp, sound = Sound.UI_SELECT) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
+                if (def != null) io.github.projectwip.ui.FighterView(def, 0, Modifier.fillMaxSize(), pedestal = false)
+                else GameIcon(IconKind.SKULL, Modifier.size(32.dp))
+            }
+            Spacer(Modifier.width(6.dp))
+            Column {
+                GameText(name, Type.Label, outline = 2.dp)
+                PlainText(title, Type.Small, color = if (selected) Color.White else Palette.TextDim, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap: Boolean, short: Boolean = false, onClick: () -> Unit) {
     val arena = remember(m) { arenaFor(m) }
-    ChunkyButton(onClick, modifier.height(if (showMap) 330.dp else 190.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, cut = 18.dp, sound = Sound.UI_SELECT) {
+    ChunkyButton(onClick, modifier.height(if (!showMap) 190.dp else if (short) 268.dp else 330.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, cut = 18.dp, sound = Sound.UI_SELECT) {
         Column(Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GameIcon(modeIcon(m), Modifier.size(26.dp))

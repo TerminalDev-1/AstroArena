@@ -92,7 +92,7 @@ fun MatchScreen(
     var started by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         val plan = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            server?.planMatch(config.mode, config.playerFighter, config.playerLevel, config.difficulty)
+            server?.planMatch(config.mode, config.playerFighter, config.playerLevel, config.difficulty, config.boss)
         }
         val planned = if (plan == null) config
             else config.copy(

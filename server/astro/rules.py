@@ -17,6 +17,9 @@ PLACEMENT_CUPS = [10, 8, 6, 4, 2, 0, -1, -2, -3, -4]
 DIFFICULTIES = tuple(CUP_BONUS)
 OUTCOMES = ("VICTORY", "DEFEAT", "DRAW")
 
+# The bosses of Boss Mode. A player may ask for one; otherwise the match's seed picks. Keep in step with BossKind.
+BOSSES = ("BARRAGE", "SWEEPER", "STAMPEDE")
+
 # Bots in each mode (the names the server hands out).
 MODES = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 5, "BOSS": 0, "TRAINING": 0}
 

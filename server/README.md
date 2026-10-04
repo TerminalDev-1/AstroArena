@@ -116,7 +116,7 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `GET /v1/me` * | `{account}` |
 | `GET /v1/save` * | `{revision, updatedAt, save}` or 404 |
 | `PUT /v1/save` * `{save}` | `{revision, account}` |
-| `POST /v1/matches` * `{mode, fighter}` | `{matchId, seed, botNames, difficulty, fighter, level, bots, refereed}`; 409 if the fighter isn't unlocked |
+| `POST /v1/matches` * `{mode, fighter, boss}` (`boss` is optional: which Boss Mode boss to fight) | `{matchId, seed, botNames, difficulty, fighter, level, bots, boss, refereed}`; 409 if the fighter isn't unlocked |
 | `POST /v1/matches/<id>/result` * `{inputs}` (base64 of the gzipped input log; the device's own result fields are only used when there is no referee) | `{verified, report, cupDelta, cups, drop, bolts, firstWinPrisms, account}`, or 422 if refused |
 | `POST /v1/drops/open` * `{luck, free}` | `{tier, pieces, reward, account}`, or 409 if there are none |
 | `POST /v1/drops/open-all` * `{luck}` | `{results: [{tier, pieces, reward}, ...], account}`: every drop the player holds, in the order opened (pieces that split off are left to open next); 409 if there are none |

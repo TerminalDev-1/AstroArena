@@ -344,9 +344,12 @@ def make_handler(game: Game, quiet: bool = False):
             # The difficulty is the one the player picked earlier and the server approved, not whatever this request says;
             # the fighter's level is the server's; and the bots behave as bots.cfg says right now.
             difficulty = game.difficulty(player)
+            # Boss Mode: which boss to fight is the player's to choose. Anything else means "let the seed pick".
+            boss = str(data.get("boss") or "").upper()
+            boss = boss if mode == "BOSS" and boss in rules.BOSSES else ""
             try:
                 plan = game.store.plan_match(
-                    player["id"], mode, str(data.get("fighter") or "JUNO"), difficulty, rules.MODES[mode], game.config.bots().get(difficulty, {})
+                    player["id"], mode, str(data.get("fighter") or "JUNO"), difficulty, rules.MODES[mode], game.config.bots().get(difficulty, {}), boss
                 )
             except Refused as refused:
                 return self._error(refused.status, refused.message)
@@ -371,7 +374,8 @@ def make_handler(game: Game, quiet: bool = False):
                     if count_ticks(raw) / TICKS_PER_SECOND > time.time() - match["started_at"] + 5:
                         raise Refused(422, "result refused: more match than time")
                     judged = game.referee.judge(
-                        match["mode"], match["fighter"], match["level"], match["difficulty"], match["seed"], match["names"], match["bots"], raw
+                        match["mode"], match["fighter"], match["level"], match["difficulty"], match["seed"], match["names"], match["bots"], raw,
+                        match.get("boss") or "",
                     )
                 except Refused as refused:
                     if refused.status != 503:  # 503: the referee itself broke; that isn't the player's doing

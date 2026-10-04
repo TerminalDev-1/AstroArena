@@ -51,6 +51,8 @@ fun main() {
             mode = GameMode.valueOf(fields.getValue("mode")),
             seed = fields.getValue("seed").toLong(),
             botNames = fields["names"].orEmpty().split(',').filter { it.isNotBlank() },
+            // Boss Mode: the boss the player asked for, if they asked for one.
+            boss = fields["boss"]?.let { name -> io.github.projectwip.data.BossKind.entries.firstOrNull { it.name == name } },
         )
         val verdict = Referee.judge(config, Base64.getDecoder().decode(fields["inputs"].orEmpty()))
         val r = verdict.report

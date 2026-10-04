@@ -371,6 +371,19 @@ class Api(unittest.TestCase):
         # A result for a match the server never planned gets nothing either.
         self.assertEqual(self.call("POST", "/v1/matches/9999/result", win, me["token"])[0], 409)
 
+    def test_the_player_picks_the_boss(self):
+        me = self.player()
+        token = me["token"]
+        # Asked for by name; anything else, or any other mode, leaves it to the seed.
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS", "boss": "sweeper"}, token)[1]["boss"], "SWEEPER")
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS", "boss": "NOPE"}, token)[1]["boss"], "")
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS"}, token)[1]["boss"], "")
+        _, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "boss": "SWEEPER"}, token)
+        self.assertEqual(plan["boss"], "")
+        # The choice is kept with the match, for the referee.
+        _, plan = self.call("POST", "/v1/matches", {"mode": "BOSS", "boss": "STAMPEDE"}, token)
+        self.assertEqual(self.store.open_match(me["id"], plan["matchId"])["boss"], "STAMPEDE")
+
     def test_the_server_opens_drops(self):
         save = {"cups": 0, "capsules": 2, "bolts": 100, "prisms": 10}
         me = self.player(save=save)

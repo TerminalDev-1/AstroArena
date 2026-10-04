@@ -73,12 +73,14 @@ class Referee:
             return "referee.jar is missing (build it with `gradlew :referee:installReferee` in client/)"
         return "Java was not found (install Java 17 or newer, or set JAVA_HOME)"
 
-    def judge(self, mode: str, fighter: str, level: int, difficulty: str, seed: int, names: list[str], bots: dict, raw: bytes) -> dict:
+    def judge(self, mode: str, fighter: str, level: int, difficulty: str, seed: int, names: list[str], bots: dict, raw: bytes, boss: str = "") -> dict:
         """Plays the match back and returns {outcome, placement, kos, deaths, damage, mvp, ticks, finished}."""
         lines = [
             "mode=%s" % mode, "fighter=%s" % fighter, "level=%d" % level, "difficulty=%s" % difficulty,
             "seed=%d" % seed, "names=%s" % ",".join(names),
         ]
+        if boss:
+            lines.append("boss=%s" % boss)
         for key, value in sorted(bots.items()):
             lines.append("bot.%s=%s" % (key, ("true" if value else "false") if isinstance(value, bool) else repr(float(value))))
         lines.append("inputs=%s" % base64.b64encode(raw).decode("ascii"))

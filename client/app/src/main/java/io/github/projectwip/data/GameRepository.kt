@@ -65,6 +65,9 @@ class GameRepository(private val store: SaveStore) {
 
     fun selectMode(mode: GameMode) = commit(_save.value.copy(selectedMode = mode))
 
+    /** Boss Mode: which boss to fight (null = a random one each time). */
+    fun selectBoss(boss: BossKind?) = commit(_save.value.copy(selectedBoss = boss))
+
     fun selectSkin(id: FighterId, skin: Int) = commit(Progression.selectSkin(_save.value, id, skin))
 
     fun updateSettings(transform: (Settings) -> Settings) = commit(_save.value.copy(settings = transform(_save.value.settings)))

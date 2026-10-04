@@ -444,7 +444,8 @@ fun connectToServer(server: io.github.projectwip.net.GameServer, repo: GameRepos
 
 fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
     val p = save.progress(save.selectedFighter)
-    return MatchConfig(save.selectedFighter, p.level, p.skin, save.settings.playerName, save.settings.botDifficulty, mode = save.selectedMode)
+    return MatchConfig(save.selectedFighter, p.level, p.skin, save.settings.playerName, save.settings.botDifficulty, mode = save.selectedMode,
+        boss = save.selectedBoss.takeIf { save.selectedMode == io.github.projectwip.data.GameMode.BOSS })
 }
 
 fun rewardLabel(r: Reward): String = when (r) {

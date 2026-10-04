@@ -353,9 +353,11 @@ class GameServer(context: Context) {
     }
 
     /** Asks the server to set a match up. Null (quickly) when there is no server to ask. */
-    fun planMatch(mode: GameMode, fighter: FighterId, level: Int, difficulty: BotDifficulty): MatchPlan? {
+    fun planMatch(mode: GameMode, fighter: FighterId, level: Int, difficulty: BotDifficulty, boss: io.github.projectwip.data.BossKind? = null): MatchPlan? {
         if (!usable) return null
         val body = JSONObject().put("mode", mode.name).put("fighter", fighter.name).put("level", level).put("difficulty", difficulty.name)
+        // Boss Mode: the boss the player picked, which the server keeps so that its replay fights the same one.
+        if (boss != null) body.put("boss", boss.name)
         val r = call("POST", "/v1/matches", body, auth = true, timeoutMs = 1500)
         val o = r?.body
         if (r == null || r.code != 201 || o == null) {

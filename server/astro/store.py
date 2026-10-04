@@ -89,6 +89,7 @@ MATCH_COLUMNS = [
     ("bots", "TEXT"),                         # the bot settings the match was played with (JSON)
     ("ticks", "INTEGER"),                     # how long the match ran, as the referee counted it
     ("verified", "INTEGER NOT NULL DEFAULT 0"),  # 1 = the referee replayed it and this is its result; 0 = the device's claim
+    ("boss", "TEXT"),                         # Boss Mode: the boss the player asked for ('' or NULL = the seed picks)
 ]
 
 BOT_NAMES = [
@@ -352,7 +353,7 @@ class Store:
 
     # ------------------------------------------------------------------ matches
 
-    def plan_match(self, player_id: str, mode: str, fighter: str, difficulty: str, bots: int, bot_settings: dict | None = None) -> dict:
+    def plan_match(self, player_id: str, mode: str, fighter: str, difficulty: str, bots: int, bot_settings: dict | None = None, boss: str = "") -> dict:
         """The server decides the match: its seed (which fixes the bots' fighters and behaviour), the bots' names,
         the difficulty and how the bots behave. The fighter has to be one the player has unlocked, and it plays at
         the level the server holds for it. All of this is kept, so the referee can replay the match later."""
@@ -365,11 +366,11 @@ class Store:
                 raise Refused(409, "that fighter isn't unlocked")
             level = int(entry["level"])
             cur = self._db.execute(
-                "INSERT INTO matches (player_id, mode, fighter, level, difficulty, seed, started_at, names, bots) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (player_id, mode[:24], fighter, level, difficulty[:12], seed, time.time(), json.dumps(names), json.dumps(bot_settings)),
+                "INSERT INTO matches (player_id, mode, fighter, level, difficulty, seed, started_at, names, bots, boss) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (player_id, mode[:24], fighter, level, difficulty[:12], seed, time.time(), json.dumps(names), json.dumps(bot_settings), boss),
             )
             match_id = cur.lastrowid
-        return {"matchId": match_id, "seed": seed, "botNames": names, "difficulty": difficulty, "fighter": fighter, "level": level, "bots": bot_settings}
+        return {"matchId": match_id, "seed": seed, "botNames": names, "difficulty": difficulty, "fighter": fighter, "level": level, "bots": bot_settings, "boss": boss}
 
     def open_match(self, player_id: str, match_id: int) -> dict | None:
         """A match this player was given that hasn't been reported yet, with everything needed to replay it."""
