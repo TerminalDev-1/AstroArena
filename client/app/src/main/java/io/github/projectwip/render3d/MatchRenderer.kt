@@ -579,23 +579,40 @@ class MatchRenderer(
                 val px = lerp(p.prevX, p.x, alpha)
                 val pz = lerp(p.prevY, p.y, alpha)
                 val yaw = -Math.toDegrees(atan2(dz, dx).toDouble()).toFloat()
-                if (inp.aimingSuper) lit.v4("uTint", 1f, 0.84f, 0.25f, 0.42f) else lit.v4("uTint", 1f, 1f, 1f, 0.32f)
                 val a = world.arena
+                // Every reticle is drawn in three layers so it reads on any floor: a dark rim, a bright fill that
+                // pulses, and a solid mark (a bar across the far end of a beam, a line down the middle of a fan).
+                val pulse = 0.5f + 0.5f * sin(time * 7f)
+                fun tint(layer: Int) = when {
+                    layer == 0 -> lit.v4("uTint", 0.06f, 0.03f, 0.16f, 0.45f)
+                    layer == 2 -> lit.v4("uTint", 1f, 1f, 1f, 1f)
+                    // The fill has a colour of its own, so it stands out from pale floors as well as dark ones:
+                    // bright cyan for the attack, gold for the super.
+                    inp.aimingSuper -> lit.v4("uTint", 1f, 0.78f, 0.1f, 0.7f + 0.15f * pulse)
+                    else -> lit.v4("uTint", 0.15f, 0.85f, 1f, 0.62f + 0.15f * pulse)
+                }
+                fun beam(length: Float, width: Float) {
+                    tint(0); setModel(px - dx * 0.06f, 0.045f, pz - dz * 0.06f, length + 0.12f, 1f, width + 0.16f, yaw); rect.draw()
+                    tint(1); setModel(px, 0.05f, pz, length, 1f, width, yaw); rect.draw()
+                    tint(2); setModel(px + dx * (length - 0.1f), 0.055f, pz + dz * (length - 0.1f), 0.1f, 1f, width, yaw); rect.draw()
+                }
+                fun fan(range: Float, degrees: Float) {
+                    tint(0); setModel(px, 0.045f, pz, range + 0.12f, 1f, range + 0.12f, yaw); sector(degrees + 5f).draw()
+                    tint(1); setModel(px, 0.05f, pz, range, 1f, range, yaw); sector(degrees).draw()
+                    // A solid line down the middle shows where the fan is pointed and how far it reaches.
+                    tint(2); setModel(px, 0.055f, pz, range, 1f, 0.07f, yaw); rect.draw()
+                }
                 if (inp.aimingSuper) {
                     val s = p.def.superSpec
                     when (s.kind) {
-                        SuperKind.VOLLEY -> { setModel(px, 0.05f, pz, s.range, 1f, s.range, yaw); sector(s.spreadDegrees + 8f).draw() }
-                        SuperKind.PIERCE -> { val l = clip(a, px, pz, dx, dz, s.range); setModel(px, 0.05f, pz, l, 1f, s.radius * 3.2f, yaw); rect.draw() }
-                        SuperKind.RAM -> { setModel(px, 0.05f, pz, s.range, 1f, p.radius * 2.2f, yaw); rect.draw() }
+                        SuperKind.VOLLEY -> fan(s.range, s.spreadDegrees + 8f)
+                        SuperKind.PIERCE -> beam(clip(a, px, pz, dx, dz, s.range), s.radius * 3.2f)
+                        SuperKind.RAM -> beam(s.range, p.radius * 2.2f)
                     }
                 } else {
                     val at = p.def.attack
-                    if (at.shape == AttackShape.SPREAD) {
-                        setModel(px, 0.05f, pz, at.range, 1f, at.range, yaw); sector(at.spreadDegrees + 8f).draw()
-                    } else {
-                        val l = clip(a, px, pz, dx, dz, at.range)
-                        setModel(px, 0.05f, pz, l, 1f, if (at.shape == AttackShape.BURST) 0.55f else 0.34f, yaw); rect.draw()
-                    }
+                    if (at.shape == AttackShape.SPREAD) fan(at.range, at.spreadDegrees + 8f)
+                    else beam(clip(a, px, pz, dx, dz, at.range), if (at.shape == AttackShape.BURST) 0.55f else 0.34f)
                 }
             }
         }

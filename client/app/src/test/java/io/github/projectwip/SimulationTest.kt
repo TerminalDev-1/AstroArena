@@ -281,6 +281,19 @@ class SimulationTest {
         }
     }
 
+    @Test fun theBossNeverHeals() {
+        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
+        val boss = m.world.fighters.first { it.scale > 1f }
+        val me = m.world.fighters.first { it.scale == 1f }
+        boss.hp = boss.maxHp / 2
+        me.hp = me.maxHp / 2
+        // Long enough out of combat for anyone else to be healing.
+        boss.sinceDamaged = 60f; boss.sinceAttack = 60f; me.sinceDamaged = 60f; me.sinceAttack = 60f
+        m.world.regenerate(boss, 1f); m.world.regenerate(me, 1f)
+        assertEquals("the boss stays hurt", boss.maxHp / 2, boss.hp)
+        assertTrue("the player still heals", me.hp > me.maxHp / 2)
+    }
+
     /** Difficulty must come from behaviour: Elite bots should beat Easy bots with identical stats. */
     @Test fun eliteBeatsEasyWithSameStats() {
         var eliteWins = 0

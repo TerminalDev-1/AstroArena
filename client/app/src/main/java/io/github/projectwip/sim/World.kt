@@ -261,7 +261,12 @@ class World(
             f.ammo = (f.ammo + dt / f.def.reloadSeconds).coerceAtMost(f.def.ammoMax.toFloat())
         }
 
-        // --- regeneration when out of combat
+        regenerate(f, dt)
+    }
+
+    /** Healing when out of combat. The giant in Boss Mode never heals: damage done to it stays done. */
+    fun regenerate(f: Fighter, dt: Float) {
+        if (rules.boss && f.scale > 1f) return
         if (f.sinceDamaged > Balance.REGEN_DELAY_SECONDS && f.sinceAttack > Balance.REGEN_DELAY_SECONDS && f.hp < f.maxHp) {
             f.hp = (f.hp + (f.maxHp * Balance.REGEN_FRACTION_PER_SECOND * dt).toInt().coerceAtLeast(1)).coerceAtMost(f.maxHp)
         }
