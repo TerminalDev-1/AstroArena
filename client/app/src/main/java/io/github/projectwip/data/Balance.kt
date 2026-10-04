@@ -130,8 +130,10 @@ object Balance {
     const val SHIELD_MAX = 6300
     const val REGEN_DELAY_SECONDS = 3f
     const val REGEN_FRACTION_PER_SECOND = 0.12f
+    /** Bots heal (and shield) at half the pace a player does. The one place a bot's numbers differ from a player's. */
+    const val BOT_REGEN_FRACTION_PER_SECOND = 0.06f
     /** A giant heals too, but far more slowly: this share of its (much larger) health a second. */
-    const val GIANT_REGEN_FRACTION_PER_SECOND = 0.02f
+    const val GIANT_REGEN_FRACTION_PER_SECOND = 0.005f
 
     // ---- Starting wallet ----
     const val STARTING_BOLTS = 60

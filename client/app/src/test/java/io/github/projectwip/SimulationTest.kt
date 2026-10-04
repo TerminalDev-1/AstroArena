@@ -281,31 +281,29 @@ class SimulationTest {
         }
     }
 
-    @Test fun giantsHealSlowlyAndAttackingDoesNotStopHealing() {
-        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
-        val boss = m.world.fighters.first { it.scale > 1f }
-        val me = m.world.fighters.first { it.scale == 1f }
-        boss.hp = boss.maxHp / 2
-        me.hp = me.maxHp / 2
-        // Neither has been hit for a while; the player has only just fired.
-        boss.sinceDamaged = 60f; me.sinceDamaged = 60f; me.sinceAttack = 0f
-        m.world.regenerate(boss, 1f); m.world.regenerate(me, 1f)
-        val bossShare = (boss.hp - boss.maxHp / 2).toFloat() / boss.maxHp
+    @Test fun fightersAlwaysHealBotsMoreSlowlyAndGiantsSlowest() {
+        // A human player and a bot of the same kind, in the same match.
+        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 4L))
+        val me = m.world.fighters.first { !it.isBot }
+        val bot = m.world.fighters.first { it.isBot }
+        me.hp = me.maxHp / 2; bot.hp = bot.maxHp / 2
+        // Both have just been hit and have just fired: neither stops a fighter healing.
+        me.sinceDamaged = 0f; me.sinceAttack = 0f; bot.sinceDamaged = 0f; bot.sinceAttack = 0f
+        m.world.regenerate(me, 1f); m.world.regenerate(bot, 1f)
         val myShare = (me.hp - me.maxHp / 2).toFloat() / me.maxHp
-        assertTrue("attacking doesn't stop the player healing", myShare > 0.1f)
-        assertTrue("the boss heals", bossShare > 0f)
-        assertTrue("but far more slowly", bossShare < myShare / 4)
-        // Being hit does stop it, for a few seconds.
-        val before = me.hp
-        me.sinceDamaged = 1f
-        m.world.regenerate(me, 1f)
-        assertEquals(before, me.hp)
-        // The Training Area's giant heals slowly as well, and no giant has a shield.
-        val t = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, humanPlayer = false, seed = 4L))
-        val giant = t.world.fighters.first { it.scale > 1f }
-        giant.hp = giant.maxHp / 2; giant.sinceDamaged = 60f
-        t.world.regenerate(giant, 1f)
-        assertTrue(giant.hp > giant.maxHp / 2)
+        val botShare = (bot.hp - bot.maxHp / 2).toFloat() / bot.maxHp
+        assertTrue("the player heals even while being hit", myShare > 0.1f)
+        assertEquals("a bot heals at half the pace", myShare / 2, botShare, 0.005f)
+        // A giant waits a few seconds after being hit, and then heals far more slowly.
+        val b = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
+        val boss = b.world.fighters.first { it.scale > 1f }
+        boss.hp = boss.maxHp / 2; boss.sinceDamaged = 1f
+        b.world.regenerate(boss, 1f)
+        assertEquals("not while it is being hit", boss.maxHp / 2, boss.hp)
+        boss.sinceDamaged = 60f
+        b.world.regenerate(boss, 1f)
+        val bossShare = (boss.hp - boss.maxHp / 2).toFloat() / boss.maxHp
+        assertTrue(bossShare > 0f && bossShare < botShare / 8)
     }
 
     @Test fun aShieldBuildsOnTopOfFullHealth() {
@@ -322,10 +320,6 @@ class SimulationTest {
         assertEquals("up to its cap", io.github.projectwip.data.Balance.SHIELD_MAX, me.shieldHp)
         assertEquals(me.maxHp, me.hp)
         assertEquals("giants have none", 0, boss.shieldHp)
-        // Still in a fight: nothing builds.
-        me.shieldHp = 0; me.sinceDamaged = 1f
-        m.world.regenerate(me, 1f)
-        assertEquals(0, me.shieldHp)
     }
 
     /** Difficulty must come from behaviour: Elite bots should beat Easy bots with identical stats. */

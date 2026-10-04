@@ -27,7 +27,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - `sim/`, `ai/`, `data/` and `audio/SfxSynth.kt` are pure Kotlin (no Android imports); they run in JVM tests.
 - Humans and bots drive fighters through the same `Control`; bot difficulty is behaviour only, never stats or
-  vision. Visibility goes through `World.isVisibleTo`.
+  vision. One exception, by the user's decision: bots heal and shield at half a player's pace
+  (`BOT_REGEN_FRACTION_PER_SECOND`), the same at every difficulty. Visibility goes through `World.isVisibleTo`.
 - Team code must not assume two teams when `rules.freeForAll`.
 - All balance numbers live in `data/Balance.kt` and `data/Catalog.kt`; progression is pure functions in `Progression`.
 - New save field: update both `toJson` and `fromJson` in `SaveStore`, with an `opt*` default.

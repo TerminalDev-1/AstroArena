@@ -265,14 +265,18 @@ class World(
     }
 
     /**
-     * Healing. It starts once a fighter has gone a few seconds without being hit, and attacking doesn't stop it:
-     * a fighter who keeps shooting and keeps dodging keeps healing. Health comes back first; once it is full the
-     * same trickle builds a shield on top of it, up to [Balance.SHIELD_MAX]. A giant (Boss Mode, or the Training
-     * Area's) heals too, but much more slowly, and has no shield.
+     * Healing. A fighter heals all the time: attacking doesn't stop it, and neither does being hit. Health comes
+     * back first; once it is full the same trickle builds a shield on top of it, up to [Balance.SHIELD_MAX]. Bots
+     * heal at half a player's pace. Giants and the Training Area's targets (anything without a shield) are the
+     * exception: they wait a few seconds after being hit, and a giant heals far more slowly.
      */
     fun regenerate(f: Fighter, dt: Float) {
-        if (f.sinceDamaged <= Balance.REGEN_DELAY_SECONDS) return
-        val rate = if (f.scale > 1f) Balance.GIANT_REGEN_FRACTION_PER_SECOND else Balance.REGEN_FRACTION_PER_SECOND
+        if (!f.canShield && f.sinceDamaged <= Balance.REGEN_DELAY_SECONDS) return
+        val rate = when {
+            f.scale > 1f -> Balance.GIANT_REGEN_FRACTION_PER_SECOND
+            f.isBot -> Balance.BOT_REGEN_FRACTION_PER_SECOND
+            else -> Balance.REGEN_FRACTION_PER_SECOND
+        }
         val gain = (f.maxHp * rate * dt).toInt().coerceAtLeast(1)
         if (f.hp < f.maxHp) f.hp = (f.hp + gain).coerceAtMost(f.maxHp)
         else if (f.canShield && f.shieldHp < Balance.SHIELD_MAX) f.shieldHp = (f.shieldHp + gain).coerceAtMost(Balance.SHIELD_MAX)
