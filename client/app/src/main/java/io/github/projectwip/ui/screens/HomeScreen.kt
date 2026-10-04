@@ -415,7 +415,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 when (m) {
                     GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. The higher you finish, the more Cups."
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win to earn Cups."
-                    GameMode.BOSS -> "A giant version of a random fighter. Knock it out to win; you have unlimited lives. It never heals, and its strength never changes. Pays Power Ups only."
+                    GameMode.BOSS -> "A giant version of a random fighter. Knock it out to win; you have unlimited lives. It heals slowly if you leave it alone, and its strength never changes. Pays Power Ups only."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a boss that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },
                 Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 5,

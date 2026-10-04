@@ -281,23 +281,31 @@ class SimulationTest {
         }
     }
 
-    @Test fun theBossNeverHeals() {
+    @Test fun giantsHealSlowlyAndAttackingDoesNotStopHealing() {
         val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
         val boss = m.world.fighters.first { it.scale > 1f }
         val me = m.world.fighters.first { it.scale == 1f }
         boss.hp = boss.maxHp / 2
         me.hp = me.maxHp / 2
-        // Long enough out of combat for anyone else to be healing.
-        boss.sinceDamaged = 60f; boss.sinceAttack = 60f; me.sinceDamaged = 60f; me.sinceAttack = 60f
+        // Neither has been hit for a while; the player has only just fired.
+        boss.sinceDamaged = 60f; me.sinceDamaged = 60f; me.sinceAttack = 0f
         m.world.regenerate(boss, 1f); m.world.regenerate(me, 1f)
-        assertEquals("the boss stays hurt", boss.maxHp / 2, boss.hp)
-        assertTrue("the player still heals", me.hp > me.maxHp / 2)
-        // The Training Area's giant doesn't heal either.
+        val bossShare = (boss.hp - boss.maxHp / 2).toFloat() / boss.maxHp
+        val myShare = (me.hp - me.maxHp / 2).toFloat() / me.maxHp
+        assertTrue("attacking doesn't stop the player healing", myShare > 0.1f)
+        assertTrue("the boss heals", bossShare > 0f)
+        assertTrue("but far more slowly", bossShare < myShare / 4)
+        // Being hit does stop it, for a few seconds.
+        val before = me.hp
+        me.sinceDamaged = 1f
+        m.world.regenerate(me, 1f)
+        assertEquals(before, me.hp)
+        // The Training Area's giant heals slowly as well, and no giant has a shield.
         val t = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, humanPlayer = false, seed = 4L))
         val giant = t.world.fighters.first { it.scale > 1f }
-        giant.hp = giant.maxHp / 2; giant.sinceDamaged = 60f; giant.sinceAttack = 60f
+        giant.hp = giant.maxHp / 2; giant.sinceDamaged = 60f
         t.world.regenerate(giant, 1f)
-        assertEquals(giant.maxHp / 2, giant.hp)
+        assertTrue(giant.hp > giant.maxHp / 2)
     }
 
     @Test fun aShieldBuildsOnTopOfFullHealth() {

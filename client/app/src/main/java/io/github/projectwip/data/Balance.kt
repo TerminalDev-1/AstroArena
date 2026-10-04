@@ -130,6 +130,8 @@ object Balance {
     const val SHIELD_MAX = 6300
     const val REGEN_DELAY_SECONDS = 3f
     const val REGEN_FRACTION_PER_SECOND = 0.12f
+    /** A giant heals too, but far more slowly: this share of its (much larger) health a second. */
+    const val GIANT_REGEN_FRACTION_PER_SECOND = 0.02f
 
     // ---- Starting wallet ----
     const val STARTING_BOLTS = 60

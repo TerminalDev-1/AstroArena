@@ -265,14 +265,15 @@ class World(
     }
 
     /**
-     * Healing when out of combat. Health comes back first; once it is full the same trickle builds a shield on top
-     * of it, up to [Balance.SHIELD_MAX]. A giant (Boss Mode, or the Training Area's) never heals: damage done to
-     * it stays done.
+     * Healing. It starts once a fighter has gone a few seconds without being hit, and attacking doesn't stop it:
+     * a fighter who keeps shooting and keeps dodging keeps healing. Health comes back first; once it is full the
+     * same trickle builds a shield on top of it, up to [Balance.SHIELD_MAX]. A giant (Boss Mode, or the Training
+     * Area's) heals too, but much more slowly, and has no shield.
      */
     fun regenerate(f: Fighter, dt: Float) {
-        if (f.scale > 1f) return
-        if (f.sinceDamaged <= Balance.REGEN_DELAY_SECONDS || f.sinceAttack <= Balance.REGEN_DELAY_SECONDS) return
-        val gain = (f.maxHp * Balance.REGEN_FRACTION_PER_SECOND * dt).toInt().coerceAtLeast(1)
+        if (f.sinceDamaged <= Balance.REGEN_DELAY_SECONDS) return
+        val rate = if (f.scale > 1f) Balance.GIANT_REGEN_FRACTION_PER_SECOND else Balance.REGEN_FRACTION_PER_SECOND
+        val gain = (f.maxHp * rate * dt).toInt().coerceAtLeast(1)
         if (f.hp < f.maxHp) f.hp = (f.hp + gain).coerceAtMost(f.maxHp)
         else if (f.canShield && f.shieldHp < Balance.SHIELD_MAX) f.shieldHp = (f.shieldHp + gain).coerceAtMost(Balance.SHIELD_MAX)
     }
