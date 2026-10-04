@@ -52,10 +52,10 @@ def _round(x: float) -> int:
 
 # What a fighter is: its rarity. That sets what it costs in the shop (Prisms) and on the Spark Road (Credits).
 # The starting fighter has no rarity and isn't sold. Keep in step with Balance.kt.
-FIGHTER_RARITY = {
-    "BRAKK": "RARE", "PIP": "RARE", "DOZER": "RARE", "MIRA": "EPIC", "NOVA": "EPIC", "FENN": "EPIC",
-    "KITO": "MYTHIC", "VOLT": "MYTHIC", "ONYX": "MYTHIC", "AURA": "LEGENDARY", "ZERO": "ULTRA",
-}
+FIGHTER_RARITY = {"BRAKK": "RARE", "MIRA": "EPIC", "KITO": "MYTHIC"}
+# Fighters that were in the game for a few builds and were taken out again, with the Credits each took on the
+# Spark Road. A profile that still holds one loses it and gets those Credits back.
+REMOVED_FIGHTERS = {"PIP": 160, "DOZER": 160, "NOVA": 420, "FENN": 420, "VOLT": 900, "ONYX": 900, "AURA": 1600, "ZERO": 2600}
 RARITY_PRICE = {"RARE": 40, "EPIC": 70, "MYTHIC": 90, "LEGENDARY": 160, "ULTRA": 250}
 FIGHTER_PRICE = {name: RARITY_PRICE[rarity] for name, rarity in FIGHTER_RARITY.items()}
 SKIN_PRICE = 20  # Prisms, for every colourway but a fighter's first
@@ -255,6 +255,11 @@ def complete(profile: dict) -> dict:
     profile.setdefault("credits", 0)
     profile.setdefault("glory", 0)
     profile.pop("roadTarget", None)  # the road was briefly pick-your-own
+    for name, cost in REMOVED_FIGHTERS.items():
+        entry = profile["fighters"].pop(name, None)
+        if isinstance(entry, dict) and entry.get("unlocked"):
+            # Back onto the road if there is still road left; Glory otherwise.
+            profile["credits" if road_next(profile) is not None else "glory"] += cost
     return profile
 
 

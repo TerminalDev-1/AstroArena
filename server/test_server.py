@@ -435,6 +435,22 @@ class Api(unittest.TestCase):
         self.assertEqual((body["account"]["profile"]["credits"], body["account"]["profile"]["glory"]), (0, 70))
         self.assertEqual(self.call("GET", "/v1/leaderboard")[1]["players"][0]["glory"], 70)
 
+    def test_fighters_that_were_taken_out_are_paid_back(self):
+        # A profile from the builds that had more fighters: one it unlocked, one it never did.
+        profile = economy.new_profile()
+        profile["fighters"]["PIP"] = {"unlocked": True, "level": 4, "ownedSkins": [0]}
+        profile["fighters"]["ZERO"] = {"unlocked": False, "level": 1, "ownedSkins": [0]}
+        economy.complete(profile)
+        self.assertEqual(sorted(profile["fighters"]), sorted(rules.FIGHTER_SKINS))
+        self.assertEqual((profile["credits"], profile["glory"]), (160, 0))
+        # With the road already finished, the Credits come back as Glory.
+        done = economy.new_profile()
+        for entry in done["fighters"].values():
+            entry["unlocked"] = True
+        done["fighters"]["AURA"] = {"unlocked": True, "level": 1, "ownedSkins": [0]}
+        economy.complete(done)
+        self.assertEqual((done["credits"], done["glory"]), (0, 1600))
+
     def test_matches_fill_the_spark_pass(self):
         me = self.player()
         token = me["token"]

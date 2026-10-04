@@ -356,8 +356,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             // Developers only, and only if they switched it on in Settings > Developer.
             val devMenu = dev && save.settings.devMenu
             if (devMenu && screen !is Screen.Match && capsule == null && haul == null && reveal == null) {
-                // On the home screen the bottom-left corner belongs to the Spark Pass and Spark Road cards.
-                io.github.projectwip.ui.screens.DebugButton(if (screen is Screen.Home) Modifier.align(Alignment.TopStart).padding(start = 96.dp, top = 58.dp) else Modifier.align(Alignment.BottomStart)) { debugMenu = true }
+                // On the home screen the bottom-left corner belongs to the Spark Pass and Spark Road cards, so the
+                // button sits under the settings gear instead, in line with it.
+                io.github.projectwip.ui.screens.DebugButton(if (screen is Screen.Home) Modifier.align(Alignment.TopEnd).padding(top = 70.dp, end = 27.dp) else Modifier.align(Alignment.BottomStart)) { debugMenu = true }
             }
             if (debugMenu && devMenu) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
             // On top of everything: the loading screen, then (if a newer release exists) the update screen.

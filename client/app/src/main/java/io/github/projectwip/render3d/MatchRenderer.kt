@@ -853,14 +853,6 @@ class MatchRenderer(
         FighterId.BRAKK -> 1.8f
         FighterId.MIRA -> 2.0f
         FighterId.KITO -> 1.9f
-        FighterId.PIP -> 1.6f
-        FighterId.DOZER -> 1.85f
-        FighterId.NOVA -> 2.3f
-        FighterId.FENN -> 1.95f
-        FighterId.VOLT -> 2.0f
-        FighterId.ONYX -> 2.0f
-        FighterId.AURA -> 2.05f
-        FighterId.ZERO -> 1.9f
     }
 
     override fun onDestroyed() {}
