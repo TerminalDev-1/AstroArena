@@ -397,30 +397,45 @@ class Api(unittest.TestCase):
         road = self.call("GET", "/v1/me", token=token)[1]["account"]["road"]
         self.assertEqual([s["fighter"] for s in road["steps"]], [f for f, _ in economy.SPARK_ROAD])
         self.assertEqual(road["steps"][0], {"fighter": "BRAKK", "cost": 160, "rarity": "RARE"})
-        # The cheapest rarity is on offer first, and the Credits go toward one of those.
-        self.assertEqual((road["choices"], road["target"]), (["BRAKK"], "BRAKK"))
+        self.assertEqual(len(road["steps"]), len(rules.FIGHTER_SKINS) - 1)
+        # The cheapest rarity is on offer first, and the Credits go toward one of those: the player picks which.
+        self.assertEqual((road["choices"], road["target"]), (["BRAKK", "PIP", "DOZER"], "BRAKK"))
         self.assertEqual(self.call("POST", "/v1/road/target", {"fighter": "KITO"}, token)[0], 409)
-        self.assertEqual(self.call("POST", "/v1/road/target", {"fighter": "BRAKK"}, token)[0], 200)
+        status, body = self.call("POST", "/v1/road/target", {"fighter": "PIP"}, token)
+        self.assertEqual((status, body["account"]["road"]["target"]), (200, "PIP"))
         # Not covered yet.
         status, body = self.call("POST", "/v1/road/unlock", {}, token)
         self.assertEqual((status, body["error"]), (402, "not enough Credits"))
         # The shop sells Credits for Prisms; they go onto the road, and what is left over stays there.
-        self.store.grant(me["id"], prisms=1000, credits=110)
+        self.store.grant(me["id"], prisms=5000, credits=110)
         status, body = self.call("POST", "/v1/shop/buy", {"item": "credits_s"}, token)
         self.assertEqual((status, body["reward"]), (200, {"type": "credits", "amount": 60}))
         status, body = self.call("POST", "/v1/road/unlock", {}, token)
-        self.assertEqual((status, body["reward"]), (200, {"type": "fighter", "fighter": "BRAKK"}))
+        self.assertEqual((status, body["reward"]), (200, {"type": "fighter", "fighter": "PIP"}))
         self.assertEqual(body["account"]["profile"]["credits"], 10)
-        self.assertEqual((body["account"]["road"]["choices"], body["account"]["road"]["target"]), (["MIRA"], "MIRA"))
-        self.store.grant(me["id"], credits=420 + 900)
-        self.assertEqual(self.call("POST", "/v1/road/unlock", {}, token)[1]["reward"]["fighter"], "MIRA")
-        status, body = self.call("POST", "/v1/road/unlock", {}, token)
-        self.assertEqual(body["reward"]["fighter"], "KITO")
+        self.assertEqual((body["account"]["road"]["choices"], body["account"]["road"]["target"]), (["BRAKK", "DOZER"], "BRAKK"))
+        # Rarer fighters come on offer once the cheaper rarity is finished.
+        self.store.grant(me["id"], credits=320)
+        for name in ("BRAKK", "DOZER"):
+            self.assertEqual(self.call("POST", "/v1/road/unlock", {}, token)[1]["reward"]["fighter"], name)
+        self.assertEqual(self.call("GET", "/v1/me", token=token)[1]["account"]["road"]["choices"], ["MIRA", "NOVA", "FENN"])
+        # Enough for all the rest: the road is claimed one fighter at a time, in whatever order is on offer.
+        rest = sum(cost for name, cost in economy.SPARK_ROAD if name not in ("PIP", "BRAKK", "DOZER"))
+        self.store.grant(me["id"], credits=rest)
+        claimed = []
+        while True:
+            status, body = self.call("POST", "/v1/road/unlock", {}, token)
+            if status != 200:
+                break
+            claimed.append(body["reward"]["fighter"])
+            last = body
+        self.assertEqual(claimed, [name for name, _ in economy.SPARK_ROAD if name not in ("PIP", "BRAKK", "DOZER")])
+        self.assertEqual(status, 409)
         # The road is finished: the Credits left on it became Glory, and so do any earned from here on.
-        profile = body["account"]["profile"]
+        profile = last["account"]["profile"]
         self.assertEqual((profile["credits"], profile["glory"]), (0, 10))
-        self.assertEqual((body["account"]["road"]["choices"], body["account"]["road"]["target"]), ([], ""))
-        self.assertEqual(self.call("POST", "/v1/road/unlock", {}, token)[0], 409)
+        self.assertTrue(all(f["unlocked"] for f in profile["fighters"].values()))
+        self.assertEqual((last["account"]["road"]["choices"], last["account"]["road"]["target"]), ([], ""))
         status, body = self.call("POST", "/v1/shop/buy", {"item": "credits_s"}, token)
         self.assertEqual(body["reward"], {"type": "glory", "amount": 60})
         self.assertEqual((body["account"]["profile"]["credits"], body["account"]["profile"]["glory"]), (0, 70))

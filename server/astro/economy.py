@@ -50,7 +50,14 @@ def _round(x: float) -> int:
 
 # ---------------------------------------------------------------------------- the shop
 
-FIGHTER_PRICE = {"BRAKK": 40, "MIRA": 70, "KITO": 90}  # Prisms; the starting fighter isn't sold
+# What a fighter is: its rarity. That sets what it costs in the shop (Prisms) and on the Spark Road (Credits).
+# The starting fighter has no rarity and isn't sold. Keep in step with Balance.kt.
+FIGHTER_RARITY = {
+    "BRAKK": "RARE", "PIP": "RARE", "DOZER": "RARE", "MIRA": "EPIC", "NOVA": "EPIC", "FENN": "EPIC",
+    "KITO": "MYTHIC", "VOLT": "MYTHIC", "ONYX": "MYTHIC", "AURA": "LEGENDARY", "ZERO": "ULTRA",
+}
+RARITY_PRICE = {"RARE": 40, "EPIC": 70, "MYTHIC": 90, "LEGENDARY": 160, "ULTRA": 250}
+FIGHTER_PRICE = {name: RARITY_PRICE[rarity] for name, rarity in FIGHTER_RARITY.items()}
 SKIN_PRICE = 20  # Prisms, for every colourway but a fighter's first
 BOLT_CRATES = {"crate_s": (400, 10), "crate_m": (1200, 25), "crate_l": (3000, 50)}  # key: (Bolts, price in Prisms)
 CREDIT_PACKS = {"credits_s": (60, 15), "credits_m": (200, 45), "credits_l": (500, 100)}  # key: (Credits, price in Prisms)
@@ -131,9 +138,8 @@ CUP_TRACK = {
 # Fighters have a rarity; a rarer one takes more Credits. (Fighters are also sold in the shop for Prisms.)
 RARITIES = ["RARE", "EPIC", "MYTHIC", "LEGENDARY", "ULTRA"]
 ROAD_COST = {"RARE": 160, "EPIC": 420, "MYTHIC": 900, "LEGENDARY": 1600, "ULTRA": 2600}
-FIGHTER_RARITY = {"BRAKK": "RARE", "MIRA": "EPIC", "KITO": "MYTHIC"}  # the starting fighter has none
 # Every fighter on the road with what it costs, the cheapest rarity first.
-SPARK_ROAD = sorted(((name, ROAD_COST[rarity]) for name, rarity in FIGHTER_RARITY.items()), key=lambda step: step[1])
+SPARK_ROAD = sorted(((name, ROAD_COST[rarity]) for name, rarity in FIGHTER_RARITY.items()), key=lambda step: step[1])  # stable: the order above within a rarity
 
 
 def _locked(profile: dict) -> list[tuple[str, int]]:

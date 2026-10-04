@@ -94,6 +94,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "boss" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
                 "train" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.TRAINING))
                 "fighters" -> Screen.Fighters()
+                "roster" -> { io.github.projectwip.ui.screens.rosterPreview = true; Screen.Fighters() }
                 "kito" -> Screen.Fighters(FighterId.KITO)
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road

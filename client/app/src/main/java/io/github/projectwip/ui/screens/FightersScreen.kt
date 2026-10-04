@@ -75,6 +75,9 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
+/** Debug (`--es screen roster`): the grid shows every fighter in full colour, locked or not, to look the models over. */
+var rosterPreview = false
+
 /** What an upgrade changed, for the level-up moment: the level reached, and each stat before ([StatPreview.current]) and after ([StatPreview.next]). */
 private class UpgradeMoment(val level: Int, val rows: List<StatPreview>)
 
@@ -136,7 +139,7 @@ private fun FighterCard(save: SaveData, id: FighterId, roadCost: Int?, onClick: 
         ChunkyButton(onClick, Modifier.fillMaxWidth().aspectRatio(0.72f).padding(top = 6.dp),
             if (inUse) ButtonStyle.GOLD else if (p.unlocked) ButtonStyle.PURPLE else ButtonStyle.GREY, cut = 16.dp, lip = 5.dp) {
             Column(Modifier.fillMaxSize().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                FighterView(def, p.skin, Modifier.weight(1f).fillMaxWidth(), pedestal = false, locked = !p.unlocked)
+                FighterView(def, p.skin, Modifier.weight(1f).fillMaxWidth(), pedestal = false, locked = !p.unlocked && !rosterPreview)
                 GameText(def.name.substringBefore(' ').uppercase(), Type.Heading, outline = 2.5.dp)
                 PlainText(def.role, Type.Small, color = Color.White.copy(alpha = 0.85f), maxLines = 1)
                 Badge(def.rarity.label.uppercase(), color = androidx.compose.ui.graphics.lerp(Color(def.rarity.color), Color.Black, 0.35f))
