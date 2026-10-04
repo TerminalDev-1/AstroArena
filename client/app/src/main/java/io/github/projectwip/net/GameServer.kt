@@ -53,6 +53,8 @@ data class Account(
     /** When the server's day ends and the shop changes, on this device's clock (ms). */
     val dayEndsAt: Long = 0,
     val giftAvailable: Boolean = true,
+    /** This season's Spark Pass; null from a server that has none. */
+    val pass: io.github.projectwip.data.PassState? = null,
 )
 
 /** What the game knows about the server right now. */
@@ -168,6 +170,14 @@ class GameServer(context: Context) {
             dailyOffers = offers("dailyOffers"),
             day = time?.optLong("day", -1) ?: -1, dayEndsAt = local(time?.optLong("dayEndsAt") ?: 0L),
             giftAvailable = o.optBoolean("giftAvailable", true),
+            pass = o.optJSONObject("pass")?.let { p ->
+                val tiers = p.optJSONArray("tiers")
+                io.github.projectwip.data.PassState(
+                    season = p.optLong("season"), endsAt = local(p.optLong("endsAt")), points = p.optInt("points"), tierPoints = p.optInt("tierPoints", 100),
+                    claimed = ints(p, "claimed"),
+                    tiers = if (tiers == null) emptyList() else (0 until tiers.length()).mapNotNull { i -> tiers.optJSONObject(i)?.let { reward(it) } },
+                )
+            },
         )
         _status.value = _status.value.copy(account = account)
     }
@@ -181,7 +191,7 @@ class GameServer(context: Context) {
     private fun profile(o: JSONObject): ServerProfile {
         val fighters = o.optJSONObject("fighters")
         return ServerProfile(
-            bolts = o.optInt("bolts"), prisms = o.optInt("prisms"), bestCups = o.optInt("bestCups"),
+            bolts = o.optInt("bolts"), prisms = o.optInt("prisms"), bestCups = o.optInt("bestCups"), credits = o.optInt("credits"),
             fighters = FighterId.entries.associateWith { id ->
                 val f = fighters?.optJSONObject(id.name)
                 FighterProgress(
@@ -230,6 +240,12 @@ class GameServer(context: Context) {
     /** Claims the Cup Track reward at [cups]. What comes back is what was actually given (owned things are paid out instead). */
     fun claimMilestone(cups: Int): Reward? = act("/v1/track/claim", JSONObject().put("cups", cups))?.optJSONObject("reward")?.let { reward(it) }
 
+    /** Spends Credits on the next fighter along the Spark Road. Null if there aren't enough (see [lastError]). */
+    fun roadUnlock(): Reward? = act("/v1/road/unlock")?.optJSONObject("reward")?.let { reward(it) }
+
+    /** Claims the reward at Spark Pass tier [tier] (1-based). */
+    fun claimPass(tier: Int): Reward? = act("/v1/pass/claim", JSONObject().put("tier", tier))?.optJSONObject("reward")?.let { reward(it) }
+
     fun buyDeal(id: Long): Reward? = act("/v1/shop/deals/$id/buy")?.optJSONObject("reward")?.let { reward(it) }
 
     /** Developers: puts a deal in every player's shop. */
@@ -245,8 +261,8 @@ class GameServer(context: Context) {
     fun reset(): Boolean? = act("/v1/reset")?.let { true }
 
     /** Developer hand-outs (the server refuses anyone else). */
-    fun devGrant(cups: Int = 0, drops: Int = 0, bolts: Int = 0, prisms: Int = 0): Boolean? =
-        act("/v1/dev/grant", JSONObject().put("cups", cups).put("drops", drops).put("bolts", bolts).put("prisms", prisms))?.let { true }
+    fun devGrant(cups: Int = 0, drops: Int = 0, bolts: Int = 0, prisms: Int = 0, credits: Int = 0): Boolean? =
+        act("/v1/dev/grant", JSONObject().put("cups", cups).put("drops", drops).put("bolts", bolts).put("prisms", prisms).put("credits", credits))?.let { true }
 
     private fun register(name: String): Boolean {
         val r = call("POST", "/v1/players", JSONObject().put("name", name).put("version", version)) ?: return false
@@ -385,7 +401,7 @@ class GameServer(context: Context) {
         }
         return ServerVerdict(
             o.optInt("cupDelta"), o.optInt("cups"), o.optBoolean("drop"), account?.optInt("drops") ?: 0, account?.optInt("dropsLeftToday") ?: 0,
-            bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"), judged = judged,
+            bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"), credits = o.optInt("credits"), passPoints = o.optInt("passPoints"), judged = judged,
         )
     }
 
@@ -426,6 +442,7 @@ class GameServer(context: Context) {
         return when (o.optString("type")) {
             "bolts" -> Reward.Bolts(o.optInt("amount").coerceAtLeast(0))
             "prisms" -> Reward.Prisms(o.optInt("amount").coerceAtLeast(0))
+            "credits" -> Reward.Credits(o.optInt("amount").coerceAtLeast(0))
             "fighter" -> fighter()?.let { Reward.UnlockFighter(it) }
             "skin" -> fighter()?.let { Reward.SkinReward(it, o.optInt("skin")) }
             "bundle" -> o.optJSONArray("items")?.let { a -> Reward.Bundle((0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { reward(it) } }) }

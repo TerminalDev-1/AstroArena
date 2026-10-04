@@ -64,7 +64,7 @@ private val TAPS = CapsuleTier.entries.size - 1
  */
 @Composable
 fun CapsuleOpenOverlay(
-    result: CapsuleResult, remaining: Int, boltsNow: Int, prismsNow: Int,
+    result: CapsuleResult, remaining: Int, boltsNow: Int, prismsNow: Int, creditsNow: Int,
     onNext: () -> Unit, onOpenAll: (CapsuleResult?) -> Unit, onDone: () -> Unit,
 ) = key(result) {
     val sfx = LocalSfx.current
@@ -188,6 +188,7 @@ fun CapsuleOpenOverlay(
             io.github.projectwip.ui.RewardShowcase(
                 "${result.tier.label} drop", Color(result.tier.color), result.reward, boltsNow, prismsNow,
                 note = if (result.split) "SPLIT INTO ${result.pieces} · +${result.pieces - 1} DROP${if (result.pieces > 2) "S" else ""}" else null,
+                creditsNow = creditsNow,
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }

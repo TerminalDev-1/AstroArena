@@ -19,6 +19,8 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/shop/gift                  claim the daily gift -> {reward}                      (token)
     POST /v1/shop/deals/<id>/buy        buy a deal -> {reward}                                (token)
     POST /v1/track/claim    {cups}      claim a Cup Track reward -> {reward}                  (token)
+    POST /v1/road/unlock                spend Credits on the next Spark Road fighter -> {reward}  (token)
+    POST /v1/pass/claim     {tier}      claim a Spark Pass tier -> {reward}                   (token)
     POST /v1/shop/daily/<n>/buy {day}   buy one of today's offers -> {reward}                 (token)
     POST /v1/settings/difficulty {difficulty}  choose the bot difficulty; the server says yes or no  (token)
     POST /v1/reset                      start this account's progress over                    (token, developer)
@@ -51,7 +53,7 @@ from . import economy, rules
 from .config import Config, parse_version
 from .economy import Refused
 from .referee import Referee, TICKS_PER_SECOND, count_ticks, decode_inputs
-from .store import Store, clock, today
+from .store import Store, clock, season_ends_ms, today
 
 API = 2
 MAX_BODY = 2 * 1024 * 1024  # a match's input log rides along with its result
@@ -115,6 +117,13 @@ class Game:
             "difficulty": self.difficulty(player),
             "difficulties": list(rules.DIFFICULTIES) if developer else self.config.allowed_difficulties(),
             "profile": profile,
+            # The Spark Road (fighters in order, and the Credits each takes) and this season's Spark Pass.
+            "road": [{"fighter": name, "cost": cost} for name, cost in economy.SPARK_ROAD],
+            "pass": {
+                **economy.pass_view(profile, time_now["day"]), "endsAt": season_ends_ms(time_now["day"]),
+                "tierPoints": economy.PASS_TIER_POINTS,
+                "tiers": [economy.pass_reward(t) for t in range(1, economy.PASS_TIERS + 1)],
+            },
             "deals": self.store.deals(player_id),
             # The day's offers and the clock they run on. Times are the server's: the game counts down from these.
             "time": time_now,
@@ -240,7 +249,8 @@ def make_handler(game: Game, quiet: bool = False):
                 return self._act(self._open_all_drops)
             if url.path == "/v1/dev/grant":
                 return self._act(lambda p, d: game.store.grant(
-                    p["id"], int(d.get("cups") or 0), int(d.get("drops") or 0), int(d.get("bolts") or 0), int(d.get("prisms") or 0)
+                    p["id"], int(d.get("cups") or 0), int(d.get("drops") or 0), int(d.get("bolts") or 0), int(d.get("prisms") or 0),
+                    int(d.get("credits") or 0)
                 ), developer=True)
             if url.path == "/v1/fighters/upgrade":
                 return self._act(self._upgrade)
@@ -250,6 +260,10 @@ def make_handler(game: Game, quiet: bool = False):
                 return self._act(lambda p, d: {"reward": game.store.claim_gift(p["id"])})
             if url.path == "/v1/track/claim":
                 return self._act(lambda p, d: {"reward": game.store.claim_milestone(p["id"], int(d.get("cups") or 0))})
+            if url.path == "/v1/road/unlock":
+                return self._act(lambda p, d: {"reward": game.store.road_unlock(p["id"])})
+            if url.path == "/v1/pass/claim":
+                return self._act(lambda p, d: {"reward": game.store.claim_pass(p["id"], int(d.get("tier") or 0))})
             if url.path == "/v1/reset":
                 return self._act(lambda p, d: game.store.reset(p["id"]), developer=True)
             if url.path == "/v1/settings/difficulty":

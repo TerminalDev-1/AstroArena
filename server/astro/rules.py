@@ -175,24 +175,28 @@ def roll_reward(tier: int, save: dict, rng) -> dict:
         ]
         return rng.choice(choices) if choices else None
 
-    def new_fighter() -> dict | None:
-        locked = [f for f in FIGHTER_SKINS if not _unlocked(save, f)]
-        return {"type": "fighter", "fighter": rng.choice(locked)} if locked else None
+    def credits(lo: int, hi: int) -> dict:
+        # Credits unlock fighters on the Spark Road. (Drops don't hand out fighters themselves.) The buff leaves
+        # them alone: they are worth what the road charges.
+        return {"type": "credits", "amount": rng.randint(lo, hi)}
 
     name = TIERS[tier][0]
     if name == "SCRAP":
         return bolts(60, 120)
     if name == "TUNED":
-        return prisms(15, 25) if rng.randrange(3) == 0 else bolts(180, 300)
+        pick = rng.randrange(4)
+        return prisms(15, 25) if pick == 0 else credits(8, 14) if pick == 1 else bolts(180, 300)
     if name == "CHARGED":
-        return prisms(35, 50) if rng.randrange(2) == 0 else bolts(400, 600)
+        pick = rng.randrange(3)
+        return prisms(35, 50) if pick == 0 else credits(20, 30) if pick == 1 else bolts(400, 600)
     if name == "OVERCLOCKED":
         skin = new_skin() if rng.randrange(2) == 0 else None
-        return skin or (prisms(80, 110) if rng.randrange(2) == 0 else bolts(1000, 1300))
+        pick = rng.randrange(3)
+        return skin or (prisms(80, 110) if pick == 0 else credits(45, 60) if pick == 1 else bolts(1000, 1300))
     if name == "PRISMATIC":
-        return new_fighter() or new_skin() or prisms(250, 300)
-    # Ultra, the jackpot: something new to play with (while anything is left) plus a pile of both currencies.
-    items = [new_fighter() or new_skin(), prisms(400, 500), bolts(2000, 2500)]
+        return credits(120, 160) if rng.randrange(2) == 0 else (new_skin() or prisms(250, 300))
+    # Ultra, the jackpot: a colourway (while any is left) plus a pile of every currency.
+    items = [new_skin(), credits(250, 300), prisms(400, 500), bolts(2000, 2500)]
     return {"type": "bundle", "items": [i for i in items if i]}
 
 
@@ -206,6 +210,8 @@ def apply_reward(save: dict, reward: dict) -> None:
         save["bolts"] = int(save.get("bolts") or 0) + int(reward["amount"])
     elif kind == "prisms":
         save["prisms"] = int(save.get("prisms") or 0) + int(reward["amount"])
+    elif kind == "credits":
+        save["credits"] = int(save.get("credits") or 0) + int(reward["amount"])
     elif kind in ("fighter", "skin"):
         fighters = save.setdefault("fighters", {})
         if not isinstance(fighters, dict):

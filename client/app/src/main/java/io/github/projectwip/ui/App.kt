@@ -74,6 +74,8 @@ sealed interface Screen {
     data object CupTrack : Screen { override val depth = 1 }
     data object Leaderboard : Screen { override val depth = 1 }
     data object Shop : Screen { override val depth = 1 }
+    data object Road : Screen { override val depth = 2 }
+    data object Pass : Screen { override val depth = 1 }
     data object Settings : Screen { override val depth = 1 }
     data class Match(val config: MatchConfig) : Screen { override val depth = 2 }
     data class Result(val summary: MatchSummary, val rewards: MatchRewards) : Screen { override val depth = 3 }
@@ -94,6 +96,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "fighters" -> Screen.Fighters()
                 "kito" -> Screen.Fighters(FighterId.KITO)
                 "shop" -> Screen.Shop
+                "road" -> Screen.Road
+                "pass" -> Screen.Pass
                 "track" -> Screen.CupTrack
                 "settings" -> Screen.Settings
                 "leaders" -> Screen.Leaderboard
@@ -315,6 +319,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
                     Screen.Leaderboard -> io.github.projectwip.ui.screens.LeaderboardScreen(save, go)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
+                    Screen.Road -> io.github.projectwip.ui.screens.RoadScreen(save, go, showReward)
+                    Screen.Pass -> io.github.projectwip.ui.screens.PassScreen(save, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
                     is Screen.Match -> MatchScreen(
                         // The difficulty is the one the server last approved (it is kept in the settings), and the
@@ -343,7 +349,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             }
 
             AnimatedVisibility(reveal != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                reveal?.let { RewardRevealOverlay(it, save.bolts, save.prisms) { reveal = null } }
+                reveal?.let { RewardRevealOverlay(it, save.bolts, save.prisms, save.credits) { reveal = null } }
             }
             // The debug menu hides behind a small "D" in the corner of every menu screen.
             // Developers only, and only if they switched it on in Settings > Developer.
@@ -384,10 +390,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 )
             }
             AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, onNext = openCapsule, onOpenAll = openAll, onDone = { capsule = null }) }
+                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, save.credits, onNext = openCapsule, onOpenAll = openAll, onDone = { capsule = null }) }
             }
             AnimatedVisibility(haul != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                haul?.let { io.github.projectwip.ui.screens.DropHaulOverlay(it, save.bolts, save.prisms) { haul = null } }
+                haul?.let { io.github.projectwip.ui.screens.DropHaulOverlay(it, save.bolts, save.prisms, save.credits) { haul = null } }
             }
         }
     }
@@ -440,6 +446,7 @@ fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
 fun rewardLabel(r: Reward): String = when (r) {
     is Reward.Bolts -> "+${r.amount} Power Ups"
     is Reward.Prisms -> "+${r.amount} Crystals"
+    is Reward.Credits -> "+${r.amount} Credits"
     is Reward.UnlockFighter -> "${Balance.fighter(r.fighter).name} unlocked!"
     is Reward.SkinReward -> "${Balance.fighter(r.fighter).skins[r.skinIndex].name} colorway"
     is Reward.Bundle -> r.items.joinToString(", ") { rewardLabel(it) }
@@ -450,6 +457,7 @@ fun RewardVisual(r: Reward, modifier: Modifier = Modifier) {
     when (r) {
         is Reward.Bolts -> GameIcon(IconKind.BOLT, modifier)
         is Reward.Prisms -> GameIcon(IconKind.PRISM, modifier)
+        is Reward.Credits -> GameIcon(IconKind.CREDIT, modifier)
         is Reward.UnlockFighter -> FighterView(Balance.fighter(r.fighter), 0, modifier, pedestal = false)
         is Reward.SkinReward -> FighterView(Balance.fighter(r.fighter), r.skinIndex, modifier, pedestal = false)
         is Reward.Bundle -> GameIcon(IconKind.GIFT, modifier)
@@ -457,13 +465,13 @@ fun RewardVisual(r: Reward, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RewardRevealOverlay(r: RewardReveal, boltsNow: Int, prismsNow: Int, onDismiss: () -> Unit) {
+private fun RewardRevealOverlay(r: RewardReveal, boltsNow: Int, prismsNow: Int, creditsNow: Int, onDismiss: () -> Unit) {
     Box(
         // Swallows taps so nothing underneath is pressed while the reward plays out.
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).clickable(remember { MutableInteractionSource() }, null) { },
         contentAlignment = Alignment.Center,
     ) {
-        RewardShowcase(r.title, Palette.Gold, r.reward, boltsNow, prismsNow) {
+        RewardShowcase(r.title, Palette.Gold, r.reward, boltsNow, prismsNow, creditsNow = creditsNow) {
             ChunkyButton(onDismiss, Modifier.size(200.dp, 60.dp), ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
         }
     }

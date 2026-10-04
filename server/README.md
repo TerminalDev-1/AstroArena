@@ -34,6 +34,8 @@ server never locks anyone out.
 | **Developers** | `game.cfg` lists the players who can switch on the debug menu, make shop deals and reset an account |
 | **Accounts** | a new player picks a name, then the install registers once and gets an id and a secret token |
 | **Cups** | the server works out what each match is worth and keeps the total |
+| **Credits and the Spark Road** | Credits (from matches, drops, the Cup Track, the Spark Pass and the shop) unlock fighters in a fixed order; once every fighter is unlocked, Credits are paid as Bolts |
+| **Spark Pass** | a 28-day season of 30 tiers; matches earn pass points, each tier has a reward to claim |
 | **Bolts and Prisms** | kept by the server: match pay, upgrades, shop purchases, the daily gift and Cup Track rewards all happen there |
 | **Deals** | shop offers made by developers in the game's Offer Creator, stored here and shown to every player |
 | **Leaderboard** | the real accounts on this server, ranked by Cups; there are no made-up names |
@@ -122,6 +124,8 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `POST /v1/shop/gift` * | `{reward, account}`; 409 once claimed today |
 | `POST /v1/shop/deals/<id>/buy` * | `{reward, account}` |
 | `POST /v1/track/claim` * `{cups}` | `{reward, account}` |
+| `POST /v1/road/unlock` * | `{reward, account}`: spends Credits on the next Spark Road fighter; 402 if there aren't enough, 409 when the road is finished |
+| `POST /v1/pass/claim` * `{tier}` | `{reward, account}`: a Spark Pass tier; 409 if not reached or already claimed |
 | `POST /v1/shop/daily/<n>/buy` * `{day}` | `{reward, account}`: one of today's offers; 409 if bought already or the day has changed |
 | `POST /v1/settings/difficulty` * `{difficulty}` | `{ok, account}`, or 403 if the server doesn't allow it |
 | `POST /v1/reset` * | `{account}`: starts this account's progress over (developers only) |

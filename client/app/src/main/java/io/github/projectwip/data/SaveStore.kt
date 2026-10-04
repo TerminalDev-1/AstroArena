@@ -42,6 +42,7 @@ class SaveStore(context: Context) {
             put("bestCups", s.bestCups)
             put("bolts", s.bolts)
             put("prisms", s.prisms)
+            put("credits", s.credits)
             put("selectedFighter", s.selectedFighter.name)
             put("selectedMode", s.selectedMode.name)
             put("claimedMilestones", JSONArray(s.claimedMilestones.sorted()))
@@ -154,6 +155,7 @@ class SaveStore(context: Context) {
                 bestCups = o.optInt("bestCups", 0).coerceAtLeast(0),
                 bolts = o.optInt("bolts", d.bolts).coerceAtLeast(0),
                 prisms = o.optInt("prisms", d.prisms).coerceAtLeast(0),
+                credits = o.optInt("credits", d.credits).coerceAtLeast(0),
                 fighters = fighters,
                 selectedFighter = if (fighters[selected]?.unlocked == true) selected else FighterId.JUNO,
                 selectedMode = enumOr(o.optString("selectedMode"), d.selectedMode),

@@ -66,6 +66,8 @@ data class SaveData(
     val bestCups: Int = 0,
     val bolts: Int = Balance.STARTING_BOLTS,
     val prisms: Int = Balance.STARTING_PRISMS,
+    /** Credits for the Spark Road. Like the other currencies, a copy of what the server holds. */
+    val credits: Int = 0,
     val fighters: Map<FighterId, FighterProgress> = defaultFighters(),
     val selectedFighter: FighterId = FighterId.JUNO,
     val selectedMode: GameMode = GameMode.LAST_SPARK,

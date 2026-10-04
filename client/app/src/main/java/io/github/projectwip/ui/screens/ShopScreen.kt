@@ -86,7 +86,7 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("SHOP", { go(Screen.Home) }, save.bolts, save.prisms)
+            ScreenHeader("SHOP", { go(Screen.Home) }, save.bolts, save.prisms, credits = save.credits)
             LazyRow(
                 Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 18.dp, top = 4.dp),
@@ -133,6 +133,20 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                             OfferCard(cardW, c.pricePrisms, owned = false, tag = if (i == 2) "BEST VALUE" else null, onBuy = { pending = c }) {
                                 BoltPile(i + 1)
                                 Title(c.title, "+${c.bolts} Power Ups")
+                            }
+                        }
+                    }
+                }
+                item {
+                    // Credits unlock fighters on the Spark Road; these are the quick way to more of them.
+                    Section("CREDITS") {
+                        Shop.creditPacks.forEachIndexed { i, c ->
+                            OfferCard(cardW, c.pricePrisms, owned = false, tag = if (i == 2) "BEST VALUE" else null, onBuy = { pending = c }) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    FighterRays(Modifier.fillMaxSize(), Palette.Green)
+                                    GameIcon(IconKind.CREDIT, Modifier.size((70 + i * 18).dp))
+                                }
+                                Title(c.title, "+${c.credits} Credits")
                             }
                         }
                     }
@@ -234,6 +248,7 @@ private fun Clock(modifier: Modifier, seconds: Long) {
 private fun rewardOf(item: ShopItem): Reward = when (item) {
     is ShopItem.FighterOffer -> Reward.UnlockFighter(item.fighter)
     is ShopItem.BoltCrate -> Reward.Bolts(item.bolts)
+    is ShopItem.CreditPack -> Reward.Credits(item.credits)
     is ShopItem.SkinOffer -> Reward.SkinReward(item.fighter, item.skinIndex)
 }
 

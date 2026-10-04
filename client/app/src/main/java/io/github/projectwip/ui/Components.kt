@@ -441,7 +441,7 @@ fun ProgressBar(
 
 /** Header row used by every sub-screen: back button, title, and wallet. */
 @Composable
-fun ScreenHeader(title: String, onBack: () -> Unit, bolts: Int?, prisms: Int?, modifier: Modifier = Modifier, extra: @Composable () -> Unit = {}) {
+fun ScreenHeader(title: String, onBack: () -> Unit, bolts: Int?, prisms: Int?, modifier: Modifier = Modifier, credits: Int? = null, extra: @Composable () -> Unit = {}) {
     Row(modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         ChunkyButton(onBack, Modifier.size(52.dp, 50.dp), ButtonStyle.PURPLE, sound = Sound.UI_BACK) { GameIcon(IconKind.BACK, Modifier.size(26.dp)) }
         Spacer(Modifier.width(14.dp))
@@ -452,6 +452,7 @@ fun ScreenHeader(title: String, onBack: () -> Unit, bolts: Int?, prisms: Int?, m
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (bolts != null) CurrencyPill(IconKind.BOLT, bolts)
             if (prisms != null) CurrencyPill(IconKind.PRISM, prisms)
+            if (credits != null) CurrencyPill(IconKind.CREDIT, credits)
         }
     }
 }

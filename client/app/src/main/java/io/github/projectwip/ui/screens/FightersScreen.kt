@@ -87,7 +87,15 @@ fun FightersScreen(save: SaveData, repo: GameRepository, initial: FighterId, go:
     Box(Modifier.fillMaxSize()) {
         io.github.projectwip.ui.LobbyVignette(0.8f)
         Column(Modifier.fillMaxSize()) {
-            ScreenHeader("FIGHTERS", { go(Screen.Home) }, save.bolts, save.prisms)
+            ScreenHeader("FIGHTERS", { go(Screen.Home) }, save.bolts, save.prisms, credits = save.credits) {
+                // The Spark Road is where fighters are unlocked.
+                ChunkyButton({ go(Screen.Road) }, Modifier.size(170.dp, 46.dp), ButtonStyle.GREEN, lip = 4.dp) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameIcon(IconKind.CREDIT, Modifier.size(22.dp))
+                        GameText(" SPARK ROAD", Type.Label, outline = 2.dp)
+                    }
+                }
+            }
             Row(Modifier.weight(1f).fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
                 // ---------------- roster
                 Column(

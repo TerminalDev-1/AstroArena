@@ -58,6 +58,7 @@ fun RewardShowcase(
     /** Wallet totals with this reward already included, so the counters can run up to them. */
     boltsNow: Int, prismsNow: Int,
     note: String? = null,
+    creditsNow: Int = 0,
     buttons: @Composable () -> Unit,
 ) {
     val sfx = LocalSfx.current
@@ -74,15 +75,19 @@ fun RewardShowcase(
     val slam = remember { Animatable(2.4f) }
     var boltSpot by remember { mutableStateOf(Offset.Unspecified) }
     var prismSpot by remember { mutableStateOf(Offset.Unspecified) }
+    var creditSpot by remember { mutableStateOf(Offset.Unspecified) }
 
     fun bolts(r: Reward) = (r as? Reward.Bolts)?.amount ?: 0
     fun prisms(r: Reward) = (r as? Reward.Prisms)?.amount ?: 0
+    fun credits(r: Reward) = (r as? Reward.Credits)?.amount ?: 0
+    /** Power Ups, Crystals and Credits are counted into the wallet; fighters and colourways are revealed. */
+    fun currency(r: Reward) = r is Reward.Bolts || r is Reward.Prisms || r is Reward.Credits
     val item = items[index]
 
     LaunchedEffect(reward, index) {
         pop.snapTo(0f); count.snapTo(0f); fly.snapTo(0f); slam.snapTo(2.4f)
         revealed = false
-        if (item is Reward.Bolts || item is Reward.Prisms) {
+        if (currency(item)) {
             sfx?.play(Sound.POP)
             launch { pop.animateTo(1f, spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMediumLow)) }
             val ticking = launch {
@@ -91,7 +96,7 @@ fun RewardShowcase(
             }
             // The flyers reach the wallet from about here on. Each handful that lands sounds like what it is:
             // Power Ups charge with a rising blip, Crystals chime like glass.
-            val landing = if (item is Reward.Bolts) Sound.BOLT_LAND else Sound.PRISM_LAND
+            val landing = when (item) { is Reward.Bolts -> Sound.BOLT_LAND; is Reward.Prisms -> Sound.PRISM_LAND; else -> Sound.CHING }
             launch { delay(620); repeat(7) { sfx?.play(landing, 0.85f, 0.92f + it * 0.04f); sfx?.buzz(12, 90); delay(110) } }
             launch { fly.animateTo(1f, tween(1500, easing = LinearEasing)) }
             count.animateTo(1f, tween(900))
@@ -115,6 +120,7 @@ fun RewardShowcase(
     val landed = ((fly.value - 0.42f) / 0.5f).coerceIn(0f, 1f)
     val boltsShown = if (settled) boltsNow else boltsNow - items.sumOf { bolts(it) } + items.take(index).sumOf { bolts(it) } + (bolts(item) * landed).toInt()
     val prismsShown = if (settled) prismsNow else prismsNow - items.sumOf { prisms(it) } + items.take(index).sumOf { prisms(it) } + (prisms(item) * landed).toInt()
+    val creditsShown = if (settled) creditsNow else creditsNow - items.sumOf { credits(it) } + items.take(index).sumOf { credits(it) } + (credits(item) * landed).toInt()
     val big = if (ui.roomy) 170.dp else 120.dp
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -122,6 +128,8 @@ fun RewardShowcase(
         Row(Modifier.align(Alignment.TopEnd).padding(horizontal = 18.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             CurrencyPill(IconKind.BOLT, boltsShown, Modifier.onGloballyPositioned { boltSpot = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
             CurrencyPill(IconKind.PRISM, prismsShown, Modifier.onGloballyPositioned { prismSpot = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
+            // The Credit counter is only there when Credits are part of what is being handed over.
+            if (items.any { it is Reward.Credits }) CurrencyPill(IconKind.CREDIT, creditsShown, Modifier.onGloballyPositioned { creditSpot = it.positionInRoot() + Offset(it.size.height / 2f, it.size.height / 2f) })
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             GameText(title.uppercase(), Type.Title, color = titleColor, outline = 3.5.dp)
@@ -135,13 +143,13 @@ fun RewardShowcase(
                     }
                 }
             } else when (item) {
-                is Reward.Bolts, is Reward.Prisms -> {
-                    val amount = bolts(item) + prisms(item)
-                    GameIcon(if (item is Reward.Bolts) IconKind.BOLT else IconKind.PRISM,
+                is Reward.Bolts, is Reward.Prisms, is Reward.Credits -> {
+                    val amount = bolts(item) + prisms(item) + credits(item)
+                    GameIcon(when (item) { is Reward.Bolts -> IconKind.BOLT; is Reward.Prisms -> IconKind.PRISM; else -> IconKind.CREDIT },
                         Modifier.size(big).graphicsLayer { scaleX = pop.value; scaleY = pop.value; rotationZ = (1f - pop.value) * -50f })
                     Spacer(Modifier.height(6.dp))
                     val bump = 1f + 0.12f * sin(count.value * 40f) * (1f - count.value)
-                    GameText("+${"%,d".format((amount * count.value).toInt())} ${if (item is Reward.Bolts) "Power Ups" else "Crystals"}", Type.Display, outline = 4.dp,
+                    GameText("+${"%,d".format((amount * count.value).toInt())} ${when (item) { is Reward.Bolts -> "Power Ups"; is Reward.Prisms -> "Crystals"; else -> "Credits" }}", Type.Display, outline = 4.dp,
                         modifier = Modifier.graphicsLayer { scaleX = bump; scaleY = bump })
                 }
                 else -> {
@@ -172,9 +180,9 @@ fun RewardShowcase(
         }
 
         // The spray of icons: burst out of the reward, hang for a beat, then race to the wallet.
-        if ((item is Reward.Bolts || item is Reward.Prisms) && fly.value > 0f && fly.value < 1f && !settled) {
-            val kind = if (item is Reward.Bolts) IconKind.BOLT else IconKind.PRISM
-            val target = if (item is Reward.Bolts) boltSpot else prismSpot
+        if (currency(item) && fly.value > 0f && fly.value < 1f && !settled) {
+            val kind = when (item) { is Reward.Bolts -> IconKind.BOLT; is Reward.Prisms -> IconKind.PRISM; else -> IconKind.CREDIT }
+            val target = when (item) { is Reward.Bolts -> boltSpot; is Reward.Prisms -> prismSpot; else -> creditSpot }
             Canvas(Modifier.fillMaxSize()) {
                 if (target == Offset.Unspecified) return@Canvas
                 val from = Offset(size.width / 2f, size.height / 2f - 20.dp.toPx())

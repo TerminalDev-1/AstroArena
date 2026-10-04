@@ -134,6 +134,8 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.End,
                 ) {
+                    PassButton(serverStatus?.account?.takeIf { online }?.pass) { go(Screen.Pass) }
+                    Spacer(Modifier.height(10.dp))
                     CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online, openCapsule)
                     Spacer(Modifier.height(10.dp))
                     ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
@@ -233,6 +235,29 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
 }
 
 /** Spark Capsules waiting to be opened, or how to earn the next one. The server earns and opens them, so offline they wait. */
+/** The way into the Spark Pass: the tier the player is on, the bar toward the next, and a badge when a reward is waiting. */
+@Composable
+private fun PassButton(pass: io.github.projectwip.data.PassState?, onClick: () -> Unit) {
+    Box {
+        ChunkyButton(onClick, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.GLASS, cut = 14.dp, lip = 4.dp, sound = Sound.UI_OPEN) {
+            Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                GameIcon(IconKind.STAR, Modifier.size(36.dp))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    GameText("SPARK PASS", Type.Label, color = Palette.Gold, outline = 2.dp)
+                    if (pass == null) PlainText("Tiers of rewards, online", Type.Small, color = Color.White, maxLines = 1)
+                    else {
+                        PlainText("Tier ${pass.reached} of ${pass.tiers.size}", Type.Small, color = Color.White, maxLines = 1)
+                        ProgressBar(if (pass.reached >= pass.tiers.size) 1f else (pass.points % pass.tierPoints).toFloat() / pass.tierPoints, Modifier.fillMaxWidth(), Palette.Gold, 9.dp)
+                    }
+                }
+            }
+        }
+        val waiting = pass?.claimable ?: 0
+        if (waiting > 0) Badge(waiting.toString(), Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp))
+    }
+}
+
 @Composable
 private fun CapsuleButton(count: Int, leftToday: Int, online: Boolean, onOpen: () -> Unit) {
     Box {

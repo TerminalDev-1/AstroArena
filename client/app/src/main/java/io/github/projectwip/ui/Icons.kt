@@ -19,7 +19,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE }
+enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE, CREDIT }
 
 /** Original vector icon set. Each icon is drawn in a 0..1 unit square with an ink outline. */
 @Composable
@@ -130,6 +130,15 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
                 drawPath(chevron, Color.White)
                 outline(chevron, 0.045f)
             }
+        }
+        IconKind.CREDIT -> {
+            // A Credit: a green token stamped with a four-pointed spark.
+            drawCircle(INK, 0.47f, Offset(0.5f, 0.52f))
+            drawCircle(Brush.verticalGradient(listOf(Color(0xFFD2FFDD), Color(0xFF3FE08A), Color(0xFF159A5E)), 0.08f, 0.96f), 0.41f, Offset(0.5f, 0.52f))
+            drawArc(Color.White.copy(alpha = 0.45f), 200f, 100f, false, Offset(0.16f, 0.18f), Size(0.68f, 0.68f), style = Stroke(0.045f, cap = StrokeCap.Round))
+            val spark = poly(0.5f, 0.2f, 0.58f, 0.44f, 0.82f, 0.52f, 0.58f, 0.6f, 0.5f, 0.84f, 0.42f, 0.6f, 0.18f, 0.52f, 0.42f, 0.44f)
+            drawPath(spark, Color.White)
+            outline(spark, 0.045f)
         }
         IconKind.PRISM -> {
             val outer = poly(0.5f, 0.06f, 0.88f, 0.4f, 0.5f, 0.95f, 0.12f, 0.4f)

@@ -295,7 +295,10 @@ class ProgressionTest {
         assertEquals("Kito", kito.name)
         assertFalse("new fighters start locked", SaveData().progress(FighterId.KITO).unlocked)
         assertNotNull(Balance.unlockPrismPrice(FighterId.KITO))
-        assertTrue(CupTrack.milestones.any { it.reward == Reward.UnlockFighter(FighterId.KITO) })
+        // Fighters are unlocked on the Spark Road; the Cup Track pays Credits towards it instead of handing one out.
+        assertTrue(io.github.projectwip.data.SparkRoad.steps.any { it.fighter == FighterId.KITO })
+        assertTrue(CupTrack.milestones.none { it.reward is Reward.UnlockFighter })
+        assertEquals(io.github.projectwip.data.SparkRoad.steps.first(), io.github.projectwip.data.SparkRoad.next(SaveData()))
         // Thousands of health, hundreds to a thousand-odd per hit.
         for (f in Balance.fighters) {
             assertTrue("${f.name} health ${f.health.base}", f.health.base in 2500..6000)

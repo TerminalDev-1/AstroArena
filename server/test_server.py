@@ -81,7 +81,8 @@ class Rules(unittest.TestCase):
 
     def test_drops_never_give_what_is_owned(self):
         rng = random.Random(11)
-        save = {"bolts": 0, "prisms": 0, "fighters": {"JUNO": {"unlocked": True, "level": 1, "skin": 0, "ownedSkins": [0]}}}
+        # Drops hand out colourways for the fighters a player has, and never a fighter: those come from the Spark Road.
+        save = {"bolts": 0, "prisms": 0, "fighters": {f: {"unlocked": True, "level": 1, "skin": 0, "ownedSkins": [0]} for f in rules.FIGHTER_SKINS}}
         seen = set()
         for _ in range(400):
             result = rules.open_drop(save, boosted=False, luck=4.0, rng=rng)
@@ -93,7 +94,8 @@ class Rules(unittest.TestCase):
                     seen.add(key)
             rules.apply_reward(save, reward)
         # Everything there is to own was handed out exactly once, and only currency after that.
-        self.assertEqual(len([k for k in seen if k[0] == "fighter"]), len(rules.FIGHTER_SKINS) - 1)
+        self.assertEqual(len([k for k in seen if k[0] == "fighter"]), 0)
+        self.assertGreater(save["credits"], 0)
         self.assertEqual(len([k for k in seen if k[0] == "skin"]), sum(rules.FIGHTER_SKINS.values()) - len(rules.FIGHTER_SKINS))
         self.assertTrue(all(f["unlocked"] for f in save["fighters"].values()))
         self.assertGreater(save["bolts"], 0)
@@ -163,8 +165,9 @@ class Economy(unittest.TestCase):
         with self.assertRaises(Refused):
             economy.claim_milestone(p, 100)  # not reached
         p["bestCups"] = 120
-        # Brakk is already owned, so the track pays out instead.
-        self.assertEqual(economy.claim_milestone(p, 100), {"type": "bolts", "amount": 300})
+        # The track pays Credits where it used to hand out a fighter.
+        self.assertEqual(economy.claim_milestone(p, 100), {"type": "credits", "amount": 80})
+        self.assertEqual(p["credits"], 80)
         with self.assertRaises(Refused):
             economy.claim_milestone(p, 100)
         with self.assertRaises(Refused):
@@ -387,6 +390,60 @@ class Api(unittest.TestCase):
         while left > 0:
             left = self.call("POST", "/v1/drops/open", {}, me["token"])[1]["account"]["drops"]
         self.assertEqual(self.call("POST", "/v1/drops/open", {}, me["token"])[0], 409)
+
+    def test_credits_unlock_fighters_along_the_spark_road(self):
+        me = self.player()
+        token = me["token"]
+        account = self.call("GET", "/v1/me", token=token)[1]["account"]
+        self.assertEqual(account["road"], [{"fighter": f, "cost": c} for f, c in economy.SPARK_ROAD])
+        self.assertEqual(account["profile"]["credits"], 0)
+        # Not enough Credits yet.
+        status, body = self.call("POST", "/v1/road/unlock", {}, token)
+        self.assertEqual((status, body["error"]), (402, "not enough Credits"))
+        # The shop sells Credits for Prisms; the road takes them in order, one fighter at a time.
+        self.store.grant(me["id"], prisms=1000, credits=100)
+        status, body = self.call("POST", "/v1/shop/buy", {"item": "credits_s"}, token)
+        self.assertEqual((status, body["reward"]), (200, {"type": "credits", "amount": 60}))
+        status, body = self.call("POST", "/v1/road/unlock", {}, token)
+        self.assertEqual((status, body["reward"]), (200, {"type": "fighter", "fighter": "BRAKK"}))
+        self.assertEqual(body["account"]["profile"]["credits"], 0)
+        self.assertTrue(body["account"]["profile"]["fighters"]["BRAKK"]["unlocked"])
+        self.store.grant(me["id"], credits=420 + 900)
+        for name in ("MIRA", "KITO"):
+            self.assertEqual(self.call("POST", "/v1/road/unlock", {}, token)[1]["reward"]["fighter"], name)
+        self.assertEqual(self.call("POST", "/v1/road/unlock", {}, token)[0], 409)
+        # With the road finished, Credits have nowhere to go: they are paid as Bolts.
+        before = self.call("GET", "/v1/me", token=token)[1]["account"]["profile"]["bolts"]
+        status, body = self.call("POST", "/v1/shop/buy", {"item": "credits_s"}, token)
+        self.assertEqual(body["reward"], {"type": "bolts", "amount": 60 * economy.BOLTS_PER_SPARE_CREDIT})
+        self.assertEqual((body["account"]["profile"]["credits"], body["account"]["profile"]["bolts"]), (0, before + 600))
+
+    def test_matches_fill_the_spark_pass(self):
+        me = self.player()
+        token = me["token"]
+        season = self.call("GET", "/v1/me", token=token)[1]["account"]["pass"]
+        self.assertEqual((season["points"], season["claimed"], season["tierPoints"], len(season["tiers"])), (0, [], 100, economy.PASS_TIERS))
+        self.assertEqual(season["tiers"][0], economy.pass_reward(1))
+        self.assertEqual(self.call("POST", "/v1/pass/claim", {"tier": 1}, token)[0], 409)  # not reached
+        # Three wins: Credits for each, and enough pass points for the first tier.
+        win = {"outcome": "VICTORY", "placement": 0, "kos": 3, "deaths": 1, "damage": 4000}
+        for _ in range(3):
+            _, plan = self.call("POST", "/v1/matches", {"mode": "KNOCKOUT_RUSH"}, token)
+            self.age_matches()
+            _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], win, token)
+            self.assertEqual((body["credits"], body["passPoints"]), (6, 40))
+        account = body["account"]
+        self.assertEqual((account["profile"]["credits"], account["pass"]["points"]), (18, 120))
+        status, body = self.call("POST", "/v1/pass/claim", {"tier": 1}, token)
+        self.assertEqual((status, body["reward"]), (200, economy.pass_reward(1)))
+        self.assertEqual(body["account"]["pass"]["claimed"], [1])
+        self.assertEqual(self.call("POST", "/v1/pass/claim", {"tier": 1}, token)[0], 409)  # only once
+        self.assertEqual(self.call("POST", "/v1/pass/claim", {"tier": 2}, token)[0], 409)  # not reached
+        self.assertEqual(self.call("POST", "/v1/pass/claim", {"tier": 99}, token)[0], 404)
+        # A new season starts everyone from nothing.
+        profile = self.store.profile(me["id"])
+        day = (profile["pass"]["season"] + 1) * economy.PASS_SEASON_DAYS
+        self.assertEqual(economy.pass_view(profile, day), {"season": profile["pass"]["season"] + 1, "points": 0, "claimed": []})
 
     def test_the_server_opens_every_drop_at_once(self):
         save = {"cups": 0, "capsules": 5, "bolts": 0, "prisms": 0}
@@ -649,6 +706,9 @@ class Refereed(Api):
         pass
 
     def test_a_claimed_instant_win_is_refused(self):
+        pass
+
+    def test_matches_fill_the_spark_pass(self):
         pass
 
     def test_the_referee_decides_the_result(self):

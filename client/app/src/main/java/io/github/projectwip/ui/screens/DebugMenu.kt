@@ -120,5 +120,6 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
         ChunkyButton({ ask({ devGrant(bolts = 1000) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("+1,000 POWER UPS", Type.Label, outline = 2.dp) }
         ChunkyButton({ ask({ devGrant(prisms = 100) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("+100 CRYSTALS", Type.Label, outline = 2.dp) }
         ChunkyButton({ ask({ devGrant(drops = 5) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 DROPS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(credits = 100) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+100 CREDITS", Type.Label, outline = 2.dp) }
     }
 }

@@ -2,14 +2,17 @@
 
 A player's *profile* is the part of their progress the server is in charge of:
 
-    {"bolts", "prisms", "bestCups", "fighters": {ID: {"unlocked", "level", "ownedSkins"}},
-     "claimedMilestones": [cups, ...], "lastDailyGiftDay", "lastFirstWinDay"}
+    {"bolts", "prisms", "credits", "bestCups", "fighters": {ID: {"unlocked", "level", "ownedSkins"}},
+     "claimedMilestones": [cups, ...], "lastDailyGiftDay", "lastFirstWinDay",
+     "pass": {"season", "points", "claimed": [tier, ...]}}
+
+Players see Bolts as "Power Ups" and Prisms as "Crystals". Credits unlock fighters on the Spark Road.
 
 The keys are the ones the game's save file uses, so a profile can be started from a save and sent back to the
 game as it is. Every number here used to live in the client's `Balance.kt` / `Catalog.kt`; the client still has
 copies of the prices for showing them, so keep the two in step.
 
-Rewards are small dicts: {"type": "bolts"|"prisms", "amount"}, {"type": "fighter", "fighter"},
+Rewards are small dicts: {"type": "bolts"|"prisms"|"credits", "amount"}, {"type": "fighter", "fighter"},
 {"type": "skin", "fighter", "skin"}, {"type": "bundle", "items": [...]}.
 """
 
@@ -49,11 +52,15 @@ def _round(x: float) -> int:
 FIGHTER_PRICE = {"BRAKK": 40, "MIRA": 70, "KITO": 90}  # Prisms; the starting fighter isn't sold
 SKIN_PRICE = 20  # Prisms, for every colourway but a fighter's first
 BOLT_CRATES = {"crate_s": (400, 10), "crate_m": (1200, 25), "crate_l": (3000, 50)}  # key: (Bolts, price in Prisms)
+CREDIT_PACKS = {"credits_s": (60, 15), "credits_m": (200, 45), "credits_l": (500, 100)}  # key: (Credits, price in Prisms)
 CURRENCIES = ("FREE", "BOLTS", "PRISMS")
 
 
 def shop_item(key: str) -> tuple[dict, int] | None:
     """The reward and Prism price of a standing shop item, or None if there is no such item."""
+    if key in CREDIT_PACKS:
+        credits, price = CREDIT_PACKS[key]
+        return {"type": "credits", "amount": credits}, price
     if key in BOLT_CRATES:
         bolts, price = BOLT_CRATES[key]
         return {"type": "bolts", "amount": bolts}, price
@@ -104,25 +111,131 @@ def first_win_prisms(mode: str, outcome: str, profile: dict, day: int) -> int:
 
 def _b(n): return {"type": "bolts", "amount": n}
 def _p(n): return {"type": "prisms", "amount": n}
+def _c(n): return {"type": "credits", "amount": n}
 def _f(name): return {"type": "fighter", "fighter": name}
 def _s(name, i): return {"type": "skin", "fighter": name, "skin": i}
 
 
 CUP_TRACK = {
-    10: _b(40), 25: _p(10), 40: _b(75), 60: _s("JUNO", 1), 80: _p(20), 100: _f("BRAKK"), 130: _b(150), 160: _p(25),
-    200: _s("BRAKK", 1), 250: _b(250), 300: _p(40), 350: _f("MIRA"), 420: _b(400), 500: _s("MIRA", 1), 600: _p(60),
-    700: _b(600), 850: _s("JUNO", 2), 1000: _p(100), 1200: _f("KITO"), 1500: _s("KITO", 1),
+    10: _b(40), 25: _p(10), 40: _b(75), 60: _s("JUNO", 1), 80: _p(20), 100: _c(80), 130: _b(150), 160: _p(25),
+    200: _s("BRAKK", 1), 250: _b(250), 300: _p(40), 350: _c(200), 420: _b(400), 500: _s("MIRA", 1), 600: _p(60),
+    700: _b(600), 850: _s("JUNO", 2), 1000: _p(100), 1200: _c(400), 1500: _s("KITO", 1),
 }
+
+
+# ---------------------------------------------------------------------------- Credits and the Spark Road
+
+# The fighters along the road, in order, and the Credits each one takes. Fighters are unlocked here (or bought
+# in the shop with Prisms); nothing else hands one out.
+SPARK_ROAD = [("BRAKK", 160), ("MIRA", 420), ("KITO", 900)]
+# Once the road is finished there is nothing for Credits to do, so any that are earned are paid in Bolts instead.
+BOLTS_PER_SPARE_CREDIT = 10
+
+
+def road_next(profile: dict) -> tuple[str, int] | None:
+    """The next fighter on the road and what it costs, or None when every one is unlocked."""
+    for name, cost in SPARK_ROAD:
+        if not profile["fighters"].get(name, {}).get("unlocked"):
+            return name, cost
+    return None
+
+
+def road_unlock(profile: dict) -> dict:
+    """Spends Credits on the next fighter along the road and returns the reward."""
+    step = road_next(profile)
+    if step is None:
+        raise Refused(409, "the Spark Road is finished")
+    name, cost = step
+    if profile["credits"] < cost:
+        raise Refused(402, "not enough Credits")
+    profile["credits"] -= cost
+    return grant(profile, _f(name))
+
+
+def match_credits(mode: str, outcome: str, placement: int) -> int:
+    """Credits for playing a match: a few for turning up, more for a good finish."""
+    if mode == "TRAINING":
+        return 0
+    good = outcome == "VICTORY" or (mode == "LAST_SPARK" and 1 <= placement <= 4)
+    if mode == "BOSS":
+        return 3 if good else 1
+    return 6 if good else 2
+
+
+# ---------------------------------------------------------------------------- the Spark Pass
+
+# A season of tiers. Playing earns pass points; every PASS_TIER_POINTS of them reaches the next tier, and each
+# tier has a reward to claim, most of them Credits. A new season starts everyone from nothing.
+PASS_SEASON_DAYS = 28
+PASS_TIER_POINTS = 100
+PASS_TIERS = 30
+
+
+def pass_reward(tier: int) -> dict:
+    """What tier `tier` (1-based) gives."""
+    if tier % 10 == 0:
+        return _c(150)
+    if tier % 5 == 0:
+        return _p(30)
+    if tier % 2 == 1:
+        return _c(30 + 10 * (tier // 10))
+    return _b(200 + 20 * tier)
+
+
+def pass_points(mode: str, outcome: str, placement: int) -> int:
+    if mode == "TRAINING":
+        return 0
+    good = outcome == "VICTORY" or (mode == "LAST_SPARK" and 1 <= placement <= 4)
+    if mode == "BOSS":
+        return 20 if good else 8
+    return 40 if good else 15
+
+
+def pass_season(day: int) -> int:
+    return day // PASS_SEASON_DAYS
+
+
+def pass_view(profile: dict, day: int) -> dict:
+    """The player's pass this season, without changing the profile: a pass from an earlier season counts as new."""
+    state = profile.get("pass")
+    if not isinstance(state, dict) or state.get("season") != pass_season(day):
+        return {"season": pass_season(day), "points": 0, "claimed": []}
+    return state
+
+
+def add_pass_points(profile: dict, points: int, day: int) -> None:
+    state = dict(pass_view(profile, day))
+    state["points"] = min(state["points"] + max(points, 0), PASS_TIERS * PASS_TIER_POINTS)
+    profile["pass"] = state
+
+
+def claim_pass(profile: dict, tier: int, day: int) -> dict:
+    state = dict(pass_view(profile, day))
+    if not 1 <= tier <= PASS_TIERS:
+        raise Refused(404, "no such Spark Pass tier")
+    if state["points"] < tier * PASS_TIER_POINTS:
+        raise Refused(409, "not reached yet")
+    if tier in state["claimed"]:
+        raise Refused(409, "already claimed")
+    state["claimed"] = sorted(state["claimed"] + [tier])
+    profile["pass"] = state
+    return grant(profile, pass_reward(tier))
 
 
 # ---------------------------------------------------------------------------- profiles
 
 def new_profile() -> dict:
     return {
-        "bolts": STARTING_BOLTS, "prisms": STARTING_PRISMS, "bestCups": 0,
+        "bolts": STARTING_BOLTS, "prisms": STARTING_PRISMS, "credits": 0, "bestCups": 0,
         "fighters": {name: {"unlocked": name == rules.STARTING_FIGHTER, "level": 1, "ownedSkins": [0]} for name in rules.FIGHTER_SKINS},
         "claimedMilestones": [], "lastDailyGiftDay": -1, "lastFirstWinDay": -1,
     }
+
+
+def complete(profile: dict) -> dict:
+    """Fills in what a profile stored by an older server doesn't have yet."""
+    profile.setdefault("credits", 0)
+    return profile
 
 
 def _int(value, default=0, low=0, high=2_000_000_000) -> int:
@@ -186,6 +299,8 @@ def grant(profile: dict, reward: dict) -> dict:
     if reward.get("type") == "bundle":
         return {"type": "bundle", "items": [grant(profile, item) for item in reward.get("items", [])]}
     actual = compensation(reward) if owns(profile, reward) else reward
+    if actual.get("type") == "credits" and road_next(profile) is None:
+        actual = _b(int(actual["amount"]) * BOLTS_PER_SPARE_CREDIT)
     rules.apply_reward(profile, actual)
     return actual
 

@@ -88,7 +88,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     LaunchedEffect(Unit) {
         // ...then the rewards pop in one by one, each a little higher...
         delay(550)
-        repeat(6) { i ->
+        repeat(8) { i ->
             rowsShown = i + 1
             if (i < rewardRowCount(rewards, r.mvp && r.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH)) {
                 // Every reward lands with a pop and a cha-ching, each one a little higher than the last.
@@ -157,6 +157,8 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             (if (rewards.cupDelta >= 0) "+" else "") + rewards.cupDelta,
                             if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
                         if (row++ < rowsShown) RewardRow(IconKind.BOLT, "Power Ups", "+${rewards.bolts}", Palette.CyanDeep)
+                        if (rewards.credits > 0 && row++ < rowsShown) RewardRow(IconKind.CREDIT, "Credits", "+${rewards.credits}", Palette.GreenDeep)
+                        if (rewards.passPoints > 0 && row++ < rowsShown) RewardRow(IconKind.STAR, "Spark Pass", "+${rewards.passPoints}", Palette.OrangeDeep)
                         if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
                         if (rewards.capsuleEarned && row++ < rowsShown) RewardRow(IconKind.CAPSULE, "Spark Drop", "+1", Palette.CyanDeep)
                         if (r.mvp && r.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH && row++ < rowsShown) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
@@ -200,7 +202,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
 
 /** How many rows the rewards panel will show, so each one gets its own pop. */
 private fun rewardRowCount(rewards: MatchRewards, mvpBonus: Boolean) =
-    2 + (if (rewards.firstWinPrisms > 0) 1 else 0) + (if (rewards.capsuleEarned) 1 else 0) + (if (mvpBonus) 1 else 0)
+    2 + (if (rewards.credits > 0) 1 else 0) + (if (rewards.passPoints > 0) 1 else 0) + (if (rewards.firstWinPrisms > 0) 1 else 0) + (if (rewards.capsuleEarned) 1 else 0) + (if (mvpBonus) 1 else 0)
 
 @Composable
 private fun RewardRow(icon: IconKind, label: String, value: String, chip: Color) {

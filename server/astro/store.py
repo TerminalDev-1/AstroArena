@@ -111,6 +111,12 @@ def today() -> int:
     return (datetime.date.today() - _EPOCH).days
 
 
+def season_ends_ms(day: int) -> int:
+    """When the Spark Pass season that `day` falls in ends (ms since 1970, the server's midnight)."""
+    last = _EPOCH + datetime.timedelta(days=(economy.pass_season(day) + 1) * economy.PASS_SEASON_DAYS)
+    return int(datetime.datetime.combine(last, datetime.time.min).timestamp() * 1000)
+
+
 def clock() -> dict:
     """The server's time, for the game to count down from: now, today's number, and when today ends (ms since 1970)."""
     midnight = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time.min)
@@ -168,7 +174,7 @@ class Store:
         with self._lock:
             return self._db.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
 
-    def grant(self, player_id: str, cups: int = 0, drops: int = 0, bolts: int = 0, prisms: int = 0) -> None:
+    def grant(self, player_id: str, cups: int = 0, drops: int = 0, bolts: int = 0, prisms: int = 0, credits: int = 0) -> None:
         """Developer hand-outs."""
         with self._lock, self._db:
             self._db.execute(
@@ -177,6 +183,7 @@ class Store:
             profile = self._profile(player_id)
             profile["bolts"] = max(0, profile["bolts"] + int(bolts))
             profile["prisms"] = max(0, profile["prisms"] + int(prisms))
+            profile["credits"] = max(0, profile["credits"] + int(credits))
             self._keep(player_id, profile)
 
     def set_difficulty(self, player_id: str, difficulty: str) -> None:
@@ -218,7 +225,7 @@ class Store:
         """The player's profile. One that hasn't been started yet begins from their stored save, or from scratch."""
         row = self._db.execute("SELECT profile FROM players WHERE id = ?", (player_id,)).fetchone()
         if row["profile"]:
-            return json.loads(row["profile"])
+            return economy.complete(json.loads(row["profile"]))
         saved = self._db.execute("SELECT json FROM saves WHERE player_id = ?", (player_id,)).fetchone()
         if saved is not None and self.import_progress():
             return economy.profile_from_save(json.loads(saved["json"]))
@@ -250,6 +257,12 @@ class Store:
 
     def claim_milestone(self, player_id: str, cups: int) -> dict:
         return self._change(player_id, lambda p: economy.claim_milestone(p, cups))
+
+    def road_unlock(self, player_id: str) -> dict:
+        return self._change(player_id, economy.road_unlock)
+
+    def claim_pass(self, player_id: str, tier: int) -> dict:
+        return self._change(player_id, lambda p: economy.claim_pass(p, tier, today()))
 
     # ------------------------------------------------------------------ deals
 
@@ -428,8 +441,16 @@ class Store:
             if prisms:
                 profile["lastFirstWinDay"] = day
             profile["bestCups"] = max(profile["bestCups"], cups)
+            # Credits for the Spark Road (paid in Bolts once it is finished) and points for the Spark Pass.
+            paid = economy.grant(profile, {"type": "credits", "amount": economy.match_credits(mode, outcome, placement)})
+            credits = paid["amount"] if paid["type"] == "credits" else 0
+            points = economy.pass_points(mode, outcome, placement)
+            economy.add_pass_points(profile, points, day)
             self._keep(player_id, profile)
-            return {"cupDelta": cups - player["cups"], "cups": cups, "drop": drop, "bolts": bolts, "firstWinPrisms": prisms}
+            return {
+                "cupDelta": cups - player["cups"], "cups": cups, "drop": drop, "bolts": bolts + (paid["amount"] if paid["type"] == "bolts" else 0),
+                "firstWinPrisms": prisms, "credits": credits, "passPoints": points,
+            }
 
     # ------------------------------------------------------------------ Spark Drops
 

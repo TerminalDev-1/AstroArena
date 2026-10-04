@@ -29,6 +29,9 @@ data class MatchRewards(
     val capsulesLeftToday: Int = 0,
     /** False for an offline match: the server wasn't there to award Cups or a Spark Drop. */
     val online: Boolean = true,
+    /** Credits for the Spark Road, and points for the Spark Pass. */
+    val credits: Int = 0,
+    val passPoints: Int = 0,
 )
 
 /**
@@ -48,6 +51,8 @@ data class ServerVerdict(
     val bolts: Int = 0,
     /** Prisms for the first win of the day (0 if this wasn't it). */
     val firstWinPrisms: Int = 0,
+    val credits: Int = 0,
+    val passPoints: Int = 0,
     /** How the match went according to the server's own replay of it. Null if the server has no referee running. */
     val judged: JudgedResult? = null,
 )
@@ -66,6 +71,7 @@ data class ServerProfile(
     val bolts: Int,
     val prisms: Int,
     val bestCups: Int,
+    val credits: Int = 0,
     /** [FighterProgress.skin] is not the server's business: which colourway is worn is chosen on the device. */
     val fighters: Map<FighterId, FighterProgress>,
     val claimedMilestones: Set<Int>,
@@ -104,7 +110,7 @@ object Progression {
             victories = save.victories + if (report.outcome == MatchOutcome.VICTORY) 1 else 0,
             totalKos = save.totalKos + report.kos,
         )
-        val rewards = MatchRewards(newCups - cupDelta, cupDelta, verdict?.bolts ?: 0, verdict?.firstWinPrisms ?: 0, reached, verdict?.drop == true, leftToday, online = verdict != null)
+        val rewards = MatchRewards(newCups - cupDelta, cupDelta, verdict?.bolts ?: 0, verdict?.firstWinPrisms ?: 0, reached, verdict?.drop == true, leftToday, online = verdict != null, credits = verdict?.credits ?: 0, passPoints = verdict?.passPoints ?: 0)
         return next to rewards
     }
 
@@ -130,7 +136,7 @@ object Progression {
             theirs.copy(ownedSkins = owned, skin = save.progress(id).skin.takeIf { it in owned } ?: 0)
         }
         return base.copy(
-            bolts = profile.bolts.coerceAtLeast(0), prisms = profile.prisms.coerceAtLeast(0),
+            bolts = profile.bolts.coerceAtLeast(0), prisms = profile.prisms.coerceAtLeast(0), credits = profile.credits.coerceAtLeast(0),
             bestCups = maxOf(profile.bestCups, cups),
             fighters = fighters,
             selectedFighter = if (fighters[save.selectedFighter]?.unlocked == true) save.selectedFighter else FighterId.JUNO,

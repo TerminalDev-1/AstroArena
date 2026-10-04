@@ -16,7 +16,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|fighters|kito|shop|track|settings|result|leaders`, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` splits into eight, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
+  (`match|boss|train|fighters|kito|shop|road|pass|track|settings|result|leaders`, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` splits into eight, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - UI changes must be checked with a screenshot (`adb exec-out screencap -p`) and `adb logcat -b crash -d`.
 - The tablet is the user's everyday device. Before every `input tap` or `am start`, confirm
   `dumpsys window | grep mCurrentFocus` shows `io.github.projectwip` or the home screen (`com.miui.home`): on
@@ -63,7 +63,12 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (`server/shop.cfg`). The client moves server times onto its own clock on receipt and only counts down.
 - The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
   is asked for a name before their account is made (`NameScreen`).
-- A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`.
+- A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`; a new fighter
+  also needs a place on the Spark Road (`SPARK_ROAD` in `economy.py`, `SparkRoad` in `Catalog.kt`).
+- Fighters are unlocked on the Spark Road with Credits (or bought with Crystals): drops and the Cup Track pay
+  Credits, never a fighter. The Spark Pass (seasons, tiers, rewards) is entirely the server's; the client has no
+  copy of its table and shows what the account says.
+- The Spark Road and Spark Pass are our own take on a familiar idea. Keep their names, art and layout original.
 - Matches: the device plays the match and records the player's `Control` on every tick (`sim/InputLog`). The
   server replays that record through the same simulation (`sim/Referee`, built into `server/referee/referee.jar`,
   started by `server/astro/referee.py`) with the seed, bots and fighter level it handed out, and the result is

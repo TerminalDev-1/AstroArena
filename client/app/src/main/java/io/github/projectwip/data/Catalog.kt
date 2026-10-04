@@ -4,6 +4,8 @@ package io.github.projectwip.data
 sealed interface Reward {
     data class Bolts(val amount: Int) : Reward
     data class Prisms(val amount: Int) : Reward
+    /** Credits: what the Spark Road takes to unlock a fighter. */
+    data class Credits(val amount: Int) : Reward
     data class UnlockFighter(val fighter: FighterId) : Reward
     data class SkinReward(val fighter: FighterId, val skinIndex: Int) : Reward
     /** Several rewards at once (custom shop offers). */
@@ -103,6 +105,38 @@ object SparkCapsules {
 
 data class Milestone(val cups: Int, val reward: Reward)
 
+/** One stop on the Spark Road: a fighter, and the Credits it takes to unlock. */
+data class RoadStep(val fighter: FighterId, val cost: Int)
+
+/**
+ * The Spark Road: fighters are unlocked along it one after another, with Credits. The server spends the Credits
+ * and unlocks the fighter (`server/astro/economy.py`, SPARK_ROAD); this copy is for showing the road.
+ */
+object SparkRoad {
+    val steps = listOf(RoadStep(FighterId.BRAKK, 160), RoadStep(FighterId.MIRA, 420), RoadStep(FighterId.KITO, 900))
+
+    /** The next fighter to unlock, or null when the road is finished. */
+    fun next(save: SaveData): RoadStep? = steps.firstOrNull { !save.progress(it.fighter).unlocked }
+}
+
+/** This season's Spark Pass as the server holds it: points earned by playing, and a reward to claim at every tier. */
+data class PassState(
+    val season: Long,
+    /** When the season ends, on this device's clock (ms). */
+    val endsAt: Long,
+    val points: Int,
+    /** Points from one tier to the next. */
+    val tierPoints: Int,
+    /** Tiers (1-based) whose reward has been claimed. */
+    val claimed: Set<Int>,
+    /** The reward at each tier; index 0 is tier 1. */
+    val tiers: List<Reward>,
+) {
+    /** Tiers reached so far. */
+    val reached: Int get() = if (tierPoints > 0) (points / tierPoints).coerceAtMost(tiers.size) else 0
+    val claimable: Int get() = (1..reached).count { it !in claimed }
+}
+
 /** The Cup Track. Milestones must be sorted by [Milestone.cups] and unique. */
 object CupTrack {
     val milestones: List<Milestone> = listOf(
@@ -111,20 +145,20 @@ object CupTrack {
         Milestone(40, Reward.Bolts(75)),
         Milestone(60, Reward.SkinReward(FighterId.JUNO, 1)),
         Milestone(80, Reward.Prisms(20)),
-        Milestone(100, Reward.UnlockFighter(FighterId.BRAKK)),
+        Milestone(100, Reward.Credits(80)),
         Milestone(130, Reward.Bolts(150)),
         Milestone(160, Reward.Prisms(25)),
         Milestone(200, Reward.SkinReward(FighterId.BRAKK, 1)),
         Milestone(250, Reward.Bolts(250)),
         Milestone(300, Reward.Prisms(40)),
-        Milestone(350, Reward.UnlockFighter(FighterId.MIRA)),
+        Milestone(350, Reward.Credits(200)),
         Milestone(420, Reward.Bolts(400)),
         Milestone(500, Reward.SkinReward(FighterId.MIRA, 1)),
         Milestone(600, Reward.Prisms(60)),
         Milestone(700, Reward.Bolts(600)),
         Milestone(850, Reward.SkinReward(FighterId.JUNO, 2)),
         Milestone(1000, Reward.Prisms(100)),
-        Milestone(1200, Reward.UnlockFighter(FighterId.KITO)),
+        Milestone(1200, Reward.Credits(400)),
         Milestone(1500, Reward.SkinReward(FighterId.KITO, 1)),
     )
 
@@ -145,6 +179,8 @@ sealed interface ShopItem {
 
     data class BoltCrate(override val key: String, override val title: String, val bolts: Int, override val pricePrisms: Int) : ShopItem
 
+    data class CreditPack(override val key: String, override val title: String, val credits: Int, override val pricePrisms: Int) : ShopItem
+
     data class SkinOffer(val fighter: FighterId, val skinIndex: Int) : ShopItem {
         override val key = "skin_${fighter.name}_$skinIndex"
         private val skin get() = Balance.fighter(fighter).skins[skinIndex]
@@ -158,6 +194,12 @@ object Shop {
         ShopItem.BoltCrate("crate_s", "Power Up Pouch", bolts = 400, pricePrisms = 10),
         ShopItem.BoltCrate("crate_m", "Power Up Crate", bolts = 1200, pricePrisms = 25),
         ShopItem.BoltCrate("crate_l", "Power Up Vault", bolts = 3000, pricePrisms = 50),
+    )
+
+    val creditPacks = listOf(
+        ShopItem.CreditPack("credits_s", "Credit Chip", credits = 60, pricePrisms = 15),
+        ShopItem.CreditPack("credits_m", "Credit Stack", credits = 200, pricePrisms = 45),
+        ShopItem.CreditPack("credits_l", "Credit Case", credits = 500, pricePrisms = 100),
     )
 
     val fighterOffers: List<ShopItem.FighterOffer> =
