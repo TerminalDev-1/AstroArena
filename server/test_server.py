@@ -388,6 +388,33 @@ class Api(unittest.TestCase):
             left = self.call("POST", "/v1/drops/open", {}, me["token"])[1]["account"]["drops"]
         self.assertEqual(self.call("POST", "/v1/drops/open", {}, me["token"])[0], 409)
 
+    def test_the_server_opens_every_drop_at_once(self):
+        save = {"cups": 0, "capsules": 5, "bolts": 0, "prisms": 0}
+        me = self.player(save=save)
+        status, body = self.call("POST", "/v1/drops/open-all", {"luck": 14}, me["token"])
+        self.assertEqual(status, 200)
+        results = body["results"]
+        # `luck` was ignored (no developer). All five were opened, and every piece that split off along the way,
+        # unless a long run of splits reached the most one request opens; what is left is still the player's.
+        left = 5 + sum(r["pieces"] - 1 for r in results) - len(results)
+        self.assertEqual(body["account"]["drops"], left)
+        self.assertTrue(left == 0 or len(results) == rules.MAX_OPEN_ALL)
+        # Everything that came out is in the profile the server keeps.
+        expected = economy.profile_from_save(save)
+        for r in results:
+            economy.grant(expected, r["reward"])
+        self.assertEqual(body["account"]["profile"], expected)
+        while left > 0:
+            left = self.call("POST", "/v1/drops/open-all", {}, me["token"])[1]["account"]["drops"]
+        self.assertEqual(self.call("POST", "/v1/drops/open-all", {}, me["token"])[0], 409)
+
+    def test_drops_pay_three_times_over(self):
+        rng = random.Random(5)
+        for _ in range(200):
+            reward = rules.roll_reward(0, {}, rng)  # Scrap: 60 to 120 Bolts before the buff
+            self.assertEqual(reward["type"], "bolts")
+            self.assertTrue(180 <= reward["amount"] <= 360 and reward["amount"] % 15 == 0)
+
     def test_developers_are_chosen_by_the_server(self):
         me = self.player()
         account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]

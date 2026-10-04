@@ -13,6 +13,7 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/matches/<id>/result {inputs}  hand in the match's inputs; the server replays it and
                                         answers with the result and what it earned            (token)
     POST /v1/drops/open     {...}       open a Spark Drop -> {tier, pieces, reward, account}  (token)
+    POST /v1/drops/open-all {...}       open every Spark Drop -> {results: [{tier, pieces, reward}], account}  (token)
     POST /v1/fighters/upgrade {fighter} level a fighter up with Bolts                         (token)
     POST /v1/shop/buy       {item}      buy a standing shop item with Prisms -> {reward}      (token)
     POST /v1/shop/gift                  claim the daily gift -> {reward}                      (token)
@@ -235,6 +236,8 @@ def make_handler(game: Game, quiet: bool = False):
                 return self._finish_match(int(m.group(1)))
             if url.path == "/v1/drops/open":
                 return self._open_drop()
+            if url.path == "/v1/drops/open-all":
+                return self._act(self._open_all_drops)
             if url.path == "/v1/dev/grant":
                 return self._act(lambda p, d: game.store.grant(
                     p["id"], int(d.get("cups") or 0), int(d.get("drops") or 0), int(d.get("bolts") or 0), int(d.get("prisms") or 0)
@@ -294,6 +297,14 @@ def make_handler(game: Game, quiet: bool = False):
                 raise Refused(403, "the server doesn't allow that difficulty")
             game.store.set_difficulty(player["id"], wanted)
             return {"ok": True}
+
+        def _open_all_drops(self, player, data):
+            # Luck is the debug menu's, so only a developer's counts.
+            luck = float(data.get("luck") or 0) if game.config.is_developer(player["id"]) else 0.0
+            results = game.store.open_all_drops(player["id"], luck)
+            if not results:
+                raise Refused(409, "no Spark Drops to open")
+            return {"results": results}
 
         def _upgrade(self, player, data):
             # The cost slider and the level cap switch in the debug menu are for developers only.

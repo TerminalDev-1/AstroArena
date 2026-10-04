@@ -150,7 +150,7 @@ object Progression {
         SparkCapsules.PER_DAY - if (save.capsuleDay == today) save.capsulesEarnedToday else 0
 
     /** Counts a Spark Drop as opened. (Its reward arrives with the profile the server sends.) */
-    fun dropOpened(save: SaveData): SaveData = save.copy(capsulesOpened = save.capsulesOpened + 1)
+    fun dropOpened(save: SaveData, count: Int = 1): SaveData = save.copy(capsulesOpened = save.capsulesOpened + count)
 
     /** Puts the debug menu's cheats back to normal (for players the server doesn't list as developers). */
     fun withoutCheats(settings: Settings): Settings =

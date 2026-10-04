@@ -50,6 +50,8 @@ class LobbyParams {
     /** When the capsule last split (0 = it hasn't), and how many capsules there are now. */
     @Volatile var capsuleSplitAt = 0L
     @Volatile var capsulePieces = 1
+    /** How unstable the capsule is, 0..1: how often and how hard it glitches while it waits. */
+    @Volatile var capsuleGlitch = 0f
 }
 
 /**

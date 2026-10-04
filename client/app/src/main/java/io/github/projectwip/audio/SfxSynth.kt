@@ -15,7 +15,7 @@ enum class Sound {
     SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
-    UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND,
+    UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH,
 }
 
 /**
@@ -62,6 +62,7 @@ object SfxSynth {
         Sound.CHING -> ching().finish(0.72f)
         Sound.BOLT_LAND -> boltLand().finish(0.7f)
         Sound.PRISM_LAND -> prismLand().finish(0.62f)
+        Sound.GLITCH -> glitch().finish(0.45f)
     }
 
     const val LOBBY_BPM = 124f
@@ -702,6 +703,16 @@ object SfxSynth {
         osc(Wave.SINE, 0f, 0.5f, { hz(100) * 1.004f }, { perc(it, 0.001f, 0.14f) * 0.15f })
         noise(231, 0f, 0.05f, Band.HIGH, { 9000f }, 0.7f, { perc(it, 0.0005f, 0.012f) * 0.2f })
         reverb(0.3f, 0.75f)
+    }
+
+    /** A Spark Drop tearing: a stutter of square-wave blips that jump about in pitch, over chopped static. */
+    private fun glitch() = Clip(0.34f).apply {
+        for ((i, f) in floatArrayOf(220f, 1760f, 440f, 3520f, 880f, 110f, 2640f).withIndex()) {
+            osc(Wave.SQUARE, i * 0.036f, 0.034f, { f }, { hold(it, 0.001f, 0.022f, 0.004f) * 0.4f })
+        }
+        noise(241, 0f, 0.26f, Band.BAND, { 2600f }, 3f, { if ((it * 42f).toInt() % 2 == 0) hold(it, 0.002f, 0.22f, 0.02f) * 0.35f else 0f })
+        drive(1.6f)
+        filter(Band.LOW, 0.8f) { 6000f }
     }
 
     /** Something popping into place (reward rows, sliders). */

@@ -41,7 +41,7 @@ class GameRepository(private val store: SaveStore) {
     }
 
     /** Counts a Spark Drop the server opened. */
-    fun dropOpened() = commit(Progression.dropOpened(_save.value))
+    fun dropOpened(count: Int = 1) = commit(Progression.dropOpened(_save.value, count))
 
     /** Takes on what the server holds for this player (Cups, drops, and when given the profile and shop deals). */
     fun syncAccount(

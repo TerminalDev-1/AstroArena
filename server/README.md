@@ -116,6 +116,7 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `POST /v1/matches` * `{mode, fighter}` | `{matchId, seed, botNames, difficulty, fighter, level, bots, refereed}`; 409 if the fighter isn't unlocked |
 | `POST /v1/matches/<id>/result` * `{inputs}` (base64 of the gzipped input log; the device's own result fields are only used when there is no referee) | `{verified, report, cupDelta, cups, drop, bolts, firstWinPrisms, account}`, or 422 if refused |
 | `POST /v1/drops/open` * `{luck, free}` | `{tier, pieces, reward, account}`, or 409 if there are none |
+| `POST /v1/drops/open-all` * `{luck}` | `{results: [{tier, pieces, reward}, ...], account}`: every drop, and the pieces that split off, in the order opened; 409 if there are none |
 | `POST /v1/fighters/upgrade` * `{fighter}` | `{cost, account}`; 402 if it can't be afforded, 409 if it can't be upgraded |
 | `POST /v1/shop/buy` * `{item}` | `{reward, account}`; items are `fighter_MIRA`, `skin_MIRA_1`, `crate_s` / `crate_m` / `crate_l` |
 | `POST /v1/shop/gift` * | `{reward, account}`; 409 once claimed today |

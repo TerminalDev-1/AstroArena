@@ -246,12 +246,35 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             }
         }
     }
+    /** Everything that came out of an "open all", while it is being shown. Like [capsule], it is already saved. */
+    var haul by remember {
+        // Debug: `--es screen haul` previews it with made-up drops, without touching the save.
+        mutableStateOf(if (startScreen == "haul") io.github.projectwip.ui.screens.previewHaul() else null)
+    }
+    // Opens every drop that is left. [first] is the one on screen, when its own reveal is being skipped.
+    val openAll: (CapsuleResult?) -> Unit = { first ->
+        if (!opening) {
+            if (!serverStatus.online) toast = "Spark Drops are opened by the server, and you're offline."
+            else {
+                opening = true
+                scope.launch {
+                    val luck = if (dev) repo.save.value.settings.debugLuck else 0f
+                    val rest = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server.openAllDrops(luck) }
+                    opening = false
+                    server.status.value.account?.let { repo.sync(it) }
+                    if (rest != null) { repo.dropOpened(rest.size); capsule = null; haul = listOfNotNull(first) + rest }
+                    else toast = if (server.status.value.online) "No Spark Drops to open." else "Couldn't reach the server. Try again in a moment."
+                }
+            }
+        }
+    }
     var debugMenu by remember { mutableStateOf(false) }
 
     BackHandler(enabled = screen !is Screen.Home && screen !is Screen.Match) {
         screen = Screen.Home
     }
     BackHandler(enabled = capsule != null) { capsule = null }
+    BackHandler(enabled = haul != null) { haul = null }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Palette.BgBottom)) {
         // Uniform UI scale so tablets get bigger, more legible UI — layouts then use the extra room
@@ -270,7 +293,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 )
             }
             // The menu steps aside while a capsule is being opened, so nothing sits on top of the 3D capsule.
-            val menuAlpha by androidx.compose.animation.core.animateFloatAsState(if (capsule != null) 0f else 1f, tween(160), label = "menu")
+            val menuAlpha by androidx.compose.animation.core.animateFloatAsState(if (capsule != null || haul != null) 0f else 1f, tween(160), label = "menu")
             AnimatedContent(
                 modifier = Modifier.graphicsLayer { alpha = menuAlpha },
                 targetState = screen,
@@ -325,13 +348,13 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             // The debug menu hides behind a small "D" in the corner of every menu screen.
             // Developers only, and only if they switched it on in Settings > Developer.
             val devMenu = dev && save.settings.devMenu
-            if (devMenu && screen !is Screen.Match && capsule == null && reveal == null) {
+            if (devMenu && screen !is Screen.Match && capsule == null && haul == null && reveal == null) {
                 io.github.projectwip.ui.screens.DebugButton(Modifier.align(Alignment.BottomStart)) { debugMenu = true }
             }
             if (debugMenu && devMenu) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
             // On top of everything: the loading screen, then (if a newer release exists) the update screen.
             // Server status in the corner. (Its notice is part of the home screen.)
-            if (screen !is Screen.Match && capsule == null && reveal == null) {
+            if (screen !is Screen.Match && capsule == null && haul == null && reveal == null) {
                 PlainText(
                     if (serverStatus.online) "● ONLINE" else "● OFFLINE MODE · practice only", Type.Small,
                     Modifier.align(Alignment.BottomStart).padding(start = if (devMenu) 48.dp else 14.dp, bottom = 12.dp),
@@ -361,7 +384,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 )
             }
             AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, onNext = openCapsule, onDone = { capsule = null }) }
+                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, onNext = openCapsule, onOpenAll = openAll, onDone = { capsule = null }) }
+            }
+            AnimatedVisibility(haul != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
+                haul?.let { io.github.projectwip.ui.screens.DropHaulOverlay(it, save.bolts, save.prisms) { haul = null } }
             }
         }
     }

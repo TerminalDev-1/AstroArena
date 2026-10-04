@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -55,10 +56,16 @@ private val TAPS = CapsuleTier.entries.size - 1
 
 /**
  * Opening a Spark Capsule. The result is already decided (and saved) before this is shown; the taps only
- * reveal it: each knock either rattles the capsule or charges it up a tier, and the last one bursts it open.
+ * reveal it: each knock either rattles the capsule or charges it up a tier, and the last one overloads it.
+ * The capsule is unstable, more so with every tier, and the screen glitches along with it.
+ * [onOpenAll] opens everything that is left in one go; it is handed this capsule's result when this one has not
+ * been shown yet, so that it can be shown with the rest.
  */
 @Composable
-fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, prismsNow: Int, onNext: () -> Unit, onDone: () -> Unit) = key(result) {
+fun CapsuleOpenOverlay(
+    result: CapsuleResult, remaining: Int, boltsNow: Int, prismsNow: Int,
+    onNext: () -> Unit, onOpenAll: (CapsuleResult?) -> Unit, onDone: () -> Unit,
+) = key(result) {
     val sfx = LocalSfx.current
     val ui = LocalUi.current
     val scope = rememberCoroutineScope()
@@ -85,9 +92,12 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, pri
         lobby.capsuleSplitAt = 0L
         lobby.capsulePieces = 1
         lobby.capsuleColor = CapsuleTier.SCRAP.color.toInt()
+        lobby.capsuleGlitch = 0.2f
         lobby.capsuleShown = true
         onDispose { lobby.capsuleShown = false }
     }
+    // "Open all" makes sense when there is a known number of others waiting (the debug menu's endless drops are not).
+    val others = remaining in 1..100_000
     val shown = CapsuleTier.entries[tier]
     val color = Color(shown.color)
 
@@ -100,6 +110,9 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, pri
             tier++
             lobby.capsuleColor = CapsuleTier.entries[tier].color.toInt()
             lobby.capsuleChargeAt = System.currentTimeMillis()
+            // The higher it charges, the less stable it gets.
+            lobby.capsuleGlitch = 0.2f + 0.16f * tier
+            sfx?.play(Sound.GLITCH, 0.5f, 0.9f + 0.08f * tier)
             sfx?.play(Sound.DROP_UPGRADE, pitch = 0.85f + 0.12f * tier)
             sfx?.buzz(45, 210)
             scope.launch { pop.snapTo(1.4f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
@@ -120,10 +133,14 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, pri
         }
         if (taps == TAPS) scope.launch {
             delay(if (charged) 750 else 450)
+            // It winds up and collapses, tearing all the way, then blows apart.
             lobby.capsuleOpenAt = System.currentTimeMillis()
+            sfx?.play(Sound.GLITCH, 0.9f, 0.8f)
+            sfx?.buzz(30, 140)
+            delay((io.github.projectwip.render3d.Capsule3D.WIND * 1000).toLong())
             sfx?.play(Sound.DROP_OPEN)
             sfx?.buzz(90, 255)
-            delay(260)
+            delay(((io.github.projectwip.render3d.Capsule3D.GONE - io.github.projectwip.render3d.Capsule3D.WIND) * 1000).toLong() - 120)
             lobby.capsuleShown = false
             opened = true
             flash.snapTo(1f)
@@ -141,8 +158,8 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, pri
         if (!opened) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 GameText("SPARK DROP", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
-                GameText(shown.label.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), color = color, outline = 5.dp,
-                    modifier = Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value })
+                GlitchText(shown.label.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), color, 5.dp, time, 0.5f + 0.2f * tier,
+                    Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value })
                 // Room for the 3D capsule, which sits in the middle of the screen.
                 Spacer(Modifier.height(capsuleRoom))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -166,10 +183,16 @@ fun CapsuleOpenOverlay(result: CapsuleResult, remaining: Int, boltsNow: Int, pri
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
                     if (remaining > 0) ChunkyButton(onNext, Modifier.size(220.dp, 60.dp), ButtonStyle.GREEN) { GameText(if (remaining > 999) "OPEN NEXT" else "OPEN NEXT ($remaining)", Type.Heading) }
+                    if (others && remaining > 1) ChunkyButton({ onOpenAll(null) }, Modifier.size(220.dp, 60.dp), ButtonStyle.GOLD) { GameText("OPEN ALL ($remaining)", Type.Heading) }
                 }
             }
         }
+        if (!opened) GlitchBars(time, color, 0.4f + 0.15f * tier)
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value * 0.85f)))
+        // Skips the knocking: this drop and every other one are opened and shown together.
+        if (!opened && others && taps < TAPS) ChunkyButton({ onOpenAll(result) }, Modifier.align(Alignment.TopEnd).padding(18.dp).size(230.dp, 58.dp), ButtonStyle.GOLD) {
+            GameText("OPEN ALL (${remaining + 1})", Type.Heading)
+        }
         if (!opened) PlainText("Drops charge up at random, and now and then one splits — into two, four or even eight — and the pieces roll better. The result is locked in when you open one.", Type.Small,
             Modifier.align(Alignment.BottomCenter).graphicsLayer { translationY = -14.dp.toPx() }, align = TextAlign.Center)
     }

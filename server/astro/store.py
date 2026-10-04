@@ -439,26 +439,37 @@ class Store:
         None if they have none to open. `luck` and `free` (the drop isn't used up) are for developers; the
         caller decides whether this player may use them.
         """
+        results = self._open_drops(player_id, luck, free, 1)
+        return results[0] if results else None
+
+    def open_all_drops(self, player_id: str, luck: float = 0.0) -> list[dict]:
+        """Opens every Spark Drop the player has, one after another, including the pieces that split off on the
+        way (up to `rules.MAX_OPEN_ALL`). The results come back in the order they were opened; empty if there
+        were none."""
+        return self._open_drops(player_id, luck, False, rules.MAX_OPEN_ALL)
+
+    def _open_drops(self, player_id: str, luck: float, free: bool, most: int) -> list[dict]:
+        results = []
         with self._lock, self._db:
             player = self._db.execute("SELECT drops, boosted FROM players WHERE id = ?", (player_id,)).fetchone()
-            if player is None or (player["drops"] <= 0 and not free):
-                return None
+            if player is None:
+                return results
+            drops, boosted_left = player["drops"], player["boosted"]
             profile = self._profile(player_id)
-            # Pieces from an earlier split are opened first, and roll better than a plain one.
-            boosted = player["boosted"] > 0
-            result = rules.open_drop(profile, boosted, luck, secrets.SystemRandom())
-            result["reward"] = economy.grant(profile, result["reward"])
-            self._keep(player_id, profile)
-            extra = result["pieces"] - 1
-            self._db.execute(
-                "UPDATE players SET drops = ?, boosted = ? WHERE id = ?",
-                (
-                    player["drops"] - (0 if free else 1) + extra,
-                    max(0, player["boosted"] - (1 if boosted else 0)) + extra,
-                    player_id,
-                ),
-            )
-        return result
+            rng = secrets.SystemRandom()
+            while len(results) < most and (drops > 0 or (free and not results)):
+                # Pieces from an earlier split are opened first, and roll better than a plain one.
+                boosted = boosted_left > 0
+                result = rules.open_drop(profile, boosted, luck, rng)
+                result["reward"] = economy.grant(profile, result["reward"])
+                extra = result["pieces"] - 1
+                drops = drops - (0 if free else 1) + extra
+                boosted_left = max(0, boosted_left - (1 if boosted else 0)) + extra
+                results.append(result)
+            if results:
+                self._keep(player_id, profile)
+                self._db.execute("UPDATE players SET drops = ?, boosted = ? WHERE id = ?", (drops, boosted_left, player_id))
+        return results
 
     # ------------------------------------------------------------------ leaderboard & stats
 

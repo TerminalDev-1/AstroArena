@@ -100,6 +100,10 @@ MAX_LUCK = 14.0
 MAX_PIECES = 8
 # The pieces a drop splits into roll with this much extra luck and are never Scrap.
 SPLIT_LUCK = 0.6
+# Every Bolt and Prism amount a drop gives is multiplied by this (3 = the amounts below, plus 200%).
+DROP_BUFF = 3
+# The most drops one "open all" goes through (splits made along the way count).
+MAX_OPEN_ALL = 300
 
 # Every fighter and how many colourways it has (index 0 is the one it comes with). Keep in step with Balance.kt.
 FIGHTER_SKINS = {"JUNO": 3, "BRAKK": 3, "MIRA": 3, "KITO": 3}
@@ -157,10 +161,10 @@ def roll_reward(tier: int, save: dict, rng) -> dict:
     """What a drop of this tier gives this player. Never something they already own."""
 
     def bolts(lo: int, hi: int) -> dict:
-        return {"type": "bolts", "amount": rng.randint(lo, hi) // 5 * 5}
+        return {"type": "bolts", "amount": rng.randint(lo, hi) // 5 * 5 * DROP_BUFF}
 
     def prisms(lo: int, hi: int) -> dict:
-        return {"type": "prisms", "amount": rng.randint(lo, hi)}
+        return {"type": "prisms", "amount": rng.randint(lo, hi) * DROP_BUFF}
 
     def new_skin() -> dict | None:
         choices = [

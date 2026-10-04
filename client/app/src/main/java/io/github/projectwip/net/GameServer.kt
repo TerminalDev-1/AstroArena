@@ -401,6 +401,20 @@ class GameServer(context: Context) {
         // 409: the server says there is nothing to open, so its count is the one to show.
         if (r?.code == 409) refreshAccount()
         if (r == null || r.code != 200 || o == null) return null
+        return capsuleResult(o)
+    }
+
+    /**
+     * Opens every Spark Drop the player has, and the pieces that split off on the way, in one go. The server
+     * rolls them all; the answer is what came out of each, in the order they were opened. Null if it couldn't
+     * be reached or there were none.
+     */
+    fun openAllDrops(luck: Float = 0f): List<CapsuleResult>? {
+        val results = act("/v1/drops/open-all", JSONObject().put("luck", luck.toDouble()))?.optJSONArray("results") ?: return null
+        return (0 until results.length()).mapNotNull { i -> results.optJSONObject(i)?.let { capsuleResult(it) } }.takeIf { it.isNotEmpty() }
+    }
+
+    private fun capsuleResult(o: JSONObject): CapsuleResult? {
         val tier = CapsuleTier.entries.firstOrNull { it.name == o.optString("tier") } ?: return null
         val reward = o.optJSONObject("reward")?.let { reward(it) } ?: return null
         return CapsuleResult(tier, reward, o.optInt("pieces", 1).coerceIn(1, 8))
