@@ -294,8 +294,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
                     is Screen.Match -> MatchScreen(
-                        // The difficulty is the one the server last approved (it is kept in the settings), and the
-                        // server's match plan has the final word.
+                        // The difficulty is the player's pick (it is kept in the settings); the server plans the match with it.
                         s.config,
                         save.settings, sfx, save.matchesPlayed, server,
                         onCancel = { screen = Screen.Home },

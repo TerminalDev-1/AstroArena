@@ -5,7 +5,7 @@ They are re-read whenever they change on disk, so there is no need to restart th
 versions_not_supported.cfg   which client versions are turned away, and what they are told
 notices.cfg                  short messages shown to players on the home screen
 bots.cfg                     how bots behave at each difficulty (the client has the same numbers built in as a fallback)
-game.cfg                     the difficulties players may pick, who the developers are, how new accounts start
+game.cfg                     who the developers are, how new accounts start
 shop.cfg                     the pool the day's shop offers are picked from
 """
 
@@ -142,21 +142,10 @@ class Config:
             self._refresh()
             return [dict(o) for o in self._shop], self._offers_per_day
 
-    def allowed_difficulties(self) -> list[str]:
-        """The difficulties an ordinary player may pick."""
-        raw = self._setting("players", "allowed", "EASY, NORMAL, HARD, ELITE")
-        picked = [d for d in re.split(r"[,\s]+", raw.upper()) if d in ("EASY", "NORMAL", "HARD", "ELITE")]
-        return picked or [self.default_difficulty()]
-
     def _setting(self, section: str, key: str, default: str = "") -> str:
         with self._lock:
             self._refresh()
             return self._game.get(section, {}).get(key, default).strip()
-
-    def default_difficulty(self) -> str:
-        """The bot difficulty ordinary players are given."""
-        value = self._setting("players", "difficulty", "EASY").upper()
-        return value if value in ("EASY", "NORMAL", "HARD", "ELITE") else "EASY"
 
     def is_developer(self, player_id: str) -> bool:
         if self._setting("developers", "everyone", "no").lower() in ("yes", "true", "on", "1"):

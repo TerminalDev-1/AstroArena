@@ -145,9 +145,9 @@ class ProgressionTest {
         assertEquals(listOf(deal), synced.customOffers)
         assertEquals("applying the same account twice changes nothing", synced, Progression.syncAccount(synced, 200, 2, 3, 7, profile, listOf(deal)))
         assertEquals(1, Progression.dropOpened(synced).capsulesOpened)
-        // The difficulty shown is the one the server approved.
-        assertEquals(BotDifficulty.NORMAL, synced.settings.botDifficulty)
-        assertEquals(BotDifficulty.HARD, Progression.syncAccount(synced, 200, 2, 3, 7, difficulty = BotDifficulty.HARD).settings.botDifficulty)
+        // The difficulty is the player's own setting: nothing the server sends changes it.
+        val hard = synced.copy(settings = synced.settings.copy(botDifficulty = BotDifficulty.HARD))
+        assertEquals(BotDifficulty.HARD, Progression.syncAccount(hard, 200, 2, 3, 7, profile, listOf(deal)).settings.botDifficulty)
     }
 
     @Test fun dropOddsShownInTheDebugMenu() {

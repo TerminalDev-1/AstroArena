@@ -46,10 +46,10 @@ class GameRepository(private val store: SaveStore) {
     /** Takes on what the server holds for this player (Cups, drops, and when given the profile and shop deals). */
     fun syncAccount(
         cups: Int, drops: Int, dropsLeftToday: Int, profile: ServerProfile? = null, deals: List<CustomOffer>? = null,
-        difficulty: BotDifficulty? = null, day: Long? = null,
+        day: Long? = null,
     ) {
         if (day != null) serverDay = day
-        val next = Progression.syncAccount(_save.value, cups, drops, dropsLeftToday, today, profile, deals, difficulty)
+        val next = Progression.syncAccount(_save.value, cups, drops, dropsLeftToday, today, profile, deals)
         if (next != _save.value) commit(next)
     }
 

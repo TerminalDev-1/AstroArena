@@ -74,7 +74,7 @@ val LocalUi = compositionLocalOf { UiMetrics(800f, 400f, 1f) }
 val LocalSfx = staticCompositionLocalOf<Sfx?> { null }
 val LocalServer = staticCompositionLocalOf<io.github.projectwip.net.GameServer?> { null }
 
-/** True for developers (dev builds, and players the game server lists): they get the debug menu and the difficulty choice. */
+/** True for developers (dev builds, and players the game server lists): they get the debug menu. */
 val LocalDev = staticCompositionLocalOf { false }
 /** The persistent 3D lobby behind the menus; screens tell it what to show. */
 val LocalLobby = staticCompositionLocalOf { io.github.projectwip.render3d.LobbyParams() }

@@ -313,8 +313,8 @@ class Api(unittest.TestCase):
         me = self.player()
         other = self.player("Other")
         self.assertEqual(self.call("POST", "/v1/matches", {"mode": "NOPE"}, me["token"])[0], 400)
-        # An ordinary player asks for Elite bots and gets the server's difficulty.
-        status, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "fighter": "JUNO", "level": 3, "difficulty": "ELITE"}, me["token"])
+        # The difficulty is the player's to pick: the match is planned at the one the device asks for.
+        status, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "fighter": "JUNO", "level": 3, "difficulty": "EASY"}, me["token"])
         self.assertEqual((status, plan["difficulty"]), (201, "EASY"))
         # The level is the server's (1 here), not the 3 the device asked for, and a locked fighter can't be played.
         self.assertEqual((plan["fighter"], plan["level"], plan["refereed"]), ("JUNO", 1, False))
@@ -338,7 +338,7 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("POST", path, win, me["token"])[0], 409)  # only once
         # Three drops a day: the fourth good finish earns Cups but no drop.
         for expected_drop in (True, True, False):
-            _, plan = self.call("POST", "/v1/matches", {"mode": "KNOCKOUT_RUSH"}, me["token"])
+            _, plan = self.call("POST", "/v1/matches", {"mode": "KNOCKOUT_RUSH", "difficulty": "EASY"}, me["token"])
             self.assertEqual(len(plan["botNames"]), 5)
             self.age_matches()
             _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], {**win, "placement": 0, "mvp": True}, me["token"])
@@ -392,7 +392,6 @@ class Api(unittest.TestCase):
         me = self.player()
         account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]
         self.assertFalse(account["developer"])
-        self.assertEqual(account["difficulty"], "EASY")
         self.assertEqual(self.call("POST", "/v1/dev/grant", {"cups": 500}, me["token"])[0], 403)
         self.make_developer(me["id"])
         self.assertTrue(self.call("GET", "/v1/me", token=me["token"])[1]["account"]["developer"])
@@ -480,27 +479,19 @@ class Api(unittest.TestCase):
         self.assertTrue(self.call("POST", "/v1/dev/deals/%d/delete" % deal_id, {}, dev["token"])[1]["deleted"])
         self.assertEqual(self.call("POST", "/v1/shop/deals/%d/buy" % deal_id, {}, buyer["token"])[0], 404)
 
-    def test_the_server_approves_the_difficulty(self):
+    def test_the_player_picks_the_difficulty(self):
         me = self.player()
         token = me["token"]
-        account = self.call("GET", "/v1/me", token=token)[1]["account"]
-        self.assertEqual((account["difficulty"], account["difficulties"]), ("EASY", ["EASY", "NORMAL", "HARD", "ELITE"]))
-        # Picking one the server allows: it says yes, remembers it, and plans matches with it.
-        status, body = self.call("POST", "/v1/settings/difficulty", {"difficulty": "hard"}, token)
-        self.assertEqual((status, body["ok"], body["account"]["difficulty"]), (200, True, "HARD"))
-        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "difficulty": "ELITE"}, token)[1]["difficulty"], "HARD")
-        self.assertEqual(self.call("POST", "/v1/settings/difficulty", {"difficulty": "IMPOSSIBLE"}, token)[0], 400)
-        # The operator narrows the choice: the server says no, and a choice that is no longer allowed falls back.
-        self.write_cfg("game.cfg", "[players]\ndifficulty = NORMAL\nallowed = EASY, NORMAL\n")
-        status, body = self.call("POST", "/v1/settings/difficulty", {"difficulty": "ELITE"}, token)
-        self.assertEqual(status, 403)
-        self.assertIn("doesn't allow", body["error"])
-        account = self.call("GET", "/v1/me", token=token)[1]["account"]
-        self.assertEqual((account["difficulty"], account["difficulties"]), ("NORMAL", ["EASY", "NORMAL"]))
+        # The server keeps no difficulty for a player: each match is planned at the one the device sends with it.
+        self.assertNotIn("difficulty", self.call("GET", "/v1/me", token=token)[1]["account"])
+        for wanted in ("EASY", "hard", "ELITE"):
+            status, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "difficulty": wanted}, token)
+            self.assertEqual((status, plan["difficulty"]), (201, wanted.upper()))
+        self.assertEqual(plan["bots"], self.call("GET", "/v1/config")[1]["bots"]["ELITE"])
+        # Nothing said means Normal; something that isn't a difficulty is refused.
         self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, token)[1]["difficulty"], "NORMAL")
-        # Developers may pick any.
-        self.write_cfg("game.cfg", "[players]\ndifficulty = NORMAL\nallowed = EASY, NORMAL\n[developers]\nids = %s\n" % me["id"])
-        self.assertEqual(self.call("POST", "/v1/settings/difficulty", {"difficulty": "ELITE"}, token)[1]["account"]["difficulty"], "ELITE")
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "difficulty": "IMPOSSIBLE"}, token)[0], 400)
+        self.assertEqual(self.call("POST", "/v1/settings/difficulty", {"difficulty": "HARD"}, token)[0], 404)
 
     def test_only_developers_start_an_account_over(self):
         me = self.player(save={"cups": 50, "capsules": 3, "bolts": 700})
@@ -609,7 +600,7 @@ class Refereed(Api):
     referee = REFEREE
 
     def run_match(self, token, mode, inputs, claim=None, age=600):
-        _, plan = self.call("POST", "/v1/matches", {"mode": mode}, token)
+        _, plan = self.call("POST", "/v1/matches", {"mode": mode, "difficulty": "EASY"}, token)
         self.assertTrue(plan["refereed"])
         self.age_matches(age)
         body = dict(claim or {})

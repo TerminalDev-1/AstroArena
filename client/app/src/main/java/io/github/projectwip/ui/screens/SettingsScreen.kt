@@ -116,14 +116,12 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
 
 @Composable
 private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
-    // The server has to approve the choice: tapping one asks it, and what it approves is what shows as selected.
-    val ask = io.github.projectwip.ui.LocalServerCall.current
-    SectionTitle("BOT DIFFICULTY", "Changes how bots think — reaction time, aim, dodging, positioning, target choice and super timing. Never their health or damage. The server confirms your choice.")
+    SectionTitle("BOT DIFFICULTY", "Changes how bots think — reaction time, aim, dodging, positioning, target choice and super timing. Never their health or damage.")
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         for (d in BotDifficulty.entries) {
             val selected = d == s.botDifficulty
             Box(Modifier.weight(1f)) {
-                ChunkyButton({ ask({ setDifficulty(d) }) }, Modifier.fillMaxWidth().height(150.dp),
+                ChunkyButton({ set { it.copy(botDifficulty = d) } }, Modifier.fillMaxWidth().height(150.dp),
                     if (selected) ButtonStyle.ORANGE else ButtonStyle.PURPLE, cut = 14.dp, sound = Sound.UI_SELECT) {
                     Column(Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         GameText(d.label.uppercase(), Type.Heading, color = if (selected) Color.White else difficultyColor(d), outline = 2.5.dp)

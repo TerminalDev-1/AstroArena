@@ -19,7 +19,6 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/shop/deals/<id>/buy        buy a deal -> {reward}                                (token)
     POST /v1/track/claim    {cups}      claim a Cup Track reward -> {reward}                  (token)
     POST /v1/shop/daily/<n>/buy {day}   buy one of today's offers -> {reward}                 (token)
-    POST /v1/settings/difficulty {difficulty}  choose the bot difficulty; the server says yes or no  (token)
     POST /v1/reset                      start this account's progress over                    (token, developer)
     POST /v1/dev/grant      {...}       developer hand-outs                                   (token, developer)
     POST /v1/dev/deals      {...}       put a deal in everyone's shop -> {id}                 (token, developer)
@@ -84,13 +83,6 @@ class Game:
             self._signups[address] = recent
         return allowed
 
-    def difficulty(self, player) -> str:
-        """The bot difficulty this player plays at: the one they picked if it is still allowed, else the default."""
-        picked = player["difficulty"]
-        if picked in rules.DIFFICULTIES and (picked in self.config.allowed_difficulties() or self.config.is_developer(player["id"])):
-            return picked
-        return self.config.default_difficulty()
-
     def daily_offers(self) -> list[dict]:
         pool, count = self.config.daily_pool()
         return economy.daily_offers(pool, count, today())
@@ -111,8 +103,6 @@ class Game:
             "players": players,
             "drops": player["drops"],
             "dropsLeftToday": self.store.drops_left_today(player),
-            "difficulty": self.difficulty(player),
-            "difficulties": list(rules.DIFFICULTIES) if developer else self.config.allowed_difficulties(),
             "profile": profile,
             "deals": self.store.deals(player_id),
             # The day's offers and the clock they run on. Times are the server's: the game counts down from these.
@@ -249,8 +239,6 @@ def make_handler(game: Game, quiet: bool = False):
                 return self._act(lambda p, d: {"reward": game.store.claim_milestone(p["id"], int(d.get("cups") or 0))})
             if url.path == "/v1/reset":
                 return self._act(lambda p, d: game.store.reset(p["id"]), developer=True)
-            if url.path == "/v1/settings/difficulty":
-                return self._act(self._set_difficulty)
             m = _DAILY_BUY.match(url.path)
             if m:
                 index = int(m.group(1))
@@ -286,15 +274,6 @@ def make_handler(game: Game, quiet: bool = False):
                 return self._error(400, "a field has the wrong type")
             return self._send(200, {**extra, "account": game.account(player["id"])})
 
-        def _set_difficulty(self, player, data):
-            wanted = str(data.get("difficulty") or "").upper()
-            if wanted not in rules.DIFFICULTIES:
-                raise Refused(400, "unknown difficulty")
-            if wanted not in game.config.allowed_difficulties() and not game.config.is_developer(player["id"]):
-                raise Refused(403, "the server doesn't allow that difficulty")
-            game.store.set_difficulty(player["id"], wanted)
-            return {"ok": True}
-
         def _upgrade(self, player, data):
             # The cost slider and the level cap switch in the debug menu are for developers only.
             factor, no_cap = 1.0, False
@@ -313,9 +292,11 @@ def make_handler(game: Game, quiet: bool = False):
             mode = str(data.get("mode") or "")
             if mode not in rules.MODES:
                 return self._error(400, "unknown mode")
-            # The difficulty is the one the player picked earlier and the server approved, not whatever this request says;
-            # the fighter's level is the server's; and the bots behave as bots.cfg says right now.
-            difficulty = game.difficulty(player)
+            # The difficulty is the player's choice, made on the device and sent with each match. The fighter's level
+            # is the server's, and the bots behave as bots.cfg says right now.
+            difficulty = str(data.get("difficulty") or rules.DEFAULT_DIFFICULTY).upper()
+            if difficulty not in rules.DIFFICULTIES:
+                return self._error(400, "unknown difficulty")
             try:
                 plan = game.store.plan_match(
                     player["id"], mode, str(data.get("fighter") or "JUNO"), difficulty, rules.MODES[mode], game.config.bots().get(difficulty, {})

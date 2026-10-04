@@ -56,8 +56,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   Settings > Developer, where the debug menu's D button is switched on (it is off by default); only they can
   make shop deals (the in-game Offer Creator) or reset an account. The server ignores luck, free drops, free
   upgrades and hand-outs from anyone else.
-- Bot difficulty: every player may pick, but the pick is a request (`POST /v1/settings/difficulty`); the server
-  approves it against `allowed` in `game.cfg`, stores it, and uses its own copy when it plans a match.
+- Bot difficulty is the client's, by the user's decision (v11.1): the player picks it on the device, it lives in
+  the save's settings, and it is sent with each `POST /v1/matches`. The server plans, pays and replays the match
+  at that difficulty; it neither stores nor approves one.
 - Days and times are the server's: the day number, when it ends, the daily gift and the daily offers
   (`server/shop.cfg`). The client moves server times onto its own clock on receipt and only counts down.
 - The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
@@ -83,8 +84,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Checkpoint as you go: once a piece is verified (tests or device), commit just that piece and
   `git push origin main`. Never checkpoint unverified or non-compiling work.
 - **Non-negotiable: every version is committed, tagged and released.** Versions are whole numbers from v6 on
-  (`versionName = "6"`, then "7"). Whenever the version in `client/app/build.gradle.kts` changes, finish by
-  committing, tagging `vN.0`, pushing the tag and publishing a GitHub pre-release titled "AstroArena vN" with the
+  (`versionName = "6"`, then "7"); a patch is `N.P` (`versionName = "11.1"`, tag `v11.1`, "AstroArena v11.1"). Whenever the version in `client/app/build.gradle.kts` changes, finish by
+  committing, tagging `vN.0` (or `vN.P` for a patch), pushing the tag and publishing a GitHub pre-release titled "AstroArena vN" with the
   release APK attached (`AstroArena-vN.apk`), without waiting to be asked. The tag keeps the `.0` because installs
   of 0.4.2 to 0.5.1 can only read tags of the form `vX.Y`; a bare `v6` tag would be invisible to their updater.
   The newest release must always be the newest version, so nobody downloads a stale APK.

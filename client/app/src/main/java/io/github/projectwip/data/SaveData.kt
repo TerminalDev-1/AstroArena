@@ -16,7 +16,7 @@ data class ControlLayout(
 }
 
 data class Settings(
-    /** The difficulty the server last approved for this player. Picking another one asks the server first. */
+    /** The player's own choice, made on this device; each match asks the server for bots of this difficulty. */
     val botDifficulty: BotDifficulty = BotDifficulty.NORMAL,
     val sfxVolume: Float = 0.8f,
     val musicVolume: Float = 0.5f,

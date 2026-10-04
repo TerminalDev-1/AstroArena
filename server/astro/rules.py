@@ -15,6 +15,8 @@ import math
 CUP_BONUS = {"EASY": 6, "NORMAL": 8, "HARD": 10, "ELITE": 12}
 PLACEMENT_CUPS = [10, 8, 6, 4, 2, 0, -1, -2, -3, -4]
 DIFFICULTIES = tuple(CUP_BONUS)
+# What a match is planned at when the request doesn't name one.
+DEFAULT_DIFFICULTY = "NORMAL"
 OUTCOMES = ("VICTORY", "DEFEAT", "DRAW")
 
 # Bots in each mode (the names the server hands out).

@@ -28,7 +28,7 @@ server never locks anyone out.
 |---|---|
 | **Version gate** | `versions_not_supported.cfg` lists client versions that are refused, with the message they see |
 | **Notices** | `notices.cfg` holds short messages shown on the home screen |
-| **Bots** | `bots.cfg` sets how bots behave at each difficulty; `game.cfg` sets which difficulties players may pick. The game asks, the server approves |
+| **Bots** | `bots.cfg` sets how bots behave at each difficulty; the player picks the difficulty on the device, and it is sent with each match |
 | **Daily offers** | `shop.cfg` is the pool; the server picks a few each day, the same for everyone, and says when the day ends |
 | **Time** | the day, when it ends, and every countdown come from the server's clock |
 | **Developers** | `game.cfg` lists the players who can switch on the debug menu, make shop deals and reset an account |
@@ -113,7 +113,7 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `GET /v1/me` * | `{account}` |
 | `GET /v1/save` * | `{revision, updatedAt, save}` or 404 |
 | `PUT /v1/save` * `{save}` | `{revision, account}` |
-| `POST /v1/matches` * `{mode, fighter}` | `{matchId, seed, botNames, difficulty, fighter, level, bots, refereed}`; 409 if the fighter isn't unlocked |
+| `POST /v1/matches` * `{mode, fighter, difficulty}` | `{matchId, seed, botNames, difficulty, fighter, level, bots, refereed}`; 409 if the fighter isn't unlocked |
 | `POST /v1/matches/<id>/result` * `{inputs}` (base64 of the gzipped input log; the device's own result fields are only used when there is no referee) | `{verified, report, cupDelta, cups, drop, bolts, firstWinPrisms, account}`, or 422 if refused |
 | `POST /v1/drops/open` * `{luck, free}` | `{tier, pieces, reward, account}`, or 409 if there are none |
 | `POST /v1/fighters/upgrade` * `{fighter}` | `{cost, account}`; 402 if it can't be afforded, 409 if it can't be upgraded |
@@ -122,14 +122,13 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `POST /v1/shop/deals/<id>/buy` * | `{reward, account}` |
 | `POST /v1/track/claim` * `{cups}` | `{reward, account}` |
 | `POST /v1/shop/daily/<n>/buy` * `{day}` | `{reward, account}`: one of today's offers; 409 if bought already or the day has changed |
-| `POST /v1/settings/difficulty` * `{difficulty}` | `{ok, account}`, or 403 if the server doesn't allow it |
 | `POST /v1/reset` * | `{account}`: starts this account's progress over (developers only) |
 | `POST /v1/dev/grant` * `{cups, drops, bolts, prisms}` | `{account}` (developers only) |
 | `POST /v1/dev/deals` * `{title, bolts, prisms, fighter, skinFighter, skinIndex, currency, price, wasPrice, expiresAt, limit, theme}` | `{id, account}` (developers only) |
 | `POST /v1/dev/deals/<id>/delete` * | `{deleted, account}` (developers only) |
 | `GET /v1/leaderboard?limit=50` | `{players: [{id, name, cups, fighter}]}` |
 
-`account` is `{id, name, developer, cups, rank, players, drops, dropsLeftToday, difficulty, difficulties, profile,
+`account` is `{id, name, developer, cups, rank, players, drops, dropsLeftToday, profile,
 deals, dailyOffers, giftAvailable, time}`; `time` is `{now, day, dayEndsAt}` on the server's clock.
 `profile` is `{bolts, prisms, bestCups, fighters, claimedMilestones, lastDailyGiftDay, lastFirstWinDay}`.
 

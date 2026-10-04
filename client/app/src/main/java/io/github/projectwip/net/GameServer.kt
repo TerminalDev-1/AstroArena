@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReference
 /** This player as the server sees them. The server owns these numbers; the game only shows them. */
 data class Account(
     val id: String,
-    /** The server lists this player as a developer: the debug menu and the difficulty choice are theirs. */
+    /** The server lists this player as a developer: the debug menu is theirs. */
     val developer: Boolean,
     val cups: Int,
     /** Place on the server's leaderboard (1 = top), out of [players] accounts. */
@@ -38,14 +38,10 @@ data class Account(
     /** Unopened Spark Drops. */
     val drops: Int,
     val dropsLeftToday: Int,
-    /** The bot difficulty the server gives ordinary players. */
-    val difficulty: BotDifficulty,
     /** Currencies, fighters and claimed rewards. */
     val profile: ServerProfile? = null,
     /** The shop deals running right now, with how many times this player has bought each. */
     val deals: List<CustomOffer> = emptyList(),
-    /** The difficulties the server lets this player pick. */
-    val difficulties: List<BotDifficulty> = BotDifficulty.entries,
     /** Today's offers, picked by the server; their [CustomOffer.id] is their place in the list. */
     val dailyOffers: List<CustomOffer> = emptyList(),
     /** The server's day number (days since 1970 on the server's clock). */
@@ -160,11 +156,8 @@ class GameServer(context: Context) {
         val account = Account(
             id = o.optString("id"), developer = o.optBoolean("developer"), cups = o.optInt("cups"), rank = o.optInt("rank"), players = o.optInt("players"), drops = o.optInt("drops"),
             dropsLeftToday = o.optInt("dropsLeftToday"),
-            difficulty = BotDifficulty.entries.firstOrNull { it.name == o.optString("difficulty") } ?: BotDifficulty.EASY,
             profile = o.optJSONObject("profile")?.let { profile(it) },
             deals = offers("deals"),
-            difficulties = o.optJSONArray("difficulties")?.let { a -> (0 until a.length()).mapNotNull { i -> BotDifficulty.entries.firstOrNull { it.name == a.optString(i) } } }
-                ?: BotDifficulty.entries,
             dailyOffers = offers("dailyOffers"),
             day = time?.optLong("day", -1) ?: -1, dayEndsAt = local(time?.optLong("dayEndsAt") ?: 0L),
             giftAvailable = o.optBoolean("giftAvailable", true),
@@ -211,9 +204,6 @@ class GameServer(context: Context) {
         if (r != null && r.code != 200) lastError = r.body?.optString("error").orEmpty()
         return if (r?.code == 200) r.body else null
     }
-
-    /** Asks the server to let this player fight bots of [difficulty]. Null if it says no (see [lastError]). */
-    fun setDifficulty(difficulty: BotDifficulty): Boolean? = act("/v1/settings/difficulty", JSONObject().put("difficulty", difficulty.name))?.let { true }
 
     /** Buys one of today's offers ([index] in [Account.dailyOffers]) as shown on [day]; after the server's midnight it no longer counts. */
     fun buyDaily(index: Long, day: Long): Reward? = act("/v1/shop/daily/$index/buy", JSONObject().put("day", day))?.optJSONObject("reward")?.let { reward(it) }
@@ -335,7 +325,7 @@ class GameServer(context: Context) {
         }
     }
 
-    /** Asks the server to set a match up. Null (quickly) when there is no server to ask. */
+    /** Asks the server to set a match up against bots of the [difficulty] the player picked. Null (quickly) when there is no server to ask. */
     fun planMatch(mode: GameMode, fighter: FighterId, level: Int, difficulty: BotDifficulty): MatchPlan? {
         if (!usable) return null
         val body = JSONObject().put("mode", mode.name).put("fighter", fighter.name).put("level", level).put("difficulty", difficulty.name)
