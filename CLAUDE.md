@@ -4,6 +4,13 @@ AstroArena (the package id is still `io.github.projectwip`, so saves carry over)
 menus + custom OpenGL ES 3.0 renderer, no engine. All art and sound is generated in code and must stay
 original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Spark Drops", "Power Ups" and "Crystals"; the code (and the server's files and API) still call them capsules, bolts and prisms.
 
+## How to work here
+
+- Don't go on a reading spree. Read only what the task needs: grep for the spot, read that part of the file, and
+  start changing things. Don't read whole files "for context", and don't re-read what this file already explains.
+- Never go quiet for minutes. Say in a line what you are about to do before a long stretch of reading or building,
+  and show progress as pieces land (a first edit, a passing test, a screenshot).
+
 ## Build
 
 - Use the portable JDK (system Java 25 breaks Gradle 8.11):
