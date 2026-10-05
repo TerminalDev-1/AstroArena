@@ -213,6 +213,11 @@ private fun FighterPage(save: SaveData, repo: GameRepository, id: FighterId, go:
                         UpgradeBurst(upgradeCount, accent)
                         if (!prog.unlocked) GameIcon(IconKind.LOCK, Modifier.size(80.dp))
                     }
+                    if (prog.unlocked) Row(verticalAlignment = Alignment.CenterVertically) {
+                        RankBadge(io.github.projectwip.data.FighterRanks.label(prog.cups), Modifier.size(40.dp))
+                        Spacer(Modifier.width(8.dp))
+                        GameText("RANK ${io.github.projectwip.data.FighterRanks.label(prog.cups)}  ·  ${"%,d".format(prog.cups)} CUPS", Type.Label, outline = 2.dp)
+                    }
                     if (ui.roomy) {
                         // White on a dark plate: the floor behind it is bright, and the dim body colour was lost on it.
                         PlainText(def.lore, Type.Body, color = Palette.Text, align = androidx.compose.ui.text.style.TextAlign.Center,

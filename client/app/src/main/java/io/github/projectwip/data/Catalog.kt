@@ -123,6 +123,27 @@ object SparkRoad {
     fun next(save: SaveData): RoadStep? = steps.firstOrNull { !save.progress(it.fighter).unlocked }
 }
 
+/**
+ * A fighter's own rank, climbed with the Cups won while playing that fighter. Rank 1 starts at the first number,
+ * rank 2 at the second, and so on; the last is the top rank, shown as MAX. The server's table (`rules.py`) is the
+ * one that counts.
+ */
+object FighterRanks {
+    val starts = intArrayOf(0, 10, 20, 35, 50, 75, 100, 140, 180, 230, 280, 340, 400, 470, 540, 620, 700, 790, 880, 1000)
+
+    fun rank(cups: Int): Int = starts.count { it <= cups }.coerceAtLeast(1)
+    fun isMax(cups: Int): Boolean = rank(cups) == starts.size
+    fun label(cups: Int): String = if (isMax(cups)) "MAX" else rank(cups).toString()
+    /** Cups at which the next rank starts, or null at the top. */
+    fun nextAt(cups: Int): Int? = starts.getOrNull(rank(cups))
+    /** How far through the current rank [cups] is, 0..1 (1 at the top). */
+    fun progress(cups: Int): Float {
+        val next = nextAt(cups) ?: return 1f
+        val from = starts[rank(cups) - 1]
+        return (cups - from).toFloat() / (next - from)
+    }
+}
+
 /** A Glory rank: its title, and how far into it the player is. */
 data class GloryRank(val title: String, val into: Int, val size: Int)
 

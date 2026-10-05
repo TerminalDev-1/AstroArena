@@ -59,6 +59,8 @@ data class FighterProgress(
     val level: Int = 1,
     val skin: Int = 0,
     val ownedSkins: Set<Int> = setOf(0),
+    /** Cups won while playing this fighter: its rank follows them (see `FighterRanks`). */
+    val cups: Int = 0,
 )
 
 data class SaveData(

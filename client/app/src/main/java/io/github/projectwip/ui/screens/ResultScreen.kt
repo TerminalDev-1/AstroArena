@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
 import io.github.projectwip.data.CupTrack
+import io.github.projectwip.data.FighterRanks
+import androidx.compose.runtime.mutableStateOf
 import io.github.projectwip.data.MatchOutcome
 import io.github.projectwip.data.MatchRewards
 import io.github.projectwip.data.SaveData
@@ -76,6 +78,13 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     }
     val bannerPop = remember { Animatable(0.3f) }
     val cupsShown = remember { Animatable(rewards.cupsBefore.toFloat()) }
+    val me = summary.players.firstOrNull { it.isPlayer }
+    val fighterCupsAfter = rewards.fighterCupsBefore + rewards.fighterCupDelta
+    val fighterCupsShown = remember { Animatable(rewards.fighterCupsBefore.toFloat()) }
+    val rankedUp = FighterRanks.rank(fighterCupsAfter) > FighterRanks.rank(rewards.fighterCupsBefore)
+    /** Springs up when the fighter's rank changes. */
+    val rankPop = remember { Animatable(1f) }
+    var celebrate by remember { mutableStateOf(false) }
     /** How many reward rows have popped in so far. */
     var rowsShown by remember { mutableIntStateOf(0) }
     val won = r.outcome == MatchOutcome.VICTORY
@@ -102,9 +111,18 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                 var n = 0
                 while (true) { sfx?.play(Sound.COUNT, 0.6f, 0.85f + minOf(n, 12) * 0.05f); n++; delay(75) }
             }
+            launch { fighterCupsShown.animateTo(fighterCupsAfter.toFloat(), tween(1000, easing = FastOutSlowInEasing)) }
             cupsShown.animateTo((rewards.cupsBefore + rewards.cupDelta).toFloat(), tween(1000, easing = FastOutSlowInEasing))
             ticking.cancel()
             if (rewards.cupDelta > 0) { sfx?.play(Sound.REWARD, 0.8f); sfx?.play(Sound.CHING, 0.9f, 1.15f) } else sfx?.play(Sound.DENIED, 0.8f)
+        }
+        // A new rank: the badge leaps, the rays come out, and it gets a fanfare of its own.
+        if (rankedUp) {
+            delay(150)
+            celebrate = true
+            sfx?.play(Sound.UPGRADE, 1f); sfx?.play(Sound.CHING, 0.9f, 1.3f); sfx?.buzz(90, 230)
+            rankPop.snapTo(1.9f)
+            rankPop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessLow))
         }
     }
 
@@ -147,45 +165,67 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                 }
             }
 
-            // ---------------- right: rewards
+            // ---------------- right: the fighter's rank, the Cups, and what the match paid along the bottom
             Column(Modifier.width(if (ui.wide) 360.dp else 300.dp).fillMaxHeight()) {
                 Panel(Modifier.weight(1f).fillMaxWidth(), cut = 18.dp) {
-                    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        GameText("REWARDS", Type.Title, color = Palette.Gold, outline = 3.dp)
+                    Column(Modifier.fillMaxSize().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val shownCups = fighterCupsShown.value.toInt()
+                        GameText(if (celebrate) "RANK UP!" else "RANK", Type.Title, color = if (celebrate) Palette.Positive else Palette.Gold, outline = 3.dp,
+                            modifier = Modifier.graphicsLayer { scaleX = rankPop.value.coerceAtMost(1.3f); scaleY = rankPop.value.coerceAtMost(1.3f) })
+                        // The fighter, on show, with its rank badge at its shoulder.
+                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            if (celebrate || won) FighterRays(Modifier.size(300.dp), if (celebrate) Palette.Positive else Palette.Gold)
+                            if (me != null) FighterView(me.boss?.let { Balance.boss(it) } ?: Balance.fighter(me.fighter), me.skin, Modifier.fillMaxSize(), pedestal = false)
+                            RankBadge(FighterRanks.label(shownCups), Modifier.align(Alignment.BottomEnd).size(64.dp).graphicsLayer { scaleX = rankPop.value; scaleY = rankPop.value })
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            GameText(me?.let { Balance.fighter(it.fighter).name.uppercase() } ?: "", Type.Heading, outline = 2.5.dp, modifier = Modifier.weight(1f))
+                            GameIcon(IconKind.CUP, Modifier.size(22.dp))
+                            Spacer(Modifier.width(4.dp))
+                            GameText("%,d".format(shownCups), Type.Heading, outline = 2.5.dp)
+                            if (rewards.fighterCupDelta != 0) {
+                                Spacer(Modifier.width(6.dp))
+                                Badge((if (rewards.fighterCupDelta > 0) "+" else "") + rewards.fighterCupDelta, color = if (rewards.fighterCupDelta > 0) Palette.GreenDeep else Palette.RedDeep)
+                            }
+                        }
+                        ProgressBar(FighterRanks.progress(shownCups), Modifier.fillMaxWidth().height(14.dp), animate = false)
+                        PlainText(FighterRanks.nextAt(shownCups)?.let { "Rank ${FighterRanks.label(it)} at $it Cups" } ?: "Top rank reached", Type.Small, color = Palette.Text)
+
+                        // The player's own Cups, and the Cup Track they climb.
                         var row = 0
                         if (row++ < rowsShown) RewardRow(IconKind.CUP, "%,d".format(cupsShown.value.toInt()),
                             (if (rewards.cupDelta >= 0) "+" else "") + rewards.cupDelta,
                             if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
-                        if (row++ < rowsShown) RewardRow(IconKind.BOLT, "Power Ups", "+${rewards.bolts}", Palette.CyanDeep)
-                        if (rewards.credits > 0 && row++ < rowsShown) RewardRow(IconKind.CREDIT, "Spark Road", "+${rewards.credits}", Palette.GreenDeep)
-                        if (rewards.glory > 0 && row++ < rowsShown) RewardRow(IconKind.GLORY, "Glory", "+${rewards.glory}", Palette.OrangeDeep)
-                        if (rewards.passPoints > 0 && row++ < rowsShown) RewardRow(IconKind.STAR, "Spark Pass", "+${rewards.passPoints}", Palette.OrangeDeep)
-                        if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardRow(IconKind.PRISM, "First win of the day", "+${rewards.firstWinPrisms}", Palette.PrismDeep)
-                        if (rewards.capsuleEarned && row++ < rowsShown) RewardRow(IconKind.CAPSULE, "Spark Drop", "+1", Palette.CyanDeep)
-                        if (r.mvp && r.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH && row++ < rowsShown) RewardRow(IconKind.STAR, "MVP bonus", "+2 Cups", Palette.OrangeDeep)
-
-                        val after = rewards.cupsBefore + rewards.cupDelta
                         val best = save.bestCups
                         val next = CupTrack.nextMilestone(best)
                         val prev = CupTrack.previousMilestoneCups(best)
-                        Spacer(Modifier.weight(1f))
                         if (rewards.newlyReachedMilestones.isNotEmpty()) {
                             Badge("NEW CUP TRACK REWARD!", color = Palette.GreenDeep)
                             PlainText(rewards.newlyReachedMilestones.joinToString { rewardLabel(it.reward) }, Type.Small, color = Palette.Positive)
                         }
                         if (next != null) {
-                            PlainText("Next reward at ${next.cups} Cups: ${rewardLabel(next.reward)}", Type.Small)
-                            ProgressBar((best - prev).toFloat() / (next.cups - prev), Modifier.fillMaxWidth().height(16.dp))
+                            ProgressBar((best - prev).toFloat() / (next.cups - prev), Modifier.fillMaxWidth().height(12.dp))
+                            PlainText("Cup Track: ${rewardLabel(next.reward)} at ${next.cups} Cups", Type.Small, color = Palette.Text)
                         }
-                        PlainText("Cups now: $after", Type.Small)
+
+                        // What the match paid, in a row along the bottom.
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
+                            if (row++ < rowsShown) RewardChip(IconKind.BOLT, "+${rewards.bolts}")
+                            if (rewards.credits > 0 && row++ < rowsShown) RewardChip(IconKind.CREDIT, "+${rewards.credits}")
+                            if (rewards.glory > 0 && row++ < rowsShown) RewardChip(IconKind.GLORY, "+${rewards.glory}")
+                            if (rewards.passPoints > 0 && row++ < rowsShown) RewardChip(IconKind.STAR, "+${rewards.passPoints}")
+                            if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardChip(IconKind.PRISM, "+${rewards.firstWinPrisms}")
+                            if (rewards.capsuleEarned && row++ < rowsShown) RewardChip(IconKind.CAPSULE, "+1")
+                        }
+                        if (r.mvp && r.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH) PlainText("MVP: +2 Cups", Type.Small, color = Palette.Gold)
                         val dropsHere = r.mode != io.github.projectwip.data.GameMode.BOSS && rewards.online
                         // Everything a match is worth is awarded by the server; without it a match is practice.
                         if (!rewards.online) PlainText("Offline match · rewards are only earned online", Type.Small, color = Palette.Gold)
                         if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
-                            PlainText("All of today's Spark Drops are earned · more tomorrow", Type.Small)
+                            PlainText("All of today's Spark Drops are earned · more tomorrow", Type.Small, color = Palette.Text)
                         }
                         if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday > 0) {
-                            PlainText("${if (ffa) "Finish top 4" else "Win"} to earn a Spark Drop · ${rewards.capsulesLeftToday} left today", Type.Small)
+                            PlainText("${if (ffa) "Finish top 4" else "Win"} to earn a Spark Drop · ${rewards.capsulesLeftToday} left today", Type.Small, color = Palette.Text)
                         }
                     }
                 }
@@ -204,6 +244,39 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
 /** How many rows the rewards panel will show, so each one gets its own pop. */
 private fun rewardRowCount(rewards: MatchRewards, mvpBonus: Boolean) =
     2 + (if (rewards.credits > 0 || rewards.glory > 0) 1 else 0) + (if (rewards.passPoints > 0) 1 else 0) + (if (rewards.firstWinPrisms > 0) 1 else 0) + (if (rewards.capsuleEarned) 1 else 0) + (if (mvpBonus) 1 else 0)
+
+/** A fighter's rank: a gold medallion with the rank on it. */
+@Composable
+fun RankBadge(label: String, modifier: Modifier = Modifier) {
+    Box(modifier.drawBehind {
+        val r = size.minDimension / 2
+        drawCircle(Palette.Ink, r)
+        drawCircle(Palette.GoldDeep, r * 0.9f)
+        drawCircle(Palette.Gold, r * 0.74f)
+        drawCircle(Color.White.copy(alpha = 0.35f), r * 0.5f, center.copy(y = center.y - r * 0.22f))
+    }, contentAlignment = Alignment.Center) {
+        GameText(label, if (label.length > 2) Type.Label else Type.Title, outline = 2.5.dp)
+    }
+}
+
+/** One thing the match paid: its icon and how much, small enough to sit in a row. */
+@Composable
+private fun RewardChip(icon: IconKind, value: String) {
+    val pop = remember { Animatable(0.4f) }
+    LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium)) }
+    Column(
+        Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }.drawBehind {
+            val o = plateShape(8.dp, 3.dp).createOutline(size, layoutDirection, this)
+            val p = androidx.compose.ui.graphics.Path().apply { addOutline(o) }
+            drawPath(p, Palette.PanelInset)
+            drawPath(p, Palette.Ink, style = Stroke(2.dp.toPx()))
+        }.padding(horizontal = 7.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        GameIcon(icon, Modifier.size(30.dp))
+        GameText(value, Type.Label, outline = 2.dp)
+    }
+}
 
 @Composable
 private fun RewardRow(icon: IconKind, label: String, value: String, chip: Color) {

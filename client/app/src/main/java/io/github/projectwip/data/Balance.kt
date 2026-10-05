@@ -115,11 +115,11 @@ data class HyperSpec(
 /** The moments a fighter with a voice speaks up. */
 enum class VoiceCue { START, SUPER, HYPER, KO, DOWN, BACK }
 
-enum class BotDifficulty(val label: String, val blurb: String, val cupBonus: Int, val boltMultiplier: Float) {
-    EASY("Easy", "Slow reactions, loose aim, wanders into danger. Good for learning.", 6, 0.75f),
-    NORMAL("Normal", "Solid everyday opponents. Keep range, lead some shots, retreat when hurt.", 8, 1.0f),
-    HARD("Hard", "Quick reactions, sharp aim, dodges shots and hunts weakened fighters.", 10, 1.25f),
-    ELITE("Elite", "Near-perfect aim and positioning. Times supers and punishes mistakes.", 12, 1.5f),
+enum class BotDifficulty(val label: String, val blurb: String, val boltMultiplier: Float) {
+    EASY("Easy", "Slow reactions, loose aim, wanders into danger. Good for learning.", 0.75f),
+    NORMAL("Normal", "Solid everyday opponents. Keep range, lead some shots, retreat when hurt.", 1.0f),
+    HARD("Hard", "Quick reactions, sharp aim, dodges shots and hunts weakened fighters.", 1.25f),
+    ELITE("Elite", "Near-perfect aim and positioning. Times supers and punishes mistakes.", 1.5f),
 }
 
 enum class MatchOutcome { VICTORY, DEFEAT, DRAW }

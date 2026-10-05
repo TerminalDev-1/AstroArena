@@ -45,17 +45,17 @@ class VersionRules(unittest.TestCase):
 class Rules(unittest.TestCase):
     def test_cups_match_the_client_table(self):
         # Knockout Rush: a win pays the difficulty's bonus (+2 for MVP), a loss costs more as Cups grow.
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "VICTORY", 0, 0, "NORMAL", False), 8)
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "VICTORY", 0, 0, "EASY", True), 8)
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DRAW", 0, 0, "ELITE", False), 1)
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", 0, 3, "NORMAL", False), 0)
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", 0, 500, "NORMAL", False), -6)
-        # Last Spark: by placement, scaled by difficulty when positive; beginners lose nothing.
-        self.assertEqual(rules.cup_delta("LAST_SPARK", "VICTORY", 1, 100, "NORMAL", False), 10)
-        self.assertEqual(rules.cup_delta("LAST_SPARK", "VICTORY", 1, 100, "EASY", False), 8)
-        self.assertEqual(rules.cup_delta("LAST_SPARK", "DEFEAT", 10, 10, "NORMAL", False), 0)
-        self.assertEqual(rules.cup_delta("LAST_SPARK", "DEFEAT", 10, 100, "NORMAL", False), -4)
-        self.assertEqual(rules.cup_delta("BOSS", "VICTORY", 0, 100, "ELITE", True), 0)
+        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "VICTORY", 0, 0, False), 8)
+        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "VICTORY", 0, 0, True), 10)
+        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DRAW", 0, 0, False), 1)
+        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", 0, 3, False), 0)
+        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", 0, 500, False), -6)
+        # Last Spark pays by place, whatever the bots' difficulty, and last place costs nothing.
+        self.assertEqual([rules.cup_delta("LAST_SPARK", "DEFEAT", place, 100, False) for place in range(1, 11)], [25, 22, 20, 17, 14, 12, 7, 3, 0, 0])
+        self.assertEqual(rules.cup_delta("BOSS", "VICTORY", 0, 100, True), 0)
+        # A fighter's rank follows its own Cups; the top one starts at 1000.
+        self.assertEqual([rules.fighter_rank(c) for c in (0, 9, 10, 999, 1000, 5000)], [1, 1, 2, 19, 20, 20])
+        self.assertEqual(len(rules.FIGHTER_RANK_CUPS), 20)
 
     def test_unbelievable_results_are_caught(self):
         ok = dict(outcome="VICTORY", placement=1, kos=4, deaths=0, damage=9000)
@@ -182,8 +182,8 @@ class Economy(unittest.TestCase):
                 "fighters": {"MIRA": {"unlocked": True, "level": 4, "ownedSkins": [0, 2, 9]}, "JUNO": {"unlocked": False, "level": -3}}}
         p = economy.profile_from_save(save)
         self.assertEqual((p["bolts"], p["prisms"], p["bestCups"], p["claimedMilestones"], p["lastDailyGiftDay"]), (900, 0, 77, [10, 25], 5))
-        self.assertEqual(p["fighters"]["MIRA"], {"unlocked": True, "level": 4, "ownedSkins": [0, 2]})
-        self.assertEqual(p["fighters"]["JUNO"], {"unlocked": True, "level": 1, "ownedSkins": [0]})
+        self.assertEqual(p["fighters"]["MIRA"], {"unlocked": True, "level": 4, "ownedSkins": [0, 2], "cups": 0})
+        self.assertEqual(p["fighters"]["JUNO"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
         self.assertFalse(p["fighters"]["KITO"]["unlocked"])
         self.assertEqual(economy.profile_from_save({}), economy.new_profile())
 
@@ -335,11 +335,11 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("POST", path, win, other["token"])[0], 409)  # not their match
         status, body = self.call("POST", path, win, me["token"])
         self.assertEqual(status, 200)
-        self.assertEqual((body["cupDelta"], body["cups"], body["drop"]), (8, 8, True))  # 1st place on Easy
+        self.assertEqual((body["cupDelta"], body["cups"], body["drop"]), (25, 25, True))  # 1st place, whatever the difficulty
         # Bolts and the first-win Prisms are the server's to give too: (30 + 2 x 4 KOs) x 0.75 on Easy.
         self.assertEqual((body["bolts"], body["firstWinPrisms"]), (29, 10))
         self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (60 + 29, 10))
-        self.assertEqual(body["account"]["profile"]["bestCups"], 8)
+        self.assertEqual(body["account"]["profile"]["bestCups"], 25)
         self.assertEqual((body["account"]["drops"], body["account"]["dropsLeftToday"]), (2, 2))
         self.assertEqual(self.call("POST", path, win, me["token"])[0], 409)  # only once
         # Three drops a day: the fourth good finish earns Cups but no drop.
@@ -348,11 +348,11 @@ class Api(unittest.TestCase):
             self.assertEqual(len(plan["botNames"]), 5)
             self.age_matches()
             _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], {**win, "placement": 0, "mvp": True}, me["token"])
-            self.assertEqual((body["cupDelta"], body["drop"]), (8, expected_drop))
+            self.assertEqual((body["cupDelta"], body["drop"]), (10, expected_drop))
             self.assertEqual(body["firstWinPrisms"], 0)  # only the first win of the day
-        self.assertEqual((body["account"]["cups"], body["account"]["drops"], body["account"]["dropsLeftToday"]), (32, 4, 0))
+        self.assertEqual((body["account"]["cups"], body["account"]["drops"], body["account"]["dropsLeftToday"]), (55, 4, 0))
         _, board = self.call("GET", "/v1/leaderboard")
-        self.assertEqual((board["players"][0]["name"], board["players"][0]["cups"]), ("Player", 32))
+        self.assertEqual((board["players"][0]["name"], board["players"][0]["cups"]), ("Player", 55))
         # The leaderboard is the real accounts and nobody else, and each account knows its place on it.
         self.assertEqual(len(board["players"]), 2)
         self.assertEqual((body["account"]["rank"], body["account"]["players"]), (1, 2))
@@ -775,7 +775,9 @@ class Refereed(Api):
         # ...and nothing like what the device claimed.
         self.assertEqual((report["kos"], report["damage"]), (0, 0))
         self.assertNotEqual((report["outcome"], report["placement"]), ("VICTORY", 1))
-        self.assertEqual(body["cupDelta"], rules.cup_delta("LAST_SPARK", report["outcome"], report["placement"], 0, "EASY", False))
+        self.assertEqual(body["cupDelta"], rules.cup_delta("LAST_SPARK", report["outcome"], report["placement"], 0, False))
+        self.assertEqual((body["fighterCupsBefore"], body["fighterCups"]), (0, body["cupDelta"]))
+        self.assertEqual(body["account"]["profile"]["fighters"][body["fighter"]]["cups"], body["cupDelta"])
         self.assertEqual(body["bolts"], economy.match_bolts("LAST_SPARK", report["outcome"], report["placement"], 0, "EASY"))
         row = self.store._db.execute("SELECT outcome, placement, verified, ticks FROM matches WHERE id = ?", (plan["matchId"],)).fetchone()
         self.assertEqual((row["outcome"], row["placement"], row["verified"]), (report["outcome"], report["placement"], 1))

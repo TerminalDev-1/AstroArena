@@ -64,6 +64,7 @@ class SaveStore(context: Context) {
                     put(id.name, JSONObject().apply {
                         put("unlocked", p.unlocked)
                         put("level", p.level)
+                        put("cups", p.cups)
                         put("skin", p.skin)
                         put("ownedSkins", JSONArray(p.ownedSkins.sorted()))
                     })
@@ -117,6 +118,7 @@ class SaveStore(context: Context) {
                 FighterProgress(
                     unlocked = f.optBoolean("unlocked", def.unlocked),
                     level = f.optInt("level", 1).coerceIn(1, Balance.LEVEL_LIMIT),
+                    cups = f.optInt("cups", 0).coerceAtLeast(0),
                     skin = f.optInt("skin", 0),
                     ownedSkins = f.optJSONArray("ownedSkins")?.ints()?.toSet()?.plus(0) ?: setOf(0),
                 )

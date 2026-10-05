@@ -33,6 +33,9 @@ data class MatchRewards(
     val credits: Int = 0,
     val passPoints: Int = 0,
     val glory: Int = 0,
+    /** The Cups of the fighter that was played, before the match and what it changed them by: its rank follows them. */
+    val fighterCupsBefore: Int = 0,
+    val fighterCupDelta: Int = 0,
 )
 
 /**
@@ -57,6 +60,9 @@ data class ServerVerdict(
     val glory: Int = 0,
     /** How the match went according to the server's own replay of it. Null if the server has no referee running. */
     val judged: JudgedResult? = null,
+    /** The Cups of the fighter that was played, before and after this match. */
+    val fighterCupsBefore: Int = 0,
+    val fighterCups: Int = 0,
 )
 
 /** A match's result as the server's referee found it by replaying the match from the player's inputs. */
@@ -113,7 +119,8 @@ object Progression {
             victories = save.victories + if (report.outcome == MatchOutcome.VICTORY) 1 else 0,
             totalKos = save.totalKos + report.kos,
         )
-        val rewards = MatchRewards(newCups - cupDelta, cupDelta, verdict?.bolts ?: 0, verdict?.firstWinPrisms ?: 0, reached, verdict?.drop == true, leftToday, online = verdict != null, credits = verdict?.credits ?: 0, passPoints = verdict?.passPoints ?: 0, glory = verdict?.glory ?: 0)
+        val rewards = MatchRewards(newCups - cupDelta, cupDelta, verdict?.bolts ?: 0, verdict?.firstWinPrisms ?: 0, reached, verdict?.drop == true, leftToday, online = verdict != null, credits = verdict?.credits ?: 0, passPoints = verdict?.passPoints ?: 0, glory = verdict?.glory ?: 0,
+            fighterCupsBefore = verdict?.fighterCupsBefore ?: save.progress(save.selectedFighter).cups, fighterCupDelta = verdict?.let { it.fighterCups - it.fighterCupsBefore } ?: 0)
         return next to rewards
     }
 

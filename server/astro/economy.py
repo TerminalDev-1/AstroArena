@@ -2,7 +2,7 @@
 
 A player's *profile* is the part of their progress the server is in charge of:
 
-    {"bolts", "prisms", "credits", "glory", "bestCups", "fighters": {ID: {"unlocked", "level", "ownedSkins"}},
+    {"bolts", "prisms", "credits", "glory", "bestCups", "fighters": {ID: {"unlocked", "level", "ownedSkins", "cups"}},
      "claimedMilestones": [cups, ...], "lastDailyGiftDay", "lastFirstWinDay",
      "pass": {"season", "points", "claimed": [tier, ...]}}
 
@@ -245,7 +245,7 @@ def claim_pass(profile: dict, tier: int, day: int) -> dict:
 def new_profile() -> dict:
     return {
         "bolts": STARTING_BOLTS, "prisms": STARTING_PRISMS, "credits": 0, "glory": 0, "bestCups": 0,
-        "fighters": {name: {"unlocked": name == rules.STARTING_FIGHTER, "level": 1, "ownedSkins": [0]} for name in rules.FIGHTER_SKINS},
+        "fighters": {name: {"unlocked": name == rules.STARTING_FIGHTER, "level": 1, "ownedSkins": [0], "cups": 0} for name in rules.FIGHTER_SKINS},
         "claimedMilestones": [], "lastDailyGiftDay": -1, "lastFirstWinDay": -1,
     }
 
@@ -293,6 +293,7 @@ def profile_from_save(save: dict) -> dict:
                 "unlocked": bool(entry.get("unlocked")) or name == rules.STARTING_FIGHTER,
                 "level": _int(entry.get("level"), 1, low=1, high=LEVEL_LIMIT),
                 "ownedSkins": sorted(owned),
+                "cups": 0,  # a fighter's own Cups are only ever won in matches the server judged
             }
     return profile
 

@@ -426,7 +426,7 @@ class Store:
                 (now, outcome, placement, kos, deaths, damage, result.get("ticks"), 1 if verified else 0, match_id),
             )
             player = self._db.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
-            cups = max(0, player["cups"] + rules.cup_delta(mode, outcome, placement, player["cups"], difficulty, mvp))
+            cups = max(0, player["cups"] + rules.cup_delta(mode, outcome, placement, player["cups"], mvp))
             day = today()
             earned = player["drops_today"] if player["drops_day"] == day else 0
             drop = rules.earns_drop(mode, outcome, placement) and earned < rules.DROPS_PER_DAY
@@ -442,6 +442,12 @@ class Store:
             if prisms:
                 profile["lastFirstWinDay"] = day
             profile["bestCups"] = max(profile["bestCups"], cups)
+            # The fighter that was played wins (or loses) the same Cups, and its rank follows them.
+            entry = profile["fighters"].get(match["fighter"])
+            fighter_before = entry.get("cups", 0) if entry else 0
+            fighter_cups = max(0, fighter_before + cups - player["cups"])
+            if entry:
+                entry["cups"] = fighter_cups
             # Credits for the Spark Road (Glory once it is finished) and points for the Spark Pass.
             paid = economy.grant(profile, {"type": "credits", "amount": economy.match_credits(mode, outcome, placement)})
             points = economy.pass_points(mode, outcome, placement)
@@ -451,6 +457,8 @@ class Store:
                 "cupDelta": cups - player["cups"], "cups": cups, "drop": drop, "bolts": bolts, "firstWinPrisms": prisms,
                 "credits": paid["amount"] if paid["type"] == "credits" else 0, "glory": paid["amount"] if paid["type"] == "glory" else 0,
                 "passPoints": points,
+                "fighter": match["fighter"], "fighterCupsBefore": fighter_before, "fighterCups": fighter_cups,
+                "fighterRank": rules.fighter_rank(fighter_cups),
             }
 
     # ------------------------------------------------------------------ Spark Drops

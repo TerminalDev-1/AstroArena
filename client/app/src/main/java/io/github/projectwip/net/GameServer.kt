@@ -196,7 +196,7 @@ class GameServer(context: Context) {
             fighters = FighterId.entries.associateWith { id ->
                 val f = fighters?.optJSONObject(id.name)
                 FighterProgress(
-                    unlocked = f?.optBoolean("unlocked") ?: (id == FighterId.JUNO), level = (f?.optInt("level", 1) ?: 1).coerceAtLeast(1),
+                    unlocked = f?.optBoolean("unlocked") ?: (id == FighterId.JUNO), level = (f?.optInt("level", 1) ?: 1).coerceAtLeast(1), cups = (f?.optInt("cups", 0) ?: 0).coerceAtLeast(0),
                     ownedSkins = (f?.let { ints(it, "ownedSkins") } ?: emptySet()) + 0,
                 )
             },
@@ -405,6 +405,7 @@ class GameServer(context: Context) {
         return ServerVerdict(
             o.optInt("cupDelta"), o.optInt("cups"), o.optBoolean("drop"), account?.optInt("drops") ?: 0, account?.optInt("dropsLeftToday") ?: 0,
             bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"), credits = o.optInt("credits"), passPoints = o.optInt("passPoints"), glory = o.optInt("glory"), judged = judged,
+            fighterCupsBefore = o.optInt("fighterCupsBefore"), fighterCups = o.optInt("fighterCups"),
         )
     }
 

@@ -12,9 +12,19 @@ import math
 
 # ---------------------------------------------------------------------------- Cups
 
-CUP_BONUS = {"EASY": 6, "NORMAL": 8, "HARD": 10, "ELITE": 12}
-PLACEMENT_CUPS = [10, 8, 6, 4, 2, 0, -1, -2, -3, -4]
-DIFFICULTIES = tuple(CUP_BONUS)
+# Cups don't depend on how hard the bots are: a place in Last Spark is worth what this table says, and nothing is
+# lost for finishing last.
+PLACEMENT_CUPS = [25, 22, 20, 17, 14, 12, 7, 3, 0, 0]
+TEAM_WIN_CUPS = 8
+DIFFICULTIES = ("EASY", "NORMAL", "HARD", "ELITE")
+
+# A fighter has Cups of its own (won and lost while playing it) and a rank that follows them: rank 1 starts at
+# the first number here, rank 2 at the second, and so on. The last is the top rank, shown as MAX.
+FIGHTER_RANK_CUPS = [0, 10, 20, 35, 50, 75, 100, 140, 180, 230, 280, 340, 400, 470, 540, 620, 700, 790, 880, 1000]
+
+
+def fighter_rank(cups: int) -> int:
+    return max(1, sum(1 for start in FIGHTER_RANK_CUPS if start <= cups))
 OUTCOMES = ("VICTORY", "DEFEAT", "DRAW")
 
 # The bosses of Boss Mode. A player may ask for one; otherwise the match's seed picks. Keep in step with BossKind.
@@ -24,17 +34,13 @@ BOSSES = ("BARRAGE", "SWEEPER", "STAMPEDE")
 MODES = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 5, "BOSS": 0, "TRAINING": 0}
 
 
-def cup_delta(mode: str, outcome: str, placement: int, cups: int, difficulty: str, mvp: bool) -> int:
+def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool) -> int:
     """How a match changes a player's Cups. Never takes them below zero."""
-    bonus = CUP_BONUS.get(difficulty, CUP_BONUS["NORMAL"])
     if mode == "LAST_SPARK":
-        base = PLACEMENT_CUPS[min(max(placement - 1, 0), len(PLACEMENT_CUPS) - 1)]
-        if base > 0:
-            return math.floor(base * bonus / 8 + 0.5)
-        return 0 if cups < 40 else max(base, -cups)  # beginners don't lose Cups
+        return PLACEMENT_CUPS[min(max(placement - 1, 0), len(PLACEMENT_CUPS) - 1)]
     if mode == "KNOCKOUT_RUSH":
         if outcome == "VICTORY":
-            return bonus + (2 if mvp else 0)
+            return TEAM_WIN_CUPS + (2 if mvp else 0)
         if outcome == "DRAW":
             return 1
         return -min(6, cups // 80, cups)
