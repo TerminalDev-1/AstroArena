@@ -92,4 +92,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together
 
 ## License
 
-[AstroArena Source License 1.0](LICENSE): you may use, change and share this, as long as what you share stays open source in a public GitHub repository, credits AstroArena and its author, and is never used to make malware.
+Copyright (C) 2026 NitroGamerX64. AstroArena is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License, version 3](LICENSE), or (at your option) any later version. It comes with no warranty. If you share a version of it, you must share that version's source under the same license and keep this credit.
