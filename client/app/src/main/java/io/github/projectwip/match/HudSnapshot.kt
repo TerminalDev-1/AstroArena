@@ -29,7 +29,7 @@ class HudSnapshot {
     var hyperCharge = 0f
     /** The share (0..1) of the player's running hyper still to go; 0 when none is running. */
     var hyperLeft = 0f
-    /** A 1v1's line across the middle of the screen: 0 none, 1 waiting for the other player, 2 called off. */
+    /** A 1v1's line across the middle of the screen: 0 none, 1 waiting for the other player, 2 called off (out of step), 3 called off (connection lost). */
     var duelNotice = 0
     var autoTargetId = -1
     var matchesPlayed = 0

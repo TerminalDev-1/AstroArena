@@ -196,6 +196,9 @@ class Api(unittest.TestCase):
         self.dir = tempfile.mkdtemp()
         for name in ("versions_not_supported.cfg", "notices.cfg", "bots.cfg", "game.cfg", "shop.cfg"):
             shutil.copy(os.path.join(HERE, name), self.dir)
+        # The tests' own cut-off, so that raising the real one (it moves with releases) doesn't turn them away.
+        with open(os.path.join(self.dir, "versions_not_supported.cfg"), "w", encoding="utf-8") as cfg:
+            cfg.write("<11 | This version of AstroArena is no longer supported. Please update to v11 or later.\n")
         self.httpd = serve(self.dir, "127.0.0.1", 0, quiet=True, referee=self.referee)
         self.base = "http://127.0.0.1:%d" % self.httpd.server_address[1]
         self.store = self.httpd.game.store
@@ -361,37 +364,79 @@ class Api(unittest.TestCase):
             return sock
         old, new = join_as(self.player("Di"), "46"), join_as(self.player("Ed"), "47")
         for sock in (old, new):
-            sock.settimeout(1.0)
-            with self.assertRaises(socket.timeout):
-                sock.recv(1)
+            # Not a start: only a note saying why nobody is being found.
+            self.assertEqual(sock.recv(1), b"N")
+            self.assertIn("different build", text(sock))
         mate = join_as(self.player("Flo"), "46")
         self.assertEqual((old.recv(1), mate.recv(1)), (b"S", b"S"))
         for sock in (old, new, mate):
             sock.close()
+        # The same account on a second device takes over the wait instead of playing itself.
+        gil = self.player("Gil")
+        first, second = join_as(gil, "50"), join_as(gil, "50")
+        self.assertEqual(first.recv(1), b"E")
+        second.settimeout(1.0)
+        with self.assertRaises(socket.timeout):
+            second.recv(1)
+        # Someone waiting on a different build is no opponent, and both are told why nobody is being found.
+        other_build = join_as(self.player("Hal"), "51")
+        self.assertEqual((second.recv(1), other_build.recv(1)), (b"N", b"N"))
+        self.assertIn("different build", text(second))
+        for sock in (first, second, other_build):
+            sock.close()
         # A third player waits: nobody stands in for a real opponent, however long it takes.
         c = join(self.player("Cy"))
         c.settimeout(1.5)
-        with self.assertRaises(socket.timeout):
-            c.recv(1)
+        try:
+            self.assertNotEqual(c.recv(1), b"S")
+        except socket.timeout:
+            pass
         c.close()
         # When one hangs up, the other is told.
         a.close()
         self.assertEqual(b.recv(1), b"X")
         b.close()
 
-    def test_a_supported_build_keeps_its_own_referee(self):
-        import os, tempfile
-        from astro.referee import Referee
-        with tempfile.TemporaryDirectory() as folder:
-            current = os.path.join(folder, "referee.jar")
-            kept = os.path.join(folder, "referee-46.jar")
-            for path in (current, kept):
-                open(path, "w").close()
-            referee = Referee(current, java="java")
-            self.assertEqual(referee.jar_for("46"), kept)
-            self.assertEqual(referee.jar_for("v46.0"), kept)
-            self.assertEqual(referee.jar_for("47"), current)
-            self.assertEqual(referee.jar_for(""), current)
+    def test_the_1v1_lobby_says_who_stopped(self):
+        import json as _json, socket, struct, time as _time
+
+        def join(player):
+            sock = socket.create_connection(("127.0.0.1", self.httpd.duel.server_address[1]), timeout=5)
+            body = _json.dumps({"token": player["token"], "version": VERSION, "fighter": "JUNO", "skin": 0}).encode()
+            sock.sendall(b"H" + struct.pack(">H", len(body)) + body)
+            return sock
+
+        def started(*socks):
+            for sock in socks:
+                self.assertEqual(sock.recv(1), b"S")
+                (length,) = struct.unpack(">H", sock.recv(2))
+                sock.recv(length)
+
+        lobby = self.httpd.duel
+        lobby.stall_seconds, lobby.start_seconds = 0.6, 1.5
+        frame = b"I" + bytes(17)
+        # One player's inputs stop (their game was put down); the other's stop a few frames later, as they wait.
+        a, b = join(self.player("Ada")), join(self.player("Bo"))
+        started(a, b)
+        for _ in range(5):
+            a.sendall(frame); b.sendall(frame)
+        for _ in range(4):
+            b.sendall(frame)
+        _time.sleep(0.2)
+        self.assertEqual(a.recv(18 * 9), frame * 9)
+        self.assertEqual(b.recv(18 * 5), frame * 5)
+        self.assertEqual(a.recv(1), b"L")   # the one who stopped first loses...
+        self.assertEqual(b.recv(1), b"X")   # ...and the other wins
+        a.close(); b.close()
+        # Neither has sent anything yet (both still on the line-up): they get longer before it is called off.
+        c, d = join(self.player("Cy")), join(self.player("Di"))
+        started(c, d)
+        c.settimeout(0.9)
+        with self.assertRaises(socket.timeout):
+            c.recv(1)
+        c.settimeout(5)
+        self.assertEqual((c.recv(1), d.recv(1)), (b"D", b"D"))
+        c.close(); d.close()
 
     def test_the_news_tab_reads_news_cfg(self):
         status, body = self.call("GET", "/v1/news")

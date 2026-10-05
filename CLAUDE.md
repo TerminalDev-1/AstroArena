@@ -83,6 +83,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   the game port + 1) pairs them and passes the frames. Nothing is earned in it yet, and it is not refereed.
   A player waits for another real one for as long as it takes: there is no stand-in opponent, by the user's decision.
   Every 30 ticks the devices compare a checksum of the match and call it off (a draw) if they disagree.
+  The lobby, not the devices, decides what happened when a match stops moving: the player whose inputs stopped
+  first loses, and both are told (`DuelLobby.watch`). It only pairs players on the same build.
 - The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
   is asked for a name before their account is made (`NameScreen`).
 - A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`; a new fighter
@@ -114,13 +116,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   `git push origin main`. Never checkpoint unverified or non-compiling work.
 - **The version is "Beta", and it stays "Beta".** `versionName = "Beta"` is all players see. Underneath, the build
   number (`versionCode`) is what the updater and the server's version gate compare.
-- **Long-term support, from build 46.** A build with `Versions.LTS = true` may keep being played after newer ones
-  come out: its update screen has a LATER button (it asks again at every start), and the server must go on
-  serving it. That means, for every LTS build: never list it in `versions_not_supported.cfg`; never change or
-  remove a server route or field it uses (add new ones instead); and keep its referee. When releasing an LTS
-  build, copy `server/referee/referee.jar` to `server/referee/referee-<build>.jar` and commit it: the server
-  replays that build's matches with its own simulation (`Referee.jar_for`). 1v1 only pairs players on the same
-  build. Builds up to 45 are not LTS and can't be made so: their installed copies stop at the update screen.
+- **No long-term support, by the user's decision.** Every build is replaced by the next: the update screen has no
+  way past it, and nothing on the server is kept for the sake of an older build. Build 46 shipped with a LATER
+  button, so the server refuses it (`versions_not_supported.cfg`); keep that rule. Don't add an update-later option.
 - **Non-negotiable: release without being asked.** The user must never have to say "release". When a task that
   changed the client is finished, verified and pushed, release it: add one to `versionCode` (unless that build
   number has not been released yet), commit, tag `vN.0` (N = the build number), push the tag, and publish a GitHub

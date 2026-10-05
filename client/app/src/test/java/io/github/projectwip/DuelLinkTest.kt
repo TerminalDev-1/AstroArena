@@ -50,6 +50,8 @@ class DuelLinkTest {
                     }
                 } catch (_: Exception) {
                 }
+                // As the real lobby does: the one left behind is told the other has gone.
+                try { to.getOutputStream().write('X'.code); to.getOutputStream().flush() } catch (_: Exception) {}
                 try { to.close() } catch (_: Exception) {}
             }
             pipe(seats[0], seats[1]); pipe(seats[1], seats[0])
@@ -71,7 +73,7 @@ class DuelLinkTest {
             val them = match.opponent!!
             val wanted = io.github.projectwip.sim.Control()
             var tick = 0
-            while (tick < ticks && !link.outOfStep && !link.remoteLeft) {
+            while (tick < ticks && !link.over) {
                 if (link.sent <= tick) {
                     // What this player wants now: walk at the other, shoot at them.
                     wanted.moveX = (them.x - me.x) * 0.3f + hands.nextFloat() - 0.5f; wanted.moveY = (them.y - me.y) * 0.3f + hands.nextFloat() - 0.5f
@@ -131,8 +133,8 @@ class DuelLinkTest {
         a.link.close()
         tb.join(20_000)
         assertFalse(tb.isAlive)
-        assertTrue("the one left behind is told", b.link.remoteLeft)
-        assertFalse(b.link.outOfStep)
+        assertTrue("the one left behind is told the other has gone, and so wins", b.link.remoteLeft)
+        assertFalse("and is not told anything else", b.link.outOfStep || b.link.dropped || b.link.lost)
         server.close()
     }
 }

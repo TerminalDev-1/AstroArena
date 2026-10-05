@@ -169,6 +169,8 @@ private fun DuelMatch(
             if (p == null) {
                 GameText("WAITING FOR AN OPPONENT" + ".".repeat(1 + (time * 2.5f).toInt() % 3), Type.Title, outline = 3.5.dp, modifier = Modifier.width(520.dp))
                 PlainText("The match starts as soon as another player on this server picks 1v1. It waits for a real player, however long that takes.", Type.Body, color = Color.White, align = TextAlign.Center, modifier = Modifier.width(560.dp))
+                // (Read every frame, as the dots animate: the lobby may say why nobody is being found.)
+                link?.note?.let { PlainText(it, Type.Body, color = io.github.projectwip.ui.Palette.Red, align = TextAlign.Center, modifier = Modifier.width(560.dp)) }
                 PlainText("This is a test mode: nothing is earned or lost in it yet.", Type.Small, color = io.github.projectwip.ui.Palette.Gold)
             } else {
                 GameText("NO 1V1 RIGHT NOW", Type.Title, color = io.github.projectwip.ui.Palette.Gold, outline = 3.5.dp)

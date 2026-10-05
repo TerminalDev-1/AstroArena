@@ -7,7 +7,10 @@ player did. This module is the meeting point. It listens on its own TCP port (th
   * a device connects and says who it is:       'H' + text {token, version, fighter, skin}
   * when two are waiting, each is told to start:  'S' + text {seed, side, level, opponent: {name, fighter, level, skin}}
   * from then on every input frame one sends ('I' + 17 bytes) is passed to the other, untouched (and so is 'C' + 8)
-  * when one leaves, the other is told:           'X'
+  * when one leaves, the other is told:           'X'   (the other left: you win)
+  * a player whose inputs stopped is told:        'L'   (you were dropped: you lose), and the other gets 'X'
+  * if both stopped at the same moment:           'D'   (called off: a draw)
+  * while waiting, a note may be sent:            'N' + text
   * a device that can't play is told why:         'E' + text
 
 "text" is a 2-byte big-endian length followed by that many bytes of UTF-8 (what Java's writeUTF sends; the JSON is
@@ -19,6 +22,13 @@ network; the server doesn't referee these matches, and a device that sent false 
 of step.
 
 A player who joins waits for another real player, for as long as that takes. There is no stand-in opponent.
+
+What happened when a match stops moving is the lobby's call, not the devices': each of them only knows that the
+other's inputs stopped arriving, which looks the same whether the other player left, their device was put down, or
+its own Wi-Fi dropped. The lobby sees both. A match is in step, so when one player's inputs stop the other's stop a
+few ticks later: whoever has sent fewer frames is the one who stopped. After `stall_seconds` of silence that player
+is dropped and loses, and the other wins. Before either has sent anything (both are still on the line-up screen)
+they get `start_seconds` instead.
 
 Every so often each device also sends a check ('C' + 8 bytes: a tick and a number worked out from where everything
 is on that tick). It is passed on like an input; the devices compare, and call the match off if they disagree.
@@ -32,6 +42,7 @@ import socket
 import socketserver
 import struct
 import threading
+import time
 
 from . import rules
 
@@ -42,9 +53,12 @@ CHECK_BYTES = 8   # tick (int) + the number the device worked out for that tick 
 class _Seat:
     """One connected player."""
 
-    def __init__(self, sock: socket.socket, name: str, fighter: str, level: int, skin: int, version: str = ""):
+    def __init__(self, sock: socket.socket, name: str, fighter: str, level: int, skin: int, version: str = "", player_id: str = ""):
         self.sock = sock
         self.version = version
+        self.player_id = player_id
+        self.frames = 0          # input frames received from this player
+        self.heard = 0.0         # when the last one arrived (or when the match was made)
         self.name, self.fighter, self.level, self.skin = name, fighter, level, skin
         self.peer: _Seat | None = None
         self._write = threading.Lock()
@@ -91,11 +105,55 @@ class DuelLobby(socketserver.ThreadingTCPServer):
         # player is only ever paired with someone on the same one.
         self._waiting: dict[str, _Seat] = {}
         self._random = random.SystemRandom()
+        self._pairs: list[tuple[_Seat, _Seat]] = []
+        self.stall_seconds = 8.0
+        self.start_seconds = 45.0
+        self._closing = False
         super().__init__((host, port), _Handler)
 
     def start(self) -> "DuelLobby":
         threading.Thread(target=self.serve_forever, name="duel-lobby", daemon=True).start()
+        threading.Thread(target=self._watch_forever, name="duel-watch", daemon=True).start()
         return self
+
+    def server_close(self) -> None:
+        self._closing = True
+        super().server_close()
+
+    def _watch_forever(self) -> None:
+        while not self._closing:
+            time.sleep(0.25)
+            self.watch()
+
+    def watch(self, now: float | None = None) -> None:
+        """Ends any match that has stopped moving, and says who stopped."""
+        now = time.monotonic() if now is None else now
+        ended = []
+        with self._lock:
+            for pair in list(self._pairs):
+                a, b = pair
+                if a.peer is not b or b.peer is not a:
+                    self._pairs.remove(pair)  # one of them has left; that is dealt with in leave()
+                    continue
+                limit = self.stall_seconds if (a.frames and b.frames) else self.start_seconds
+                if now - max(a.heard, b.heard) < limit:
+                    continue
+                self._pairs.remove(pair)
+                a.peer = b.peer = None
+                ended.append(pair)
+        for a, b in ended:
+            if a.frames == b.frames:
+                self.log(f"{a.name} v {b.name}: both went quiet together, called off")
+                a.send(b"D"); b.send(b"D")
+            else:
+                gone, there = (a, b) if a.frames < b.frames else (b, a)
+                self.log(f"{gone.name} stopped responding: {there.name} wins")
+                gone.send(b"L"); there.send(b"X")
+            for seat in (a, b):
+                try:
+                    seat.sock.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
 
     def log(self, message: str) -> None:
         if not self.quiet:
@@ -117,17 +175,34 @@ class DuelLobby(socketserver.ThreadingTCPServer):
             skin = 0
         if skin not in entry.get("ownedSkins", [0]):
             skin = 0
-        return _Seat(None, player["name"], fighter, int(entry["level"]), skin, str(hello.get("version") or "").strip())  # type: ignore[arg-type]
+        return _Seat(None, player["name"], fighter, int(entry["level"]), skin, str(hello.get("version") or "").strip(), player["id"])  # type: ignore[arg-type]
 
     def join(self, me: _Seat) -> None:
         """Pairs [me] with whoever is waiting, or leaves them waiting."""
         with self._lock:
-            other = self._waiting.pop(me.version, None)
+            other = self._waiting.get(me.version)
+            if other is not None and other.player_id == me.player_id:
+                # The same account on a second device: it takes over the wait, it doesn't play itself.
+                other.send(_text(b"E", "This account started waiting for a 1v1 on another device."))
+                try:
+                    other.sock.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                other = None
             if other is None:
                 self._waiting[me.version] = me
                 self.log(f"{me.name} ({me.fighter}, build {me.version or '?'}) is waiting for an opponent")
+                # Someone waiting on another build can't be this player's opponent, and both should know why.
+                others = [seat for version, seat in self._waiting.items() if version != me.version]
+                if others:
+                    note = "Another player is waiting, but on a different build of the game. Update both to the newest one."
+                    for seat in others + [me]:
+                        seat.send(_text(b"N", note))
                 return
+            del self._waiting[me.version]
             other.peer, me.peer = me, other
+            other.heard = me.heard = time.monotonic()
+            self._pairs.append((other, me))
         seed = self._random.getrandbits(62)
         self.log(f"{other.name} ({other.fighter}) v {me.name} ({me.fighter})")
         for side, (seat, opponent) in enumerate(((other, me), (me, other))):
@@ -176,6 +251,9 @@ class _Handler(socketserver.BaseRequestHandler):
                 frame = _read(sock, FRAME_BYTES if kind == b"I" else CHECK_BYTES)
                 if frame is None:
                     break
+                if kind == b"I":
+                    me.frames += 1
+                    me.heard = time.monotonic()
                 peer = me.peer
                 if peer is not None:
                     peer.send(kind + frame)

@@ -49,6 +49,9 @@ class MatchRunner(
     /** True once a 1v1 has been called off because the two devices no longer agreed about it. */
     @Volatile var outOfStep = false
         private set
+    /** True once a 1v1 has been called off because the connection went. */
+    @Volatile var connectionLost = false
+        private set
     val input = TouchControls.Input()
     /** Events produced during the last [update] — consumed by the renderer for effects. */
     val frameEvents = ArrayList<GameEvent>()
@@ -110,17 +113,26 @@ class MatchRunner(
                 outOfStep = true
                 match.world.abandon()
             } else if (link.remoteLeft) {
-                // The other player has gone: the match is this player's.
+                // The lobby says the other player has gone: the match is this player's.
                 match.world.forfeit(them.team)
+            } else if (link.dropped) {
+                // The lobby says it was this player who stopped responding: the match is the other's.
+                match.world.forfeit(p.team)
+            } else if (link.lost) {
+                // The line went and nobody can say whose doing it was: called off.
+                connectionLost = true
+                match.world.abandon()
             } else {
                 // What the player wants now is recorded, to be played a few ticks from now on both devices...
                 if (link.sent <= simTick) link.sendLocal(c)
                 // ...and this tick only runs if both players' inputs for it have arrived.
                 if (!link.ready(simTick)) {
                     c.attack = false; c.superAttack = false; c.hyper = false
+                    // Held up. What that means is the lobby's call (it can see both players); this device only gives
+                    // up by itself if the lobby has gone quiet too.
                     stalled += Match.STEP
                     waitingForOpponent = stalled > 0.4f
-                    if (stalled > 8f) link.close()
+                    if (stalled > 60f) link.close()
                     return
                 }
                 stalled = 0f

@@ -42,8 +42,20 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
     private val remote = ArrayList<Frame>()
     @Volatile private var closed = false
 
-    /** The other player has gone (or the line has): the match can't go on. */
+    /** The lobby says the other player has gone (they left, or stopped responding): this player wins. */
     @Volatile var remoteLeft = false
+        private set
+
+    /** The lobby says this player stopped responding (the game was put down, or its connection stalled): they lose. */
+    @Volatile var dropped = false
+        private set
+
+    /** The line to the lobby went with no word on who was at fault, or both stalled together: the match is called off. */
+    @Volatile var lost = false
+        private set
+
+    /** Something the lobby wants a waiting player to know (the only other player waiting is on another build). */
+    @Volatile var note: String? = null
         private set
 
     /** The two devices disagree about the match: something made them compute it differently. It can't go on. */
@@ -69,17 +81,23 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
         out = o
         o.writeByte('H'.code); o.writeUTF(hello.toString()); o.flush()
         val input = DataInputStream(BufferedInputStream(s.getInputStream()))
-        when (input.readUnsignedByte().toChar()) {
-            'S' -> {
-                val j = JSONObject(input.readUTF())
-                val them = j.getJSONObject("opponent")
-                val fighter = FighterId.entries.firstOrNull { it.name == them.optString("fighter") } ?: FighterId.JUNO
-                Thread({ listen(input) }, "duel-link").apply { isDaemon = true }.start()
-                Start(j.getLong("seed"), j.optInt("level", 1), DuelSetup(j.getInt("side"), fighter, them.optInt("level", 1), them.optInt("skin"), them.optString("name", "Player")))
+        var start: Start? = null
+        waiting@ while (true) {
+            when (input.readUnsignedByte().toChar()) {
+                'S' -> {
+                    val j = JSONObject(input.readUTF())
+                    val them = j.getJSONObject("opponent")
+                    val fighter = FighterId.entries.firstOrNull { it.name == them.optString("fighter") } ?: FighterId.JUNO
+                    Thread({ listen(input) }, "duel-link").apply { isDaemon = true }.start()
+                    start = Start(j.getLong("seed"), j.optInt("level", 1), DuelSetup(j.getInt("side"), fighter, them.optInt("level", 1), them.optInt("skin"), them.optString("name", "Player")))
+                    break@waiting
+                }
+                'N' -> note = input.readUTF()
+                'E' -> { error = input.readUTF(); close(); break@waiting }
+                else -> { close(); break@waiting }
             }
-            'E' -> { error = input.readUTF(); close(); null }
-            else -> { close(); null }
         }
+        start
     } catch (_: Exception) {
         close()
         null
@@ -98,12 +116,15 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
                         val sum = input.readInt()
                         synchronized(lock) { theirChecks[tick] = sum; compare(tick) }
                     }
-                    else -> break
+                    'X' -> { remoteLeft = true; return }
+                    'L' -> { dropped = true; return }
+                    else -> break   // 'D', or anything unexpected: called off
                 }
             }
         } catch (_: IOException) {
         }
-        remoteLeft = true
+        // The line went without the lobby saying whose doing it was.
+        lost = true
     }
 
     /** Records what the player wants ([c], as it stands now) as their next frame, and sends it across. */
@@ -116,7 +137,7 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
             o.writeFloat(c.moveX); o.writeFloat(c.moveY); o.writeFloat(c.aimX); o.writeFloat(c.aimY)
             o.flush()
         } catch (_: IOException) {
-            remoteLeft = true
+            // Nothing to do here: the listener hears from the lobby what happened, or that the line is gone.
         }
     }
 
@@ -131,7 +152,6 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
             o.writeByte('C'.code); o.writeInt(tick); o.writeInt(sum)
             o.flush()
         } catch (_: IOException) {
-            remoteLeft = true
         }
     }
 
@@ -161,11 +181,13 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
         }
     }
 
-    /** Hangs up. The other player is told, and their match ends. */
+    /** True once the match can't go on, whatever the reason. */
+    val over: Boolean get() = remoteLeft || dropped || lost || outOfStep
+
+    /** Hangs up. The lobby tells the other player, and their match ends. */
     override fun close() {
         if (closed) return
         closed = true
-        remoteLeft = true
         try { socket?.close() } catch (_: IOException) {}
     }
 

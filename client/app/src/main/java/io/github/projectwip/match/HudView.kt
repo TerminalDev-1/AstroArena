@@ -199,8 +199,11 @@ class HudView(
         if (s.duelNotice != 0) {
             // A 1v1 held up, or called off: said plainly, across the middle.
             text.textSize = dp(22f)
-            outlined(c, if (s.duelNotice == 2) "THE TWO DEVICES FELL OUT OF STEP · MATCH CALLED OFF" else "WAITING FOR YOUR OPPONENT…", cx, h * 0.3f,
-                if (s.duelNotice == 2) Color.rgb(255, 92, 92) else Color.WHITE, dp(4f))
+            outlined(c, when (s.duelNotice) {
+                2 -> "THE TWO DEVICES FELL OUT OF STEP · MATCH CALLED OFF"
+                3 -> "CONNECTION LOST · MATCH CALLED OFF"
+                else -> "WAITING FOR YOUR OPPONENT…"
+            }, cx, h * 0.3f, if (s.duelNotice == 1) Color.WHITE else Color.rgb(255, 92, 92), dp(4f))
         }
         val top = dp(10f)
         val panelW = dp(260f)
