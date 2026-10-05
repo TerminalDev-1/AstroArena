@@ -138,7 +138,7 @@ class SimulationTest {
         val a = Arenas.staticCanyon()
         val def = Balance.fighter(FighterId.JUNO)
         val f = Fighter(0, def, 1, 0, 0, "A", true)
-        val w = World(a, listOf(f, Fighter(1, def, 1, 0, 1, "B", true)), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w = World(a, listOf(f, Fighter(1, def, 1, 0, 2, "B", true)), io.github.projectwip.sim.MatchRules.lastSpark())
         // Quadrant row 1 is "gggg.c##..": a crate at (5,1) with open floor to its left and wall to its right.
         assertEquals(Tile.CRATE, a[5, 1])
         f.x = 2.5f; f.y = 1.5f
@@ -393,35 +393,76 @@ class SimulationTest {
         return Triple(w, varun, target)
     }
 
-    @Test fun varunFiresThreeRockets() {
+    @Test fun varunFiresSixRocketsPackedTogether() {
         val (w, varun, target) = varunBehindAWall()
         varun.control.aimX = -(target.x - varun.x); varun.control.aimY = 0f; varun.control.attack = true
         w.step(Match.STEP)
-        assertEquals(3, w.projectiles.size)
-        assertTrue(w.projectiles.all { it.style == io.github.projectwip.sim.ShotStyle.ROCKET && !it.seeker })
+        assertEquals(6, varun.def.attack.projectiles)
+        assertEquals("the first row of three has left; the second follows a moment behind, in the same three lanes", listOf(-Balance.ROCKET_LANE, 0f, Balance.ROCKET_LANE), varun.pending.map { it.side })
+        assertTrue(varun.pending.all { it.delay > 0f })
     }
 
-    @Test fun varunsSeekersCrossWallsAndNeverKnockOut() {
+    @Test fun varunsRocketsBurstAndCatchEveryoneNearby() {
+        val a = Arenas.staticCanyon()
+        val varun = Fighter(0, Balance.fighter(FighterId.VARUN), 1, 0, 0, "V", true)
+        val one = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "A", true)
+        val two = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "B", true)
+        val w = World(a, listOf(varun, one, two), io.github.projectwip.sim.MatchRules.lastSpark())
+        repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
+        var placed = false
+        search@ for (y in 3 until a.height - 3) for (x in 3 until a.width - 8) {
+            val x0 = x + 0.5f; val y0 = y + 0.5f
+            if ((0..5).any { a.circleBlocked(x0 + it, y0, 0.9f) } || a.circleBlocked(x0 + 5.9f, y0, 0.6f)) continue
+            varun.x = x0; varun.y = y0; one.x = x0 + 5f; one.y = y0; two.x = x0 + 5f; two.y = y0 + 1.3f
+            placed = true
+            break@search
+        }
+        assertTrue(placed)
+        one.shield = 0f; two.shield = 0f
+        varun.control.aimX = 1f; varun.control.aimY = 0f; varun.control.attack = true
+        var bursts = 0
+        repeat(90) { w.step(Match.STEP); bursts += w.events.count { it is io.github.projectwip.sim.GameEvent.Burst }; w.events.clear() }
+        assertEquals("every rocket goes off", 6, bursts)
+        assertTrue("the one in the way is hit", one.hp < one.maxHp)
+        assertTrue("and so is the one standing beside it, out of the rockets' path", two.hp < two.maxHp)
+    }
+
+    @Test fun varunsRocketRainCrossesWallsAndNeverKnocksOut() {
         val (w, varun, target) = varunBehindAWall()
-        // Fired straight away from the target: the rockets have to turn round and come through the wall.
         varun.superCharge = 1f
         varun.control.aimX = -(target.x - varun.x); varun.control.aimY = 0f; varun.control.superAttack = true
         w.step(Match.STEP)
-        assertEquals("eight rockets", 8, w.projectiles.size)
-        assertTrue(w.projectiles.all { it.seeker && it.targetId == target.id })
+        assertEquals("eight rockets on their way down", 8, w.hazards.size)
+        assertTrue("no straight shots: nothing for the wall to stop", w.projectiles.isEmpty())
+        // The target walks off: the marks follow it.
+        target.x += 0.6f
+        w.step(Match.STEP)
+        assertEquals("the first is dead on", target.x to target.y, w.hazards[0].x to w.hazards[0].y)
         var t = 0f
-        while (w.projectiles.isNotEmpty() && t < 6f) { w.step(Match.STEP); target.sinceDamaged = 0f; t += Match.STEP }
-        assertTrue("every rocket found the target through the wall", w.projectiles.isEmpty() && t < 5f)
-        assertTrue("massive damage: ${varun.damageDealt}", varun.damageDealt >= target.maxHp - 1 || varun.damageDealt >= 8 * varun.superDamage * 9 / 10)
+        while (w.hazards.isNotEmpty() && t < 6f) { w.step(Match.STEP); t += Match.STEP }
+        assertTrue("they all came down, and quickly", w.hazards.isEmpty() && t < 2.5f)
+        assertTrue("massive damage: ${varun.damageDealt}", varun.damageDealt >= minOf(target.maxHp - 1, 6 * varun.superDamage))
         assertTrue("but the target is left standing", target.alive && target.hp >= 1)
         // Even a target on its last legs survives a whole salvo.
         target.hp = 5; target.shieldHp = 0
         varun.superCharge = 1f; varun.control.superAttack = true
         t = 0f
-        do { w.step(Match.STEP); t += Match.STEP } while (w.projectiles.isNotEmpty() && t < 6f)
+        do { w.step(Match.STEP); t += Match.STEP } while (w.hazards.isNotEmpty() && t < 6f)
         assertTrue(target.alive)
         assertEquals(1, target.hp)
         assertEquals(0, varun.kos)
+    }
+
+    @Test fun rocketRainCanBeSteppedOutOfAtTheLastMoment() {
+        val (w, varun, target) = varunBehindAWall()
+        varun.superCharge = 1f; varun.control.superAttack = true
+        w.step(Match.STEP)
+        val first = w.hazards[0]
+        while (first.age < first.delay - Balance.RAIN_LOCK_SECONDS) w.step(Match.STEP)
+        val x = first.x
+        target.x += 0.5f
+        w.step(Match.STEP)
+        assertEquals("once locked, a mark stays where it is", x, first.x, 0f)
     }
 
     @Test fun aHyperBuffsDamageHealthAndShieldForEightSeconds() {

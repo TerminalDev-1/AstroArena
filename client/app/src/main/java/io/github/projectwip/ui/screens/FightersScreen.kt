@@ -214,7 +214,11 @@ private fun FighterPage(save: SaveData, repo: GameRepository, id: FighterId, go:
                         if (!prog.unlocked) GameIcon(IconKind.LOCK, Modifier.size(80.dp))
                     }
                     if (ui.roomy) {
-                        PlainText(def.lore, Type.Body, modifier = Modifier.width(400.dp), align = androidx.compose.ui.text.style.TextAlign.Center)
+                        // White on a dark plate: the floor behind it is bright, and the dim body colour was lost on it.
+                        PlainText(def.lore, Type.Body, color = Palette.Text, align = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.width(430.dp)
+                                .background(androidx.compose.ui.graphics.Color(0xD9140A32), androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                                .padding(horizontal = 12.dp, vertical = 7.dp))
                         Spacer(Modifier.height(8.dp))
                     }
                     SkinRow(save, id, repo, go)
@@ -421,10 +425,10 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
         }
     }
     Spacer(Modifier.height(6.dp))
-    PlainText("${def.superSpec.name}: ${def.superSpec.description}", Type.Small)
+    PlainText("${def.superSpec.name}: ${def.superSpec.description}", Type.Small, color = Palette.Text)
     val pct = { v: Float -> "${Math.round(v * 100)}%" }
-    PlainText("Hyper: for ${Balance.HYPER_SECONDS.toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage, +${pct(Balance.HYPER_HEALTH_BONUS)} health and +${pct(Balance.HYPER_SHIELD_BONUS)} shield.", Type.Small)
-    PlainText("Upgrades raise Health, ${def.attackName} and ${def.superSpec.name} by the same amount every level.", Type.Small, color = Palette.TextDim.copy(alpha = 0.7f))
+    PlainText("Hyper: for ${Balance.HYPER_SECONDS.toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage, +${pct(Balance.HYPER_HEALTH_BONUS)} health and +${pct(Balance.HYPER_SHIELD_BONUS)} shield.", Type.Small, color = Palette.Text)
+    PlainText("Upgrades raise Health, ${def.attackName} and ${def.superSpec.name} by the same amount every level.", Type.Small, color = Palette.Text.copy(alpha = 0.85f))
 }
 
 @Composable

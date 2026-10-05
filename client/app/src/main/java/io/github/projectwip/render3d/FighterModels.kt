@@ -10,7 +10,7 @@ import kotlin.math.abs
 import kotlin.math.sin
 
 /** Which skin colour a part takes. Meshes are white; colour is applied per draw so skins are free. */
-enum class Slot { PRIMARY, SECONDARY, ACCENT, SKIN, DARK, METAL, WHITE, INK }
+enum class Slot { PRIMARY, SECONDARY, ACCENT, SKIN, SKIN_BROWN, DARK, METAL, WHITE, INK }
 
 /** Simple rig. Every part is attached to exactly one bone. */
 enum class Bone { BODY, HEAD, WEAPON, ARM, LEG_L, LEG_R, FLOAT }
@@ -240,7 +240,7 @@ class FighterModels {
         a.add(Bone.BODY, Slot.METAL) { at(-0.36f, 0.72f, 0f) { capsule(0.13f, 0.26f) } }
         a.add(Bone.BODY, Slot.ACCENT, emissive = true) { at(-0.36f, 1.0f, 0f) { sphere(0.06f, 6, 8) } }
         // Head: a helmet with a wide brim swept down at the back, a crest along the top and a badge on the front.
-        a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.2f, 0f) { sphere(0.32f) } }
+        a.add(Bone.HEAD, Slot.SKIN_BROWN) { at(0f, 0.2f, 0f) { sphere(0.32f) } }
         a.add(Bone.HEAD, Slot.DARK, outline = false) { at(0.29f, 0.1f, 0f) { roundedBox(0.08f, 0.06f, 0.3f, 0.025f) } }
         a.add(Bone.HEAD, Slot.WHITE, outline = false) { for (z in listOf(0.11f, -0.11f)) at(0.31f, 0.23f, z) { sphere(0.04f, 6, 8) } }
         a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.02f, 0.3f, 0f) { ellipsoid(0.37f, 0.33f, 0.37f, 8, 16, 0f, 0.5f) } }
@@ -433,6 +433,7 @@ class FighterModels {
             Slot.SECONDARY -> secondary
             Slot.ACCENT -> accent
             Slot.SKIN -> 0xFFFFD3B0
+            Slot.SKIN_BROWN -> 0xFFB5764A
             Slot.DARK -> darken(primary, 0.5f)
             Slot.METAL -> 0xFF6A7390
             Slot.WHITE -> 0xFFFFFFFF

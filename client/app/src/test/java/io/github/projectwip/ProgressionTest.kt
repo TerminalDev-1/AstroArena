@@ -299,7 +299,7 @@ class ProgressionTest {
         // Fighters are unlocked on the Spark Road; the Cup Track pays Credits towards it instead of handing one out.
         assertTrue(io.github.projectwip.data.SparkRoad.steps.any { it.fighter == FighterId.KITO })
         val varun = Balance.fighter(FighterId.VARUN)
-        assertEquals("three rockets a shot, eight in the super", 3 to 8, varun.attack.projectiles to varun.superSpec.projectiles)
+        assertEquals("six rockets a shot, eight in the super", 6 to 8, varun.attack.projectiles to varun.superSpec.projectiles)
         assertEquals("the rarest fighter is the last one on the road", FighterId.VARUN, io.github.projectwip.data.SparkRoad.steps.last().fighter)
         assertTrue(CupTrack.milestones.none { it.reward is Reward.UnlockFighter })
         assertEquals(io.github.projectwip.data.SparkRoad.steps.first(), io.github.projectwip.data.SparkRoad.next(SaveData()))

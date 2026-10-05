@@ -5,6 +5,7 @@ import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.AttackShape
 import io.github.projectwip.data.MatchReport
 import io.github.projectwip.data.Settings
+import io.github.projectwip.data.VoiceCue
 import io.github.projectwip.sim.Fighter
 import io.github.projectwip.sim.GameEvent
 import io.github.projectwip.sim.Match
@@ -167,6 +168,7 @@ class MatchRunner(
         val world = match.world
         when (e) {
             is GameEvent.Shot -> {
+                if (e.isSuper && e.fighterId == pid) say(VoiceCue.SUPER)
                 val f = world.fighter(e.fighterId) ?: return
                 val near = 1f / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
                 val gain = if (e.fighterId == pid) 1f else near * 0.6f
@@ -191,8 +193,8 @@ class MatchRunner(
                 val k = world.fighter(e.killerId)
                 val v = world.fighter(e.victimId)
                 if (v != null) hudEvents += HudEvent.Ko(k?.name ?: if (match.freeForAll) "Static Storm" else "—", k?.team ?: -2, v.name, v.team)
-                if (e.killerId == pid) { sfx.play(Sound.KO, 1f); sfx.buzz(60, 220) }
-                else if (e.victimId == pid) { sfx.play(Sound.KO, 0.9f, 0.7f); sfx.buzz(120, 255) }
+                if (e.killerId == pid) { sfx.play(Sound.KO, 1f); sfx.buzz(60, 220); say(VoiceCue.KO) }
+                else if (e.victimId == pid) { sfx.play(Sound.KO, 0.9f, 0.7f); sfx.buzz(120, 255); say(VoiceCue.DOWN) }
                 else sfx.play(Sound.KO, 0.35f)
             }
             is GameEvent.CellPicked -> if (e.fighterId == pid) { sfx.play(Sound.PICKUP); sfx.buzz(18, 110) }
@@ -209,6 +211,7 @@ class MatchRunner(
             is GameEvent.SuperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY); sfx.buzz(25, 120) }
             is GameEvent.HyperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY, 1f, 1.35f); sfx.buzz(25, 120) }
             is GameEvent.Hyper -> {
+                if (e.fighterId == pid) say(VoiceCue.HYPER)
                 val f = world.fighter(e.fighterId) ?: return
                 val gain = if (e.fighterId == pid) 1f else 0.5f / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
                 sfx.play(Sound.SUPER, gain, 0.6f)
@@ -216,7 +219,12 @@ class MatchRunner(
                 if (e.fighterId == pid) sfx.buzz(70, 220)
             }
             is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }
-            is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop }
+            is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop; say(VoiceCue.START) }
+            is GameEvent.Spawned -> if (e.fighterId == pid) say(VoiceCue.BACK)
+            is GameEvent.Burst -> {
+                val p = match.player
+                sfx.play(Sound.SHOOT_HEAVY, 0.55f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f), 0.7f)
+            }
             is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
             is GameEvent.Eliminated -> if (e.fighterId == pid) sfx.play(Sound.DEFEAT)
             is GameEvent.StormHit -> if (e.targetId == pid) {
@@ -225,6 +233,14 @@ class MatchRunner(
             }
             else -> Unit
         }
+    }
+
+    private var voiceTurn = 0
+
+    /** The player's fighter says one of its lines for [cue], if it has a voice. */
+    private fun say(cue: VoiceCue) {
+        val lines = match.player.def.voice[cue] ?: return
+        if (lines.isNotEmpty()) sfx.say(lines[voiceTurn++ % lines.size])
     }
 
     companion object {

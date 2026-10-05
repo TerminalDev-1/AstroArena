@@ -496,8 +496,8 @@ class BotBrain(
         return when (s.kind) {
             SuperKind.VOLLEY -> clear && d <= s.range * (if (smart) 0.7f else 1.1f)
             SuperKind.PIERCE -> clear && d <= s.range * 0.95f && (!smart || t.hp <= me.superDamage * 1.1f || lineHitsTwo(t))
-            // Seekers find their own way round walls; they can't finish anyone, so a smart bot spends them on the healthy.
-            SuperKind.SWARM -> d <= me.def.attack.range * 1.6f && (!smart || t.hp > me.superDamage)
+            // The rockets come down over walls; they can't finish anyone, so a smart bot spends them on the healthy.
+            SuperKind.SWARM -> d <= s.range && (!smart || t.hp > me.superDamage)
             SuperKind.RAM -> d <= s.range * 0.85f && arena.walkClear(me.x, me.y, t.x, t.y, me.radius * 0.9f) &&
                 (!smart || t.hp <= me.superDamage * 1.3f || d < 2.5f)
         }

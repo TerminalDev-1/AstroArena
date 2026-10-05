@@ -230,6 +230,9 @@ class World(
                     val ang = atan2(dy, dx) + jitter
                     f.pending += PendingShot(i * a.burstInterval, cos(ang), sin(ang))
                 }
+                AttackShape.ROCKETS -> for (i in 0 until a.projectiles) {
+                    f.pending += PendingShot((i / a.lanes) * a.burstInterval, dx, dy, (i % a.lanes - (a.lanes - 1) / 2f) * Balance.ROCKET_LANE)
+                }
                 else -> f.pending += PendingShot(0f, dx, dy)
             }
             events += GameEvent.Shot(f.id, false, f.x, f.y, dx, dy)
@@ -243,7 +246,7 @@ class World(
                 val p = it.next()
                 p.delay -= dt
                 if (p.delay <= 0f) {
-                    fireMain(f, p.dirX, p.dirY)
+                    fireMain(f, p.dirX, p.dirY, p.side)
                     it.remove()
                 }
             }
@@ -358,7 +361,7 @@ class World(
         return if (len > 1e-4f) (c.aimX / len) to (c.aimY / len) else cos(f.facing) to sin(f.facing)
     }
 
-    private fun fireMain(f: Fighter, dx: Float, dy: Float) {
+    private fun fireMain(f: Fighter, dx: Float, dy: Float, side: Float = 0f) {
         val a = f.def.attack
         val style = when (a.shape) {
             AttackShape.BURST -> ShotStyle.SPARK
@@ -367,11 +370,11 @@ class World(
             AttackShape.ROCKETS -> ShotStyle.ROCKET
         }
         val baseAng = atan2(dy, dx)
-        val n = if (a.shape == AttackShape.SPREAD || a.shape == AttackShape.ROCKETS) a.projectiles else 1
+        val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
         val spread = Math.toRadians(a.spreadDegrees.toDouble()).toFloat()
         for (i in 0 until n) {
             val ang = if (n == 1) baseAng else baseAng - spread / 2 + spread * i / (n - 1)
-            spawnProjectile(f, ang, a.speed, a.radius, f.attackDamage, a.range, a.pierce, false, style)
+            spawnProjectile(f, ang, a.speed, a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast)
         }
     }
 
@@ -388,14 +391,25 @@ class World(
             }
             SuperKind.PIERCE -> spawnProjectile(f, baseAng, s.speed, s.radius, f.superDamage, s.range, true, true, ShotStyle.LANCE)
             SuperKind.SWARM -> {
-                // The rockets fan out and share the enemies in sight between them, nearest first.
+                // The rockets go up, and come down one after another on the enemies in sight, shared out nearest first.
+                // The first on each target is dead on; the rest land scattered round it.
                 val targets = fighters.filter { it.team != f.team && isVisibleTo(it, f.team) }.sortedBy { hypot(it.x - f.x, it.y - f.y) }
-                val spread = Math.toRadians(s.spreadDegrees.toDouble()).toFloat()
                 for (i in 0 until s.projectiles) {
-                    val ang = baseAng - spread / 2 + spread * i / (s.projectiles - 1)
-                    val p = spawnProjectile(f, ang, s.speed, s.radius, f.superDamage, s.range, false, true, ShotStyle.SEEKER, seeker = true)
-                    if (p != null && targets.isNotEmpty()) p.targetId = targets[i % targets.size].id
+                    val delay = Balance.RAIN_DELAY_SECONDS + i * Balance.RAIN_GAP_SECONDS
+                    val scatter = if (i < targets.size) 0f else 0.75f
+                    val ox = cos(i * 2.4f) * scatter
+                    val oy = sin(i * 2.4f) * scatter
+                    if (targets.isNotEmpty()) {
+                        val t = targets[i % targets.size]
+                        hazards += Hazard(f.id, f.team, t.x + ox, t.y + oy, s.radius, delay, f.superDamage, HazardKind.ROCKET,
+                            lethal = false, targetId = t.id, offX = ox, offY = oy, lock = Balance.RAIN_LOCK_SECONDS)
+                    } else {
+                        // Nobody in sight: they come down in a line ahead of him.
+                        val d = 2.5f + i * 0.8f
+                        hazards += Hazard(f.id, f.team, f.x + dx * d, f.y + dy * d, s.radius, delay, f.superDamage, HazardKind.ROCKET, lethal = false)
+                    }
                 }
+                events += GameEvent.Launch(f.id, s.projectiles)
             }
             SuperKind.RAM -> if (!f.rooted) {
                 f.dashTime = s.range / s.speed
@@ -410,47 +424,31 @@ class World(
 
     private fun spawnProjectile(
         f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float,
-        pierce: Boolean, isSuper: Boolean, style: ShotStyle, seeker: Boolean = false,
-    ): Projectile? {
+        pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f,
+    ) {
         val dx = cos(ang)
         val dy = sin(ang)
         // Spawn slightly in front of the fighter, but never inside a wall.
         val off = f.radius * 0.6f
-        val sx = f.x + dx * off
-        val sy = f.y + dy * off
-        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, seeker)
-        if (!seeker && arena.tileAt(sx, sy).blocksShots) {
+        val sx = f.x + dx * off - dy * side
+        val sy = f.y + dy * off + dx * side
+        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast)
+        if (arena.tileAt(sx, sy).blocksShots) {
             events += GameEvent.WallHit(sx, sy, style)
-            return null
+            return
         }
         projectiles += p
-        return p
     }
 
-    /** Turns a seeker rocket toward its target (or, without one it can see, the nearest enemy it can). */
-    private fun steer(p: Projectile, dt: Float) {
-        fun valid(f: Fighter) = f.team != p.team && f.id !in p.hit && isVisibleTo(f, p.team)
-        var t = fighter(p.targetId)?.takeIf { valid(it) }
-        if (t == null) {
-            var best = Float.MAX_VALUE
-            for (f in fighters) {
-                if (!valid(f)) continue
-                val d = hypot(f.x - p.x, f.y - p.y)
-                if (d < best) { best = d; t = f }
-            }
-            p.targetId = t?.id ?: -1
+    /** A rocket goes off at ([x], [y]): every enemy within its blast is hit, once. */
+    private fun detonate(p: Projectile, x: Float, y: Float) {
+        events += GameEvent.Burst(x, y, p.blast)
+        if (phase != Phase.PLAYING) return
+        val owner = fighter(p.ownerId)
+        for (f in fighters) {
+            if (f.team == p.team || !f.alive) continue
+            if (hypot(f.x - x, f.y - y) < p.blast + f.radius) damage(f, owner, p.damage, p.isSuper, f.x, f.y)
         }
-        if (t == null) return
-        val speed = hypot(p.vx, p.vy)
-        val cur = atan2(p.vy, p.vx)
-        var diff = atan2(t.y - p.y, t.x - p.x) - cur
-        while (diff > Math.PI) diff -= (2 * Math.PI).toFloat()
-        while (diff < -Math.PI) diff += (2 * Math.PI).toFloat()
-        // It turns tighter the longer it has flown, so it closes in instead of circling.
-        val turn = (Balance.SEEKER_TURN + Balance.SEEKER_TURN_GAIN * p.age) * dt
-        val ang = cur + diff.coerceIn(-turn, turn)
-        p.vx = cos(ang) * speed
-        p.vy = sin(ang) * speed
     }
 
     private fun stepDash(f: Fighter, dt: Float) {
@@ -484,9 +482,8 @@ class World(
     // What a boss's script uses to act on the world.
     internal val rng get() = random
     internal fun announce(e: GameEvent) { events += e }
-    internal fun bossShot(f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float, pierce: Boolean, style: ShotStyle) {
+    internal fun bossShot(f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float, pierce: Boolean, style: ShotStyle) =
         spawnProjectile(f, ang, speed, radius, damage, range, pierce, true, style)
-    }
 
     internal fun startDash(f: Fighter, dx: Float, dy: Float) {
         val s = f.def.superSpec
@@ -502,6 +499,8 @@ class World(
         while (i < hazards.size) {
             val h = hazards[i]
             h.age += dt
+            // A mark that is after someone follows them, while it can see them, until just before it goes off.
+            if (h.targetId >= 0 && h.age < h.delay - h.lock) fighter(h.targetId)?.takeIf { isVisibleTo(it, h.team) }?.let { h.x = it.x + h.offX; h.y = it.y + h.offY }
             if (h.age < h.delay) { i++; continue }
             hazards.removeAt(i)
             events += GameEvent.Blast(h.x, h.y, h.radius, h.kind)
@@ -509,7 +508,7 @@ class World(
             for (f in fighters) {
                 if (f.team == h.team || !f.alive) continue
                 // Caught if the middle of the fighter is inside the mark (a little is forgiven at the very edge).
-                if (hypot(f.x - h.x, f.y - h.y) < h.radius + f.radius * 0.3f) damage(f, owner, h.damage, true, f.x, f.y)
+                if (hypot(f.x - h.x, f.y - h.y) < h.radius + f.radius * 0.3f) damage(f, owner, h.damage, true, f.x, f.y, lethal = h.lethal)
             }
         }
     }
@@ -521,7 +520,6 @@ class World(
             p.prevX = p.x
             p.prevY = p.y
             p.age += dt
-            if (p.seeker && phase == Phase.PLAYING) steer(p, dt)
             val speed = hypot(p.vx, p.vy)
             val total = speed * dt
             val sub = maxOf(1, (total / 0.15f).toInt() + 1)
@@ -531,9 +529,10 @@ class World(
                 p.x += sdx
                 p.y += sdy
                 p.rangeLeft -= total / sub
-                if (!p.seeker && arena.tileAt(p.x, p.y).blocksShots) {
+                if (arena.tileAt(p.x, p.y).blocksShots) {
                     p.alive = false
                     events += GameEvent.WallHit(p.x - sdx, p.y - sdy, p.style)
+                    if (p.blast > 0f) detonate(p, p.x - sdx, p.y - sdy)
                     if (arena.tileAt(p.x, p.y) == Tile.CRATE) damageCrate(kotlin.math.floor(p.x).toInt(), kotlin.math.floor(p.y).toInt(), p.damage)
                     break@loop
                 }
@@ -542,12 +541,16 @@ class World(
                     val rr = f.radius + p.radius
                     if ((f.x - p.x) * (f.x - p.x) + (f.y - p.y) * (f.y - p.y) < rr * rr) {
                         p.hit += f.id
+                        if (p.blast > 0f) { detonate(p, p.x, p.y); p.alive = false; break@loop }
                         val owner = fighter(p.ownerId)
-                        damage(f, owner, p.damage, p.isSuper, p.x, p.y, lethal = !p.seeker)
+                        damage(f, owner, p.damage, p.isSuper, p.x, p.y)
                         if (!p.pierce) { p.alive = false; break@loop }
                     }
                 }
-                if (p.rangeLeft <= 0f) { p.alive = false; break@loop }
+                if (p.rangeLeft <= 0f) {
+                    if (p.blast > 0f) detonate(p, p.x, p.y)
+                    p.alive = false; break@loop
+                }
             }
             if (!p.alive) it.remove()
         }

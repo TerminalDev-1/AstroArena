@@ -14,7 +14,11 @@ enum class HazardKind { ROCKET, MINE, SLAM }
  * it. The mark is there from the start, so it can always be walked out of.
  */
 class Hazard(
-    val ownerId: Int, val team: Int, val x: Float, val y: Float, val radius: Float, val delay: Float, val damage: Int, val kind: HazardKind,
+    val ownerId: Int, val team: Int, var x: Float, var y: Float, val radius: Float, val delay: Float, val damage: Int, val kind: HazardKind,
+    /** False: it can take a fighter down to its last point of health, but never knocks it out. */
+    val lethal: Boolean = true,
+    /** A fighter the mark follows (keeping [offX], [offY] from it) until [lock] seconds before it goes off. -1: it stays put. */
+    val targetId: Int = -1, val offX: Float = 0f, val offY: Float = 0f, val lock: Float = 0f,
 ) {
     var age = 0f
 }
@@ -155,16 +159,16 @@ internal class BossScript(private val w: World, private val me: Fighter) {
                 return 2.2f
             }
             turn % 2 == 0 -> {
-                // A charge at the target (three in a row when enraged), each ending in a slam where it stops.
-                val charges = if (enraged) 3 else 1
+                // A charge at the target (two in a row when enraged), each ending in a slam where it stops.
+                val charges = if (enraged) 2 else 1
                 val spec = me.def.superSpec
-                for (k in 0 until charges) after(0.35f + k * 1.2f) {
+                for (k in 0 until charges) after(0.6f + k * 1.5f) {
                     val a = aim()
                     face(a)
                     w.startDash(me, cos(a), sin(a))
-                    after(spec.range / spec.speed) { mark(me.x, me.y, 2.4f, 0.4f, 1200, HazardKind.SLAM) }
+                    after(spec.range / spec.speed) { mark(me.x, me.y, 2.1f, 0.55f, 900, HazardKind.SLAM) }
                 }
-                return 1.2f + charges * 1.2f
+                return 1.6f + charges * 1.5f
             }
             else -> {
                 // Three quick blasts of shrapnel.

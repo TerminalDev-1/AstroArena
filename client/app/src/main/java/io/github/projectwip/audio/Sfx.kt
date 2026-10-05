@@ -77,7 +77,39 @@ class Sfx(private val context: Context) {
         }
     }
 
-    fun release() { worker.shutdown(); pool.release() }
+    // ---- Voice lines. Nothing is recorded: the device's own speech engine reads a fighter's lines out.
+    private var tts: android.speech.tts.TextToSpeech? = null
+    @Volatile private var ttsReady = false
+    private var lastSaid = 0L
+
+    /** Wakes the speech engine up, so the first line isn't lost. A device without one simply stays silent. */
+    fun loadVoice() {
+        if (tts != null) return
+        tts = android.speech.tts.TextToSpeech(context.applicationContext) { status ->
+            val t = tts
+            if (status != android.speech.tts.TextToSpeech.SUCCESS || t == null) return@TextToSpeech
+            try {
+                val indian = java.util.Locale("en", "IN")
+                t.language = if (t.isLanguageAvailable(indian) >= android.speech.tts.TextToSpeech.LANG_AVAILABLE) indian else java.util.Locale.US
+                t.setPitch(0.8f)
+                t.setSpeechRate(1.1f)
+                ttsReady = true
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** Says a line out loud, unless one was said a moment ago. */
+    fun say(line: String) {
+        val t = tts ?: return
+        val now = android.os.SystemClock.uptimeMillis()
+        if (!ttsReady || volume <= 0f || now - lastSaid < 2200) return
+        lastSaid = now
+        val params = android.os.Bundle().apply { putFloat(android.speech.tts.TextToSpeech.Engine.KEY_PARAM_VOLUME, volume.coerceIn(0f, 1f)) }
+        try { t.speak(line, android.speech.tts.TextToSpeech.QUEUE_FLUSH, params, "line") } catch (_: Exception) {}
+    }
+
+    fun release() { worker.shutdown(); pool.release(); tts?.shutdown(); tts = null }
 
     private fun writeWav(f: File, samples: FloatArray) {
         val data = ByteBuffer.allocate(samples.size * 2).order(ByteOrder.LITTLE_ENDIAN)

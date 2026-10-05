@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
         repo.onCommit = { server.pushSave(SaveStore.toJson(it)) }
         // Debug: `--es server http://host:port` points this install at another server ("default" clears it).
         if (BuildConfig.DEBUG) intent?.getStringExtra("server")?.let { url -> repo.updateSettings { it.copy(serverUrl = if (url == "default") "" else url) } }
-        sfx = Sfx(this).also { it.load() }
+        sfx = Sfx(this).also { it.load(); it.loadVoice() }
         music = io.github.projectwip.audio.Music(this).also { it.load() }
         // The no-level-cap cheat is for dev builds: a release build switches it back off.
         if (!BuildConfig.DEBUG && repo.save.value.settings.debugNoLevelCap) repo.updateSettings { it.copy(debugNoLevelCap = false) }

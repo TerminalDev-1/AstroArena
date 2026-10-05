@@ -25,7 +25,8 @@ class Control {
     }
 }
 
-class PendingShot(var delay: Float, val dirX: Float, val dirY: Float)
+/** [side]: how far to the left (+) or right (-) of the fighter the shot leaves from, in tiles. */
+class PendingShot(var delay: Float, val dirX: Float, val dirY: Float, val side: Float = 0f)
 
 class Fighter(
     val id: Int,
@@ -117,7 +118,7 @@ class Fighter(
     val isDashing get() = dashTime > 0f
 }
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, SEEKER }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET }
 
 class Projectile(
     val ownerId: Int,
@@ -132,11 +133,9 @@ class Projectile(
     val pierce: Boolean,
     val isSuper: Boolean,
     val style: ShotStyle,
-    /** A seeker rocket: steers toward enemies, flies over walls, and hurts but never knocks out. */
-    val seeker: Boolean = false,
+    /** Bursts where it lands, hitting every enemy within this many tiles (0 = only what it touches). */
+    val blast: Float = 0f,
 ) {
-    /** Who a seeker is after (-1: whoever is nearest). */
-    var targetId = -1
     var prevX = x
     var prevY = y
     var alive = true
@@ -167,6 +166,10 @@ sealed interface GameEvent {
     /** A fighter switched its hyper on. */
     data class Hyper(val fighterId: Int) : GameEvent
     data class Dash(val fighterId: Int) : GameEvent
+    /** A rocket went off. */
+    data class Burst(val x: Float, val y: Float, val radius: Float) : GameEvent
+    /** A fighter fired a salvo of rockets into the sky. */
+    data class Launch(val fighterId: Int, val count: Int) : GameEvent
     /** A marked patch of ground went off. */
     data class Blast(val x: Float, val y: Float, val radius: Float, val kind: HazardKind) : GameEvent
     data object CountdownTick : GameEvent

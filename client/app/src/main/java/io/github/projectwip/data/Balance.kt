@@ -15,7 +15,7 @@ data class StatLine(val base: Int, val perLevel: Int) {
 
 enum class FighterId { JUNO, BRAKK, MIRA, KITO, VARUN }
 
-/** [ROCKETS] is a [SPREAD] of rockets: the same fan, slower and heavier. */
+/** [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. */
 enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
@@ -34,7 +34,7 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
     ULTRA("Ultra", 0xFF29F0FF, 2600),
 }
 
-/** [SWARM] is a salvo of seeker rockets: they steer toward enemies, fly over walls, and hurt but never knock out. */
+/** [SWARM] is a salvo of rockets fired into the sky: they come down on the enemies in sight, over any wall, and hurt but never knock out. */
 enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
@@ -48,6 +48,10 @@ data class AttackSpec(
     /** Time between projectiles of the same shot (burst weapons). 0 = all at once. */
     val burstInterval: Float,
     val pierce: Boolean = false,
+    /** Rockets: everyone within this many tiles of where one lands is hit. 0 = only what it touches. */
+    val blast: Float = 0f,
+    /** Rockets: how many leave side by side in each row. */
+    val lanes: Int = 1,
 )
 
 data class SuperSpec(
@@ -88,7 +92,12 @@ data class FighterDef(
     val rarity: Rarity = Rarity.RARE,
     /** Set for a Boss Mode boss: which one it is. Null for every fighter. */
     val boss: BossKind? = null,
+    /** What the fighter says, and when. Empty for a fighter without a voice. */
+    val voice: Map<VoiceCue, List<String>> = emptyMap(),
 )
+
+/** The moments a fighter with a voice speaks up. */
+enum class VoiceCue { START, SUPER, HYPER, KO, DOWN, BACK }
 
 enum class BotDifficulty(val label: String, val blurb: String, val cupBonus: Int, val boltMultiplier: Float) {
     EASY("Easy", "Slow reactions, loose aim, wanders into danger. Good for learning.", 6, 0.75f),
@@ -154,9 +163,14 @@ object Balance {
     /** A main-attack hit charges the hyper this much as fast as it charges the super. */
     const val HYPER_CHARGE_RATE = 0.4f
 
-    /** Seeker rockets (a [SuperKind.SWARM]): how fast they can turn, in radians a second, and how much faster for every second in the air. */
-    const val SEEKER_TURN = 4f
-    const val SEEKER_TURN_GAIN = 6f
+    /** How far apart, in tiles, the lanes of a [AttackShape.ROCKETS] attack are. */
+    const val ROCKET_LANE = 0.3f
+
+    /** A [SuperKind.SWARM]: the first rocket lands this long after the launch, and the rest follow this far apart. */
+    const val RAIN_DELAY_SECONDS = 0.9f
+    const val RAIN_GAP_SECONDS = 0.12f
+    /** Each rocket follows its target until this long before it lands; after that, it can be stepped out of. */
+    const val RAIN_LOCK_SECONDS = 0.4f
 
     // ---- Starting wallet ----
     const val STARTING_BOLTS = 60
@@ -291,21 +305,29 @@ object Balance {
             title = "Rocket Firefighter",
             role = "Artillery",
             lore = "An Indian firefighter who was captured and told to work for the people of the Sparks. He has never left since. Nobody knows why.",
-            attackName = "Triple Rocket",
+            attackName = "Rocket Pack",
             health = StatLine(4400, 220),
-            attackDamage = StatLine(420, 21),
+            attackDamage = StatLine(220, 11),
             superDamage = StatLine(900, 45),
             moveSpeed = 3.55f,
-            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 3, spreadDegrees = 16f, range = 7.2f, speed = 13f, radius = 0.2f, burstInterval = 0f),
-            superSpec = SuperSpec(SuperKind.SWARM, "Seeker Swarm", "Launches 8 seeker rockets that fly over walls and hunt enemies down. They hit hard, but never land the knockout.", projectiles = 8, spreadDegrees = 150f, range = 26f, speed = 10f, radius = 0.22f),
+            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 6, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.17f, burstInterval = 0.1f, blast = 0.8f, lanes = 3),
+            superSpec = SuperSpec(SuperKind.SWARM, "Rocket Rain", "Fires 8 rockets into the sky. They rain down on the enemies in sight, over any wall, following them until just before they land. They hit hard, but never land the knockout.", projectiles = 8, range = 12f, speed = 10f, radius = 1.0f),
             ammoMax = 3,
             reloadSeconds = 1.5f,
-            superChargePerHit = 0.07f,
+            superChargePerHit = 0.035f,
             radius = 0.44f,
             skins = listOf(
                 Skin("Fire Engine", 0xFFD9342B, 0xFFFFC72C, 0xFFFFF1C2, 0),
                 Skin("Monsoon", 0xFF1F6FB5, 0xFF2ED8A3, 0xFFE6F7FF, 20),
                 Skin("Marigold", 0xFFFF9F1C, 0xFF7B2CBF, 0xFFFFF3B0, 20),
+            ),
+            voice = mapOf(
+                VoiceCue.START to listOf("Varun reporting. Where is the fire?", "Hoses down. Rockets up."),
+                VoiceCue.SUPER to listOf("Look up!", "No wall will save you!"),
+                VoiceCue.HYPER to listOf("Now I am burning bright!", "Full pressure!"),
+                VoiceCue.KO to listOf("Fire is out.", "That one is contained."),
+                VoiceCue.DOWN to listOf("I will be back on shift."),
+                VoiceCue.BACK to listOf("Back on duty."),
             ),
         ),
     )
@@ -321,10 +343,10 @@ object Balance {
     private fun bossDef(kind: BossKind, name: String, title: String, lore: String, health: Int, speed: Float, standOff: Float, skin: Skin) = FighterDef(
         id = FighterId.JUNO, rarity = Rarity.STARTER, boss = kind,
         name = name, title = title, role = "Boss", lore = lore, attackName = "",
-        health = StatLine(health, 0), attackDamage = StatLine(400, 0), superDamage = StatLine(1300, 0),
+        health = StatLine(health, 0), attackDamage = StatLine(400, 0), superDamage = StatLine(950, 0),
         moveSpeed = speed,
         attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 30f, range = standOff, speed = 14f, radius = 0.24f, burstInterval = 0f),
-        superSpec = SuperSpec(SuperKind.RAM, "Charge", "", range = 9f, speed = 15f, radius = 0.9f),
+        superSpec = SuperSpec(SuperKind.RAM, "Charge", "", range = 7f, speed = 12.5f, radius = 0.9f),
         ammoMax = 3, reloadSeconds = 1.5f, superChargePerHit = 0f,
         radius = fighter(FighterId.JUNO).radius * 2.5f,
         skins = listOf(skin),
