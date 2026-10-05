@@ -100,7 +100,7 @@ class Match(val config: MatchConfig) {
         turn++
         for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
         // A boss's brain only walks it about: what it does to the player is its script's business (see World).
-        for (f in world.fighters) if (f.def.boss != null) { f.control.attack = false; f.control.superAttack = false }
+        for (f in world.fighters) if (f.def.boss != null) { f.control.attack = false; f.control.superAttack = false; f.control.hyper = false }
         world.step(dt)
         if (isOver) overFor += dt
     }

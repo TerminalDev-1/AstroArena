@@ -18,6 +18,7 @@ import kotlin.math.min
  *  - Attack stick (right): drag to aim (aim line shown in the arena), release to fire.
  *    Quick tap = auto-aim at nearest visible enemy. Drag back into the centre before releasing = cancel.
  *  - Super stick: same gestures, only live when the super is charged.
+ *  - Hyper button: a plain tap, only live when the hyper is charged. It sits above the attack stick and moves with it.
  *
  * Touch events arrive on the UI thread; the game thread reads via [poll]. All access is synchronized.
  */
@@ -49,6 +50,7 @@ class TouchControls(private val density: Float) {
         var superFire = FireMode.NONE
         var superX = 0f
         var superY = 0f
+        var hyper = false
         var pause = false
     }
 
@@ -75,6 +77,9 @@ class TouchControls(private val density: Float) {
     var attackCy = 0f; private set
     var superCx = 0f; private set
     var superCy = 0f; private set
+    var hyperRadius = 0f; private set
+    var hyperCx = 0f; private set
+    var hyperCy = 0f; private set
     val pauseRect = RectF()
 
     private var settings = Settings()
@@ -86,10 +91,13 @@ class TouchControls(private val density: Float) {
     private var pendingSuper = FireMode.NONE
     private var pendingSuperX = 0f
     private var pendingSuperY = 0f
+    private var pendingHyper = false
     private var pendingPause = false
 
     /** Set by the game thread so the super stick knows whether to grab touches. */
     @Volatile var superReady = false
+    /** Likewise for the hyper button. */
+    @Volatile var hyperReady = false
 
     private fun dp(v: Float) = v * density
 
@@ -103,6 +111,7 @@ class TouchControls(private val density: Float) {
         moveRadius = dp(64f) * k
         attackRadius = dp(60f) * k
         superRadius = dp(42f) * k
+        hyperRadius = dp(32f) * k
         fixedMoveX = safeLeft + dp(44f) + moveRadius * 1.15f
         fixedMoveY = height - dp(36f) - moveRadius * 1.15f
         attackCx = width - safeRight - dp(48f) - attackRadius * 1.25f
@@ -115,6 +124,8 @@ class TouchControls(private val density: Float) {
         superCx = attackCx - attackRadius * 1.9f
         superCy = attackCy - attackRadius * 1.05f
         if (l.superX >= 0f) { superCx = l.superX * width; superCy = l.superY * height }
+        hyperCx = attackCx - attackRadius * 0.55f
+        hyperCy = (attackCy - attackRadius * 2.15f).coerceAtLeast(hyperRadius * 1.6f)
         val ps = dp(46f)
         pauseRect.set(safeLeft + dp(16f), dp(14f), safeLeft + dp(16f) + ps, dp(14f) + ps)
     }
@@ -141,6 +152,8 @@ class TouchControls(private val density: Float) {
     private fun down(id: Int, x: Float, y: Float) {
         val pr = RectF(pauseRect).apply { inset(-dp(10f), -dp(10f)) }
         if (pr.contains(x, y)) { pendingPause = true; return }
+
+        if (hyperReady && hypot(x - hyperCx, y - hyperCy) < hyperRadius * 1.4f) { pendingHyper = true; return }
 
         // Aim sticks measure from where the thumb lands, so a tap anywhere on them is a clean
         // auto-aim tap and drags aim relative to the touch point (the stick is still drawn in place).
@@ -248,16 +261,18 @@ class TouchControls(private val density: Float) {
         }
         out.attack = pendingAttack; out.attackX = pendingAttackX; out.attackY = pendingAttackY
         out.superFire = pendingSuper; out.superX = pendingSuperX; out.superY = pendingSuperY
+        out.hyper = pendingHyper
         out.pause = pendingPause
         pendingAttack = FireMode.NONE
         pendingSuper = FireMode.NONE
+        pendingHyper = false
         pendingPause = false
     }
 
     @Synchronized
     fun reset() {
         move.reset(); attack.reset(); superStick.reset()
-        pendingAttack = FireMode.NONE; pendingSuper = FireMode.NONE; pendingPause = false
+        pendingAttack = FireMode.NONE; pendingSuper = FireMode.NONE; pendingHyper = false; pendingPause = false
     }
 
     // ------------------------------------------------------------------ drawing
@@ -270,9 +285,12 @@ class TouchControls(private val density: Float) {
     }
     private val arc = RectF()
 
-    /** Draws controls in screen space. [ammo] is 0..ammoMax, [superCharge] 0..1. */
+    /**
+     * Draws controls in screen space. [ammo] is 0..ammoMax, [superCharge] and [hyperCharge] 0..1; [hyperLeft] is
+     * the share (0..1) of a running hyper that is still to go.
+     */
     @Synchronized
-    fun draw(c: Canvas, ammo: Float, ammoMax: Int, superCharge: Float, alive: Boolean, time: Float) {
+    fun draw(c: Canvas, ammo: Float, ammoMax: Int, superCharge: Float, hyperCharge: Float, hyperLeft: Float, alive: Boolean, time: Float) {
         val a = (settings.controlOpacity * 255).toInt()
 
         // ---- Move stick
@@ -374,6 +392,54 @@ class TouchControls(private val density: Float) {
             text.style = Paint.Style.FILL
             text.color = Color.argb(a, 255, 255, 255)
             c.drawText("SUPER", bx, by + sr * 1.02f, text)
+        }
+
+        // ---- Hyper button
+        val hr = hyperRadius
+        val hReady = hyperCharge >= 1f && hyperLeft <= 0f && alive
+        val hOn = hyperLeft > 0f
+        val hPulse = if (hReady) 1f + 0.07f * kotlin.math.sin(time * 7f) else 1f
+        if (hReady) {
+            fill.color = Color.argb(a * 90 / 255, 200, 110, 255)
+            c.drawCircle(hyperCx, hyperCy, hr * 1.4f * hPulse, fill)
+        }
+        fill.color = when {
+            hReady -> Color.argb(a, 168, 72, 255)
+            hOn -> Color.argb(a * 220 / 255, 96, 44, 170)
+            else -> Color.argb(a * 170 / 255, 40, 30, 70)
+        }
+        c.drawCircle(hyperCx, hyperCy, hr, fill)
+        arc.set(hyperCx - hr * 1.18f, hyperCy - hr * 1.18f, hyperCx + hr * 1.18f, hyperCy + hr * 1.18f)
+        line.strokeWidth = dp(6f)
+        if (!hReady) {
+            // The rim fills as it charges, and drains while the hyper runs.
+            line.color = Color.argb(a * 120 / 255, 11, 6, 32)
+            c.drawArc(arc, 0f, 360f, false, line)
+            line.color = if (hOn) Color.argb(a, 255, 255, 255) else Color.argb(a, 200, 110, 255)
+            c.drawArc(arc, -90f, 360f * (if (hOn) hyperLeft else hyperCharge).coerceIn(0f, 1f), false, line)
+        }
+        line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(3.5f)
+        c.drawCircle(hyperCx, hyperCy, hr, line)
+        // The emblem: two chevrons pointing up.
+        line.strokeJoin = Paint.Join.ROUND
+        for (k in 0..1) {
+            val cy = hyperCy + hr * (0.02f + 0.34f * k)
+            glyph.reset()
+            glyph.moveTo(hyperCx - hr * 0.44f, cy); glyph.lineTo(hyperCx, cy - hr * 0.42f); glyph.lineTo(hyperCx + hr * 0.44f, cy)
+            line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(7f)
+            c.drawPath(glyph, line)
+            line.color = if (hReady || hOn) Color.argb(a, 255, 255, 255) else Color.argb(a * 150 / 255, 176, 164, 214)
+            line.strokeWidth = dp(3.5f)
+            c.drawPath(glyph, line)
+        }
+        if (hReady) {
+            text.textSize = hr * 0.46f
+            text.style = Paint.Style.STROKE; text.strokeWidth = dp(4f); text.strokeJoin = Paint.Join.ROUND
+            text.color = Color.argb(a, 11, 6, 32)
+            c.drawText("HYPER", hyperCx, hyperCy + hr * 1.08f, text)
+            text.style = Paint.Style.FILL
+            text.color = Color.argb(a, 255, 255, 255)
+            c.drawText("HYPER", hyperCx, hyperCy + hr * 1.08f, text)
         }
 
         // ---- Pause

@@ -18,9 +18,10 @@ class Control {
     /** One-shot triggers, cleared by the world after each tick. */
     var attack = false
     var superAttack = false
+    var hyper = false
 
     fun clear() {
-        moveX = 0f; moveY = 0f; aiming = false; attack = false; superAttack = false
+        moveX = 0f; moveY = 0f; aiming = false; attack = false; superAttack = false; hyper = false
     }
 }
 
@@ -42,7 +43,8 @@ class Fighter(
     var maxHp = baseMaxHp
     /** Power Cells collected (free-for-all). Each adds health and damage. */
     var cells = 0
-    val damageMultiplier get() = 1f + io.github.projectwip.data.Balance.CELL_DAMAGE_BONUS * cells
+    val damageMultiplier get() = (1f + io.github.projectwip.data.Balance.CELL_DAMAGE_BONUS * cells) *
+        (if (hyperActive) 1f + io.github.projectwip.data.Balance.HYPER_DAMAGE_BONUS else 1f)
     val attackDamage get() = (def.attackDamage.at(level) * damageMultiplier).toInt()
     val superDamage get() = (def.superDamage.at(level) * damageMultiplier).toInt()
     val radius = def.radius
@@ -65,8 +67,16 @@ class Fighter(
     var shield = 0f
     /** Shield points on top of health. They build up, out of combat, once health is full, and take damage first. */
     var shieldHp = 0
-    /** Fighters build a shield; giants and the Training Area's fixed targets don't. */
+    /** Fighters build a shield; giants and the Training Area's fixed targets don't. (Nobody does in Boss Mode: see `World.shields`.) */
     val canShield get() = scale == 1f && !rooted
+    /** The most shield this fighter can hold right now: a share of its full health, bigger during a hyper. */
+    val shieldMax get() = ((maxHp - hyperHpBonus) * io.github.projectwip.data.Balance.SHIELD_FRACTION *
+        (if (hyperActive) 1f + io.github.projectwip.data.Balance.HYPER_SHIELD_BONUS else 1f)).toInt()
+    /** The hyper: 0..1 charged, and the seconds left of one that is running. */
+    var hyperCharge = 0f
+    var hyperTime = 0f
+    /** Health a running hyper added to [maxHp], taken off again when it ends. */
+    var hyperHpBonus = 0
     var sinceDamaged = 99f
     var sinceAttack = 99f
     /** While > 0 the fighter is visible even inside a thicket. */
@@ -102,25 +112,31 @@ class Fighter(
 
     val hpFraction get() = hp.toFloat() / maxHp
     val superReady get() = superCharge >= 1f
+    val hyperActive get() = hyperTime > 0f
+    val hyperReady get() = hyperCharge >= 1f && !hyperActive
     val isDashing get() = dashTime > 0f
 }
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, SEEKER }
 
 class Projectile(
     val ownerId: Int,
     val team: Int,
     var x: Float,
     var y: Float,
-    val vx: Float,
-    val vy: Float,
+    var vx: Float,
+    var vy: Float,
     val radius: Float,
     val damage: Int,
     var rangeLeft: Float,
     val pierce: Boolean,
     val isSuper: Boolean,
     val style: ShotStyle,
+    /** A seeker rocket: steers toward enemies, flies over walls, and hurts but never knocks out. */
+    val seeker: Boolean = false,
 ) {
+    /** Who a seeker is after (-1: whoever is nearest). */
+    var targetId = -1
     var prevX = x
     var prevY = y
     var alive = true
@@ -147,6 +163,9 @@ sealed interface GameEvent {
     data class CrateBroken(val tx: Int, val ty: Int) : GameEvent
     data class CellPicked(val fighterId: Int, val x: Float, val y: Float) : GameEvent
     data class SuperReady(val fighterId: Int) : GameEvent
+    data class HyperReady(val fighterId: Int) : GameEvent
+    /** A fighter switched its hyper on. */
+    data class Hyper(val fighterId: Int) : GameEvent
     data class Dash(val fighterId: Int) : GameEvent
     /** A marked patch of ground went off. */
     data class Blast(val x: Float, val y: Float, val radius: Float, val kind: HazardKind) : GameEvent

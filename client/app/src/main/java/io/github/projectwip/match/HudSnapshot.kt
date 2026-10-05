@@ -26,6 +26,9 @@ class HudSnapshot {
     var ammo = 0f
     var ammoMax = 3
     var superCharge = 0f
+    var hyperCharge = 0f
+    /** The share (0..1) of the player's running hyper still to go; 0 when none is running. */
+    var hyperLeft = 0f
     var autoTargetId = -1
     var matchesPlayed = 0
     var fps = 0
@@ -60,6 +63,8 @@ class HudSnapshot {
     val relation = IntArray(MAX)
     val names = arrayOfNulls<String>(MAX)
     val superReady = BooleanArray(MAX)
+    /** A hyper is running. */
+    val hyper = BooleanArray(MAX)
     val cells = IntArray(MAX)
 
     fun copyFrom(o: HudSnapshot) {
@@ -68,6 +73,7 @@ class HudSnapshot {
         phase = o.phase; phaseTime = o.phaseTime; countdownSeconds = o.countdownSeconds; timeLeft = o.timeLeft
         myScore = o.myScore; theirScore = o.theirScore; koTarget = o.koTarget; winningTeam = o.winningTeam; playerTeam = o.playerTeam
         playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; ammo = o.ammo; ammoMax = o.ammoMax; superCharge = o.superCharge
+        hyperCharge = o.hyperCharge; hyperLeft = o.hyperLeft
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
         bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
         freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
@@ -75,7 +81,7 @@ class HudSnapshot {
         n = o.n
         for (i in 0 until n) {
             ids[i] = o.ids[i]; sx[i] = o.sx[i]; sy[i] = o.sy[i]; visible[i] = o.visible[i]
-            hp[i] = o.hp[i]; maxHp[i] = o.maxHp[i]; shield[i] = o.shield[i]; relation[i] = o.relation[i]; names[i] = o.names[i]; superReady[i] = o.superReady[i]; cells[i] = o.cells[i]
+            hp[i] = o.hp[i]; maxHp[i] = o.maxHp[i]; shield[i] = o.shield[i]; relation[i] = o.relation[i]; names[i] = o.names[i]; superReady[i] = o.superReady[i]; hyper[i] = o.hyper[i]; cells[i] = o.cells[i]
         }
     }
 

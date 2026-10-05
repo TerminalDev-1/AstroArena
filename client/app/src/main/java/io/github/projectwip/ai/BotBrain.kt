@@ -256,6 +256,7 @@ class BotBrain(
         AttackShape.BURST -> 0.62f
         AttackShape.SPREAD -> 0.4f
         AttackShape.LANCE -> 0.78f
+        AttackShape.ROCKETS -> 0.6f
     }
 
     private fun chooseEngageGoal(t: Fighter) {
@@ -445,6 +446,9 @@ class BotBrain(
         val d = dist(t)
         val clear = arena.shotClear(me.x, me.y, t.x, t.y)
 
+        // ---- hyper: switched on as a fight starts
+        if (me.hyperReady && d <= me.def.attack.range * 1.2f) c.hyper = true
+
         // ---- super
         if (me.superReady) {
             if (superDelay < 0f) superDelay = (1f - profile.superSkill) * rng.nextFloat() * 2.5f
@@ -492,6 +496,8 @@ class BotBrain(
         return when (s.kind) {
             SuperKind.VOLLEY -> clear && d <= s.range * (if (smart) 0.7f else 1.1f)
             SuperKind.PIERCE -> clear && d <= s.range * 0.95f && (!smart || t.hp <= me.superDamage * 1.1f || lineHitsTwo(t))
+            // Seekers find their own way round walls; they can't finish anyone, so a smart bot spends them on the healthy.
+            SuperKind.SWARM -> d <= me.def.attack.range * 1.6f && (!smart || t.hp > me.superDamage)
             SuperKind.RAM -> d <= s.range * 0.85f && arena.walkClear(me.x, me.y, t.x, t.y, me.radius * 0.9f) &&
                 (!smart || t.hp <= me.superDamage * 1.3f || d < 2.5f)
         }

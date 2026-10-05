@@ -110,7 +110,7 @@ DROP_BUFF = 3
 MAX_OPEN_ALL = 10000
 
 # Every fighter and how many colourways it has (index 0 is the one it comes with). Keep in step with Balance.kt.
-FIGHTER_SKINS = {name: 3 for name in ("JUNO", "BRAKK", "MIRA", "KITO")}
+FIGHTER_SKINS = {name: 3 for name in ("JUNO", "BRAKK", "MIRA", "KITO", "VARUN")}
 STARTING_FIGHTER = "JUNO"
 
 

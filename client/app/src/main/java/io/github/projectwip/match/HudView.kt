@@ -80,7 +80,7 @@ class HudView(
         drawOverheads(c)
         drawFloaters(c, dt)
         drawHud(c, dt)
-        if (snap.phase != Phase.ENDED) controls.draw(c, snap.ammo, snap.ammoMax, snap.superCharge, snap.playerAlive && snap.phase == Phase.PLAYING, time)
+        if (snap.phase != Phase.ENDED) controls.draw(c, snap.ammo, snap.ammoMax, snap.superCharge, snap.hyperCharge, snap.hyperLeft, snap.playerAlive && snap.phase == Phase.PLAYING, time)
         drawCoach(c)
     }
 
@@ -109,7 +109,8 @@ class HudView(
                 outlined(c, s.cells[i].toString(), bx, by + dp(4.3f), Color.WHITE, dp(2.5f))
             }
             rect.set(x - bw / 2, y - bh, x + bw / 2, y)
-            fill.color = INK
+            // A running hyper turns the bar's rim violet.
+            fill.color = if (s.hyper[i]) Color.rgb(190, 96, 255) else INK
             c.drawRoundRect(rect.left - dp(2.5f), rect.top - dp(2.5f), rect.right + dp(2.5f), rect.bottom + dp(2.5f), bh, bh, fill)
             fill.color = Color.rgb(50, 30, 70)
             c.drawRoundRect(rect, bh / 2, bh / 2, fill)

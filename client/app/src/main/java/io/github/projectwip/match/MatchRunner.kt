@@ -67,6 +67,7 @@ class MatchRunner(
     private fun tick() {
         val p = match.player
         controls.superReady = p.superReady && p.alive
+        controls.hyperReady = p.hyperReady && p.alive
         controls.poll(input)
         if (input.pause) onPause()
 
@@ -83,6 +84,7 @@ class MatchRunner(
             setAim(input.superFire, input.superX, input.superY, p.def.superSpec.range, p.def.superSpec.speed)
             c.superAttack = true
         }
+        if (input.hyper && p.hyperReady) c.hyper = true
 
         val ammoBefore = p.ammo
         val tried = c.attack
@@ -171,7 +173,7 @@ class MatchRunner(
                 if (e.isSuper) sfx.play(Sound.SUPER, gain)
                 else sfx.play(when (f.def.attack.shape) {
                     AttackShape.BURST -> Sound.SHOOT_SPARK
-                    AttackShape.SPREAD -> Sound.SHOOT_HEAVY
+                    AttackShape.SPREAD, AttackShape.ROCKETS -> Sound.SHOOT_HEAVY
                     AttackShape.LANCE -> Sound.SHOOT_PRISM
                 }, gain, 0.95f + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
@@ -205,6 +207,14 @@ class MatchRunner(
                 sfx.play(Sound.SHOOT_HEAVY, near * 0.8f, 0.6f)
             }
             is GameEvent.SuperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY); sfx.buzz(25, 120) }
+            is GameEvent.HyperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY, 1f, 1.35f); sfx.buzz(25, 120) }
+            is GameEvent.Hyper -> {
+                val f = world.fighter(e.fighterId) ?: return
+                val gain = if (e.fighterId == pid) 1f else 0.5f / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
+                sfx.play(Sound.SUPER, gain, 0.6f)
+                sfx.play(Sound.SUPER_READY, gain, 0.7f)
+                if (e.fighterId == pid) sfx.buzz(70, 220)
+            }
             is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }
             is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop }
             is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)

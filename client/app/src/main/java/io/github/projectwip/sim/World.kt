@@ -179,11 +179,11 @@ class World(
         f.prevX = f.x
         f.prevY = f.y
         val c = f.control
-        if (f.eliminated) { c.attack = false; c.superAttack = false; return }
+        if (f.eliminated) { c.attack = false; c.superAttack = false; c.hyper = false; return }
         if (!f.alive) {
             f.respawnTimer -= dt
             if (f.respawnTimer <= 0f) respawn(f)
-            c.attack = false; c.superAttack = false
+            c.attack = false; c.superAttack = false; c.hyper = false
             return
         }
 
@@ -261,6 +261,14 @@ class World(
         }
         c.superAttack = false
 
+        // --- hyper
+        if (c.hyper && f.hyperReady) startHyper(f)
+        c.hyper = false
+        if (f.hyperActive) {
+            f.hyperTime -= dt
+            if (f.hyperTime <= 0f) endHyper(f)
+        }
+
         // --- reload (paused while a burst is still firing)
         if (f.ammo < f.def.ammoMax && f.pending.isEmpty()) {
             f.ammo = (f.ammo + dt / f.def.reloadSeconds).coerceAtMost(f.def.ammoMax.toFloat())
@@ -271,9 +279,10 @@ class World(
 
     /**
      * Healing. A fighter heals all the time: attacking doesn't stop it, and neither does being hit. Health comes
-     * back first; once it is full the same trickle builds a shield on top of it, up to [Balance.SHIELD_MAX]. Bots
-     * heal at half a player's pace. Giants and the Training Area's targets (anything without a shield) are the
-     * exception: they wait a few seconds after being hit, and a giant heals far more slowly.
+     * back first. Once it is full, and the fighter has gone a few seconds without being hit, a slower trickle
+     * builds a shield on top of it, up to [Fighter.shieldMax]; there are no shields in Boss Mode. Bots heal at
+     * half a player's pace. Giants and the Training Area's targets are the exception: they wait a few seconds
+     * after being hit before healing at all, and a giant heals far more slowly.
      */
     fun regenerate(f: Fighter, dt: Float) {
         if (!f.canShield && f.sinceDamaged <= Balance.REGEN_DELAY_SECONDS) return
@@ -284,7 +293,34 @@ class World(
         }
         val gain = (f.maxHp * rate * dt).toInt().coerceAtLeast(1)
         if (f.hp < f.maxHp) f.hp = (f.hp + gain).coerceAtMost(f.maxHp)
-        else if (f.canShield && f.shieldHp < Balance.SHIELD_MAX) f.shieldHp = (f.shieldHp + gain).coerceAtMost(Balance.SHIELD_MAX)
+        else if (shields(f) && f.sinceDamaged > Balance.REGEN_DELAY_SECONDS && f.shieldHp < f.shieldMax) {
+            f.shieldHp = (f.shieldHp + (gain * Balance.SHIELD_BUILD_RATE).toInt().coerceAtLeast(1)).coerceAtMost(f.shieldMax)
+        }
+    }
+
+    /** Whether [f] can hold a shield in this match: nobody can in Boss Mode. */
+    fun shields(f: Fighter) = f.canShield && !rules.boss
+
+    /** Switches a charged hyper on: more damage (see [Fighter.damageMultiplier]), more health and a bigger shield, for a few seconds. */
+    private fun startHyper(f: Fighter) {
+        val shieldBefore = f.shieldMax
+        f.hyperCharge = 0f
+        f.hyperTime = Balance.HYPER_SECONDS
+        f.hyperHpBonus = (f.maxHp * Balance.HYPER_HEALTH_BONUS).toInt()
+        f.maxHp += f.hyperHpBonus
+        f.hp += f.hyperHpBonus
+        // The shield grows by as much as its cap does, so the bonus is there at once.
+        if (shields(f)) f.shieldHp += f.shieldMax - shieldBefore
+        f.revealTimer = maxOf(f.revealTimer, 1.5f)
+        events += GameEvent.Hyper(f.id)
+    }
+
+    private fun endHyper(f: Fighter) {
+        f.hyperTime = 0f
+        f.maxHp -= f.hyperHpBonus
+        f.hyperHpBonus = 0
+        f.hp = f.hp.coerceAtMost(f.maxHp)
+        f.shieldHp = f.shieldHp.coerceAtMost(f.shieldMax)
     }
 
     /** Takes [amount] off a fighter: the shield goes first, then health. Returns how much landed. */
@@ -328,9 +364,10 @@ class World(
             AttackShape.BURST -> ShotStyle.SPARK
             AttackShape.SPREAD -> ShotStyle.PELLET
             AttackShape.LANCE -> ShotStyle.PRISM
+            AttackShape.ROCKETS -> ShotStyle.ROCKET
         }
         val baseAng = atan2(dy, dx)
-        val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
+        val n = if (a.shape == AttackShape.SPREAD || a.shape == AttackShape.ROCKETS) a.projectiles else 1
         val spread = Math.toRadians(a.spreadDegrees.toDouble()).toFloat()
         for (i in 0 until n) {
             val ang = if (n == 1) baseAng else baseAng - spread / 2 + spread * i / (n - 1)
@@ -350,6 +387,16 @@ class World(
                 }
             }
             SuperKind.PIERCE -> spawnProjectile(f, baseAng, s.speed, s.radius, f.superDamage, s.range, true, true, ShotStyle.LANCE)
+            SuperKind.SWARM -> {
+                // The rockets fan out and share the enemies in sight between them, nearest first.
+                val targets = fighters.filter { it.team != f.team && isVisibleTo(it, f.team) }.sortedBy { hypot(it.x - f.x, it.y - f.y) }
+                val spread = Math.toRadians(s.spreadDegrees.toDouble()).toFloat()
+                for (i in 0 until s.projectiles) {
+                    val ang = baseAng - spread / 2 + spread * i / (s.projectiles - 1)
+                    val p = spawnProjectile(f, ang, s.speed, s.radius, f.superDamage, s.range, false, true, ShotStyle.SEEKER, seeker = true)
+                    if (p != null && targets.isNotEmpty()) p.targetId = targets[i % targets.size].id
+                }
+            }
             SuperKind.RAM -> if (!f.rooted) {
                 f.dashTime = s.range / s.speed
                 f.dashDirX = dx
@@ -363,20 +410,47 @@ class World(
 
     private fun spawnProjectile(
         f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float,
-        pierce: Boolean, isSuper: Boolean, style: ShotStyle,
-    ) {
+        pierce: Boolean, isSuper: Boolean, style: ShotStyle, seeker: Boolean = false,
+    ): Projectile? {
         val dx = cos(ang)
         val dy = sin(ang)
         // Spawn slightly in front of the fighter, but never inside a wall.
         val off = f.radius * 0.6f
         val sx = f.x + dx * off
         val sy = f.y + dy * off
-        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style)
-        if (arena.tileAt(sx, sy).blocksShots) {
+        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, seeker)
+        if (!seeker && arena.tileAt(sx, sy).blocksShots) {
             events += GameEvent.WallHit(sx, sy, style)
-            return
+            return null
         }
         projectiles += p
+        return p
+    }
+
+    /** Turns a seeker rocket toward its target (or, without one it can see, the nearest enemy it can). */
+    private fun steer(p: Projectile, dt: Float) {
+        fun valid(f: Fighter) = f.team != p.team && f.id !in p.hit && isVisibleTo(f, p.team)
+        var t = fighter(p.targetId)?.takeIf { valid(it) }
+        if (t == null) {
+            var best = Float.MAX_VALUE
+            for (f in fighters) {
+                if (!valid(f)) continue
+                val d = hypot(f.x - p.x, f.y - p.y)
+                if (d < best) { best = d; t = f }
+            }
+            p.targetId = t?.id ?: -1
+        }
+        if (t == null) return
+        val speed = hypot(p.vx, p.vy)
+        val cur = atan2(p.vy, p.vx)
+        var diff = atan2(t.y - p.y, t.x - p.x) - cur
+        while (diff > Math.PI) diff -= (2 * Math.PI).toFloat()
+        while (diff < -Math.PI) diff += (2 * Math.PI).toFloat()
+        // It turns tighter the longer it has flown, so it closes in instead of circling.
+        val turn = (Balance.SEEKER_TURN + Balance.SEEKER_TURN_GAIN * p.age) * dt
+        val ang = cur + diff.coerceIn(-turn, turn)
+        p.vx = cos(ang) * speed
+        p.vy = sin(ang) * speed
     }
 
     private fun stepDash(f: Fighter, dt: Float) {
@@ -410,8 +484,9 @@ class World(
     // What a boss's script uses to act on the world.
     internal val rng get() = random
     internal fun announce(e: GameEvent) { events += e }
-    internal fun bossShot(f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float, pierce: Boolean, style: ShotStyle) =
+    internal fun bossShot(f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float, pierce: Boolean, style: ShotStyle) {
         spawnProjectile(f, ang, speed, radius, damage, range, pierce, true, style)
+    }
 
     internal fun startDash(f: Fighter, dx: Float, dy: Float) {
         val s = f.def.superSpec
@@ -446,6 +521,7 @@ class World(
             p.prevX = p.x
             p.prevY = p.y
             p.age += dt
+            if (p.seeker && phase == Phase.PLAYING) steer(p, dt)
             val speed = hypot(p.vx, p.vy)
             val total = speed * dt
             val sub = maxOf(1, (total / 0.15f).toInt() + 1)
@@ -455,7 +531,7 @@ class World(
                 p.x += sdx
                 p.y += sdy
                 p.rangeLeft -= total / sub
-                if (arena.tileAt(p.x, p.y).blocksShots) {
+                if (!p.seeker && arena.tileAt(p.x, p.y).blocksShots) {
                     p.alive = false
                     events += GameEvent.WallHit(p.x - sdx, p.y - sdy, p.style)
                     if (arena.tileAt(p.x, p.y) == Tile.CRATE) damageCrate(kotlin.math.floor(p.x).toInt(), kotlin.math.floor(p.y).toInt(), p.damage)
@@ -467,7 +543,7 @@ class World(
                     if ((f.x - p.x) * (f.x - p.x) + (f.y - p.y) * (f.y - p.y) < rr * rr) {
                         p.hit += f.id
                         val owner = fighter(p.ownerId)
-                        damage(f, owner, p.damage, p.isSuper, p.x, p.y)
+                        damage(f, owner, p.damage, p.isSuper, p.x, p.y, lethal = !p.seeker)
                         if (!p.pierce) { p.alive = false; break@loop }
                     }
                 }
@@ -479,8 +555,10 @@ class World(
 
     // ------------------------------------------------------------------ damage & respawn
 
-    private fun damage(target: Fighter, source: Fighter?, amount: Int, isSuper: Boolean, x: Float, y: Float) {
-        if (target.shield > 0f) {
+    /** [lethal] false: the hit can take the target down to its last point of health, but never knocks it out. */
+    private fun damage(target: Fighter, source: Fighter?, wanted: Int, isSuper: Boolean, x: Float, y: Float, lethal: Boolean = true) {
+        val amount = if (lethal) wanted else minOf(wanted, target.shieldHp + target.hp - 1)
+        if (target.shield > 0f || amount <= 0) {
             events += GameEvent.Blocked(x, y)
             return
         }
@@ -495,6 +573,10 @@ class World(
                 val before = source.superReady
                 source.superCharge = (source.superCharge + source.def.superChargePerHit).coerceAtMost(1f)
                 if (!before && source.superReady) events += GameEvent.SuperReady(source.id)
+                if (!source.hyperActive && source.hyperCharge < 1f) {
+                    source.hyperCharge = (source.hyperCharge + source.def.superChargePerHit * Balance.HYPER_CHARGE_RATE).coerceAtMost(1f)
+                    if (source.hyperReady) events += GameEvent.HyperReady(source.id)
+                }
             }
         }
         events += GameEvent.Hit(target.id, source?.id ?: -1, amount, x, y, isSuper)
@@ -509,7 +591,8 @@ class World(
         victim.pending.clear()
         victim.dashTime = 0f
         victim.shieldHp = 0
-        // The super charge is kept: whatever was charged is still there after the respawn.
+        if (victim.hyperActive) endHyper(victim)
+        // The super and hyper charges are kept: whatever was charged is still there after the respawn.
         events += GameEvent.Ko(killer?.id ?: -1, victim.id, victim.x, victim.y)
         killer?.let { it.kos++ }
         if (rules.freeForAll) {

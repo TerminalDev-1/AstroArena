@@ -548,6 +548,12 @@ class MatchRenderer(
                 setModel(x, 0.035f, z, r * 1.25f, 1f, r * 1.25f, time * 90f)
                 dashRing.draw()
             }
+            if (f.hyperActive) {
+                lit.v4("uTint", 0.75f, 0.38f, 1f, 0.95f)
+                val k = r * (1.5f + 0.08f * sin(time * 10f))
+                setModel(x, 0.04f, z, k, 1f, k, -time * 160f)
+                dashRing.draw()
+            }
         }
 
         // Auto-aim target marker
@@ -620,10 +626,12 @@ class MatchRenderer(
                         SuperKind.VOLLEY -> fan(s.range, s.spreadDegrees + 8f)
                         SuperKind.PIERCE -> beam(clip(a, px, pz, dx, dz, s.range), s.radius * 3.2f)
                         SuperKind.RAM -> beam(s.range, p.radius * 2.2f)
+                        // Seekers find their own targets: the fan only shows which way they set off.
+                        SuperKind.SWARM -> fan(4.5f, s.spreadDegrees)
                     }
                 } else {
                     val at = p.def.attack
-                    if (at.shape == AttackShape.SPREAD) fan(at.range, at.spreadDegrees + 8f)
+                    if (at.shape == AttackShape.SPREAD || at.shape == AttackShape.ROCKETS) fan(at.range, at.spreadDegrees + 8f)
                     else beam(clip(a, px, pz, dx, dz, at.range), if (at.shape == AttackShape.BURST) 0.55f else 0.34f)
                 }
             }
@@ -675,6 +683,15 @@ class MatchRenderer(
                     val big = pr.style == ShotStyle.LANCE
                     setModel(x, 0.75f, z, if (big) 0.85f else 0.42f, pr.radius * 0.9f, pr.radius * 0.9f, yaw); octa.draw()
                 }
+                ShotStyle.ROCKET, ShotStyle.SEEKER -> {
+                    // A stubby rocket: a body in the fighter's colour with a bright nose.
+                    val y = shotHeight(pr)
+                    val dx = cos(atan2(pr.vy, pr.vx)); val dz = sin(atan2(pr.vy, pr.vx))
+                    tint(skin.primary)
+                    setModel(x, y, z, pr.radius * 1.9f, pr.radius * 0.75f, pr.radius * 0.75f, yaw); octa.draw()
+                    tint(skin.secondary)
+                    setModel(x + dx * pr.radius * 1.1f, y, z + dz * pr.radius * 1.1f, pr.radius * 0.6f, pr.radius * 0.6f, pr.radius * 0.6f); sphere.draw()
+                }
             }
         }
         // What is about to land on the marked ground: a rocket dropping out of the sky, or a mine blinking where it lies.
@@ -698,6 +715,9 @@ class MatchRenderer(
         lit.f("uEmissive", 0f)
     }
 
+    /** How high a shot flies. Seekers climb as they leave, to clear the walls they fly over. */
+    private fun shotHeight(pr: io.github.projectwip.sim.Projectile) = if (pr.seeker) 0.72f + 1.1f * min(1f, pr.age * 3f) else 0.72f
+
     private fun tint(c: Long, a: Float = 1f) {
         val v = c.toInt()
         lit.v4("uTint", ((v shr 16) and 0xFF) / 255f, ((v shr 8) and 0xFF) / 255f, (v and 0xFF) / 255f, a)
@@ -709,7 +729,7 @@ class MatchRenderer(
             val owner = world.fighter(pr.ownerId) ?: continue
             val c = colorOf(pr.style, owner)
             val x = lerp(pr.prevX, pr.x, alpha); val z = lerp(pr.prevY, pr.y, alpha)
-            if (rng.nextFloat() < 0.9f) particles.spawn(x, 0.72f, z, 0f, 0.1f, 0f, 0.18f, pr.radius * 2.2f, c, 0.6f)
+            if (rng.nextFloat() < 0.9f) particles.spawn(x, shotHeight(pr), z, 0f, 0.1f, 0f, if (pr.seeker) 0.4f else 0.18f, pr.radius * 2.2f, c, 0.6f)
         }
         sprite.use()
         sprite.mat4("uViewProj", viewProj)
@@ -723,7 +743,7 @@ class MatchRenderer(
             val c = colorOf(pr.style, owner)
             val x = lerp(pr.prevX, pr.x, alpha); val z = lerp(pr.prevY, pr.y, alpha)
             val s = if (pr.style == ShotStyle.LANCE) 1.3f else pr.radius * 4.5f
-            sprites.add(x, 0.72f, z, s, r(c), g(c), b(c), 0.85f)
+            sprites.add(x, shotHeight(pr), z, s, r(c), g(c), b(c), 0.85f)
         }
         for (pk in world.pickups) sprites.add(pk.x, 0.6f + sin(time * 3f + pk.x) * 0.12f, pk.y, 0.9f, 1f, 0.85f, 0.3f, 0.6f)
         for (l in arena.lamps) sprites.add(l[0], l[1], l[2], 1.1f + 0.05f * sin(time * 3f + l[0]), 1f, 0.9f, 0.55f, 0.55f)
@@ -733,6 +753,14 @@ class MatchRenderer(
             repeat(1) {
                 val a = rng.nextFloat() * 6.28f
                 particles.spawn(p.x + cos(a) * 0.5f, 0.2f, p.y + sin(a) * 0.5f, 0f, 1.6f, 0f, 0.6f, 0.12f, 0xFFFFD640.toInt(), 0.9f)
+            }
+        }
+        // A running hyper: violet sparks streaming up off the fighter.
+        for (f in world.fighters) {
+            if (!f.hyperActive || !shown(f)) continue
+            repeat(2) {
+                val a = rng.nextFloat() * 6.28f
+                particles.spawn(f.x + cos(a) * 0.45f, 0.2f + rng.nextFloat() * 0.8f, f.y + sin(a) * 0.45f, 0f, 2.2f, 0f, 0.5f, 0.13f, 0xFFC060FF.toInt(), 0.9f)
             }
         }
         particles.emit(sprites, true)
@@ -748,6 +776,7 @@ class MatchRenderer(
         return when (style) {
             ShotStyle.VOLLEY -> 0xFFFFD640.toInt()
             ShotStyle.SPARK -> s.accent.toInt()
+            ShotStyle.ROCKET, ShotStyle.SEEKER -> 0xFFFF9A2E.toInt()
             else -> s.secondary.toInt()
         }
     }
@@ -813,6 +842,15 @@ class MatchRenderer(
                 }
             }
             is GameEvent.Dash -> shake = max(shake, 0.1f)
+            is GameEvent.Hyper -> world.fighter(e.fighterId)?.let { f ->
+                if (f === match.player) shake = max(shake, 0.12f)
+                particles.spawn(f.x, 0.8f, f.y, 0f, 0f, 0f, 0.35f, 3f, 0xFFC060FF.toInt(), 0.8f)
+                repeat(22) {
+                    val a = rng.nextFloat() * 6.28f
+                    val sp = 2f + rng.nextFloat() * 4f
+                    particles.spawn(f.x, 0.6f, f.y, cos(a) * sp, 2f + rng.nextFloat() * 4f, sin(a) * sp, 0.5f, 0.14f, 0xFFE0A0FF.toInt(), 0.9f)
+                }
+            }
             is GameEvent.Blast -> {
                 particles.spawn(e.x, 0.5f, e.y, 0f, 0f, 0f, 0.3f, e.radius * 2.6f, 0xFFFFFFFF.toInt(), 0.9f)
                 repeat((14 * e.radius).toInt()) {
@@ -882,6 +920,7 @@ class MatchRenderer(
         s.koTarget = w.rules.koTarget
         s.winningTeam = w.winningTeam; s.playerTeam = p.team
         s.playerAlive = p.alive; s.respawnTimer = p.respawnTimer; s.ammo = p.ammo; s.ammoMax = p.def.ammoMax; s.superCharge = p.superCharge
+        s.hyperCharge = p.hyperCharge; s.hyperLeft = p.hyperTime / io.github.projectwip.data.Balance.HYPER_SECONDS
         s.autoTargetId = runner.autoTarget?.id ?: -1
         s.matchesPlayed = matchesPlayed
         s.fps = fps
@@ -905,6 +944,7 @@ class MatchRenderer(
             s.relation[i] = if (f === p) 0 else if (f.team == p.team) 1 else 2
             s.names[i] = f.name
             s.superReady[i] = f.superReady
+            s.hyper[i] = f.hyperActive
             s.cells[i] = f.cells
         }
         hud.publish()
@@ -915,6 +955,7 @@ class MatchRenderer(
         FighterId.BRAKK -> 1.8f
         FighterId.MIRA -> 2.0f
         FighterId.KITO -> 1.9f
+        FighterId.VARUN -> 1.95f
     }
 
     override fun onDestroyed() {}

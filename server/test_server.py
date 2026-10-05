@@ -113,6 +113,9 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.upgrade_cost(3, 99), 105)  # the factor is capped at x3
         self.assertEqual(economy.shop_item("crate_l"), ({"type": "bolts", "amount": 3000}, 50))
         self.assertEqual(economy.shop_item("fighter_KITO"), ({"type": "fighter", "fighter": "KITO"}, 90))
+        self.assertEqual(economy.shop_item("fighter_VARUN"), ({"type": "fighter", "fighter": "VARUN"}, 160))
+        self.assertEqual(economy.SPARK_ROAD[-1], ("VARUN", 1600))
+        self.assertEqual(economy.shop_item("skin_VARUN_2"), ({"type": "skin", "fighter": "VARUN", "skin": 2}, 20))
         self.assertEqual(economy.shop_item("skin_MIRA_2"), ({"type": "skin", "fighter": "MIRA", "skin": 2}, 20))
         for missing in ("fighter_JUNO", "skin_MIRA_0", "skin_MIRA_3", "skin_NOBODY_1", "crate_xl", ""):
             self.assertIsNone(economy.shop_item(missing))

@@ -96,6 +96,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "fighters" -> Screen.Fighters()
                 "roster" -> { io.github.projectwip.ui.screens.rosterPreview = true; Screen.Fighters() }
                 "kito" -> Screen.Fighters(FighterId.KITO)
+                "varun" -> Screen.Fighters(FighterId.VARUN)
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road
                 "pass" -> Screen.Pass

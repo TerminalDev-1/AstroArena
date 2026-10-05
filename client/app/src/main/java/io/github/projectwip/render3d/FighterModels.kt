@@ -55,6 +55,7 @@ class FighterModels {
         models[FighterId.BRAKK] = buildBrakk()
         models[FighterId.MIRA] = buildMira()
         models[FighterId.KITO] = buildKito()
+        models[FighterId.VARUN] = buildVarun()
         bossModels[io.github.projectwip.data.BossKind.BARRAGE] = buildHailstorm()
         bossModels[io.github.projectwip.data.BossKind.SWEEPER] = buildLighthouse()
         bossModels[io.github.projectwip.data.BossKind.STAMPEDE] = buildRamrod()
@@ -218,6 +219,41 @@ class FighterModels {
         a.add(Bone.WEAPON, Slot.DARK) { at(0.02f, 0f, 0f) { sphere(0.09f, 8, 10) } }
         a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.11f, 0f) { capsule(0.08f, 0.14f) } }
         a.add(Bone.ARM, Slot.DARK) { at(0f, -0.28f, 0f) { sphere(0.085f, 8, 10) } }
+        return a.build(rig)
+    }
+
+    // ------------------------------------------------------------------ Varun — firefighter with a rocket rack
+
+    private fun buildVarun(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 1.06f, hipY = 0.42f, hipZ = 0.17f, shoulder = floatArrayOf(0.06f, 0.84f, 0.36f), shoulderL = floatArrayOf(0.02f, 0.86f, -0.34f))
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.PRIMARY) { at(0f, -0.15f, 0f) { capsule(0.12f, 0.16f) } }
+            a.add(bone, Slot.SECONDARY) { at(0f, -0.24f, 0f) { cylinder(0.13f, 0.05f, 10) } }
+            a.add(bone, Slot.DARK) { at(0.05f, -0.37f, 0f) { roundedBox(0.34f, 0.14f, 0.22f, 0.06f) } }
+        }
+        // A long turnout coat with two bright bands, and a collar turned up.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.68f, 0f) { roundedBox(0.54f, 0.6f, 0.64f, 0.2f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { for (y in listOf(0.5f, 0.76f)) at(0f, y, 0f) { roundedBox(0.57f, 0.07f, 0.67f, 0.03f) } }
+        a.add(Bone.BODY, Slot.DARK) { at(0f, 0.96f, 0f) { torus(0.2f, 0.07f) } }
+        // The air tank on his back, with its valve.
+        a.add(Bone.BODY, Slot.METAL) { at(-0.36f, 0.72f, 0f) { capsule(0.13f, 0.26f) } }
+        a.add(Bone.BODY, Slot.ACCENT, emissive = true) { at(-0.36f, 1.0f, 0f) { sphere(0.06f, 6, 8) } }
+        // Head: a helmet with a wide brim swept down at the back, a crest along the top and a badge on the front.
+        a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.2f, 0f) { sphere(0.32f) } }
+        a.add(Bone.HEAD, Slot.DARK, outline = false) { at(0.29f, 0.1f, 0f) { roundedBox(0.08f, 0.06f, 0.3f, 0.025f) } }
+        a.add(Bone.HEAD, Slot.WHITE, outline = false) { for (z in listOf(0.11f, -0.11f)) at(0.31f, 0.23f, z) { sphere(0.04f, 6, 8) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.02f, 0.3f, 0f) { ellipsoid(0.37f, 0.33f, 0.37f, 8, 16, 0f, 0.5f) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.06f, 0.3f, 0f) { rotate(-10f, 0f, 0f, 1f); cylinder(0.5f, 0.04f, 18) } }
+        a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.04f, 0.58f, 0f) { roundedBox(0.56f, 0.12f, 0.08f, 0.03f) } }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.33f, 0.42f, 0f) { roundedBox(0.05f, 0.14f, 0.14f, 0.03f) } }
+        // The rocket rack on his shoulder: three tubes side by side, a warhead showing in each.
+        a.add(Bone.WEAPON, Slot.METAL) { for (z in listOf(-0.14f, 0f, 0.14f)) at(0.3f, 0.04f, z) { alongX { cylinder(0.075f, 0.62f, 10) } } }
+        a.add(Bone.WEAPON, Slot.DARK) { for (x in listOf(0.12f, 0.46f)) at(x, 0.04f, 0f) { roundedBox(0.08f, 0.2f, 0.48f, 0.03f) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { for (z in listOf(-0.14f, 0f, 0.14f)) at(0.63f, 0.04f, z) { sphere(0.065f, 6, 8) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.04f, -0.08f, 0f) { sphere(0.1f, 8, 10) } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.12f, 0f) { capsule(0.1f, 0.14f) } }
+        a.add(Bone.ARM, Slot.DARK) { at(0f, -0.31f, 0f) { sphere(0.1f, 8, 10) } }
         return a.build(rig)
     }
 

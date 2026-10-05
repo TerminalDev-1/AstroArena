@@ -217,6 +217,7 @@ class ProgressionTest {
             if (c.aiming) { c.aimX = hands.nextFloat() - 0.5f; c.aimY = hands.nextFloat() - 0.5f }
             c.attack = hands.nextInt(9) == 0
             c.superAttack = hands.nextInt(40) == 0
+            c.hyper = hands.nextInt(50) == 0
             match.step(io.github.projectwip.sim.Match.STEP)
             match.world.events.clear()
             t++
@@ -226,7 +227,7 @@ class ProgressionTest {
 
     @Test fun theRefereeReplaysAMatchExactly() {
         for ((mode, seed) in listOf(GameMode.LAST_SPARK to 11L, GameMode.KNOCKOUT_RUSH to 12L, GameMode.BOSS to 13L, GameMode.LAST_SPARK to 14L)) {
-            val config = io.github.projectwip.sim.MatchConfig(FighterId.KITO, 6, 0, "Me", BotDifficulty.HARD, mode = mode, seed = seed, botNames = listOf("A", "B", "C"))
+            val config = io.github.projectwip.sim.MatchConfig(if (seed % 2 == 0L) FighterId.VARUN else FighterId.KITO, 6, 0, "Me", BotDifficulty.HARD, mode = mode, seed = seed, botNames = listOf("A", "B", "C"))
             val live = played(config, 60 * 200, script = seed * 31)
             val verdict = io.github.projectwip.sim.Referee.judge(config, live.inputs.toBytes())
             assertEquals("$mode: same number of ticks", live.inputs.ticks, verdict.ticks)
@@ -297,6 +298,9 @@ class ProgressionTest {
         assertNotNull(Balance.unlockPrismPrice(FighterId.KITO))
         // Fighters are unlocked on the Spark Road; the Cup Track pays Credits towards it instead of handing one out.
         assertTrue(io.github.projectwip.data.SparkRoad.steps.any { it.fighter == FighterId.KITO })
+        val varun = Balance.fighter(FighterId.VARUN)
+        assertEquals("three rockets a shot, eight in the super", 3 to 8, varun.attack.projectiles to varun.superSpec.projectiles)
+        assertEquals("the rarest fighter is the last one on the road", FighterId.VARUN, io.github.projectwip.data.SparkRoad.steps.last().fighter)
         assertTrue(CupTrack.milestones.none { it.reward is Reward.UnlockFighter })
         assertEquals(io.github.projectwip.data.SparkRoad.steps.first(), io.github.projectwip.data.SparkRoad.next(SaveData()))
         // Thousands of health, hundreds to a thousand-odd per hit.

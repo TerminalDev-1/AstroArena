@@ -14,7 +14,7 @@ import java.io.EOFException
  * device's word for the result.
  *
  * The format is a run-length list of records, each 19 bytes, big-endian:
- * ticks (2 bytes, unsigned) · flags (1: aiming, 2: attack, 4: super) · moveX · moveY · aimX · aimY (4-byte floats).
+ * ticks (2 bytes, unsigned) · flags (1: aiming, 2: attack, 4: super, 8: hyper) · moveX · moveY · aimX · aimY (4-byte floats).
  * Floats are stored bit for bit, so the replay gets exactly the numbers the match did.
  */
 class InputLog {
@@ -33,7 +33,8 @@ class InputLog {
 
     /** Notes what [c] holds for the tick that is about to run. */
     fun record(c: Control) {
-        val f = (if (c.aiming) AIMING else 0) or (if (c.attack) ATTACK else 0) or (if (c.superAttack) SUPER else 0)
+        val f = (if (c.aiming) AIMING else 0) or (if (c.attack) ATTACK else 0) or (if (c.superAttack) SUPER else 0) or
+            (if (c.hyper) HYPER else 0)
         val mx = c.moveX.toRawBits()
         val my = c.moveY.toRawBits()
         val ax = c.aimX.toRawBits()
@@ -65,6 +66,7 @@ class InputLog {
         private const val AIMING = 1
         private const val ATTACK = 2
         private const val SUPER = 4
+        private const val HYPER = 8
         private const val MAX_RUN = 65535
 
         /**
@@ -87,6 +89,7 @@ class InputLog {
                         control.aiming = f and AIMING != 0
                         control.attack = f and ATTACK != 0
                         control.superAttack = f and SUPER != 0
+                        control.hyper = f and HYPER != 0
                         if (!tick()) return false
                     }
                 }

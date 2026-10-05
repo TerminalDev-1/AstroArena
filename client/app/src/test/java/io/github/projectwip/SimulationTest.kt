@@ -350,19 +350,115 @@ class SimulationTest {
     }
 
     @Test fun aShieldBuildsOnTopOfFullHealth() {
-        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
-        val boss = m.world.fighters.first { it.scale > 1f }
-        val me = m.world.fighters.first { it.scale == 1f }
-        me.hp = me.maxHp - 1; me.sinceDamaged = 60f; me.sinceAttack = 60f
-        boss.sinceDamaged = 60f; boss.sinceAttack = 60f
+        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 4L))
+        val me = m.player
+        me.hp = me.maxHp - 1; me.sinceDamaged = 60f
         m.world.regenerate(me, 1f)
         assertEquals("health is topped up before any shield", me.maxHp to 0, me.hp to me.shieldHp)
+        me.sinceDamaged = 1f
+        m.world.regenerate(me, 1f)
+        assertEquals("no shield builds while the fighter is being hit", 0, me.shieldHp)
+        me.sinceDamaged = 60f
         m.world.regenerate(me, 1f)
         assertTrue("then the shield starts", me.shieldHp > 0)
-        repeat(200) { m.world.regenerate(me, 1f); m.world.regenerate(boss, 1f) }
-        assertEquals("up to its cap", io.github.projectwip.data.Balance.SHIELD_MAX, me.shieldHp)
+        repeat(200) { m.world.regenerate(me, 1f) }
+        assertEquals("up to its cap, a share of full health", (me.maxHp * Balance.SHIELD_FRACTION).toInt(), me.shieldHp)
+        assertTrue("which is well short of a second health bar", me.shieldHp < me.maxHp / 2)
         assertEquals(me.maxHp, me.hp)
-        assertEquals("giants have none", 0, boss.shieldHp)
+        // Boss Mode has no shields at all: not the boss, and not the player either.
+        val b = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
+        for (f in b.world.fighters) {
+            f.sinceDamaged = 60f
+            repeat(50) { b.world.regenerate(f, 1f) }
+            assertEquals("${f.name} has no shield in Boss Mode", 0, f.shieldHp)
+        }
+    }
+
+    /** Two fighters past the countdown: Varun, and a target standing where a wall blocks every straight shot. */
+    private fun varunBehindAWall(): Triple<World, Fighter, Fighter> {
+        val a = Arenas.staticCanyon()
+        val varun = Fighter(0, Balance.fighter(FighterId.VARUN), 1, 0, 0, "V", true)
+        val target = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "T", true)
+        val w = World(a, listOf(varun, target), io.github.projectwip.sim.MatchRules.lastSpark())
+        repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
+        // Find two open spots a few tiles apart with something solid between them.
+        search@ for (y in 3 until a.height - 3) for (x in 3 until a.width - 9) {
+            val x0 = x + 0.5f; val y0 = y + 0.5f; val x1 = x + 6.5f
+            if (a.circleBlocked(x0, y0, 0.5f) || a.circleBlocked(x1, y0, 0.5f) || a.shotClear(x0, y0, x1, y0)) continue
+            if (a.inThicket(x0, y0) || a.inThicket(x1, y0)) continue
+            varun.x = x0; varun.y = y0; target.x = x1; target.y = y0
+            break@search
+        }
+        assertFalse("a wall stands between them", a.shotClear(varun.x, varun.y, target.x, target.y))
+        return Triple(w, varun, target)
+    }
+
+    @Test fun varunFiresThreeRockets() {
+        val (w, varun, target) = varunBehindAWall()
+        varun.control.aimX = -(target.x - varun.x); varun.control.aimY = 0f; varun.control.attack = true
+        w.step(Match.STEP)
+        assertEquals(3, w.projectiles.size)
+        assertTrue(w.projectiles.all { it.style == io.github.projectwip.sim.ShotStyle.ROCKET && !it.seeker })
+    }
+
+    @Test fun varunsSeekersCrossWallsAndNeverKnockOut() {
+        val (w, varun, target) = varunBehindAWall()
+        // Fired straight away from the target: the rockets have to turn round and come through the wall.
+        varun.superCharge = 1f
+        varun.control.aimX = -(target.x - varun.x); varun.control.aimY = 0f; varun.control.superAttack = true
+        w.step(Match.STEP)
+        assertEquals("eight rockets", 8, w.projectiles.size)
+        assertTrue(w.projectiles.all { it.seeker && it.targetId == target.id })
+        var t = 0f
+        while (w.projectiles.isNotEmpty() && t < 6f) { w.step(Match.STEP); target.sinceDamaged = 0f; t += Match.STEP }
+        assertTrue("every rocket found the target through the wall", w.projectiles.isEmpty() && t < 5f)
+        assertTrue("massive damage: ${varun.damageDealt}", varun.damageDealt >= target.maxHp - 1 || varun.damageDealt >= 8 * varun.superDamage * 9 / 10)
+        assertTrue("but the target is left standing", target.alive && target.hp >= 1)
+        // Even a target on its last legs survives a whole salvo.
+        target.hp = 5; target.shieldHp = 0
+        varun.superCharge = 1f; varun.control.superAttack = true
+        t = 0f
+        do { w.step(Match.STEP); t += Match.STEP } while (w.projectiles.isNotEmpty() && t < 6f)
+        assertTrue(target.alive)
+        assertEquals(1, target.hp)
+        assertEquals(0, varun.kos)
+    }
+
+    @Test fun aHyperBuffsDamageHealthAndShieldForEightSeconds() {
+        val (w, varun, _) = varunBehindAWall()
+        val hp = varun.maxHp; val dmg = varun.attackDamage
+        varun.hp = hp; varun.shieldHp = varun.shieldMax
+        val shield = varun.shieldHp
+        varun.control.hyper = true
+        w.step(Match.STEP)
+        assertFalse("nothing happens until it is charged", varun.hyperActive)
+        varun.hyperCharge = 1f
+        varun.control.hyper = true
+        w.step(Match.STEP)
+        assertTrue(varun.hyperActive)
+        assertEquals("a quarter more health", hp + hp / 4, varun.maxHp)
+        assertEquals("which it has at once", varun.maxHp, varun.hp)
+        assertEquals("a quarter more damage", dmg * 1.25f, varun.attackDamage.toFloat(), 1f)
+        assertEquals("a quarter more shield", shield * 1.25f, varun.shieldHp.toFloat(), 2f)
+        assertEquals("and the charge is spent", 0f, varun.hyperCharge, 0f)
+        var t = 0f
+        while (varun.hyperActive && t < 20f) { w.step(Match.STEP); t += Match.STEP }
+        assertEquals("it lasts eight seconds", Balance.HYPER_SECONDS, t, 0.1f)
+        assertEquals("then everything is as it was", Triple(hp, hp, dmg), Triple(varun.maxHp, varun.hp, varun.attackDamage))
+        assertTrue(varun.shieldHp <= varun.shieldMax)
+    }
+
+    @Test fun theHyperChargesFromHitsAndBotsUseIt() {
+        val m = Match(MatchConfig(FighterId.VARUN, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 21L))
+        var hypers = 0
+        var t = 0f
+        while (m.world.phase != Phase.ENDED && t < 200f) {
+            m.step(Match.STEP); t += Match.STEP
+            hypers += m.world.events.count { it is io.github.projectwip.sim.GameEvent.Hyper }
+            m.world.events.clear()
+        }
+        println("hypers used in one Knockout Rush: $hypers")
+        assertTrue("bots charge and use their hyper", hypers > 0)
     }
 
     /** Difficulty must come from behaviour: Elite bots should beat Easy bots with identical stats. */

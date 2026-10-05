@@ -13,9 +13,10 @@ data class StatLine(val base: Int, val perLevel: Int) {
     fun at(level: Int): Int = base + perLevel * (level.coerceAtLeast(1) - 1)
 }
 
-enum class FighterId { JUNO, BRAKK, MIRA, KITO }
+enum class FighterId { JUNO, BRAKK, MIRA, KITO, VARUN }
 
-enum class AttackShape { BURST, SPREAD, LANCE }
+/** [ROCKETS] is a [SPREAD] of rockets: the same fan, slower and heavier. */
+enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
 enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
@@ -33,7 +34,8 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
     ULTRA("Ultra", 0xFF29F0FF, 2600),
 }
 
-enum class SuperKind { VOLLEY, RAM, PIERCE }
+/** [SWARM] is a salvo of seeker rockets: they steer toward enemies, fly over walls, and hurt but never knock out. */
+enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
 data class AttackSpec(
@@ -131,14 +133,30 @@ object Balance {
     const val MATCH_SECONDS = 150f
     const val RESPAWN_SECONDS = 3f
     const val SPAWN_SHIELD_SECONDS = 2f
-    /** The most shield a fighter can build up on top of full health. Damage comes off the shield first. */
-    const val SHIELD_MAX = 6300
+    /** The most shield a fighter can build up on top of full health, as a share of that health. Damage comes off the shield first. */
+    const val SHIELD_FRACTION = 0.25f
+    /** A shield builds at this share of the pace health comes back, and only once the fighter has gone [REGEN_DELAY_SECONDS] without being hit. */
+    const val SHIELD_BUILD_RATE = 0.5f
     const val REGEN_DELAY_SECONDS = 3f
     const val REGEN_FRACTION_PER_SECOND = 0.12f
     /** Bots heal (and shield) at half the pace a player does. The one place a bot's numbers differ from a player's. */
     const val BOT_REGEN_FRACTION_PER_SECOND = 0.06f
     /** A giant heals too, but far more slowly: this share of its (much larger) health a second. */
     const val GIANT_REGEN_FRACTION_PER_SECOND = 0.005f
+
+    // ---- Hyper ----
+    // Every fighter's third ability. It charges as main-attack hits land (more slowly than the super), and for a
+    // few seconds makes the fighter hit harder, with more health and a bigger shield.
+    const val HYPER_SECONDS = 8f
+    const val HYPER_DAMAGE_BONUS = 0.25f
+    const val HYPER_HEALTH_BONUS = 0.25f
+    const val HYPER_SHIELD_BONUS = 0.25f
+    /** A main-attack hit charges the hyper this much as fast as it charges the super. */
+    const val HYPER_CHARGE_RATE = 0.4f
+
+    /** Seeker rockets (a [SuperKind.SWARM]): how fast they can turn, in radians a second, and how much faster for every second in the air. */
+    const val SEEKER_TURN = 4f
+    const val SEEKER_TURN_GAIN = 6f
 
     // ---- Starting wallet ----
     const val STARTING_BOLTS = 60
@@ -264,6 +282,30 @@ object Balance {
                 Skin("Nightfall", 0xFF1F7A8C, 0xFFFF3D7F, 0xFF9BFFF0, 0),
                 Skin("Ember", 0xFFB83227, 0xFFFFC145, 0xFFFFE9A8, 20),
                 Skin("Frostbite", 0xFFE6F1FF, 0xFF3A86FF, 0xFFB5F2FF, 20),
+            ),
+        ),
+        FighterDef(
+            id = FighterId.VARUN,
+            rarity = Rarity.LEGENDARY,
+            name = "Varun",
+            title = "Rocket Firefighter",
+            role = "Artillery",
+            lore = "An Indian firefighter who was captured and told to work for the people of the Sparks. He has never left since. Nobody knows why.",
+            attackName = "Triple Rocket",
+            health = StatLine(4400, 220),
+            attackDamage = StatLine(420, 21),
+            superDamage = StatLine(900, 45),
+            moveSpeed = 3.55f,
+            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 3, spreadDegrees = 16f, range = 7.2f, speed = 13f, radius = 0.2f, burstInterval = 0f),
+            superSpec = SuperSpec(SuperKind.SWARM, "Seeker Swarm", "Launches 8 seeker rockets that fly over walls and hunt enemies down. They hit hard, but never land the knockout.", projectiles = 8, spreadDegrees = 150f, range = 26f, speed = 10f, radius = 0.22f),
+            ammoMax = 3,
+            reloadSeconds = 1.5f,
+            superChargePerHit = 0.07f,
+            radius = 0.44f,
+            skins = listOf(
+                Skin("Fire Engine", 0xFFD9342B, 0xFFFFC72C, 0xFFFFF1C2, 0),
+                Skin("Monsoon", 0xFF1F6FB5, 0xFF2ED8A3, 0xFFE6F7FF, 20),
+                Skin("Marigold", 0xFFFF9F1C, 0xFF7B2CBF, 0xFFFFF3B0, 20),
             ),
         ),
     )
