@@ -348,7 +348,8 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty?, onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
                 PlainText(mode.tagline, Type.Small, maxLines = 1)
-                if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                if (mode == GameMode.DUEL) PlainText("Against a real player", Type.Small, color = Palette.Positive)
+                else if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
                     PlainText("Bots: ", Type.Small)
                     PlainText(d.label, Type.Label, color = difficultyColor(d))
                 }

@@ -445,7 +445,7 @@ def make_handler(game: Game, quiet: bool = False):
 
 def serve(
     directory: str, host: str = "0.0.0.0", port: int = 8765, db_path: str | None = None, quiet: bool = False,
-    referee: Referee | None | bool = True, sparring: bool = False,
+    referee: Referee | None | bool = True,
 ) -> ThreadingHTTPServer:
     """Builds the server (call .serve_forever() on the result). `referee`: True uses referee/referee.jar next to
     the config files, None or False runs without one, or pass a Referee."""
@@ -459,7 +459,7 @@ def serve(
     httpd.duel = None  # type: ignore[attr-defined]
     try:
         from .duel import DuelLobby
-        httpd.duel = DuelLobby(game, host, httpd.server_address[1] + 1, quiet, sparring).start()  # type: ignore[attr-defined]
+        httpd.duel = DuelLobby(game, host, httpd.server_address[1] + 1, quiet).start()  # type: ignore[attr-defined]
     except OSError:
         pass
     return httpd

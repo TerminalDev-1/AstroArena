@@ -81,7 +81,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - 1v1 (`GameMode.DUEL`) is two real players, each on their own device. Both run the same simulation from the same
   seed and only exchange inputs (`net/DuelLink.kt`, lockstep in `MatchRunner`); the server's lobby (`astro/duel.py`,
   the game port + 1) pairs them and passes the frames. Nothing is earned in it yet, and it is not refereed.
-  `python run.py --sparring` pairs a lone player with a stand-still dummy, for testing with one device.
+  A player waits for another real one for as long as it takes: there is no stand-in opponent, by the user's decision.
+  Every 30 ticks the devices compare a checksum of the match and call it off (a draw) if they disagree.
 - The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
   is asked for a name before their account is made (`NameScreen`).
 - A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`; a new fighter

@@ -537,7 +537,13 @@ class SimulationTest {
             a.step(Match.STEP); b.step(Match.STEP)
             a.world.events.clear(); b.world.events.clear()
             t++
+            if (t % 30 == 0) assertEquals("the checksums the devices would exchange agree at tick $t", a.world.checksum(), b.world.checksum())
         }
+        // The checksum notices the smallest disagreement.
+        val before = a.world.checksum()
+        a.world.fighters[0].hp -= 1
+        assertTrue(before != a.world.checksum())
+        a.world.fighters[0].hp += 1
         fun state(m: Match) = m.world.fighters.map { listOf(it.x, it.y, it.hp, it.shieldHp, it.kos, it.superCharge, it.hyperCharge) } + listOf(m.world.score.toList(), listOf(m.world.phase, m.world.winningTeam))
         assertEquals("after $t ticks the two devices agree on everything", state(a), state(b))
         assertTrue("and something happened", a.world.fighters.sumOf { it.damageDealt } > 0)
@@ -545,6 +551,10 @@ class SimulationTest {
         val c = Match(MatchConfig(FighterId.JUNO, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L, duel = io.github.projectwip.sim.DuelSetup(1, FighterId.JUNO, 1, 0, "B")))
         c.world.forfeit(c.opponent!!.team)
         assertEquals(io.github.projectwip.data.MatchOutcome.VICTORY, c.report().outcome)
+        // A match the devices disagree about is called off: a draw.
+        val e = Match(MatchConfig(FighterId.JUNO, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L, duel = io.github.projectwip.sim.DuelSetup(0, FighterId.JUNO, 1, 0, "B")))
+        e.world.abandon()
+        assertEquals(io.github.projectwip.data.MatchOutcome.DRAW, e.report().outcome)
         // Offline, a 1v1 is practice against one bot.
         val d = Match(MatchConfig(FighterId.JUNO, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L))
         assertEquals(1, d.brains.size)

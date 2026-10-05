@@ -6,7 +6,7 @@ player did. This module is the meeting point. It listens on its own TCP port (th
 
   * a device connects and says who it is:       'H' + text {token, version, fighter, skin}
   * when two are waiting, each is told to start:  'S' + text {seed, side, level, opponent: {name, fighter, level, skin}}
-  * from then on every input frame one sends ('I' + 17 bytes) is passed to the other, untouched
+  * from then on every input frame one sends ('I' + 17 bytes) is passed to the other, untouched (and so is 'C' + 8)
   * when one leaves, the other is told:           'X'
   * a device that can't play is told why:         'E' + text
 
@@ -18,8 +18,10 @@ Nothing is earned in a 1v1 yet. This is the first mode against real players and 
 network; the server doesn't referee these matches, and a device that sent false inputs would only put the two out
 of step.
 
-For testing with one device there is a sparring partner (`python run.py --sparring`): a player who has waited five
-seconds without anyone joining is paired with a dummy that stands still, so the whole path can be played alone.
+A player who joins waits for another real player, for as long as that takes. There is no stand-in opponent.
+
+Every so often each device also sends a check ('C' + 8 bytes: a tick and a number worked out from where everything
+is on that tick). It is passed on like an input; the devices compare, and call the match off if they disagree.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ import threading
 from . import rules
 
 FRAME_BYTES = 17  # flags (1) + moveX, moveY, aimX, aimY (4 floats)
+CHECK_BYTES = 8   # tick (int) + the number the device worked out for that tick (int)
 
 
 class _Seat:
@@ -43,7 +46,6 @@ class _Seat:
         self.sock = sock
         self.name, self.fighter, self.level, self.skin = name, fighter, level, skin
         self.peer: _Seat | None = None
-        self.sparring = False  # paired with the lobby's own stand-still dummy
         self._write = threading.Lock()
 
     def send(self, data: bytes) -> bool:
@@ -80,10 +82,9 @@ class DuelLobby(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, game, host: str, port: int, quiet: bool = False, sparring: bool = False):
+    def __init__(self, game, host: str, port: int, quiet: bool = False):
         self.game = game
         self.quiet = quiet
-        self.sparring = sparring
         self._lock = threading.Lock()
         self._waiting: _Seat | None = None
         self._random = random.SystemRandom()
@@ -122,8 +123,6 @@ class DuelLobby(socketserver.ThreadingTCPServer):
             if other is None:
                 self._waiting = me
                 self.log(f"{me.name} ({me.fighter}) is waiting for an opponent")
-                if self.sparring:
-                    threading.Timer(5.0, self.spar, [me]).start()
                 return
             self._waiting = None
             other.peer, me.peer = me, other
@@ -131,17 +130,6 @@ class DuelLobby(socketserver.ThreadingTCPServer):
         self.log(f"{other.name} ({other.fighter}) v {me.name} ({me.fighter})")
         for side, (seat, opponent) in enumerate(((other, me), (me, other))):
             seat.send(_text(b"S", {"seed": seed, "side": side, "level": seat.level, "opponent": opponent.describe()}))
-
-    def spar(self, me: _Seat) -> None:
-        """Nobody came: [me] gets the stand-still dummy. Every frame they send is answered with an idle one."""
-        with self._lock:
-            if self._waiting is not me:
-                return
-            self._waiting = None
-            me.sparring = True
-        self.log(f"{me.name} ({me.fighter}) v the sparring dummy")
-        dummy = {"name": "Sparring Dummy", "fighter": rules.STARTING_FIGHTER, "level": 1, "skin": 0}
-        me.send(_text(b"S", {"seed": self._random.getrandbits(62), "side": 0, "level": me.level, "opponent": dummy}))
 
     def leave(self, me: _Seat) -> None:
         with self._lock:
@@ -181,15 +169,13 @@ class _Handler(socketserver.BaseRequestHandler):
             # one it sends nothing, so this read is also how a cancelled search is noticed.)
             while True:
                 kind = _read(sock, 1)
-                if kind != b"I":
+                if kind not in (b"I", b"C"):
                     break
-                frame = _read(sock, FRAME_BYTES)
+                frame = _read(sock, FRAME_BYTES if kind == b"I" else CHECK_BYTES)
                 if frame is None:
                     break
                 peer = me.peer
                 if peer is not None:
-                    peer.send(b"I" + frame)
-                elif me.sparring:
-                    me.send(b"I" + bytes(FRAME_BYTES))
+                    peer.send(kind + frame)
         finally:
             lobby.leave(me)

@@ -349,6 +349,16 @@ class Api(unittest.TestCase):
         frame = b"I" + bytes(range(17))
         a.sendall(frame)
         self.assertEqual(b.recv(18), frame)
+        # So is a check, either way.
+        check = b"C" + bytes(range(8))
+        b.sendall(check)
+        self.assertEqual(a.recv(9), check)
+        # A third player waits: nobody stands in for a real opponent, however long it takes.
+        c = join(self.player("Cy"))
+        c.settimeout(1.5)
+        with self.assertRaises(socket.timeout):
+            c.recv(1)
+        c.close()
         # When one hangs up, the other is told.
         a.close()
         self.assertEqual(b.recv(1), b"X")

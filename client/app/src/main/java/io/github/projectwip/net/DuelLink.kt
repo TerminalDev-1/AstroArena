@@ -46,6 +46,12 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
     @Volatile var remoteLeft = false
         private set
 
+    /** The two devices disagree about the match: something made them compute it differently. It can't go on. */
+    @Volatile var outOfStep = false
+        private set
+    private val myChecks = HashMap<Int, Int>()
+    private val theirChecks = HashMap<Int, Int>()
+
     /** Why the lobby turned this player away, if it did. */
     @Volatile var error: String? = null
         private set
@@ -82,9 +88,18 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
     private fun listen(input: DataInputStream) {
         try {
             while (true) {
-                if (input.readUnsignedByte().toChar() != 'I') break
-                val f = Frame(input.readUnsignedByte(), input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat())
-                synchronized(lock) { remote += f }
+                when (input.readUnsignedByte().toChar()) {
+                    'I' -> {
+                        val f = Frame(input.readUnsignedByte(), input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat())
+                        synchronized(lock) { remote += f }
+                    }
+                    'C' -> {
+                        val tick = input.readInt()
+                        val sum = input.readInt()
+                        synchronized(lock) { theirChecks[tick] = sum; compare(tick) }
+                    }
+                    else -> break
+                }
             }
         } catch (_: IOException) {
         }
@@ -103,6 +118,29 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
         } catch (_: IOException) {
             remoteLeft = true
         }
+    }
+
+    /**
+     * Tells the other device what this one makes of the match after [tick] ticks ([sum], from `World.checksum`),
+     * and compares with what it said. Both run the same ticks, so they must agree; if they don't, [outOfStep].
+     */
+    fun check(tick: Int, sum: Int) {
+        synchronized(lock) { myChecks[tick] = sum; compare(tick) }
+        try {
+            val o = out ?: return
+            o.writeByte('C'.code); o.writeInt(tick); o.writeInt(sum)
+            o.flush()
+        } catch (_: IOException) {
+            remoteLeft = true
+        }
+    }
+
+    /** (Holding [lock].) Once both devices' numbers for [tick] are in, they are compared and forgotten. */
+    private fun compare(tick: Int) {
+        val mine = myChecks[tick] ?: return
+        val theirs = theirChecks[tick] ?: return
+        if (mine != theirs) outOfStep = true
+        myChecks.remove(tick); theirChecks.remove(tick)
     }
 
     /** How many of this player's frames have been recorded: the next one is for tick [DELAY] + this. */
@@ -134,5 +172,7 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
     companion object {
         /** Ticks between a player's input and when it is played (6 ticks = a tenth of a second). */
         const val DELAY = 6
+        /** The devices compare notes this often (30 ticks = twice a second). */
+        const val CHECK_EVERY = 30
     }
 }

@@ -23,15 +23,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="AstroArena game server")
     parser.add_argument("--host", default="0.0.0.0", help="address to listen on (default: every interface)")
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--sparring", action="store_true", help="1v1: pair a player who waits 5 seconds alone with a stand-still dummy (for testing with one device)")
     args = parser.parse_args()
     here = os.path.dirname(os.path.abspath(__file__))
-    httpd = serve(here, args.host, args.port, sparring=args.sparring)
+    httpd = serve(here, args.host, args.port)
     print(f"AstroArena server listening on port {args.port}")
     print(f"  In the game: Settings > Data > Server address:  http://{lan_address()}:{args.port}")
     print(f"  Database: {os.path.join(here, 'astroarena.db')}")
     print("  Edit the .cfg files (versions_not_supported, notices, bots, game, shop) while it runs; changes apply at once.")
-    print(f"  1v1 lobby: port {args.port + 1}" + (" (with the sparring dummy)" if args.sparring else "") if httpd.duel is not None else f"  1v1 lobby: OFF, port {args.port + 1} is in use")
+    print(f"  1v1 lobby: port {args.port + 1}" if httpd.duel is not None else f"  1v1 lobby: OFF, port {args.port + 1} is in use")
     referee = httpd.game.referee
     if referee is not None:
         print("  Referee: on. Every match is replayed here to decide its result.")

@@ -46,6 +46,9 @@ class MatchRunner(
     /** True while a 1v1 is held up waiting for the other player: the HUD says so. */
     @Volatile var waitingForOpponent = false
         private set
+    /** True once a 1v1 has been called off because the two devices no longer agreed about it. */
+    @Volatile var outOfStep = false
+        private set
     val input = TouchControls.Input()
     /** Events produced during the last [update] — consumed by the renderer for effects. */
     val frameEvents = ArrayList<GameEvent>()
@@ -102,7 +105,11 @@ class MatchRunner(
         val link = duel
         val them = match.opponent
         if (link != null && them != null && !match.isOver) {
-            if (link.remoteLeft) {
+            if (link.outOfStep) {
+                // The two devices have computed the match differently. Neither can be trusted: it is called off.
+                outOfStep = true
+                match.world.abandon()
+            } else if (link.remoteLeft) {
                 // The other player has gone: the match is this player's.
                 match.world.forfeit(them.team)
             } else {
@@ -118,6 +125,8 @@ class MatchRunner(
                 }
                 stalled = 0f
                 waitingForOpponent = false
+                // Twice a second the devices compare what they make of the match so far (before this tick runs).
+                if (simTick % io.github.projectwip.net.DuelLink.CHECK_EVERY == 0) link.check(simTick, match.world.checksum())
                 link.apply(simTick, c, them.control)
                 simTick++
             }

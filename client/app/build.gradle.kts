@@ -13,7 +13,7 @@ android {
         minSdk = 26
         targetSdk = 35
         // Players see "Beta". The build number is what the updater and the server's version gate compare.
-        versionCode = 44
+        versionCode = 45
         versionName = "Beta"
         // Where the game looks for its server unless the player sets another address in Settings.
         // Override at build time with -Pastro.server=http://host:port
@@ -54,4 +54,6 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
 
     testImplementation(libs.junit)
+    // The real JSON library, for tests that run the 1v1 link (the Android one is only a stub off the device).
+    testImplementation("org.json:json:20240303")
 }
