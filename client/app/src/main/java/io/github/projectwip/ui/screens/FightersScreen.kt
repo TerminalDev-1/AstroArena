@@ -427,7 +427,8 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
     Spacer(Modifier.height(6.dp))
     PlainText("${def.superSpec.name}: ${def.superSpec.description}", Type.Small, color = Palette.Text)
     val pct = { v: Float -> "${Math.round(v * 100)}%" }
-    PlainText("Hyper: for ${Balance.HYPER_SECONDS.toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage, +${pct(Balance.HYPER_HEALTH_BONUS)} health and +${pct(Balance.HYPER_SHIELD_BONUS)} shield.", Type.Small, color = Palette.Text)
+    PlainText("Hyper: for ${(def.hyper?.seconds ?: Balance.HYPER_SECONDS).toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage, +${pct(Balance.HYPER_HEALTH_BONUS)} health and +${pct(Balance.HYPER_SHIELD_BONUS)} shield.", Type.Small, color = Palette.Text)
+    def.hyper?.let { PlainText("${it.name}, ${def.name}'s own hyper: ${it.description}", Type.Small, color = Palette.Gold) }
     PlainText("Upgrades raise Health, ${def.attackName} and ${def.superSpec.name} by the same amount every level.", Type.Small, color = Palette.Text.copy(alpha = 0.85f))
 }
 

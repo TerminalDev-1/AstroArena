@@ -465,7 +465,7 @@ class SimulationTest {
         assertEquals("once locked, a mark stays where it is", x, first.x, 0f)
     }
 
-    @Test fun aHyperBuffsDamageHealthAndShieldForEightSeconds() {
+    @Test fun aHyperBuffsDamageHealthAndShield() {
         val (w, varun, _) = varunBehindAWall()
         val hp = varun.maxHp; val dmg = varun.attackDamage
         varun.hp = hp; varun.shieldHp = varun.shieldMax
@@ -484,9 +484,28 @@ class SimulationTest {
         assertEquals("and the charge is spent", 0f, varun.hyperCharge, 0f)
         var t = 0f
         while (varun.hyperActive && t < 20f) { w.step(Match.STEP); t += Match.STEP }
-        assertEquals("it lasts eight seconds", Balance.HYPER_SECONDS, t, 0.1f)
+        assertEquals("Varun's own hyper runs fourteen seconds; a plain one eight", 14f to 8f, varun.hyperSeconds to Fighter(9, Balance.fighter(FighterId.JUNO), 1, 0, 0, "J", true).hyperSeconds)
+        assertEquals(varun.hyperSeconds, t, 0.1f)
         assertEquals("then everything is as it was", Triple(hp, hp, dmg), Triple(varun.maxHp, varun.hp, varun.attackDamage))
         assertTrue(varun.shieldHp <= varun.shieldMax)
+    }
+
+    @Test fun varunsOwnHyperSpeedsUpHisRocketsAndHisSuper() {
+        val (w, varun, _) = varunBehindAWall()
+        val plain = varun.def.attack.speed
+        varun.hyperCharge = 1f; varun.control.hyper = true
+        varun.control.aimX = 1f; varun.control.aimY = 0f; varun.control.attack = true
+        w.step(Match.STEP)
+        val fast = w.projectiles.firstOrNull()?.let { kotlin.math.hypot(it.vx, it.vy) }
+        // (The hyper comes on after the shot is asked for in the same tick, so fire again to be sure.)
+        varun.control.attack = true; varun.attackCooldown = 0f; varun.pending.clear(); w.projectiles.clear()
+        w.step(Match.STEP)
+        val speed = kotlin.math.hypot(w.projectiles.first().vx, w.projectiles.first().vy)
+        assertEquals("rockets fly faster during his hyper", plain * varun.def.hyper!!.shotSpeed, speed, 0.01f)
+        assertTrue(fast == null || fast >= plain)
+        varun.superCharge = 1f; varun.control.superAttack = true
+        w.step(Match.STEP)
+        assertEquals("and the rain comes down sooner", Balance.RAIN_DELAY_SECONDS / varun.def.hyper!!.shotSpeed, w.hazards[0].delay, 0.001f)
     }
 
     @Test fun theHyperChargesFromHitsAndBotsUseIt() {

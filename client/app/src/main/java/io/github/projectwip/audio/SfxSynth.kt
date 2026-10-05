@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -37,6 +37,7 @@ object SfxSynth {
         Sound.HURT -> hurt().finish(0.8f)
         Sound.KO -> knockOut().finish(0.85f)
         Sound.SUPER_READY -> superReady().finish(0.7f)
+        Sound.HYPER -> hyper().finish(0.9f)
         Sound.TICK -> tick().finish(0.6f)
         Sound.GO -> go().finish(0.8f)
         Sound.TAP -> tap().finish(0.5f)
@@ -516,6 +517,19 @@ object SfxSynth {
         for ((i, n) in intArrayOf(79, 86, 91).withIndex()) bell(0.1f + i * 0.07f, n, 0.2f, 0.1f)
         drive(1.4f)
         reverb(0.22f, 0.75f)
+    }
+
+    /** A hyper catching light: a low thump, a roar of fire that opens up, a siren-like rise and a bright chord on top. */
+    private fun hyper() = Clip(1.5f).apply {
+        osc(Wave.SINE, 0f, 0.35f, { glide(it, 0.3f, 150f, 42f) }, { perc(it, 0.004f, 0.22f) * 0.9f })
+        noise(57, 0f, 1.2f, Band.LOW, { 300f + 2600f * (it / 1.2f).coerceIn(0f, 1f) }, 0.9f, { perc(it, 0.25f, 0.7f) * 0.5f })
+        noise(58, 0.05f, 1.1f, Band.BAND, { 900f + 500f * kotlin.math.sin(it * 38f) }, 2.5f, { perc(it, 0.2f, 0.6f) * 0.22f })
+        osc(Wave.SAW, 0.02f, 0.55f, { glide(it, 0.5f, 180f, 720f) }, { perc(it, 0.2f, 0.3f) * 0.22f })
+        osc(Wave.SQUARE, 0.02f, 0.55f, { glide(it, 0.5f, 271f, 1084f) }, { perc(it, 0.25f, 0.25f) * 0.1f })
+        bell(0.5f, 81, 0.6f, 0.1f)
+        bell(0.5f, 88, 0.6f, 0.09f)
+        bell(0.58f, 93, 0.7f, 0.1f)
+        echo(0.13f, 0.35f, 0.25f)
     }
 
     private fun superReady() = Clip(0.95f).apply {

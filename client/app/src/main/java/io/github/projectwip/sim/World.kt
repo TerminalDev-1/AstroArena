@@ -308,7 +308,7 @@ class World(
     private fun startHyper(f: Fighter) {
         val shieldBefore = f.shieldMax
         f.hyperCharge = 0f
-        f.hyperTime = Balance.HYPER_SECONDS
+        f.hyperTime = f.hyperSeconds
         f.hyperHpBonus = (f.maxHp * Balance.HYPER_HEALTH_BONUS).toInt()
         f.maxHp += f.hyperHpBonus
         f.hp += f.hyperHpBonus
@@ -374,9 +374,12 @@ class World(
         val spread = Math.toRadians(a.spreadDegrees.toDouble()).toFloat()
         for (i in 0 until n) {
             val ang = if (n == 1) baseAng else baseAng - spread / 2 + spread * i / (n - 1)
-            spawnProjectile(f, ang, a.speed, a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast)
+            spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast)
         }
     }
+
+    /** How much faster [f]'s shots fly right now: its own hyper may speed them up. */
+    private fun hyperShotSpeed(f: Fighter) = if (f.hyperActive) f.def.hyper?.shotSpeed ?: 1f else 1f
 
     private fun fireSuper(f: Fighter, dx: Float, dy: Float) {
         val s = f.def.superSpec
@@ -395,7 +398,7 @@ class World(
                 // The first on each target is dead on; the rest land scattered round it.
                 val targets = fighters.filter { it.team != f.team && isVisibleTo(it, f.team) }.sortedBy { hypot(it.x - f.x, it.y - f.y) }
                 for (i in 0 until s.projectiles) {
-                    val delay = Balance.RAIN_DELAY_SECONDS + i * Balance.RAIN_GAP_SECONDS
+                    val delay = (Balance.RAIN_DELAY_SECONDS + i * Balance.RAIN_GAP_SECONDS) / hyperShotSpeed(f)
                     val scatter = if (i < targets.size) 0f else 0.75f
                     val ox = cos(i * 2.4f) * scatter
                     val oy = sin(i * 2.4f) * scatter
@@ -574,11 +577,13 @@ class World(
             source.damageDealt += dealt
             if (!isSuper) {
                 val before = source.superReady
-                source.superCharge = (source.superCharge + source.def.superChargePerHit).coerceAtMost(1f)
+                val faster = if (source.hyperActive) source.def.hyper?.superCharge ?: 1f else 1f
+                source.superCharge = (source.superCharge + source.def.superChargePerHit * faster).coerceAtMost(1f)
                 if (!before && source.superReady) events += GameEvent.SuperReady(source.id)
-                if (!source.hyperActive && source.hyperCharge < 1f) {
+                // Hits charge the hyper even while one is running, so the next can follow straight on.
+                if (source.hyperCharge < 1f) {
                     source.hyperCharge = (source.hyperCharge + source.def.superChargePerHit * Balance.HYPER_CHARGE_RATE).coerceAtMost(1f)
-                    if (source.hyperReady) events += GameEvent.HyperReady(source.id)
+                    if (source.hyperCharge >= 1f) events += GameEvent.HyperReady(source.id)
                 }
             }
         }

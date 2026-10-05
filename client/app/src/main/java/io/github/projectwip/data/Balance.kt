@@ -92,8 +92,24 @@ data class FighterDef(
     val rarity: Rarity = Rarity.RARE,
     /** Set for a Boss Mode boss: which one it is. Null for every fighter. */
     val boss: BossKind? = null,
+    /** What this fighter's own hyper adds to the buffs every hyper gives. Null: the plain hyper. */
+    val hyper: HyperSpec? = null,
     /** What the fighter says, and when. Empty for a fighter without a voice. */
     val voice: Map<VoiceCue, List<String>> = emptyMap(),
+)
+
+/**
+ * A fighter's own hyper. On top of the buffs every hyper gives (see the `HYPER_*` numbers in [Balance]), it can run
+ * longer, make the fighter's shots fly faster, and charge the super faster while it runs.
+ */
+data class HyperSpec(
+    val name: String,
+    val description: String,
+    val seconds: Float,
+    /** Shots fly this many times as fast, and rockets fired into the sky come down that much sooner. */
+    val shotSpeed: Float = 1f,
+    /** The super charges this many times as fast. */
+    val superCharge: Float = 1f,
 )
 
 /** The moments a fighter with a voice speaks up. */
@@ -155,7 +171,8 @@ object Balance {
 
     // ---- Hyper ----
     // Every fighter's third ability. It charges as main-attack hits land (more slowly than the super), and for a
-    // few seconds makes the fighter hit harder, with more health and a bigger shield.
+    // few seconds makes the fighter hit harder, with more health and a bigger shield. Hits landed while one is
+    // running charge the next, so a fighter who keeps hitting can go from one hyper into another.
     const val HYPER_SECONDS = 8f
     const val HYPER_DAMAGE_BONUS = 0.25f
     const val HYPER_HEALTH_BONUS = 0.25f
@@ -321,6 +338,7 @@ object Balance {
                 Skin("Monsoon", 0xFF1F6FB5, 0xFF2ED8A3, 0xFFE6F7FF, 20),
                 Skin("Marigold", 0xFFFF9F1C, 0xFF7B2CBF, 0xFFFFF3B0, 20),
             ),
+            hyper = HyperSpec("Five Alarm", "Lasts 14 seconds. His rockets fly faster, and his super charges half as fast again.", seconds = 14f, shotSpeed = 1.4f, superCharge = 1.5f),
             voice = mapOf(
                 VoiceCue.START to listOf("Varun reporting. Where is the fire?", "Hoses down. Rockets up."),
                 VoiceCue.SUPER to listOf("Look up!", "No wall will save you!"),

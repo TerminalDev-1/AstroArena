@@ -113,6 +113,8 @@ class Fighter(
 
     val hpFraction get() = hp.toFloat() / maxHp
     val superReady get() = superCharge >= 1f
+    /** How long this fighter's hyper runs. */
+    val hyperSeconds get() = def.hyper?.seconds ?: io.github.projectwip.data.Balance.HYPER_SECONDS
     val hyperActive get() = hyperTime > 0f
     val hyperReady get() = hyperCharge >= 1f && !hyperActive
     val isDashing get() = dashTime > 0f

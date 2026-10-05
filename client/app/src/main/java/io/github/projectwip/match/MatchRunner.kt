@@ -214,8 +214,7 @@ class MatchRunner(
                 if (e.fighterId == pid) say(VoiceCue.HYPER)
                 val f = world.fighter(e.fighterId) ?: return
                 val gain = if (e.fighterId == pid) 1f else 0.5f / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
-                sfx.play(Sound.SUPER, gain, 0.6f)
-                sfx.play(Sound.SUPER_READY, gain, 0.7f)
+                sfx.play(Sound.HYPER, gain)
                 if (e.fighterId == pid) sfx.buzz(70, 220)
             }
             is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }

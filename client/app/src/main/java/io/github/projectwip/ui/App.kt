@@ -97,8 +97,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "roster" -> { io.github.projectwip.ui.screens.rosterPreview = true; Screen.Fighters() }
                 "kito" -> Screen.Fighters(FighterId.KITO)
                 "varun" -> Screen.Fighters(FighterId.VARUN)
-                // An offline practice match as Varun, unlocked or not, for looking at him in play.
-                "tryvarun" -> Screen.Match(startMatchConfig(repo.save.value).copy(playerFighter = FighterId.VARUN, playerSkin = 0))
+                // The Training Area as Varun, unlocked or not, for looking at him in play.
+                "tryvarun" -> Screen.Match(startMatchConfig(repo.save.value).copy(playerFighter = FighterId.VARUN, playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road
                 "pass" -> Screen.Pass
