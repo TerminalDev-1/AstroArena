@@ -6,8 +6,10 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 ## How to work here
 
-- Don't go on a reading spree. Read only what the task needs: grep for the spot, read that part of the file, and
-  start changing things. Don't read whole files "for context", and don't re-read what this file already explains.
+- Read what is necessary for the task you are trying to accomplish, and then stop reading. Don't go on long
+  reading sprees, and don't keep reading and re-reading: it takes a lot of time. Be reasonable about it: find the
+  spot, read that part, and start changing things. Don't re-read a file you have already read, or what this file
+  already explains.
 - Never go quiet for minutes. Say in a line what you are about to do before a long stretch of reading or building,
   and show progress as pieces land (a first edit, a passing test, a screenshot).
 
