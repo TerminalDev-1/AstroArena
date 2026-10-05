@@ -73,6 +73,7 @@ sealed interface Screen {
     data class Fighters(val focus: FighterId? = null) : Screen { override val depth = 1 }
     data object CupTrack : Screen { override val depth = 1 }
     data object Leaderboard : Screen { override val depth = 1 }
+    data object News : Screen { override val depth = 1 }
     data object Shop : Screen { override val depth = 1 }
     data object Road : Screen { override val depth = 2 }
     data object Pass : Screen { override val depth = 1 }
@@ -105,6 +106,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "track" -> Screen.CupTrack
                 "settings" -> Screen.Settings
                 "leaders" -> Screen.Leaderboard
+                "news" -> Screen.News
                 "result" -> previewResult(repo.save.value)
                 else -> Screen.Home
             }
@@ -322,6 +324,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     is Screen.Fighters -> FightersScreen(save, repo, s.focus, go)
                     Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
                     Screen.Leaderboard -> io.github.projectwip.ui.screens.LeaderboardScreen(save, go)
+                    Screen.News -> io.github.projectwip.ui.screens.NewsScreen(go)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
                     Screen.Road -> io.github.projectwip.ui.screens.RoadScreen(save, go, showReward)
                     Screen.Pass -> io.github.projectwip.ui.screens.PassScreen(save, go, showReward)

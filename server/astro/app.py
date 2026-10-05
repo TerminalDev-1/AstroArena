@@ -28,6 +28,7 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/dev/deals      {...}       put a deal in everyone's shop -> {id}                 (token, developer)
     POST /v1/dev/deals/<id>/delete      take a deal out of the shop                           (token, developer)
     GET  /v1/leaderboard?limit=50       players by Cups
+    GET  /v1/news                       the News tab's items (news.cfg)
 
 A token goes in the `Authorization: Bearer <token>` header, and every request with a token must also say which
 version of the game is asking (`X-Client-Version`); versions listed in versions_not_supported.cfg are refused.
@@ -215,6 +216,8 @@ def make_handler(game: Game, quiet: bool = False):
                 })
             if url.path == "/v1/config":
                 return self._send(200, {"bots": game.config.bots()})
+            if url.path == "/v1/news":
+                return self._send(200, {"news": game.config.news()})
             if url.path == "/v1/leaderboard":
                 try:
                     limit = int((query.get("limit") or ["50"])[0])

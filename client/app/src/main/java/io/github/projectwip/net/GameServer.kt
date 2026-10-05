@@ -79,6 +79,9 @@ data class MatchPlan(
     val level: Int?,
 )
 
+/** One item on the News tab, as the server wrote it. */
+data class NewsItem(val title: String, val date: String, val tag: String, val text: String)
+
 /** A real player on the server's leaderboard. */
 data class RemotePlayer(val id: String, val name: String, val cups: Int, val fighter: FighterId, val glory: Int = 0)
 
@@ -452,6 +455,16 @@ class GameServer(context: Context) {
             "skin" -> fighter()?.let { Reward.SkinReward(it, o.optInt("skin")) }
             "bundle" -> o.optJSONArray("items")?.let { a -> Reward.Bundle((0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { reward(it) } }) }
             else -> null
+        }
+    }
+
+    /** The News tab's items, newest first, or null when the server can't be asked. */
+    fun news(): List<NewsItem>? {
+        if (!_status.value.online) return null
+        val items = call("GET", "/v1/news")?.body?.optJSONArray("news") ?: return null
+        return (0 until items.length()).mapNotNull { i ->
+            val n = items.optJSONObject(i) ?: return@mapNotNull null
+            NewsItem(n.optString("title"), n.optString("date"), n.optString("tag", "NEWS"), n.optString("text"))
         }
     }
 

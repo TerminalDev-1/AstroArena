@@ -315,6 +315,14 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("POST", "/v1/players", {"name": "Two"})[0], 201)
         self.assertEqual(self.call("POST", "/v1/players", {"name": "Three"})[0], 429)
 
+    def test_the_news_tab_reads_news_cfg(self):
+        status, body = self.call("GET", "/v1/news")
+        self.assertEqual(status, 200)
+        self.assertIsInstance(body["news"], list)
+        for item in body["news"]:
+            self.assertEqual(set(item), {"title", "date", "tag", "text"})
+            self.assertTrue(item["title"] and item["text"])
+
     def test_the_server_awards_cups_and_drops(self):
         me = self.player()
         other = self.player("Other")

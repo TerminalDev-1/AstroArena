@@ -105,6 +105,10 @@ fun HomeScreen(
                         PlainText("LEADERBOARD", Type.Small, color = Color.White, maxLines = 1)
                     }
                 }
+                Spacer(Modifier.width(6.dp))
+                ChunkyButton({ go(Screen.News) }, Modifier.size(58.dp, 58.dp), ButtonStyle.GLASS, lip = 4.dp) {
+                    GameText("NEWS", Type.Label, color = Palette.Cyan, outline = 2.dp)
+                }
                 Spacer(Modifier.weight(1f))
                 CurrencyPill(IconKind.BOLT, save.bolts)
                 Spacer(Modifier.width(10.dp))

@@ -7,6 +7,7 @@ notices.cfg                  short messages shown to players on the home screen
 bots.cfg                     how bots behave at each difficulty (the client has the same numbers built in as a fallback)
 game.cfg                     the difficulties players may pick, who the developers are, how new accounts start
 shop.cfg                     the pool the day's shop offers are picked from
+news.cfg                     the items on the News tab
 """
 
 from __future__ import annotations
@@ -73,6 +74,7 @@ class Config:
         self._game: dict[str, dict[str, str]] = {}
         self._shop: list[dict] = []
         self._offers_per_day = 3
+        self._news: list[dict] = []
 
     def _path(self, name: str) -> str:
         return os.path.join(self.directory, name)
@@ -135,6 +137,29 @@ class Config:
                     "price": values.get("price", 0), "wasPrice": values.get("was", 0), "theme": values.get("theme", 0),
                 })
             self._shop, self._offers_per_day = pool, per_day
+
+        if self._changed("news.cfg"):
+            # Section names are kept as written: they are the headlines players see.
+            parser = configparser.ConfigParser(interpolation=None)
+            parser.optionxform = str.lower
+            try:
+                parser.read(self._path("news.cfg"), encoding="utf-8")
+            except configparser.Error:
+                pass
+            self._news = [
+                {
+                    "title": section[:80], "date": parser.get(section, "date", fallback="")[:20],
+                    "tag": (parser.get(section, "tag", fallback="NEWS").strip().upper() or "NEWS")[:12],
+                    "text": " ".join(parser.get(section, "text", fallback="").split())[:1200],
+                }
+                for section in parser.sections()
+            ][:30]
+
+    def news(self) -> list[dict]:
+        """The News tab's items (as written in news.cfg), newest first."""
+        with self._lock:
+            self._refresh()
+            return [dict(item) for item in self._news]
 
     def daily_pool(self) -> tuple[list[dict], int]:
         """The offers the day's shop is picked from (as written in shop.cfg), and how many to pick."""

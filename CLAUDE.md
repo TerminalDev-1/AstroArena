@@ -25,7 +25,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|fighters|roster|kito|varun|shop|road|pass|track|settings|result|leaders`; `roster` is the fighter grid with every model shown unlocked, `tryvarun` the Training Area as Varun, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` splits into eight, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
+  (`match|boss|train|fighters|roster|kito|varun|shop|road|pass|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `tryvarun` the Training Area as Varun, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` splits into eight, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - UI changes must be checked with a screenshot (`adb exec-out screencap -p`) and `adb logcat -b crash -d`.
 - The tablet is the user's everyday device. Before every `input tap` or `am start`, confirm
   `dumpsys window | grep mCurrentFocus` shows `io.github.projectwip` or the home screen (`com.miui.home`): on
@@ -74,6 +74,10 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   approves it against `allowed` in `game.cfg`, stores it, and uses its own copy when it plans a match.
 - Days and times are the server's: the day number, when it ends, the daily gift and the daily offers
   (`server/shop.cfg`). The client moves server times onto its own clock on receipt and only counts down.
+- The News tab shows `server/news.cfg` (`GET /v1/news`), newest first; add an item there when a release changes what
+  players see. Offline there is none.
+- Cups don't depend on bot difficulty (`PLACEMENT_CUPS` in `rules.py`). Each fighter has Cups and a rank of its own
+  (`FIGHTER_RANK_CUPS` in `rules.py`, `FighterRanks` in `Catalog.kt`); only a judged match changes them.
 - The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
   is asked for a name before their account is made (`NameScreen`).
 - A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`; a new fighter
