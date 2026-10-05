@@ -633,24 +633,29 @@ class MatchRenderer(
                         SuperKind.PIERCE -> beam(clip(a, px, pz, dx, dz, s.range), s.radius * 3.2f)
                         SuperKind.RAM -> beam(s.range, p.radius * 2.2f)
                         SuperKind.SWARM -> {
-                            // The rockets go up and come down: a thin line out to each place they will land, and a
-                            // circle the size of the blast there. On the enemies in sight; with none, along the aim.
-                            fun landing(tx: Float, tz: Float, radius: Float) {
-                                val d = hypot(tx - px, tz - pz)
-                                val lineYaw = -Math.toDegrees(atan2(tz - pz, tx - px).toDouble()).toFloat()
-                                tint(0); setModel(px, 0.045f, pz, d, 1f, 0.2f, lineYaw); rect.draw()
-                                tint(1); setModel(px, 0.05f, pz, d, 1f, 0.09f, lineYaw); rect.draw()
-                                lit.v4("uTint", 1f, 0.78f, 0.1f, 0.28f + 0.12f * pulse)
-                                setModel(tx, 0.05f, tz, radius, 1f, radius); sector(360f).draw()
-                                tint(2); setModel(tx, 0.056f, tz, radius, 1f, radius); ring.draw()
-                                tint(1); setModel(tx, 0.058f, tz, radius * (0.25f + 0.75f * pulse), 1f, radius * (0.25f + 0.75f * pulse)); ring.draw()
+                            // The rockets go up and come down: an arc from the fighter, up and over, to one big
+                            // circle where they will land. How far the stick is pushed is how far away that is.
+                            val reach = min(1f, len) * s.range
+                            val tx = px + dx * reach
+                            val tz = pz + dz * reach
+                            lit.v4("uTint", 1f, 0.78f, 0.1f, 0.26f + 0.12f * pulse)
+                            setModel(tx, 0.05f, tz, s.radius, 1f, s.radius); sector(360f).draw()
+                            tint(2); setModel(tx, 0.056f, tz, s.radius, 1f, s.radius); ring.draw()
+                            tint(1); setModel(tx, 0.058f, tz, s.radius * (0.3f + 0.7f * pulse), 1f, s.radius * (0.3f + 0.7f * pulse)); ring.draw()
+                            tint(2); setModel(tx, 0.06f, tz, 0.22f, 1f, 0.22f); sector(360f).draw()
+                            // The arc: beads strung along the rockets' path, running from the fighter to the circle.
+                            lit.i("uMode", 0)
+                            lit.f("uEmissive", 0.9f)
+                            val beads = 16
+                            val peak = 2.2f + reach * 0.3f
+                            for (i in 0..beads) {
+                                val u = ((i + (time * 1.5f) % 1f) / (beads + 1)).coerceIn(0f, 1f)
+                                val size = 0.1f + 0.07f * sin(u * 3.1416f)
+                                lit.v4("uTint", 1f, 0.82f, 0.2f, 1f)
+                                setModel(px + dx * reach * u, 1f + peak * 4f * u * (1f - u) - u, pz + dz * reach * u, size, size, size); sphere.draw()
                             }
-                            val targets = world.fighters.filter { it.team != p.team && shown(it) && world.isVisibleTo(it, p.team) }
-                            if (targets.isNotEmpty()) {
-                                for (t in targets) landing(lerp(t.prevX, t.x, alpha), lerp(t.prevY, t.y, alpha), s.radius + if (s.projectiles > targets.size) 0.75f else 0f)
-                            } else {
-                                for (i in 0 until s.projectiles) { val d = 2.5f + i * 0.8f; landing(px + dx * d, pz + dz * d, s.radius) }
-                            }
+                            lit.f("uEmissive", 0f)
+                            lit.i("uMode", 1)
                         }
                     }
                 } else {
@@ -758,7 +763,7 @@ class MatchRenderer(
             val x = lerp(pr.prevX, pr.x, alpha); val z = lerp(pr.prevY, pr.y, alpha)
             if (pr.style == ShotStyle.ROCKET) {
                 // A rocket leaves fire behind it, and a puff of smoke that hangs in the air.
-                particles.spawn(x, 0.72f, z, 0f, 0.2f, 0f, 0.22f, 0.5f, c, 0.85f)
+                particles.spawn(x, 0.72f, z, 0f, 0.2f, 0f, 0.2f, 0.3f, c, 0.6f)
                 if (rng.nextFloat() < 0.5f) particles.spawn(x, 0.72f, z, 0f, 0.5f, 0f, 0.7f, 0.42f, 0xFFD8D2E6.toInt(), 0.35f)
             } else if (rng.nextFloat() < 0.9f) particles.spawn(x, 0.72f, z, 0f, 0.1f, 0f, 0.18f, pr.radius * 2.2f, c, 0.6f)
         }
@@ -773,7 +778,7 @@ class MatchRenderer(
             val owner = world.fighter(pr.ownerId) ?: continue
             val c = colorOf(pr.style, owner)
             val x = lerp(pr.prevX, pr.x, alpha); val z = lerp(pr.prevY, pr.y, alpha)
-            val s = if (pr.style == ShotStyle.LANCE) 1.3f else if (pr.style == ShotStyle.ROCKET) 1.3f else pr.radius * 4.5f
+            val s = if (pr.style == ShotStyle.LANCE) 1.3f else if (pr.style == ShotStyle.ROCKET) 0.8f else pr.radius * 4.5f
             sprites.add(x, 0.72f, z, s, r(c), g(c), b(c), 0.85f)
         }
         for (pk in world.pickups) sprites.add(pk.x, 0.6f + sin(time * 3f + pk.x) * 0.12f, pk.y, 0.9f, 1f, 0.85f, 0.3f, 0.6f)
@@ -899,8 +904,8 @@ class MatchRenderer(
                 }
             }
             is GameEvent.Burst -> {
-                particles.spawn(e.x, 0.7f, e.y, 0f, 0f, 0f, 0.22f, e.radius * 3.2f, 0xFFFFE9A8.toInt(), 0.95f)
-                repeat(12) {
+                particles.spawn(e.x, 0.7f, e.y, 0f, 0f, 0f, 0.2f, e.radius * 2.2f, 0xFFFFC46A.toInt(), 0.45f)
+                repeat(8) {
                     val a = rng.nextFloat() * 6.28f
                     val sp = 1.5f + rng.nextFloat() * 3.5f
                     particles.spawn(e.x, 0.6f, e.y, cos(a) * sp, 1f + rng.nextFloat() * 3f, sin(a) * sp, 0.35f + rng.nextFloat() * 0.2f, 0.2f, 0xFFFF8A1F.toInt(), 0.9f)
@@ -921,7 +926,7 @@ class MatchRenderer(
                 }
             }
             is GameEvent.Blast -> {
-                particles.spawn(e.x, 0.5f, e.y, 0f, 0f, 0f, 0.3f, e.radius * 2.6f, 0xFFFFFFFF.toInt(), 0.9f)
+                particles.spawn(e.x, 0.5f, e.y, 0f, 0f, 0f, 0.3f, e.radius * 2.6f, 0xFFFFE0B0.toInt(), 0.5f)
                 repeat((14 * e.radius).toInt()) {
                     val a = rng.nextFloat() * 6.28f
                     val sp = (2f + rng.nextFloat() * 5f) * e.radius

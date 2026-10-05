@@ -34,7 +34,7 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
     ULTRA("Ultra", 0xFF29F0FF, 2600),
 }
 
-/** [SWARM] is a salvo of rockets fired into the sky: they come down on the enemies in sight, over any wall, and hurt but never knock out. */
+/** [SWARM] is a salvo of rockets fired into the sky: they come down inside one circle where the fighter aimed, over any wall, and hurt but never knock out. */
 enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
@@ -184,10 +184,10 @@ object Balance {
     const val ROCKET_LANE = 0.3f
 
     /** A [SuperKind.SWARM]: the first rocket lands this long after the launch, and the rest follow this far apart. */
-    const val RAIN_DELAY_SECONDS = 0.9f
-    const val RAIN_GAP_SECONDS = 0.12f
-    /** Each rocket follows its target until this long before it lands; after that, it can be stepped out of. */
-    const val RAIN_LOCK_SECONDS = 0.4f
+    const val RAIN_DELAY_SECONDS = 0.7f
+    const val RAIN_GAP_SECONDS = 0.1f
+    /** Each rocket of the rain hits everyone within this many tiles of where it lands (the super's own radius is the whole circle they fall in). */
+    const val RAIN_BLAST = 1.1f
 
     // ---- Starting wallet ----
     const val STARTING_BOLTS = 60
@@ -323,15 +323,15 @@ object Balance {
             role = "Artillery",
             lore = "An Indian firefighter who was captured and told to work for the people of the Sparks. He has never left since. Nobody knows why.",
             attackName = "Rocket Pack",
-            health = StatLine(4400, 220),
-            attackDamage = StatLine(220, 11),
-            superDamage = StatLine(900, 45),
-            moveSpeed = 3.55f,
-            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 6, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.17f, burstInterval = 0.1f, blast = 0.8f, lanes = 3),
-            superSpec = SuperSpec(SuperKind.SWARM, "Rocket Rain", "Fires 8 rockets into the sky. They rain down on the enemies in sight, over any wall, following them until just before they land. They hit hard, but never land the knockout.", projectiles = 8, range = 12f, speed = 10f, radius = 1.0f),
+            health = StatLine(4800, 240),
+            attackDamage = StatLine(260, 13),
+            superDamage = StatLine(1000, 50),
+            moveSpeed = 3.65f,
+            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 6, spreadDegrees = 0f, range = 8.5f, speed = 14f, radius = 0.17f, burstInterval = 0.1f, blast = 1.0f, lanes = 3),
+            superSpec = SuperSpec(SuperKind.SWARM, "Rocket Rain", "Fires 8 rockets into the sky. They rain down inside one big circle, wherever you aim, over any wall. They hit hard, but never land the knockout.", projectiles = 8, range = 9f, speed = 10f, radius = 2.3f),
             ammoMax = 3,
-            reloadSeconds = 1.5f,
-            superChargePerHit = 0.035f,
+            reloadSeconds = 1.35f,
+            superChargePerHit = 0.045f,
             radius = 0.44f,
             skins = listOf(
                 Skin("Fire Engine", 0xFFD9342B, 0xFFFFC72C, 0xFFFFF1C2, 0),

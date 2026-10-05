@@ -394,23 +394,17 @@ class World(
             }
             SuperKind.PIERCE -> spawnProjectile(f, baseAng, s.speed, s.radius, f.superDamage, s.range, true, true, ShotStyle.LANCE)
             SuperKind.SWARM -> {
-                // The rockets go up, and come down one after another on the enemies in sight, shared out nearest first.
-                // The first on each target is dead on; the rest land scattered round it.
-                val targets = fighters.filter { it.team != f.team && isVisibleTo(it, f.team) }.sortedBy { hypot(it.x - f.x, it.y - f.y) }
+                // The rockets go up, and come down one after another inside one circle where the fighter aimed. For
+                // this super the aim is not just a direction: it is how far away, in tiles, the circle is.
+                val reach = hypot(f.control.aimX, f.control.aimY).coerceAtMost(s.range)
+                val d = if (reach > 1e-3f) reach else s.range * 0.5f
+                val scatter = (s.radius - Balance.RAIN_BLAST).coerceAtLeast(0f)
                 for (i in 0 until s.projectiles) {
+                    // The first lands dead centre; the rest spiral out from it to fill the circle.
+                    val out = scatter * kotlin.math.sqrt(i.toFloat() / (s.projectiles - 1).coerceAtLeast(1))
                     val delay = (Balance.RAIN_DELAY_SECONDS + i * Balance.RAIN_GAP_SECONDS) / hyperShotSpeed(f)
-                    val scatter = if (i < targets.size) 0f else 0.75f
-                    val ox = cos(i * 2.4f) * scatter
-                    val oy = sin(i * 2.4f) * scatter
-                    if (targets.isNotEmpty()) {
-                        val t = targets[i % targets.size]
-                        hazards += Hazard(f.id, f.team, t.x + ox, t.y + oy, s.radius, delay, f.superDamage, HazardKind.ROCKET,
-                            lethal = false, targetId = t.id, offX = ox, offY = oy, lock = Balance.RAIN_LOCK_SECONDS)
-                    } else {
-                        // Nobody in sight: they come down in a line ahead of him.
-                        val d = 2.5f + i * 0.8f
-                        hazards += Hazard(f.id, f.team, f.x + dx * d, f.y + dy * d, s.radius, delay, f.superDamage, HazardKind.ROCKET, lethal = false)
-                    }
+                    hazards += Hazard(f.id, f.team, f.x + dx * d + cos(i * 2.4f) * out, f.y + dy * d + sin(i * 2.4f) * out,
+                        Balance.RAIN_BLAST, delay, f.superDamage, HazardKind.ROCKET, lethal = false)
                 }
                 events += GameEvent.Launch(f.id, s.projectiles)
             }
@@ -502,8 +496,6 @@ class World(
         while (i < hazards.size) {
             val h = hazards[i]
             h.age += dt
-            // A mark that is after someone follows them, while it can see them, until just before it goes off.
-            if (h.targetId >= 0 && h.age < h.delay - h.lock) fighter(h.targetId)?.takeIf { isVisibleTo(it, h.team) }?.let { h.x = it.x + h.offX; h.y = it.y + h.offY }
             if (h.age < h.delay) { i++; continue }
             hazards.removeAt(i)
             events += GameEvent.Blast(h.x, h.y, h.radius, h.kind)

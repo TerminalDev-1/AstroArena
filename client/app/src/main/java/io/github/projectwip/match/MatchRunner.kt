@@ -5,6 +5,7 @@ import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.AttackShape
 import io.github.projectwip.data.MatchReport
 import io.github.projectwip.data.Settings
+import io.github.projectwip.data.SuperKind
 import io.github.projectwip.data.VoiceCue
 import io.github.projectwip.sim.Fighter
 import io.github.projectwip.sim.GameEvent
@@ -82,7 +83,8 @@ class MatchRunner(
             c.attack = true
         }
         if (input.superFire != TouchControls.FireMode.NONE && p.superReady) {
-            setAim(input.superFire, input.superX, input.superY, p.def.superSpec.range, p.def.superSpec.speed)
+            if (p.def.superSpec.kind == SuperKind.SWARM) aimRain(input.superFire, input.superX, input.superY, p.def.superSpec.range)
+            else setAim(input.superFire, input.superX, input.superY, p.def.superSpec.range, p.def.superSpec.speed)
             c.superAttack = true
         }
         if (input.hyper && p.hyperReady) c.hyper = true
@@ -120,6 +122,25 @@ class MatchRunner(
     }
 
     private val lead = FloatArray(2)
+
+    /**
+     * Aims a rain of rockets: the aim is the spot they land on, as an offset in tiles. Dragged, that is exactly
+     * where the stick points (how far it is pushed is how far away, up to [range]) with no help. Tapped, it is
+     * the nearest enemy in sight, or failing that a spot ahead.
+     */
+    private fun aimRain(mode: TouchControls.FireMode, ax: Float, ay: Float, range: Float) {
+        val p = match.player
+        val c = p.control
+        if (mode == TouchControls.FireMode.AIMED && hypot(ax, ay) >= 0.01f) {
+            val push = hypot(ax, ay).coerceAtMost(1f)
+            c.aimX = ax / hypot(ax, ay) * push * range
+            c.aimY = ay / hypot(ax, ay) * push * range
+            return
+        }
+        val t = match.world.nearestVisibleEnemy(p, range)
+        if (t != null) { c.aimX = t.x - p.x; c.aimY = t.y - p.y }
+        else { c.aimX = cos(p.facing) * range * 0.5f; c.aimY = sin(p.facing) * range * 0.5f }
+    }
 
     /**
      * Auto = lock onto the nearest visible enemy and lead the shot so it meets them.

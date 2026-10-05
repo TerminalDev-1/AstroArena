@@ -427,42 +427,45 @@ class SimulationTest {
         assertTrue("and so is the one standing beside it, out of the rockets' path", two.hp < two.maxHp)
     }
 
-    @Test fun varunsRocketRainCrossesWallsAndNeverKnocksOut() {
+    @Test fun varunsRocketRainLandsWhereItIsAimedOverWallsAndNeverKnocksOut() {
         val (w, varun, target) = varunBehindAWall()
-        varun.superCharge = 1f
-        varun.control.aimX = -(target.x - varun.x); varun.control.aimY = 0f; varun.control.superAttack = true
-        w.step(Match.STEP)
+        // Aimed at the spot the target stands on: the aim is the offset to it, in tiles.
+        fun fire() {
+            varun.superCharge = 1f
+            varun.control.aimX = target.x - varun.x; varun.control.aimY = target.y - varun.y; varun.control.superAttack = true
+            w.step(Match.STEP)
+        }
+        fire()
         assertEquals("eight rockets on their way down", 8, w.hazards.size)
         assertTrue("no straight shots: nothing for the wall to stop", w.projectiles.isEmpty())
-        // The target walks off: the marks follow it.
-        target.x += 0.6f
-        w.step(Match.STEP)
-        assertEquals("the first is dead on", target.x to target.y, w.hazards[0].x to w.hazards[0].y)
+        assertEquals("the first lands dead centre of the aim", target.x to target.y, w.hazards[0].x to w.hazards[0].y)
+        val spec = varun.def.superSpec
+        assertTrue("and all of them inside the one circle", w.hazards.all { kotlin.math.hypot(it.x - target.x, it.y - target.y) + it.radius <= spec.radius + 0.01f })
         var t = 0f
         while (w.hazards.isNotEmpty() && t < 6f) { w.step(Match.STEP); t += Match.STEP }
         assertTrue("they all came down, and quickly", w.hazards.isEmpty() && t < 2.5f)
-        assertTrue("massive damage: ${varun.damageDealt}", varun.damageDealt >= minOf(target.maxHp - 1, 6 * varun.superDamage))
+        assertTrue("massive damage: ${varun.damageDealt}", varun.damageDealt >= minOf(target.maxHp - 1, 4 * varun.superDamage))
         assertTrue("but the target is left standing", target.alive && target.hp >= 1)
         // Even a target on its last legs survives a whole salvo.
         target.hp = 5; target.shieldHp = 0
-        varun.superCharge = 1f; varun.control.superAttack = true
+        fire()
         t = 0f
         do { w.step(Match.STEP); t += Match.STEP } while (w.hazards.isNotEmpty() && t < 6f)
         assertTrue(target.alive)
         assertEquals(1, target.hp)
         assertEquals(0, varun.kos)
-    }
-
-    @Test fun rocketRainCanBeSteppedOutOfAtTheLastMoment() {
-        val (w, varun, target) = varunBehindAWall()
-        varun.superCharge = 1f; varun.control.superAttack = true
+        // Aimed somewhere else, it lands somewhere else: nothing steers it onto the target.
+        target.hp = target.maxHp
+        varun.superCharge = 1f
+        varun.control.aimX = -(target.x - varun.x); varun.control.aimY = 0f; varun.control.superAttack = true
         w.step(Match.STEP)
-        val first = w.hazards[0]
-        while (first.age < first.delay - Balance.RAIN_LOCK_SECONDS) w.step(Match.STEP)
-        val x = first.x
-        target.x += 0.5f
+        while (w.hazards.isNotEmpty()) w.step(Match.STEP)
+        assertEquals("a rain aimed away misses", target.maxHp, target.hp)
+        // And it can't be thrown further than its range.
+        varun.superCharge = 1f
+        varun.control.aimX = 50f; varun.control.aimY = 0f; varun.control.superAttack = true
         w.step(Match.STEP)
-        assertEquals("once locked, a mark stays where it is", x, first.x, 0f)
+        assertEquals(varun.x + spec.range, w.hazards[0].x, 0.01f)
     }
 
     @Test fun aHyperBuffsDamageHealthAndShield() {

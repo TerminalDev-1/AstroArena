@@ -455,6 +455,12 @@ class BotBrain(
             superDelay -= dt
             if (superDelay <= 0f && wantsSuper(t, d, clear)) {
                 aimAt(t, superProjectileSpeed())
+                // A rain of rockets is aimed at a spot, not along a line: where the target will be when it lands.
+                if (me.def.superSpec.kind == SuperKind.SWARM) {
+                    val ahead = io.github.projectwip.data.Balance.RAIN_DELAY_SECONDS * profile.leadFactor
+                    c.aimX = t.x + t.vx * ahead - me.x
+                    c.aimY = t.y + t.vy * ahead - me.y
+                }
                 c.superAttack = true
                 superDelay = -1f
                 return

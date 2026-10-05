@@ -14,11 +14,9 @@ enum class HazardKind { ROCKET, MINE, SLAM }
  * it. The mark is there from the start, so it can always be walked out of.
  */
 class Hazard(
-    val ownerId: Int, val team: Int, var x: Float, var y: Float, val radius: Float, val delay: Float, val damage: Int, val kind: HazardKind,
+    val ownerId: Int, val team: Int, val x: Float, val y: Float, val radius: Float, val delay: Float, val damage: Int, val kind: HazardKind,
     /** False: it can take a fighter down to its last point of health, but never knocks it out. */
     val lethal: Boolean = true,
-    /** A fighter the mark follows (keeping [offX], [offY] from it) until [lock] seconds before it goes off. -1: it stays put. */
-    val targetId: Int = -1, val offX: Float = 0f, val offY: Float = 0f, val lock: Float = 0f,
 ) {
     var age = 0f
 }
