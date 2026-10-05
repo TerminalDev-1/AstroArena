@@ -315,6 +315,45 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("POST", "/v1/players", {"name": "Two"})[0], 201)
         self.assertEqual(self.call("POST", "/v1/players", {"name": "Three"})[0], 429)
 
+    def test_the_1v1_lobby_pairs_two_players_and_passes_their_inputs(self):
+        import json as _json, socket, struct
+
+        def text(sock):
+            (length,) = struct.unpack(">H", sock.recv(2))
+            return sock.recv(length).decode()
+
+        def join(player, fighter="JUNO"):
+            sock = socket.create_connection(("127.0.0.1", self.httpd.duel.server_address[1]), timeout=5)
+            body = _json.dumps({"token": player["token"], "version": VERSION, "fighter": fighter, "skin": 0}).encode()
+            sock.sendall(b"H" + struct.pack(">H", len(body)) + body)
+            return sock
+
+        self.assertIsNotNone(self.httpd.duel)
+        one, two = self.player("Ada"), self.player("Bo")
+        # A fighter that isn't unlocked is turned away, with the reason.
+        cheat = join(one, "VARUN")
+        self.assertEqual(cheat.recv(1), b"E")
+        self.assertIn("unlocked", text(cheat))
+        cheat.close()
+        a = join(one)
+        b = join(two)
+        starts = []
+        for sock in (a, b):
+            self.assertEqual(sock.recv(1), b"S")
+            starts.append(_json.loads(text(sock)))
+        self.assertEqual(starts[0]["seed"], starts[1]["seed"])
+        self.assertEqual({starts[0]["side"], starts[1]["side"]}, {0, 1})
+        self.assertTrue(all(isinstance(s["opponent"]["name"], str) and s["opponent"]["name"] for s in starts))
+        self.assertEqual((starts[0]["level"], starts[0]["opponent"]["fighter"]), (1, "JUNO"))
+        # A frame one sends reaches the other untouched.
+        frame = b"I" + bytes(range(17))
+        a.sendall(frame)
+        self.assertEqual(b.recv(18), frame)
+        # When one hangs up, the other is told.
+        a.close()
+        self.assertEqual(b.recv(1), b"X")
+        b.close()
+
     def test_the_news_tab_reads_news_cfg(self):
         status, body = self.call("GET", "/v1/news")
         self.assertEqual(status, 200)

@@ -27,7 +27,15 @@ data class MatchConfig(
     val botNames: List<String> = emptyList(),
     /** The server's id for this match (0 = set up on the device). */
     val serverMatchId: Long = 0,
+    /** A 1v1 against a real player: who they are and which side this device plays. Null: a 1v1 is against a bot. */
+    val duel: DuelSetup? = null,
 )
+
+/**
+ * The other player in a 1v1. Both devices build the same two fighters in the same order (side 0 first), so that
+ * their simulations match; [side] is which of the two this device's player is.
+ */
+data class DuelSetup(val side: Int, val fighter: FighterId, val level: Int, val skin: Int, val name: String)
 
 /** A complete match: world + bot brains. Advance it with [step]. */
 class Match(val config: MatchConfig) {
@@ -51,10 +59,24 @@ class Match(val config: MatchConfig) {
         val passive = HashSet<Fighter>()
         val roster = ArrayList<Fighter>()
         var id = 0
-        player = Fighter(id++, Balance.fighter(config.playerFighter), config.playerLevel, config.playerSkin, 0, config.playerName, isBot = !config.humanPlayer)
-        roster += player
+        val duel = config.duel.takeIf { config.mode == GameMode.DUEL }
+        if (duel != null) {
+            // Two real players. Fighter 0 is side 0 on both devices, whoever's device this is.
+            val mine = Fighter(duel.side, Balance.fighter(config.playerFighter), config.playerLevel, config.playerSkin, duel.side, config.playerName, isBot = false)
+            val theirs = Fighter(1 - duel.side, Balance.fighter(duel.fighter), duel.level, duel.skin, 1 - duel.side, duel.name, isBot = false)
+            player = mine
+            roster += if (duel.side == 0) listOf(mine, theirs) else listOf(theirs, mine)
+        } else {
+            player = Fighter(id++, Balance.fighter(config.playerFighter), config.playerLevel, config.playerSkin, 0, config.playerName, isBot = !config.humanPlayer)
+            roster += player
+        }
         // Bots use the same level as the player — difficulty comes from behaviour, never from stats.
-        if (freeForAll) {
+        if (duel != null) {
+            // Nobody else is in a 1v1.
+        } else if (config.mode == GameMode.DUEL) {
+            // No real opponent (offline): a bot stands in, for practice.
+            roster += botFighter(id++, 1, names.next())
+        } else if (freeForAll) {
             repeat(config.mode.players - 1) { roster += botFighter(id, team = id, names.next()); id++ }
         } else if (practice) {
             // Everything stands where it is put, at fixed strength. Order matches the arena's spawn list:
@@ -75,8 +97,9 @@ class Match(val config: MatchConfig) {
             repeat(2) { roster += botFighter(id++, 0, names.next()) }
             repeat(3) { roster += botFighter(id++, 1, names.next()) }
         }
-        val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.trainingArea() else if (bossMode) Arenas.provingGround() else Arenas.foundryYard()
-        val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.training() else if (bossMode) MatchRules.bossMode() else MatchRules.knockoutRush()
+        val oneOnOne = config.mode == GameMode.DUEL
+        val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.trainingArea() else if (bossMode || oneOnOne) Arenas.provingGround() else Arenas.foundryYard()
+        val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.training() else if (bossMode) MatchRules.bossMode() else if (oneOnOne) MatchRules.duel() else MatchRules.knockoutRush()
         world = World(arena, roster, rules, Random(rng.nextLong()))
         pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
@@ -89,6 +112,9 @@ class Match(val config: MatchConfig) {
         val skin = rng.nextInt(def.skins.size)
         return Fighter(id, def, config.playerLevel, skin, team, name, isBot = true)
     }
+
+    /** In a 1v1, the other fighter. */
+    val opponent: Fighter? get() = if (config.mode == GameMode.DUEL) world.fighters.firstOrNull { it !== player } else null
 
     /** What the player's control held on every tick so far: the record the server replays to judge the match. */
     val inputs = InputLog()

@@ -31,12 +31,13 @@ class MatchView(
     private val matchesPlayed: Int,
     onPauseRequested: () -> Unit,
     onFinished: (MatchReport) -> Unit,
+    duel: io.github.projectwip.net.DuelLink? = null,
 ) : FrameLayout(context), SurfaceHolder.Callback {
     private val main = Handler(Looper.getMainLooper())
     private val controls = TouchControls(resources.displayMetrics.density)
     private val runner = MatchRunner(match, settings, sfx, controls,
         onPause = { main.post(onPauseRequested) },
-        onFinished = { r -> main.post { onFinished(r) } })
+        onFinished = { r -> main.post { onFinished(r) } }, duel = duel)
     private val channel = HudChannel()
     private val surface = SurfaceView(context)
     private val hud = HudView(context, channel, runner)

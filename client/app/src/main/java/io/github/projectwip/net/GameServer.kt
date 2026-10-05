@@ -458,6 +458,21 @@ class GameServer(context: Context) {
         }
     }
 
+    /** The line to the server's 1v1 lobby (it listens one port above the game server), or null when offline. */
+    fun duelLink(): DuelLink? {
+        if (!_status.value.online) return null
+        return try {
+            val url = URL(baseUrl)
+            DuelLink(url.host, (if (url.port > 0) url.port else 80) + 1)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** What this player tells the lobby: who they are and the fighter they bring. Its level is the server's to say. */
+    fun duelHello(fighter: FighterId, skin: Int): JSONObject =
+        JSONObject().put("token", token.orEmpty()).put("version", version).put("fighter", fighter.name).put("skin", skin)
+
     /** The News tab's items, newest first, or null when the server can't be asked. */
     fun news(): List<NewsItem>? {
         if (!_status.value.online) return null

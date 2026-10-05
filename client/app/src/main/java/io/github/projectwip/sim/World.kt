@@ -36,6 +36,8 @@ data class MatchRules(
         fun lastSpark() = MatchRules(freeForAll = true, durationSeconds = Float.MAX_VALUE)
         /** The player wins by knocking out the boss, and has unlimited lives to do it. */
         fun bossMode() = MatchRules(koTarget = 1, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, boss = true)
+        /** One against one: first to three knockouts, or whoever is ahead after two minutes. */
+        fun duel() = MatchRules(koTarget = 3, durationSeconds = 120f)
         fun training() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, practice = true)
     }
 }
@@ -164,6 +166,11 @@ class World(
             timeLeft = 0f
             end(if (score[0] > score[1]) 0 else if (score[1] > score[0]) 1 else -1)
         }
+    }
+
+    /** [team] gives up (in a 1v1: its player left): the other team wins on the spot. */
+    fun forfeit(team: Int) {
+        if (phase != Phase.ENDED) end(1 - team)
     }
 
     private fun end(winner: Int) {

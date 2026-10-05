@@ -511,6 +511,45 @@ class SimulationTest {
         assertEquals("and the rain comes down sooner", Balance.RAIN_DELAY_SECONDS / varun.def.hyper!!.shotSpeed, w.hazards[0].delay, 0.001f)
     }
 
+    @Test fun twoDevicesStayInStepInA1v1() {
+        // The same match as each device builds it: one plays side 0, the other side 1.
+        val a = Match(MatchConfig(FighterId.VARUN, 5, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 9L, duel = io.github.projectwip.sim.DuelSetup(0, FighterId.KITO, 7, 1, "B")))
+        val b = Match(MatchConfig(FighterId.KITO, 7, 1, "B", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 9L, duel = io.github.projectwip.sim.DuelSetup(1, FighterId.VARUN, 5, 0, "A")))
+        assertEquals("each device's player is on its own side", 0 to 1, a.player.team to b.player.team)
+        assertTrue("nobody in a 1v1 is a bot", a.brains.isEmpty() && a.world.fighters.none { it.isBot } && a.world.fighters.size == 2)
+        assertEquals(listOf("A", "B"), a.world.fighters.map { it.name })
+        assertEquals("both devices line the fighters up the same way", a.world.fighters.map { it.name to it.def.id }, b.world.fighters.map { it.name to it.def.id })
+        val hands = Random(3)
+        var t = 0
+        while (t < 60 * 90 && !a.isOver) {
+            // What each player does goes to both devices.
+            for ((me, there) in listOf(a.player to b.opponent!!.control, b.player to a.opponent!!.control)) {
+                val here = me.control
+                val foe = (if (me === a.player) a.opponent else b.opponent)!!
+                // Each walks at the other, weaving, and shoots at them most of the time.
+                if (t % 9 == 0) { here.moveX = (foe.x - me.x) * 0.3f + hands.nextFloat() - 0.5f; here.moveY = (foe.y - me.y) * 0.3f + hands.nextFloat() - 0.5f }
+                here.aiming = true
+                here.aimX = foe.x - me.x + hands.nextFloat() - 0.5f; here.aimY = foe.y - me.y + hands.nextFloat() - 0.5f
+                here.attack = hands.nextInt(7) == 0; here.superAttack = hands.nextInt(30) == 0; here.hyper = hands.nextInt(40) == 0
+                there.moveX = here.moveX; there.moveY = here.moveY; there.aimX = here.aimX; there.aimY = here.aimY
+                there.aiming = here.aiming; there.attack = here.attack; there.superAttack = here.superAttack; there.hyper = here.hyper
+            }
+            a.step(Match.STEP); b.step(Match.STEP)
+            a.world.events.clear(); b.world.events.clear()
+            t++
+        }
+        fun state(m: Match) = m.world.fighters.map { listOf(it.x, it.y, it.hp, it.shieldHp, it.kos, it.superCharge, it.hyperCharge) } + listOf(m.world.score.toList(), listOf(m.world.phase, m.world.winningTeam))
+        assertEquals("after $t ticks the two devices agree on everything", state(a), state(b))
+        assertTrue("and something happened", a.world.fighters.sumOf { it.damageDealt } > 0)
+        // One player leaving hands the other the win.
+        val c = Match(MatchConfig(FighterId.JUNO, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L, duel = io.github.projectwip.sim.DuelSetup(1, FighterId.JUNO, 1, 0, "B")))
+        c.world.forfeit(c.opponent!!.team)
+        assertEquals(io.github.projectwip.data.MatchOutcome.VICTORY, c.report().outcome)
+        // Offline, a 1v1 is practice against one bot.
+        val d = Match(MatchConfig(FighterId.JUNO, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L))
+        assertEquals(1, d.brains.size)
+    }
+
     @Test fun theHyperChargesFromHitsAndBotsUseIt() {
         val m = Match(MatchConfig(FighterId.VARUN, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 21L))
         var hypers = 0

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +89,27 @@ fun MatchScreen(
     config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed: Int,
     server: io.github.projectwip.net.GameServer?, onCancel: () -> Unit, onFinish: (MatchSummary) -> Unit,
 ) {
+    // Decided once, as the match is asked for: online it is against a real player, offline against a bot for practice.
+    // (If the connection is still coming up, it gets a few seconds to, so a 1v1 asked for at start-up isn't offline.)
+    var duelOnline by remember {
+        mutableStateOf(if (config.mode != io.github.projectwip.data.GameMode.DUEL || server == null) false else if (server.status.value.online) true else null)
+    }
+    LaunchedEffect(Unit) {
+        if (duelOnline != null) return@LaunchedEffect
+        repeat(60) {
+            if (server?.status?.value?.online == true) { duelOnline = true; return@LaunchedEffect }
+            kotlinx.coroutines.delay(100)
+        }
+        duelOnline = false
+    }
+    if (duelOnline == null) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF1C143A)), contentAlignment = Alignment.Center) { GameText("CONNECTING…", Type.Title, outline = 3.5.dp) }
+        return
+    }
+    if (duelOnline == true && server != null) {
+        DuelMatch(config, settings, sfx, matchesPlayed, server, onCancel, onFinish)
+        return
+    }
     var match by remember { mutableStateOf<Match?>(null) }
     var started by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -108,6 +130,52 @@ fun MatchScreen(
     else if (matchmade) Matchmaking(config, ready, onCancel) { started = true }
     else Box(Modifier.fillMaxSize().background(Color(0xFF1C143A)), contentAlignment = Alignment.Center) {
         GameText("LOADING THE ARENA…", Type.Title, outline = 3.5.dp)
+    }
+}
+
+/**
+ * A 1v1 against a real player: joins the server's lobby, waits there for someone else to join, then plays the
+ * match in step with their device. Leaving (or cancelling the wait) hangs up, which hands the other player the win.
+ */
+@Composable
+private fun DuelMatch(
+    config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed: Int,
+    server: io.github.projectwip.net.GameServer, onCancel: () -> Unit, onFinish: (MatchSummary) -> Unit,
+) {
+    val link = remember { server.duelLink() }
+    var match by remember { mutableStateOf<Match?>(null) }
+    var problem by remember { mutableStateOf<String?>(null) }
+    val time by io.github.projectwip.ui.rememberAnimTime()
+    LaunchedEffect(Unit) {
+        if (link == null) { problem = "The 1v1 lobby is on the game server, and it can't be reached right now."; return@LaunchedEffect }
+        val start = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { link.find(server.duelHello(config.playerFighter, config.playerSkin)) }
+        if (start == null) problem = link.error ?: "Couldn't join the 1v1 lobby. Is the server's 1v1 port (its port + 1) open on the network?"
+        else match = Match(config.copy(seed = start.seed, playerLevel = start.level, duel = start.setup, humanPlayer = true))
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { link?.close() } }
+    val ready = match
+    if (ready != null) { MatchBody(ready, settings, sfx, matchesPlayed, onFinish, link); return }
+    BackHandler(onBack = onCancel)
+    val me = io.github.projectwip.data.Balance.fighter(config.playerFighter)
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        io.github.projectwip.ui.GameBackground(Modifier.fillMaxSize())
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            PlainText("1V1 · " + config.mode.tagline, Type.Label, color = io.github.projectwip.ui.Palette.TextDim)
+            Box(Modifier.size(220.dp), contentAlignment = Alignment.Center) {
+                io.github.projectwip.ui.FighterRays(Modifier.fillMaxSize(), Color(me.skins[config.playerSkin.coerceIn(0, me.skins.lastIndex)].secondary))
+                io.github.projectwip.ui.FighterView(me, config.playerSkin, Modifier.fillMaxSize(), pedestal = false)
+            }
+            val p = problem
+            if (p == null) {
+                GameText("WAITING FOR AN OPPONENT" + ".".repeat(1 + (time * 2.5f).toInt() % 3), Type.Title, outline = 3.5.dp, modifier = Modifier.width(520.dp))
+                PlainText("The match starts as soon as another player on this server picks 1v1.", Type.Body, color = Color.White, align = TextAlign.Center)
+                PlainText("This is a test mode: nothing is earned or lost in it yet.", Type.Small, color = io.github.projectwip.ui.Palette.Gold)
+            } else {
+                GameText("NO 1V1 RIGHT NOW", Type.Title, color = io.github.projectwip.ui.Palette.Gold, outline = 3.5.dp)
+                PlainText(p, Type.Body, color = Color.White, align = TextAlign.Center, modifier = Modifier.width(520.dp))
+            }
+            ChunkyButton(onCancel, Modifier.size(200.dp, 52.dp), ButtonStyle.RED, lip = 4.dp, sound = io.github.projectwip.audio.Sound.UI_BACK) { GameText(if (p == null) "CANCEL" else "BACK", Type.Heading) }
+        }
     }
 }
 
@@ -201,7 +269,7 @@ private fun Slot(fighter: io.github.projectwip.sim.Fighter?, you: Boolean, phase
 }
 
 @Composable
-private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed: Int, onFinish: (MatchSummary) -> Unit) {
+private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed: Int, onFinish: (MatchSummary) -> Unit, duel: io.github.projectwip.net.DuelLink? = null) {
     var paused by remember { mutableStateOf(false) }
     var view by remember { mutableStateOf<MatchView?>(null) }
     var done by remember { mutableStateOf(false) }
@@ -221,6 +289,8 @@ private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed:
     BackHandler(enabled = !done) {
         if (intro) return@BackHandler
         paused = !paused
+        // A 1v1 can't be stopped: the other player is still playing. The menu opens over the running match.
+        if (duel != null) return@BackHandler
         if (paused) view?.paused = true else view?.resumeGame()
     }
 
@@ -228,8 +298,9 @@ private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed:
         AndroidView(
             factory = { ctx ->
                 MatchView(ctx, match, settings, sfx, matchesPlayed,
-                    onPauseRequested = { if (!done && !intro) { paused = true; view?.paused = true } },
+                    onPauseRequested = { if (!done && !intro) { paused = true; if (duel == null) view?.paused = true } },
                     onFinished = { report -> finish(report) },
+                    duel = duel,
                 ).also { view = it; it.paused = intro }
             },
             modifier = Modifier.fillMaxSize(),
@@ -240,9 +311,9 @@ private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed:
                 Panel(cut = 20.dp) {
                     Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         GameText("PAUSED", Type.Display, outline = 4.dp)
-                        PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
+                        PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else if (duel != null) "The match is still going: your opponent can't be paused. Leaving hands them the win." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
-                        ChunkyButton({ paused = false; view?.resumeGame() }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN) { GameText("RESUME", Type.Title) }
+                        ChunkyButton({ paused = false; if (duel == null) view?.resumeGame() }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN) { GameText("RESUME", Type.Title) }
                         ChunkyButton({ finish(match.forfeit()) }, Modifier.size(260.dp, 54.dp), ButtonStyle.RED) {
                             GameText("LEAVE MATCH", Type.Heading)
                         }

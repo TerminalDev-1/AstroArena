@@ -134,6 +134,8 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
     BOSS("Boss Mode", "You against a boss · unlimited lives", 2),
     /** Practice: dummies, a swarm and a boss that just stand there, plus one sentry gun. No timer, nothing won or lost. */
     TRAINING("Training Area", "Dummies, a swarm, a sentry and a boss · no stakes", 19),
+    /** One real player against another, each on their own device. Nothing is earned in it yet. */
+    DUEL("1v1", "You against one real player · first to 3 knockouts", 2),
 }
 
 object Balance {

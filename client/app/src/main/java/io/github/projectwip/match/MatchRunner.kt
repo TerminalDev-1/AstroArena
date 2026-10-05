@@ -36,7 +36,16 @@ class MatchRunner(
     val controls: TouchControls,
     private val onPause: () -> Unit,
     private val onFinished: (MatchReport) -> Unit,
+    /** In a 1v1 against a real player: the line to them. Ticks only run once both players' inputs are in. */
+    private val duel: io.github.projectwip.net.DuelLink? = null,
 ) {
+    /** The next tick the simulation will run (1v1 only). */
+    private var simTick = 0
+    /** Seconds spent waiting for the other player's inputs. */
+    private var stalled = 0f
+    /** True while a 1v1 is held up waiting for the other player: the HUD says so. */
+    @Volatile var waitingForOpponent = false
+        private set
     val input = TouchControls.Input()
     /** Events produced during the last [update] — consumed by the renderer for effects. */
     val frameEvents = ArrayList<GameEvent>()
@@ -55,6 +64,7 @@ class MatchRunner(
     fun update(dt: Float): Float {
         frameEvents.clear()
         if (paused) { controls.poll(input); return 1f }
+        acc = acc.coerceAtMost(0.25f)
         acc += dt
         while (acc >= Match.STEP) {
             tick()
@@ -88,6 +98,30 @@ class MatchRunner(
             c.superAttack = true
         }
         if (input.hyper && p.hyperReady) c.hyper = true
+
+        val link = duel
+        val them = match.opponent
+        if (link != null && them != null && !match.isOver) {
+            if (link.remoteLeft) {
+                // The other player has gone: the match is this player's.
+                match.world.forfeit(them.team)
+            } else {
+                // What the player wants now is recorded, to be played a few ticks from now on both devices...
+                if (link.sent <= simTick) link.sendLocal(c)
+                // ...and this tick only runs if both players' inputs for it have arrived.
+                if (!link.ready(simTick)) {
+                    c.attack = false; c.superAttack = false; c.hyper = false
+                    stalled += Match.STEP
+                    waitingForOpponent = stalled > 0.4f
+                    if (stalled > 8f) link.close()
+                    return
+                }
+                stalled = 0f
+                waitingForOpponent = false
+                link.apply(simTick, c, them.control)
+                simTick++
+            }
+        }
 
         val ammoBefore = p.ammo
         val tried = c.attack
