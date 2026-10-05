@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -38,6 +38,8 @@ object SfxSynth {
         Sound.KO -> knockOut().finish(0.85f)
         Sound.SUPER_READY -> superReady().finish(0.7f)
         Sound.HYPER -> hyper().finish(0.9f)
+        Sound.ROCKET -> rocket().finish(0.8f)
+        Sound.ROCKET_BOOM -> rocketBoom().finish(0.9f)
         Sound.TICK -> tick().finish(0.6f)
         Sound.GO -> go().finish(0.8f)
         Sound.TAP -> tap().finish(0.5f)
@@ -530,6 +532,22 @@ object SfxSynth {
         bell(0.5f, 88, 0.6f, 0.09f)
         bell(0.58f, 93, 0.7f, 0.1f)
         echo(0.13f, 0.35f, 0.25f)
+    }
+
+    /** A rocket leaving: a cough from the tube, then a hiss of exhaust that climbs as it flies off. */
+    private fun rocket() = Clip(0.65f).apply {
+        osc(Wave.SINE, 0f, 0.14f, { glide(it, 0.1f, 230f, 70f) }, { perc(it, 0.002f, 0.07f) * 0.85f })
+        noise(71, 0f, 0.55f, Band.BAND, { glide(it, 0.5f, 650f, 3800f) }, 1.6f, { perc(it, 0.02f, 0.3f) * 0.6f })
+        noise(72, 0f, 0.5f, Band.HIGH, { 5200f }, 0.7f, { perc(it, 0.03f, 0.2f) * 0.12f })
+        osc(Wave.SAW, 0f, 0.45f, { glide(it, 0.45f, 85f, 250f) }, { perc(it, 0.03f, 0.22f) * 0.15f })
+    }
+
+    /** A rocket going off: a crack, a deep boom, and the rumble of what it knocked loose. */
+    private fun rocketBoom() = Clip(0.9f).apply {
+        noise(73, 0f, 0.06f, Band.HIGH, { 6000f }, 0.7f, { perc(it, 0.001f, 0.02f) * 0.7f })
+        osc(Wave.SINE, 0f, 0.5f, { glide(it, 0.35f, 150f, 34f) }, { perc(it, 0.002f, 0.22f) })
+        noise(74, 0f, 0.8f, Band.LOW, { glide(it, 0.5f, 3400f, 170f) }, 0.8f, { perc(it, 0.004f, 0.3f) * 0.8f })
+        drive(1.3f)
     }
 
     private fun superReady() = Clip(0.95f).apply {

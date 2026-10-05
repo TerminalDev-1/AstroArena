@@ -574,7 +574,7 @@ class World(
                 if (!before && source.superReady) events += GameEvent.SuperReady(source.id)
                 // Hits charge the hyper even while one is running, so the next can follow straight on.
                 if (source.hyperCharge < 1f) {
-                    source.hyperCharge = (source.hyperCharge + source.def.superChargePerHit * Balance.HYPER_CHARGE_RATE).coerceAtMost(1f)
+                    source.hyperCharge = (source.hyperCharge + source.def.superChargePerHit * Balance.HYPER_CHARGE_RATE * (source.def.hyper?.charge ?: 1f)).coerceAtMost(1f)
                     if (source.hyperCharge >= 1f) events += GameEvent.HyperReady(source.id)
                 }
             }

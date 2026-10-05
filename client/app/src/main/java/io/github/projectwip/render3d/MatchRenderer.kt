@@ -50,6 +50,9 @@ class MatchRenderer(
 
     private lateinit var sphere: Mesh
     private lateinit var octa: Mesh
+    /** A rocket lying along +X, one unit long: the body, and (drawn in a second colour) its nose cone, fins and nozzle. */
+    private lateinit var rocketBody: Mesh
+    private lateinit var rocketTrim: Mesh
     private lateinit var disc: Mesh
     private lateinit var ring: Mesh
     private lateinit var dashRing: Mesh
@@ -117,6 +120,14 @@ class MatchRenderer(
         sprites = SpriteBatch()
         sphere = MeshBuilder().apply { sphere(1f, 10, 14) }.build()
         octa = MeshBuilder().apply { ellipsoid(1f, 1f, 1f, 2, 4) }.build()
+        rocketBody = MeshBuilder().apply { with { rotate(-90f, 0f, 0f, 1f); cylinder(0.14f, 0.56f, 12) } }.build()
+        rocketTrim = MeshBuilder().apply {
+            with { translate(0.42f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); cylinder(0.14f, 0.28f, 12, topRadius = 0f) }
+            with { translate(-0.33f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); cylinder(0.07f, 0.1f, 10, topRadius = 0.11f) }
+            with { translate(0.05f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); cylinder(0.15f, 0.07f, 12) }
+            with { translate(-0.2f, 0f, 0f); roundedBox(0.22f, 0.5f, 0.045f, 0.015f) }
+            with { translate(-0.2f, 0f, 0f); roundedBox(0.22f, 0.045f, 0.5f, 0.015f) }
+        }.build()
         disc = MeshBuilder().apply { ring(0f, 1f, 40) }.build()
         ring = MeshBuilder().apply { ring(0.82f, 1f, 48) }.build()
         dashRing = MeshBuilder().apply { for (k in 0 until 8) ring(0.9f, 1f, 6, k * 45f, k * 45f + 28f) }.build()
@@ -714,18 +725,21 @@ class MatchRenderer(
                     setModel(x, 0.75f, z, if (big) 0.85f else 0.42f, pr.radius * 0.9f, pr.radius * 0.9f, yaw); octa.draw()
                 }
                 ShotStyle.ROCKET -> {
-                    // A fat rocket: a long body in the fighter's colour, a bright nose, and a flame flickering at its tail.
+                    // A proper rocket: a body in the fighter's colour, a nose cone and fins in its second, and a flame at its tail.
                     val y = 0.72f
                     val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
                     val dx = pr.vx / len; val dz = pr.vy / len
                     val k = pr.radius / 0.2f
+                    val size = 0.85f * k
                     tint(skin.primary)
-                    setModel(x, y, z, 0.62f * k, 0.2f * k, 0.2f * k, yaw); octa.draw()
+                    setModel(x, y, z, size, size, size, yaw); rocketBody.draw()
                     tint(skin.secondary)
-                    setModel(x + dx * 0.24f * k, y, z + dz * 0.24f * k, 0.15f * k, 0.15f * k, 0.15f * k); sphere.draw()
-                    val flame = (0.2f + 0.07f * sin(time * 40f + pr.x * 9f)) * k
+                    setModel(x, y, z, size, size, size, yaw); rocketTrim.draw()
+                    val flame = (0.16f + 0.06f * sin(time * 40f + pr.x * 9f)) * k
                     tint(0xFFFFE066L)
-                    setModel(x - dx * 0.36f * k, y, z - dz * 0.36f * k, flame * 1.5f, flame, flame, yaw); sphere.draw()
+                    setModel(x - dx * 0.5f * size, y, z - dz * 0.5f * size, flame * 2f, flame, flame, yaw); sphere.draw()
+                    tint(0xFFFF7A1FL)
+                    setModel(x - dx * 0.68f * size, y, z - dz * 0.68f * size, flame * 1.6f, flame * 0.7f, flame * 0.7f, yaw); sphere.draw()
                 }
             }
         }

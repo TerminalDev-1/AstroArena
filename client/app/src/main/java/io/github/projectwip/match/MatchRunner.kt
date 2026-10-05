@@ -196,7 +196,8 @@ class MatchRunner(
                 if (e.isSuper) sfx.play(Sound.SUPER, gain)
                 else sfx.play(when (f.def.attack.shape) {
                     AttackShape.BURST -> Sound.SHOOT_SPARK
-                    AttackShape.SPREAD, AttackShape.ROCKETS -> Sound.SHOOT_HEAVY
+                    AttackShape.SPREAD -> Sound.SHOOT_HEAVY
+                    AttackShape.ROCKETS -> Sound.ROCKET
                     AttackShape.LANCE -> Sound.SHOOT_PRISM
                 }, gain, 0.95f + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
@@ -226,8 +227,8 @@ class MatchRunner(
             is GameEvent.Blast -> {
                 val p = match.player
                 val near = 1f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)
-                sfx.play(Sound.CRATE_BREAK, near, 0.7f)
-                sfx.play(Sound.SHOOT_HEAVY, near * 0.8f, 0.6f)
+                if (e.kind == io.github.projectwip.sim.HazardKind.ROCKET) sfx.play(Sound.ROCKET_BOOM, near, 0.9f)
+                else { sfx.play(Sound.CRATE_BREAK, near, 0.7f); sfx.play(Sound.SHOOT_HEAVY, near * 0.8f, 0.6f) }
             }
             is GameEvent.SuperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY); sfx.buzz(25, 120) }
             is GameEvent.HyperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY, 1f, 1.35f); sfx.buzz(25, 120) }
@@ -243,7 +244,11 @@ class MatchRunner(
             is GameEvent.Spawned -> if (e.fighterId == pid) say(VoiceCue.BACK)
             is GameEvent.Burst -> {
                 val p = match.player
-                sfx.play(Sound.SHOOT_HEAVY, 0.55f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f), 0.7f)
+                sfx.play(Sound.ROCKET_BOOM, 0.5f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f), 1.15f + (e.x % 0.2f))
+            }
+            is GameEvent.Launch -> {
+                val f = world.fighter(e.fighterId) ?: return
+                sfx.play(Sound.ROCKET, (if (e.fighterId == pid) 1f else 0.6f) / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f), 0.72f)
             }
             is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
             is GameEvent.Eliminated -> if (e.fighterId == pid) sfx.play(Sound.DEFEAT)

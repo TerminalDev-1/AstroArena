@@ -110,6 +110,8 @@ data class HyperSpec(
     val shotSpeed: Float = 1f,
     /** The super charges this many times as fast. */
     val superCharge: Float = 1f,
+    /** This fighter's hyper itself charges this many times as fast as a plain one, all the time. */
+    val charge: Float = 1f,
 )
 
 /** The moments a fighter with a voice speaks up. */
@@ -323,22 +325,22 @@ object Balance {
             role = "Artillery",
             lore = "An Indian firefighter who was captured and told to work for the people of the Sparks. He has never left since. Nobody knows why.",
             attackName = "Rocket Pack",
-            health = StatLine(4800, 240),
-            attackDamage = StatLine(260, 13),
-            superDamage = StatLine(1000, 50),
+            health = StatLine(5200, 260),
+            attackDamage = StatLine(340, 17),
+            superDamage = StatLine(1200, 60),
             moveSpeed = 3.65f,
             attack = AttackSpec(AttackShape.ROCKETS, projectiles = 6, spreadDegrees = 0f, range = 8.5f, speed = 14f, radius = 0.17f, burstInterval = 0.1f, blast = 1.0f, lanes = 3),
             superSpec = SuperSpec(SuperKind.SWARM, "Rocket Rain", "Fires 8 rockets into the sky. They rain down inside one big circle, wherever you aim, over any wall. They hit hard, but never land the knockout.", projectiles = 8, range = 9f, speed = 10f, radius = 2.3f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
-            superChargePerHit = 0.045f,
+            superChargePerHit = 0.06f,
             radius = 0.44f,
             skins = listOf(
                 Skin("Fire Engine", 0xFFD9342B, 0xFFFFC72C, 0xFFFFF1C2, 0),
                 Skin("Monsoon", 0xFF1F6FB5, 0xFF2ED8A3, 0xFFE6F7FF, 20),
                 Skin("Marigold", 0xFFFF9F1C, 0xFF7B2CBF, 0xFFFFF3B0, 20),
             ),
-            hyper = HyperSpec("Five Alarm", "Lasts 14 seconds. His rockets fly faster, and his super charges half as fast again.", seconds = 14f, shotSpeed = 1.4f, superCharge = 1.5f),
+            hyper = HyperSpec("Five Alarm", "Lasts 14 seconds. His rockets fly faster, and his super charges half as fast again.", seconds = 14f, shotSpeed = 1.4f, superCharge = 1.5f, charge = 1.5f),
             voice = mapOf(
                 VoiceCue.START to listOf("Varun reporting. Where is the fire?", "Hoses down. Rockets up."),
                 VoiceCue.SUPER to listOf("Look up!", "No wall will save you!"),
