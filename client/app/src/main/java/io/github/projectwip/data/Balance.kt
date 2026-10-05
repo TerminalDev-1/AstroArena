@@ -223,6 +223,11 @@ object Balance {
     /** Prisms for the first victory each calendar day (the server pays them; this is for showing it). */
     const val FIRST_WIN_PRISMS = 10
 
+    // The floor every fighter stands on, so that fights are even: at least [MIN_HEALTH] health, and at least
+    // [MIN_AMMO_DAMAGE] damage from one ammo when all of its projectiles land. (Level 1; each level adds a twentieth.)
+    const val MIN_HEALTH = 5600
+    const val MIN_AMMO_DAMAGE = 1500
+
     val fighters: List<FighterDef> = listOf(
         FighterDef(
             id = FighterId.JUNO,
@@ -232,8 +237,8 @@ object Balance {
             role = "Skirmisher",
             lore = "Delivers parcels and bad news at the same speed. Her coil blaster was a toaster once.",
             attackName = "Spark Burst",
-            health = StatLine(3800, 200),
-            attackDamage = StatLine(460, 24),
+            health = StatLine(5600, 280),
+            attackDamage = StatLine(500, 25),
             superDamage = StatLine(560, 28),
             moveSpeed = 3.7f,
             attack = AttackSpec(AttackShape.BURST, projectiles = 3, spreadDegrees = 6f, range = 7.5f, speed = 17f, radius = 0.16f, burstInterval = 0.075f),
@@ -256,7 +261,7 @@ object Balance {
             lore = "Built himself out of a forklift and a grudge. Prefers to discuss things up close.",
             attackName = "Scrap Cannon",
             health = StatLine(5600, 280),
-            attackDamage = StatLine(240, 12),
+            attackDamage = StatLine(300, 15),
             superDamage = StatLine(1280, 64),
             moveSpeed = 3.45f,
             attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 34f, range = 4.6f, speed = 15f, radius = 0.17f, burstInterval = 0f),
@@ -279,8 +284,8 @@ object Balance {
             role = "Marksman",
             lore = "Bends starlight through a cut crystal. Never misses twice — usually never once.",
             attackName = "Prism Shot",
-            health = StatLine(2800, 140),
-            attackDamage = StatLine(1040, 52),
+            health = StatLine(5600, 280),
+            attackDamage = StatLine(1500, 75),
             superDamage = StatLine(1920, 96),
             moveSpeed = 3.5f,
             attack = AttackSpec(AttackShape.LANCE, projectiles = 1, spreadDegrees = 0f, range = 10f, speed = 22f, radius = 0.18f, burstInterval = 0f),
@@ -303,7 +308,7 @@ object Balance {
             role = "Assassin",
             lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming.",
             attackName = "Arc Slash",
-            health = StatLine(3200, 160),
+            health = StatLine(5600, 280),
             attackDamage = StatLine(520, 26),
             superDamage = StatLine(1400, 70),
             moveSpeed = 4.05f,
@@ -327,8 +332,8 @@ object Balance {
             role = "Artillery",
             lore = "An Indian firefighter who was captured and told to work for the people of the Sparks. He has never left since. Nobody knows why.",
             attackName = "Rocket Pack",
-            health = StatLine(5200, 260),
-            attackDamage = StatLine(340, 17),
+            health = StatLine(6500, 325),
+            attackDamage = StatLine(417, 21),
             superDamage = StatLine(1200, 60),
             moveSpeed = 3.65f,
             attack = AttackSpec(AttackShape.ROCKETS, projectiles = 6, spreadDegrees = 0f, range = 8.5f, speed = 14f, radius = 0.17f, burstInterval = 0.1f, blast = 1.0f, lanes = 3),

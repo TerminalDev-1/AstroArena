@@ -353,6 +353,21 @@ class Api(unittest.TestCase):
         check = b"C" + bytes(range(8))
         b.sendall(check)
         self.assertEqual(a.recv(9), check)
+        # A player on another build isn't paired with one on this build: they wait for their own kind.
+        def join_as(player, version):
+            sock = socket.create_connection(("127.0.0.1", self.httpd.duel.server_address[1]), timeout=5)
+            body = _json.dumps({"token": player["token"], "version": version, "fighter": "JUNO", "skin": 0}).encode()
+            sock.sendall(b"H" + struct.pack(">H", len(body)) + body)
+            return sock
+        old, new = join_as(self.player("Di"), "46"), join_as(self.player("Ed"), "47")
+        for sock in (old, new):
+            sock.settimeout(1.0)
+            with self.assertRaises(socket.timeout):
+                sock.recv(1)
+        mate = join_as(self.player("Flo"), "46")
+        self.assertEqual((old.recv(1), mate.recv(1)), (b"S", b"S"))
+        for sock in (old, new, mate):
+            sock.close()
         # A third player waits: nobody stands in for a real opponent, however long it takes.
         c = join(self.player("Cy"))
         c.settimeout(1.5)
@@ -363,6 +378,20 @@ class Api(unittest.TestCase):
         a.close()
         self.assertEqual(b.recv(1), b"X")
         b.close()
+
+    def test_a_supported_build_keeps_its_own_referee(self):
+        import os, tempfile
+        from astro.referee import Referee
+        with tempfile.TemporaryDirectory() as folder:
+            current = os.path.join(folder, "referee.jar")
+            kept = os.path.join(folder, "referee-46.jar")
+            for path in (current, kept):
+                open(path, "w").close()
+            referee = Referee(current, java="java")
+            self.assertEqual(referee.jar_for("46"), kept)
+            self.assertEqual(referee.jar_for("v46.0"), kept)
+            self.assertEqual(referee.jar_for("47"), current)
+            self.assertEqual(referee.jar_for(""), current)
 
     def test_the_news_tab_reads_news_cfg(self):
         status, body = self.call("GET", "/v1/news")

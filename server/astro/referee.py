@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 import gzip
 import os
+import re
 import shutil
 import subprocess
 
@@ -73,7 +74,21 @@ class Referee:
             return "referee.jar is missing (build it with `gradlew :referee:installReferee` in client/)"
         return "Java was not found (install Java 17 or newer, or set JAVA_HOME)"
 
-    def judge(self, mode: str, fighter: str, level: int, difficulty: str, seed: int, names: list[str], bots: dict, raw: bytes, boss: str = "") -> dict:
+    def jar_for(self, version: str = "") -> str:
+        """The simulation to replay a match with: the one the build that played it was made from.
+
+        A long-term-support build keeps being played after newer ones come out, and a newer simulation would
+        replay its matches wrongly (different numbers, a different fight). So each such build's own referee is kept
+        beside the current one as `referee-<build>.jar`, and used for matches that build played. Any other build
+        gets the current one."""
+        match = re.match(r"v?(\d+)", (version or "").strip())
+        if match:
+            kept = os.path.join(os.path.dirname(self.jar), "referee-%d.jar" % int(match.group(1)))
+            if os.path.exists(kept):
+                return kept
+        return self.jar
+
+    def judge(self, mode: str, fighter: str, level: int, difficulty: str, seed: int, names: list[str], bots: dict, raw: bytes, boss: str = "", version: str = "") -> dict:
         """Plays the match back and returns {outcome, placement, kos, deaths, damage, mvp, ticks, finished}."""
         lines = [
             "mode=%s" % mode, "fighter=%s" % fighter, "level=%d" % level, "difficulty=%s" % difficulty,
@@ -86,7 +101,7 @@ class Referee:
         lines.append("inputs=%s" % base64.b64encode(raw).decode("ascii"))
         try:
             done = subprocess.run(
-                [self.java, "-Xss4m", "-jar", self.jar], input="\n".join(lines) + "\n", capture_output=True, text=True, timeout=self.timeout
+                [self.java, "-Xss4m", "-jar", self.jar_for(version)], input="\n".join(lines) + "\n", capture_output=True, text=True, timeout=self.timeout
             )
         except (OSError, subprocess.TimeoutExpired) as problem:
             raise Refused(503, "the referee couldn't run: %s" % problem)

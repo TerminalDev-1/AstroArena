@@ -167,9 +167,10 @@ fun UpdateScreen(update: UpdateInfo, onSkip: () -> Unit) {
     ) {
         Panel(Modifier.widthIn(max = 720.dp).padding(18.dp), cut = 20.dp) {
             Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                GameText("UPDATE REQUIRED", Type.Display, color = Palette.Gold, outline = 4.dp)
+                GameText(if (io.github.projectwip.data.Versions.LTS) "UPDATE AVAILABLE" else "UPDATE REQUIRED", Type.Display, color = Palette.Gold, outline = 4.dp)
                 PlainText(
-                    "A newer ${BuildConfig.VERSION_NAME} build is out, and this one is no longer supported, " +
+                    if (io.github.projectwip.data.Versions.LTS) "A newer ${BuildConfig.VERSION_NAME} build is out. This one is still supported, so you can update now or carry on playing. Your progress is kept either way."
+                    else "A newer ${BuildConfig.VERSION_NAME} build is out, and this one is no longer supported, " +
                         "so the game won't start until you update. Your progress is kept.",
                     Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 4,
                 )
@@ -183,8 +184,11 @@ fun UpdateScreen(update: UpdateInfo, onSkip: () -> Unit) {
                 PlainText("This downloads the new APK in your browser. Open it when it finishes and choose Install.", Type.Small, align = TextAlign.Center)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ChunkyButton({ open(update.pageUrl) }, Modifier.size(210.dp, 50.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("RELEASE PAGE", Type.Label, outline = 2.dp) }
-                    if (BuildConfig.DEBUG) ChunkyButton(onSkip, Modifier.size(210.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) { GameText("PLAY ANYWAY (DEV)", Type.Label, outline = 2.dp) }
+                    // A long-term-support build may carry on as it is; it is asked again the next time the game starts.
+                    if (io.github.projectwip.data.Versions.LTS) ChunkyButton(onSkip, Modifier.size(210.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) { GameText("LATER", Type.Label, outline = 2.dp) }
+                    else if (BuildConfig.DEBUG) ChunkyButton(onSkip, Modifier.size(210.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) { GameText("PLAY ANYWAY (DEV)", Type.Label, outline = 2.dp) }
                 }
+                if (io.github.projectwip.data.Versions.LTS) PlainText("LATER closes this. You will be asked again the next time you start the game.", Type.Small, color = Color.White, align = TextAlign.Center)
             }
         }
     }

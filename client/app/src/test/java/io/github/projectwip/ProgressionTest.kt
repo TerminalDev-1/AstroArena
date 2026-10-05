@@ -303,11 +303,12 @@ class ProgressionTest {
         assertEquals("the rarest fighter is the last one on the road", FighterId.VARUN, io.github.projectwip.data.SparkRoad.steps.last().fighter)
         assertTrue(CupTrack.milestones.none { it.reward is Reward.UnlockFighter })
         assertEquals(io.github.projectwip.data.SparkRoad.steps.first(), io.github.projectwip.data.SparkRoad.next(SaveData()))
-        // Thousands of health, hundreds to a thousand-odd per hit.
+        // The floor every fighter stands on: enough health, and enough damage from one ammo when it all lands.
         for (f in Balance.fighters) {
-            assertTrue("${f.name} health ${f.health.base}", f.health.base in 2500..6000)
-            assertTrue("${f.name} damage ${f.attackDamage.base}", f.attackDamage.base in 200..1200)
+            assertTrue("${f.name} health ${f.health.base}", f.health.base >= Balance.MIN_HEALTH)
+            assertTrue("${f.name} damage an ammo ${f.attackDamage.base * f.attack.projectiles}", f.attackDamage.base * f.attack.projectiles >= Balance.MIN_AMMO_DAMAGE)
         }
+        assertEquals("Varun stands above it", 6500 to 2502, varun.health.base to varun.attackDamage.base * varun.attack.projectiles)
     }
 
     @Test fun serverCanRetuneBotsAndFreshSavesAreRecognised() {

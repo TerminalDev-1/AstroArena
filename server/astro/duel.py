@@ -42,8 +42,9 @@ CHECK_BYTES = 8   # tick (int) + the number the device worked out for that tick 
 class _Seat:
     """One connected player."""
 
-    def __init__(self, sock: socket.socket, name: str, fighter: str, level: int, skin: int):
+    def __init__(self, sock: socket.socket, name: str, fighter: str, level: int, skin: int, version: str = ""):
         self.sock = sock
+        self.version = version
         self.name, self.fighter, self.level, self.skin = name, fighter, level, skin
         self.peer: _Seat | None = None
         self._write = threading.Lock()
@@ -86,7 +87,9 @@ class DuelLobby(socketserver.ThreadingTCPServer):
         self.game = game
         self.quiet = quiet
         self._lock = threading.Lock()
-        self._waiting: _Seat | None = None
+        # Who is waiting, by the build they are playing: two builds may not compute a match the same way, so a
+        # player is only ever paired with someone on the same one.
+        self._waiting: dict[str, _Seat] = {}
         self._random = random.SystemRandom()
         super().__init__((host, port), _Handler)
 
@@ -114,17 +117,16 @@ class DuelLobby(socketserver.ThreadingTCPServer):
             skin = 0
         if skin not in entry.get("ownedSkins", [0]):
             skin = 0
-        return _Seat(None, player["name"], fighter, int(entry["level"]), skin)  # type: ignore[arg-type]
+        return _Seat(None, player["name"], fighter, int(entry["level"]), skin, str(hello.get("version") or "").strip())  # type: ignore[arg-type]
 
     def join(self, me: _Seat) -> None:
         """Pairs [me] with whoever is waiting, or leaves them waiting."""
         with self._lock:
-            other = self._waiting
+            other = self._waiting.pop(me.version, None)
             if other is None:
-                self._waiting = me
-                self.log(f"{me.name} ({me.fighter}) is waiting for an opponent")
+                self._waiting[me.version] = me
+                self.log(f"{me.name} ({me.fighter}, build {me.version or '?'}) is waiting for an opponent")
                 return
-            self._waiting = None
             other.peer, me.peer = me, other
         seed = self._random.getrandbits(62)
         self.log(f"{other.name} ({other.fighter}) v {me.name} ({me.fighter})")
@@ -133,8 +135,8 @@ class DuelLobby(socketserver.ThreadingTCPServer):
 
     def leave(self, me: _Seat) -> None:
         with self._lock:
-            if self._waiting is me:
-                self._waiting = None
+            if self._waiting.get(me.version) is me:
+                del self._waiting[me.version]
             peer, me.peer = me.peer, None
             if peer is not None:
                 peer.peer = None

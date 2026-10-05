@@ -114,6 +114,13 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   `git push origin main`. Never checkpoint unverified or non-compiling work.
 - **The version is "Beta", and it stays "Beta".** `versionName = "Beta"` is all players see. Underneath, the build
   number (`versionCode`) is what the updater and the server's version gate compare.
+- **Long-term support, from build 46.** A build with `Versions.LTS = true` may keep being played after newer ones
+  come out: its update screen has a LATER button (it asks again at every start), and the server must go on
+  serving it. That means, for every LTS build: never list it in `versions_not_supported.cfg`; never change or
+  remove a server route or field it uses (add new ones instead); and keep its referee. When releasing an LTS
+  build, copy `server/referee/referee.jar` to `server/referee/referee-<build>.jar` and commit it: the server
+  replays that build's matches with its own simulation (`Referee.jar_for`). 1v1 only pairs players on the same
+  build. Builds up to 45 are not LTS and can't be made so: their installed copies stop at the update screen.
 - **Non-negotiable: release without being asked.** The user must never have to say "release". When a task that
   changed the client is finished, verified and pushed, release it: add one to `versionCode` (unless that build
   number has not been released yet), commit, tag `vN.0` (N = the build number), push the tag, and publish a GitHub
