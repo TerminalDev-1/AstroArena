@@ -1,0 +1,45 @@
+AstroArena Source License, version 1.0
+
+Copyright (c) 2026 NitroGamerX64 (github.com/TerminalDev-1/AstroArena)
+
+"The Software" means everything in this repository: the game, the game server, their source code, and the art
+and sound that the code generates.
+
+You may use, copy, modify, and share the Software, and anything you make from it, free of charge, as long as you
+keep to every one of these conditions:
+
+1. Stay open source.
+   If you share the Software, or anything made from it or containing part of it, with anyone else, in any form
+   (source code, an app, a build, a hosted service), you must make the complete source code of what you shared
+   available to everyone, under this same license.
+
+2. Publish it on GitHub.
+   That source code must be in a public repository on GitHub (github.com), kept up to date with what you have
+   shared, and reachable for as long as you go on sharing it. If GitHub stops offering public repositories, a
+   comparable public code-hosting service may be used instead.
+
+3. Give credit.
+   You must keep this license file and the copyright line above in every copy. Anything you share must say
+   clearly, where a user or reader will see it (for example in its README and on its credits or about screen),
+   that it is based on AstroArena by NitroGamerX64, with a link to
+   https://github.com/TerminalDev-1/AstroArena, and must say that you changed it if you did. You may not suggest
+   that the author endorses your version.
+
+4. No malware.
+   You may not use the Software, or any part of it, to make, distribute, or run malware of any kind. That
+   includes, without being limited to: viruses, worms, trojans, ransomware, spyware, stalkerware, keyloggers,
+   credential or data stealers, cryptocurrency miners that run without the user's informed consent, botnet or
+   remote-control tools used without the device owner's consent, and any software built to damage, disrupt, or
+   gain unauthorised access to a device, network, account, or data, or to deceive users about what it does.
+
+If you break any of these conditions, your permission to use the Software ends at once. It comes back only if the
+author says so in writing.
+
+This license does not give you any right to the name "AstroArena" or to the author's name beyond what the credit
+in condition 3 requires.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHOR OR COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

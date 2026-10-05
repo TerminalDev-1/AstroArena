@@ -92,4 +92,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together
 
 ## License
 
-Not yet chosen. Until a license file is added, all rights are reserved by the author.
+[AstroArena Source License 1.0](LICENSE): you may use, change and share this, as long as what you share stays open source in a public GitHub repository, credits AstroArena and its author, and is never used to make malware.
