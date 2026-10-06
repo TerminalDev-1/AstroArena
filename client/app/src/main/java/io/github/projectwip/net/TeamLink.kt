@@ -166,13 +166,15 @@ class TeamLink(private val host: String, private val port: Int) : Closeable {
     private fun send(write: (DataOutputStream) -> Unit) {
         try {
             synchronized(lock) { out?.let { write(it); it.flush() } }
-        } catch (_: IOException) {
+        } catch (_: Exception) {
             // The listener notices the line has gone.
         }
     }
 
-    /** The leader presses Play. */
-    fun go() = send { it.writeByte('G'.code) }
+    /** The leader presses Play. (Called from the screen, and the network may not be used from its thread.) */
+    fun go() {
+        Thread({ send { it.writeByte('G'.code) } }, "team-go").apply { isDaemon = true }.start()
+    }
 
     /** Records what the player wants ([c], as it stands now) as their next frame, and sends it to the team. */
     fun sendLocal(c: Control) {
@@ -231,6 +233,7 @@ class TeamLink(private val host: String, private val port: Int) : Closeable {
     /** Leaves the team. */
     override fun close() {
         ended = true
-        try { socket?.close() } catch (_: IOException) {}
+        // (Off the caller's thread: Leave Team is pressed on the screen's.)
+        Thread({ try { socket?.close() } catch (_: Exception) {} }, "team-close").apply { isDaemon = true }.start()
     }
 }
