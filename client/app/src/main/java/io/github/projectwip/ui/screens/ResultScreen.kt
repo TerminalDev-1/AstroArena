@@ -142,6 +142,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                                 io.github.projectwip.data.GameMode.KNOCKOUT_RUSH -> "Knockout Rush · Foundry Yard · ${r.difficulty.label} bots"
                                 io.github.projectwip.data.GameMode.BOSS -> "Boss Mode · Proving Ground · ${r.difficulty.label} boss"
                                 io.github.projectwip.data.GameMode.TRAINING -> "Training Area"
+                                io.github.projectwip.data.GameMode.JAIL -> "Jail"
                                 io.github.projectwip.data.GameMode.DUEL -> "1v1 · Proving Ground"
                             }, Type.Label, color = Palette.TextDim)
                     }

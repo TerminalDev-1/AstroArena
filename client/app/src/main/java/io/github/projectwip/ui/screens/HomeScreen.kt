@@ -335,9 +335,9 @@ private fun CapsuleButton(count: Int, leftToday: Int, online: Boolean, onOpen: (
 
 // ---------------------------------------------------------------------------------------------- mode
 
-fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS; GameMode.BOSS -> IconKind.SKULL; GameMode.TRAINING -> IconKind.FIGHTERS; GameMode.DUEL -> IconKind.SWORDS }
+fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS; GameMode.BOSS -> IconKind.SKULL; GameMode.TRAINING -> IconKind.FIGHTERS; GameMode.DUEL -> IconKind.SWORDS; GameMode.JAIL -> IconKind.SKULL }
 
-fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.BOSS -> Arenas.provingGround(); GameMode.TRAINING -> Arenas.trainingArea(); GameMode.DUEL -> Arenas.provingGround() }
+fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.BOSS -> Arenas.provingGround(); GameMode.TRAINING -> Arenas.trainingArea(); GameMode.DUEL -> Arenas.provingGround(); GameMode.JAIL -> Arenas.jail() }
 
 @Composable
 private fun ModeChip(mode: GameMode, d: BotDifficulty?, onClick: () -> Unit) {
@@ -373,7 +373,7 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
                 GameText("CHOOSE A MODE", Type.Title, outline = 3.5.dp)
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    for (m in GameMode.entries) {
+                    for (m in GameMode.entries) if (m != GameMode.JAIL) {
                         // With Boss Mode picked the cards are a little shorter, to leave room for the row of bosses underneath.
                         ModeCard(m, m == save.selectedMode, Modifier.weight(1f), showMap = ui.roomy, short = save.selectedMode == GameMode.BOSS) { repo.selectMode(m) }
                     }
@@ -451,6 +451,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win to earn Cups."
                     GameMode.BOSS -> "One of three bosses, each with moves of its own: rockets, sweeping beams, charges. Watch the marked ground. Knock it out to win; you have unlimited lives. Win to earn Cups."
                     GameMode.DUEL -> "Against one real player on this server, each on their own device. First to 3 knockouts. A test mode: nothing is earned yet."
+                    GameMode.JAIL -> "Every boss at once, and your weapons don't work."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a boss that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },
                 Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 5,

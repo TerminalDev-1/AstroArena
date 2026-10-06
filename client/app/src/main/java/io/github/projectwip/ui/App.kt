@@ -94,6 +94,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "match" -> Screen.Match(startMatchConfig(repo.save.value))
                 "boss" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
                 "duel" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.DUEL, boss = null))
+                "jail" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.JAIL, boss = null))
                 "train" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.TRAINING))
                 "fighters" -> Screen.Fighters()
                 "roster" -> { io.github.projectwip.ui.screens.rosterPreview = true; Screen.Fighters() }
@@ -136,11 +137,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     val dev = account?.developer == true
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var unsupportedSkipped by remember { mutableStateOf(false) }
-    // A disabled account is told so once each time it happens; after that the game is in offline mode.
-    // Debug: `--es screen disabled` shows the screen with made-up details.
-    var disabledSeen by remember { mutableStateOf(false) }
-    val disabledShown = (serverStatus.disabled || startScreen == "disabled") && !disabledSeen
-    LaunchedEffect(serverStatus.disabled) { if (!serverStatus.disabled && startScreen != "disabled") disabledSeen = false }
+    // A disabled account gets no menus and no offline play: the notice stays up whenever they aren't in jail.
+    // Debug: `--es screen disabled` shows the notice with made-up details, `jail` goes straight to jail.
+    val disabledShown = serverStatus.disabled || startScreen == "disabled"
     var booting by remember { mutableStateOf(true) }
     var bootProgress by remember { mutableStateOf(0f) }
     var bootStatus by remember { mutableStateOf("Connecting to server…") }
@@ -342,7 +341,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                         save.settings, sfx, save.matchesPlayed, server,
                         onCancel = { screen = Screen.Home },
                         onFinish = { summary ->
-                            scope.launch {
+                            // Walking out of jail is not a result: straight back to the notice.
+                            if (summary.report.mode == io.github.projectwip.data.GameMode.JAIL) screen = Screen.Home
+                            else scope.launch {
                                 // The server replays the match from the player's inputs: the result and what it is worth are
                                 // its own. No answer means an offline match: the device's result is shown and nothing is earned.
                                 judging = summary.serverMatchId > 0 && serverStatus.online
@@ -388,8 +389,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 io.github.projectwip.ui.screens.UnsupportedScreen(serverStatus.message, REPO_RELEASES) { unsupportedSkipped = true }
             }
             if (!booting && update == null && disabledShown && !inMatch) {
-                if (serverStatus.disabled) io.github.projectwip.ui.screens.DisabledScreen(serverStatus.disabledReason, serverStatus.disabledUntil) { disabledSeen = true }
-                else io.github.projectwip.ui.screens.DisabledScreen("An example reason, as the server's owner wrote it.", System.currentTimeMillis() + 54 * 3600_000L) { disabledSeen = true }
+                val toJail = { screen = Screen.Match(startMatchConfig(save).copy(mode = io.github.projectwip.data.GameMode.JAIL, boss = null)) }
+                if (serverStatus.disabled) io.github.projectwip.ui.screens.DisabledScreen(serverStatus.disabledReason, serverStatus.disabledUntil, toJail)
+                else io.github.projectwip.ui.screens.DisabledScreen("An example reason, as the server's owner wrote it.", System.currentTimeMillis() + 54 * 3600_000L, toJail)
             }
             if (judging) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
                 GameText("THE SERVER IS CHECKING THE MATCH…", Type.Title, outline = 3.5.dp)

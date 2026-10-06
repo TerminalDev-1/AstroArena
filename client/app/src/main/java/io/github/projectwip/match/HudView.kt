@@ -226,7 +226,8 @@ class HudView(
             text.textSize = dp(17f)
             outlined(c, if (s.timesDown == 1) "TIME DOWN" else "TIMES DOWN", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
             text.textSize = dp(12f)
-            outlined(c, "BOSS MODE", cx + dp(40f), top + dp(46f), Color.rgb(255, 214, 64), dp(3f))
+            outlined(c, if (s.jail) "JAIL" else "BOSS MODE", cx + dp(40f), top + dp(46f), Color.rgb(255, 214, 64), dp(3f))
+            if (s.jail) return
             val bw = dp(420f)
             val by = top + panelH + dp(26f)
             val fr = (s.bossHp.toFloat() / s.bossMaxHp).coerceIn(0f, 1f)
@@ -312,7 +313,7 @@ class HudView(
             text.textSize = dp(96f) * big
             outlined(c, n.toString(), cx, h * 0.45f, Color.WHITE, dp(9f))
             text.textSize = dp(21f)
-            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.bossMode) "BOSS MODE · KNOCK OUT THE BOSS · UNLIMITED LIVES" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
+            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.jail) "JAIL · THERE IS NO WAY OUT" else if (s.bossMode) "BOSS MODE · KNOCK OUT THE BOSS · UNLIMITED LIVES" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
         } else if (s.phase == Phase.PLAYING && s.phaseTime < 0.9f) {
             text.textSize = dp(80f) * big
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))

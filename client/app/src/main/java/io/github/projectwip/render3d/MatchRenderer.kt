@@ -994,10 +994,11 @@ class MatchRenderer(
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
         s.freeForAll = w.rules.freeForAll
         s.bossMode = w.rules.boss
+        s.jail = w.rules.jail
         s.timesDown = p.deaths
         s.practice = w.rules.practice
         s.damage = p.damageDealt
-        val giant = if (w.rules.boss) w.fighters.firstOrNull { it.team != p.team } else null
+        val giant = if (w.rules.boss && !w.rules.jail) w.fighters.firstOrNull { it.team != p.team } else null
         s.bossHp = giant?.hp ?: 0; s.bossMaxHp = giant?.maxHp ?: 1; s.bossName = giant?.name
         s.aliveCount = w.aliveCount
         s.placement = if (p.placement > 0) p.placement else if (w.phase == Phase.ENDED && w.rules.freeForAll) 1 else 0

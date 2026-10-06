@@ -61,7 +61,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   upgraded or claimed (`server/astro/rules.py`, `economy.py`). The client's save is a copy of what the server
   sent (`Progression.syncAccount`). Don't add client-side ways to earn, spend, grant or roll anything.
 - Menus ask the server through `LocalServerCall` (`ui/ServerCall.kt`): `ask({ buy(key) }) { reward -> ... }`.
-- Offline mode still has to work, as practice: every mode plays against bots, but nothing is earned, bought,
+- Offline mode still has to work (except for a disabled account, which only gets Jail), as practice: every mode plays against bots, but nothing is earned, bought,
   upgraded, claimed or opened. The loading screen tries the server for 60 seconds, then offers Retry or Offline mode.
 - Prices and tables shown by the client (`Balance.kt`, `Catalog.kt`) are copies for display; the server's are
   the ones that count. Change both.
@@ -74,7 +74,10 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   database, leaderboard first, and forces whatever value the owner changes in it (`Store.force`). It holds player
   ids and names, so it is gitignored: never commit it. `disabled = yes` there marks an account (never deletes it),
   with an optional `disabled_reason` and `disabled_until`: the server answers it 403 everywhere and the game
-  shows `DisabledScreen` and drops to offline practice (`--es screen disabled` previews it).
+  shows `DisabledScreen` (`--es screen disabled` previews it). A disabled account gets no menus and no offline
+  play, by the user's decision: its only way on is Jail (`GameMode.JAIL`, `--es screen jail`), where every boss
+  hunts the player at once, more arrive over time, the player's weapons don't work, and it never ends. Jail is
+  played on the device only and is never offered in the mode picker.
 - Bot difficulty: every player may pick, but the pick is a request (`POST /v1/settings/difficulty`); the server
   approves it against `allowed` in `game.cfg`, stores it, and uses its own copy when it plans a match.
 - Days and times are the server's: the day number, when it ends, the daily gift and the daily offers

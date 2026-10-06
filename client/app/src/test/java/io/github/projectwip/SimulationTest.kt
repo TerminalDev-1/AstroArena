@@ -108,7 +108,8 @@ class SimulationTest {
     @Test fun enemiesDoNotFlickerInAndOutOfView() {
         var shortHides = 0
         var shortShows = 0
-        for (mode in GameMode.entries) repeat(3) { seed ->
+        // Jail is left out: nine bosses crossing the thickets for as long as it runs is its own, much larger, count.
+        for (mode in GameMode.entries) if (mode != GameMode.JAIL) repeat(3) { seed ->
             val m = Match(MatchConfig(FighterId.JUNO, 3, 0, "T", BotDifficulty.NORMAL, mode = mode, humanPlayer = false, seed = 100L + seed))
             val seen = HashMap<Int, Boolean>()
             val since = HashMap<Int, Float>()
@@ -170,6 +171,26 @@ class SimulationTest {
     }
 
     /** Boss Mode: one giant with fixed stats; it ends when the boss falls or the player runs out of lives. */
+    @Test fun jailIsEveryBossAndNoWayToFightBack() {
+        fun run(seed: Long): Match {
+            val m = Match(MatchConfig(FighterId.VARUN, 10, 0, "T", BotDifficulty.ELITE, mode = GameMode.JAIL, humanPlayer = false, seed = seed))
+            val bosses = m.world.fighters.filter { it.def.boss != null }
+            assertEquals(Match.JAIL_BOSSES, bosses.size)
+            assertEquals(Match.JAIL_BOSSES_AT_START, bosses.count { it.alive })
+            // Three minutes: long enough for every boss to have come in.
+            repeat(60 * 180) { m.step(Match.STEP) }
+            assertEquals(Match.JAIL_BOSSES, bosses.count { it.alive })
+            // The player went down again and again, never laid a finger on a boss, and it still isn't over.
+            assertTrue(m.player.deaths > 0)
+            assertEquals(0, m.player.damageDealt)
+            assertTrue(bosses.all { it.hp == it.maxHp && it.deaths == 0 })
+            assertFalse(m.isOver)
+            return m
+        }
+        // And it plays out the same way from the same seed.
+        assertEquals(run(3L).player.deaths, run(3L).player.deaths)
+    }
+
     @Test fun bossModeIsOneFixedGiant() {
         val a = Arenas.provingGround()
         assertEquals(1, a.spawns[0].size)

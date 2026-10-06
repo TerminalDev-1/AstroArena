@@ -28,6 +28,8 @@ data class MatchRules(
     val boss: Boolean = false,
     /** Training Area: no clock and no score to reach, so it only ends when the player leaves. */
     val practice: Boolean = false,
+    /** Jail: bosses that can't be beaten, for as long as the player stays. Nothing to win and no clock. */
+    val jail: Boolean = false,
 ) {
     val respawn get() = !freeForAll
 
@@ -38,6 +40,7 @@ data class MatchRules(
         fun bossMode() = MatchRules(koTarget = 1, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, boss = true)
         /** One against one: first to three knockouts, or whoever is ahead after two minutes. */
         fun duel() = MatchRules(koTarget = 3, durationSeconds = 120f)
+        fun jail() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, boss = true, jail = true)
         fun training() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, practice = true)
     }
 }

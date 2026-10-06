@@ -136,6 +136,12 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
     TRAINING("Training Area", "Dummies, a swarm, a sentry and a boss · no stakes", 19),
     /** One real player against another, each on their own device. Nothing is earned in it yet. */
     DUEL("1v1", "You against one real player · first to 3 knockouts", 2),
+    /**
+     * Where a player whose account the server's owner has disabled is sent, in place of offline play: every boss
+     * at once, more arriving as time goes on, and nothing the player does can hurt them. It never ends and is never
+     * offered in the menus.
+     */
+    JAIL("Jail", "Every boss at once · no way out", 10),
 }
 
 object Balance {

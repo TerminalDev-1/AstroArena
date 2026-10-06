@@ -48,6 +48,8 @@ class Match(val config: MatchConfig) {
     val bossMode = config.mode == GameMode.BOSS
     /** Training Area: nothing at stake, and it never ends on its own. */
     val practice = config.mode == GameMode.TRAINING
+    /** Jail: every boss hunts the player, who can do nothing to them. It only ends when the player walks out. */
+    val jail = config.mode == GameMode.JAIL
 
     /** Seconds since the match became "over" for the player (ended, or eliminated in free-for-all). */
     var overFor = 0f
@@ -89,6 +91,12 @@ class Match(val config: MatchConfig) {
             roster += Fighter(id++, giant, 1, giant.skins.lastIndex, 1, giant.name, isBot = true, rooted = true).also { passive += it }
             roster += Fighter(id++, Balance.sentry, 1, 1, 1, "Sentry", isBot = true, rooted = true)
             repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true).also { m -> passive += m } }
+        } else if (jail) {
+            // Every kind of boss, over and over. The first few are there from the start; the rest come in one by one.
+            repeat(JAIL_BOSSES) {
+                val def = Balance.bosses[it % Balance.bosses.size]
+                roster += Fighter(id++, def, 1, def.skins.lastIndex, 1, def.name, isBot = true)
+            }
         } else if (bossMode) {
             // One boss, always level 1: its stats are fixed and never follow the player's level.
             val def = Balance.boss(config.boss ?: Balance.bosses[rng.nextInt(Balance.bosses.size)].boss!!)
@@ -98,9 +106,14 @@ class Match(val config: MatchConfig) {
             repeat(3) { roster += botFighter(id++, 1, names.next()) }
         }
         val oneOnOne = config.mode == GameMode.DUEL
-        val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.trainingArea() else if (bossMode || oneOnOne) Arenas.provingGround() else Arenas.foundryYard()
-        val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.training() else if (bossMode) MatchRules.bossMode() else if (oneOnOne) MatchRules.duel() else MatchRules.knockoutRush()
+        val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.trainingArea() else if (jail) Arenas.jail() else if (bossMode || oneOnOne) Arenas.provingGround() else Arenas.foundryYard()
+        val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.training() else if (jail) MatchRules.jail() else if (bossMode) MatchRules.bossMode() else if (oneOnOne) MatchRules.duel() else MatchRules.knockoutRush()
         world = World(arena, roster, rules, Random(rng.nextLong()))
+        if (jail) roster.filter { it.def.boss != null }.drop(JAIL_BOSSES_AT_START).forEachIndexed { i, late ->
+            // Not here yet: it comes in the way a knocked-out fighter comes back.
+            late.alive = false
+            late.respawnTimer = (i + 1) * JAIL_WAVE_SECONDS
+        }
         pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
         brains = roster.filter { it.isBot && it !in passive }.map { BotBrain(it, profile, world, pathfinder, Random(rng.nextLong())) }
@@ -120,13 +133,16 @@ class Match(val config: MatchConfig) {
     val inputs = InputLog()
 
     fun step(dt: Float) {
-        if (config.humanPlayer) inputs.record(player.control)
+        // Nobody replays a stay in jail, and it can go on for hours: there is no record to keep.
+        if (config.humanPlayer && !jail) inputs.record(player.control)
         pathfinder.budget = 1
         // Rotate who goes first so the same bot doesn't always get the tick's one path search.
         turn++
         for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
         // A boss's brain only walks it about: what it does to the player is its script's business (see World).
         for (f in world.fighters) if (f.def.boss != null) { f.control.attack = false; f.control.superAttack = false; f.control.hyper = false }
+        // In jail the player's weapons don't work. All that is left is to run.
+        if (jail) { player.control.attack = false; player.control.superAttack = false; player.control.hyper = false }
         world.step(dt)
         if (isOver) overFor += dt
     }
@@ -175,6 +191,10 @@ class Match(val config: MatchConfig) {
         const val STEP = 1f / 60f
         /** How many minis make up the Training Area's swarm. */
         const val TRAINING_MINIS = 12
+        /** Jail: how many bosses there are once all have arrived, how many are there at the start, and how long between the rest. */
+        const val JAIL_BOSSES = 9
+        const val JAIL_BOSSES_AT_START = 3
+        const val JAIL_WAVE_SECONDS = 15f
 
         val BOT_NAMES = listOf(
             "Rivet", "Cobalt", "Fennick", "Quill", "Tamsin", "Brisk", "Moss", "Pixel", "Juniper",
