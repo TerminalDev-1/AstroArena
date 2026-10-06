@@ -115,6 +115,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - Checkpoint as you go: once a piece is verified (tests or device), commit just that piece and
   `git push origin main`. Never checkpoint unverified or non-compiling work.
+- **Never commit changes the user made on their own.** Commit only what you changed in this task, file by file
+  (`git add <path>`, never `git add -A` or `git commit -a`). Anything else that shows up in `git status`, such as
+  an edited `.cfg` on the live server, is the user's: leave it uncommitted and untouched, and mention it.
 - **The version is "Beta", and it stays "Beta".** `versionName = "Beta"` is all players see. Underneath, the build
   number (`versionCode`) is what the updater and the server's version gate compare.
 - **No long-term support, by the user's decision.** Every build is replaced by the next: the update screen has no
