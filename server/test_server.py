@@ -536,13 +536,32 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("GET", "/v1/me", token=fair["token"])[0], 200)
         accounts.sync()
         text = edit()
-        # delete = yes removes an account for good, whatever else was written for it, and keeps a record of what it held.
+        # Deleting an account takes delete = yes and two confirmations in the same save: its name, and the word DELETE.
         spare = self.player("Spare")
         accounts.sync()
         section = "(%s)]" % spare["id"]
-        text = edit()
-        at = text.index("\ndelete = no", text.index(section))
-        save(text[:at] + "\ndelete = yes" + text[at + len("\ndelete = no"):])
+
+        def ask(*lines):
+            text = edit()
+            at = text.index("\ndelete = no", text.index(section))
+            end = text.index("delete_confirm = ", at) + len("delete_confirm = ")
+            save(text[:at] + "\n" + "\n".join(lines) + text[end:])
+
+        for attempt, why in (
+                (("delete = yes", "delete_name = ", "delete_confirm = "), "delete_name has to be this account's name, Player."),
+                (("delete = yes", "delete_name = Somebody", "delete_confirm = DELETE"), "delete_name has to be this account's name, Player."),
+                (("delete = yes", "delete_name = Player", "delete_confirm = "), "delete_confirm has to be the word DELETE, in capitals."),
+                (("delete = yes", "delete_name = Player", "delete_confirm = delete"), "delete_confirm has to be the word DELETE, in capitals.")):
+            ask(*attempt)
+            self.assertIsNotNone(self.store.player(spare["id"]))
+            # The file is put back as it was, with a line saying why nothing was deleted.
+            self.assertIn(section + "\n# 3 on the leaderboard\n# NOT DELETED: " + why, edit())
+            self.assertIn("delete = no\ndelete_name = \ndelete_confirm = \n", edit()[edit().index(section):])
+        # The confirmations alone, without delete = yes, do nothing either (and there is nothing to explain).
+        ask("delete = no", "delete_name = Player", "delete_confirm = DELETE")
+        self.assertIsNotNone(self.store.player(spare["id"]))
+        self.assertNotIn("NOT DELETED", edit())
+        ask("delete = yes", "delete_name = player", "delete_confirm = DELETE")
         self.assertIsNone(self.store.player(spare["id"]))
         self.assertEqual(self.call("GET", "/v1/me", token=spare["token"])[0], 401)
         self.assertNotIn(section, edit())

@@ -60,12 +60,18 @@ HEADER = """\
 #
 # A section is one account: [the player's name (their player id)]. The id is the one shown in the
 # game under Settings > Data. Names are the players' own to choose and can't be set here.
-#   delete      yes deletes the account for good: its progress, its matches, its place on the
-#               leaderboard. There is no undo in the game. (A copy of what it held is added to
+#   delete      deletes the account for good: its progress, its matches, its place on the
+#               leaderboard. There is no undo in the game, so it takes three lines that agree,
+#               all in the same save:
+#                   delete = yes
+#                   delete_name = <the account's name, exactly as its section shows it>
+#                   delete_confirm = DELETE
+#               With any of them missing or wrong nothing is deleted, and a line under the
+#               section's heading says which. (A copy of what a deleted account held is added to
 #               deleted_accounts.log beside this file, in case it was the wrong one.) If the
 #               player opens the game again they simply start over as a new account.
 #
-# Removing a line or a section changes nothing: an account is only deleted by delete = yes.
+# Removing a line or a section changes nothing: an account is only deleted as above.
 # Edit it while the server is running. This file is private: it is not committed.
 
 [file]
@@ -120,17 +126,19 @@ def when(text: str, now: float | None = None) -> float | None:
     return (time.time() if now is None else now) + sum(int(n) * _SECONDS[unit[0]] for n, unit in spans)
 
 
-def render(accounts: list[dict], revision: int) -> str:
+def render(accounts: list[dict], revision: int, notes: dict[str, str] | None = None) -> str:
     lines = [HEADER % (economy.LEVEL_LIMIT, rules.STARTING_FIGHTER.lower(), revision)]
     for place, account in enumerate(accounts, start=1):
         lines.append("[%s (%s)]" % (account["name"], account["id"]))
         lines.append("# disabled: off the leaderboard" if account["disabled"] else "# %d on the leaderboard" % place)
+        if notes and account["id"] in notes:
+            lines.append("# NOT DELETED: " + notes[account["id"]])
         lines.append("disabled = %s" % ("yes" if account["disabled"] else "no"))
         lines.append("disabled_reason = %s" % account["disabled_reason"])
         lines.append("disabled_until = %s" % (time.strftime(_DATE, time.localtime(account["disabled_until"])) if account["disabled_until"] > 0 else ""))
         lines.extend("%s = %d" % (key, account[key]) for key in NUMBERS)
         lines.extend("%s = %s" % (name.lower(), _fighter_text(entry)) for name, entry in account["fighters"].items())
-        lines.append("delete = no")
+        lines += ["delete = no", "delete_name = ", "delete_confirm = "]
         lines.append("")
     return "\n".join(lines)
 
@@ -159,9 +167,10 @@ def edits(written: dict[str, dict[str, str]], now: dict[str, dict[str, str]]) ->
         for key, value in lines.items():
             if key not in before or value.strip() == before[key].strip():
                 continue
-            if key == "delete":
-                if value.strip().lower() in _YES:
-                    change["delete"] = True
+            if key in ("delete", "delete_name", "delete_confirm"):
+                # Asked for, but not carried out here: the caller checks the two confirmations first.
+                if lines.get("delete", "").strip().lower() in _YES:
+                    change["delete"] = {"name": lines.get("delete_name", "").strip(), "confirm": lines.get("delete_confirm", "").strip()}
             elif key == "disabled":
                 word = value.strip().lower()
                 if word in _YES or word in _NO:
@@ -199,6 +208,7 @@ class Accounts:
         self._text: str | None = None  # the file as the server last wrote it
         self._written: dict[int, dict[str, dict[str, str]]] = {}  # what each revision said
         self._unreadable: str | None = None  # an edit that couldn't be read, so it is reported once
+        self._notes: dict[str, str] = {}  # why an account that was asked to be deleted wasn't, shown in its section
         self._lock = threading.Lock()
 
     def _read(self) -> str | None:
@@ -217,13 +227,26 @@ class Accounts:
                 _say("can't be read, so nothing was changed. Fix it and save again. (%s)" % str(problem).splitlines()[0])
             self._unreadable = text
             return False
+        self._notes = {}  # what was said about the last edit has been read by now
         written = self._written.get(revision)
         if written is None:
             if not self.quiet:
                 _say("that copy is from before the server started, so it can't tell what was changed. Written out again: edit this one.")
             return True
         for player_id, change in edits(written, now).items():
-            if change.get("delete"):
+            asked = change.pop("delete", None)
+            player = self.store.player(player_id) if asked else None
+            if player is not None:
+                # Two confirmations, both in the owner's own hand, or nothing is deleted.
+                if asked["name"].lower() != player["name"].strip().lower():
+                    self._notes[player_id] = "delete_name has to be this account's name, %s." % player["name"].strip()
+                elif asked["confirm"] != "DELETE":
+                    self._notes[player_id] = "delete_confirm has to be the word DELETE, in capitals."
+                if player_id in self._notes:
+                    if not self.quiet:
+                        _say("%s not deleted: %s" % (player_id, self._notes[player_id]))
+                    asked = None
+            if asked and player is not None:
                 # Deleting wins over anything else written for that account. What it held is kept in a log first.
                 gone = self.store.delete(player_id)
                 if gone is not None:
@@ -231,7 +254,7 @@ class Accounts:
                         log.write(json.dumps({"deleted": time.strftime(_DATE), **gone}) + "\n")
                     if not self.quiet:
                         _say("%s (%s) deleted. What it held is in %s." % (gone["name"], player_id, DELETED))
-            elif self.store.force(player_id, change) and not self.quiet:
+            elif change and self.store.force(player_id, change) and not self.quiet:
                 _say("%s forced: %s" % (player_id, change))
         return True
 
@@ -242,11 +265,11 @@ class Accounts:
             if self._text is not None and text is not None and text != self._text:
                 if not self._apply(text):
                     return
-            fresh = render(self.store.accounts(), self._revision)
+            fresh = render(self.store.accounts(), self._revision, self._notes)
             if text is not None and fresh == text == self._text:
                 return
             self._revision += 1
-            fresh = render(self.store.accounts(), self._revision)
+            fresh = render(self.store.accounts(), self._revision, self._notes)
             self._written[self._revision] = parse(fresh)[1]
             self._written.pop(self._revision - _KEPT_REVISIONS, None)
             scratch = self.path + ".new"
