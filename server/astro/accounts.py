@@ -1,0 +1,203 @@
+"""accounts.cfg: every account on the server, written out for whoever runs it to read and to overrule.
+
+The server writes the file from its database, in leaderboard order, and writes it again whenever an account
+changes. When the operator edits a value and saves, that value is forced onto the account. Only what the
+operator changed is applied: the file carries a revision number, the server remembers what it wrote at each
+one, and an edit is a value that differs from what that revision said. So a file that was open for a while
+does not undo what other players earned in the meantime.
+
+It holds players' ids and names, so it is not committed (see .gitignore), and it never holds their tokens.
+"""
+
+from __future__ import annotations
+
+import configparser
+import os
+import re
+import sys
+import threading
+import time
+
+from . import economy, rules
+from .store import Store
+
+NAME = "accounts.cfg"
+# The whole numbers of an account, as the file calls them.
+NUMBERS = ("cups", "best_cups", "drops", "bolts", "prisms", "credits", "glory")
+_KEPT_REVISIONS = 500
+
+HEADER = """\
+# Every account on this server, top of the leaderboard first. The server writes this file and keeps it
+# up to date. Change a value and save: the server forces it onto that account within a few seconds,
+# then writes the file out again. Only the values you changed are applied.
+#
+#   cups        the player's Cups: their place on the leaderboard
+#   best_cups   the most Cups they have had: how far along the Cup Track they are
+#   drops       unopened Spark Drops
+#   bolts       Power Ups
+#   prisms      Crystals
+#   credits     Credits on the Spark Road, toward the next fighter
+#   glory       Glory, once every fighter is unlocked
+#   <fighter>   unlocked or locked, its level (1 to %d) and its own Cups (its rank follows them):
+#                   mira = unlocked, level 4, cups 120
+#               %s can't be locked: everyone starts with it.
+#
+# A section is one account, named by its player id (shown in the game under Settings > Data). The
+# line under it says who that is; names are the players' own to choose and can't be set here.
+# Removing a line or a section changes nothing; accounts are not deleted from here.
+# Edit it while the server is running. This file is private: it is not committed.
+
+[file]
+# The server's own line. Leave it as it is: it is how the server tells what you changed.
+revision = %d
+"""
+
+
+def _say(text: str) -> None:
+    sys.stderr.write("%s  accounts.cfg: %s\n" % (time.strftime("%H:%M:%S"), text))
+
+
+def _fighter_text(entry: dict) -> str:
+    return "%s, level %d, cups %d" % ("unlocked" if entry["unlocked"] else "locked", entry["level"], entry["cups"])
+
+
+def _fighter_value(text: str) -> dict | None:
+    """`unlocked, level 4, cups 120` as a dict of the parts that were written; None if it can't be read."""
+    words = [w for w in re.split(r"[,\s=:]+", text.strip().lower()) if w]
+    out: dict = {}
+    i = 0
+    while i < len(words):
+        word = words[i]
+        if word in ("locked", "unlocked"):
+            out["unlocked"] = word == "unlocked"
+            i += 1
+        elif word in ("level", "cups") and i + 1 < len(words):
+            try:
+                out[word] = int(words[i + 1])
+            except ValueError:
+                return None
+            i += 2
+        else:
+            return None
+    return out
+
+
+def render(accounts: list[dict], revision: int) -> str:
+    lines = [HEADER % (economy.LEVEL_LIMIT, rules.STARTING_FIGHTER.lower(), revision)]
+    for place, account in enumerate(accounts, start=1):
+        lines.append("[%s]" % account["id"])
+        lines.append("# %s, %d on the leaderboard" % (account["name"], place))
+        lines.extend("%s = %d" % (key, account[key]) for key in NUMBERS)
+        lines.extend("%s = %s" % (name.lower(), _fighter_text(entry)) for name, entry in account["fighters"].items())
+        lines.append("")
+    return "\n".join(lines)
+
+
+def parse(text: str) -> tuple[int, dict[str, dict[str, str]]]:
+    """The file's revision (-1 if it has none) and each account's lines as written. Raises configparser.Error."""
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read_string(text)
+    try:
+        revision = int(parser.get("file", "revision", fallback="-1"))
+    except ValueError:
+        revision = -1
+    return revision, {section: dict(parser.items(section)) for section in parser.sections() if section != "file"}
+
+
+def edits(written: dict[str, dict[str, str]], now: dict[str, dict[str, str]]) -> dict[str, dict]:
+    """What the operator changed between the file the server wrote and the file as it is now, per account,
+    in the form `Store.force` takes. Lines that can't be read are left out."""
+    out: dict[str, dict] = {}
+    for player_id, lines in now.items():
+        before = written.get(player_id)
+        if before is None:
+            continue
+        change: dict = {}
+        for key, value in lines.items():
+            if key not in before or value.strip() == before[key].strip():
+                continue
+            if key in NUMBERS:
+                try:
+                    change[key] = int(value.replace(",", "").replace("_", ""))
+                except ValueError:
+                    continue
+            elif key.upper() in rules.FIGHTER_SKINS:
+                parts, old = _fighter_value(value), _fighter_value(before[key]) or {}
+                changed = {k: v for k, v in (parts or {}).items() if old.get(k) != v}
+                if changed:
+                    change.setdefault("fighters", {})[key.upper()] = changed
+        if change:
+            out[player_id] = change
+    return out
+
+
+class Accounts:
+    """Keeps accounts.cfg and the database in step. `sync()` is one pass; `start()` runs it every few seconds."""
+
+    def __init__(self, store: Store, directory: str, quiet: bool = False):
+        self.store = store
+        self.path = os.path.join(directory, NAME)
+        self.quiet = quiet
+        self._revision = 0
+        self._text: str | None = None  # the file as the server last wrote it
+        self._written: dict[int, dict[str, dict[str, str]]] = {}  # what each revision said
+        self._unreadable: str | None = None  # an edit that couldn't be read, so it is reported once
+        self._lock = threading.Lock()
+
+    def _read(self) -> str | None:
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                return f.read()
+        except (OSError, UnicodeDecodeError):
+            return None
+
+    def _apply(self, text: str) -> bool:
+        """Forces what the operator changed. False if the file can't be read as it stands (it is left alone)."""
+        try:
+            revision, now = parse(text)
+        except configparser.Error as problem:
+            if text != self._unreadable and not self.quiet:
+                _say("can't be read, so nothing was changed. Fix it and save again. (%s)" % str(problem).splitlines()[0])
+            self._unreadable = text
+            return False
+        written = self._written.get(revision)
+        if written is None:
+            if not self.quiet:
+                _say("that copy is from before the server started, so it can't tell what was changed. Written out again: edit this one.")
+            return True
+        for player_id, change in edits(written, now).items():
+            if self.store.force(player_id, change) and not self.quiet:
+                _say("%s forced: %s" % (player_id, change))
+        return True
+
+    def sync(self) -> None:
+        with self._lock:
+            text = self._read()
+            if self._text is not None and text is not None and text != self._text:
+                if not self._apply(text):
+                    return
+            fresh = render(self.store.accounts(), self._revision)
+            if text is not None and fresh == text == self._text:
+                return
+            self._revision += 1
+            fresh = render(self.store.accounts(), self._revision)
+            self._written[self._revision] = parse(fresh)[1]
+            self._written.pop(self._revision - _KEPT_REVISIONS, None)
+            scratch = self.path + ".new"
+            with open(scratch, "w", encoding="utf-8", newline="\n") as f:
+                f.write(fresh)
+            os.replace(scratch, self.path)
+            self._text = fresh
+
+    def start(self, every: float = 3.0) -> "Accounts":
+        def loop() -> None:
+            while True:
+                try:
+                    self.sync()
+                except Exception as problem:  # the file is a convenience: it must never take the server down
+                    if not self.quiet:
+                        _say("skipped a pass: %s" % problem)
+                time.sleep(every)
+
+        threading.Thread(target=loop, daemon=True, name="accounts.cfg").start()
+        return self

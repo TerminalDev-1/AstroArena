@@ -30,6 +30,7 @@ server never locks anyone out.
 | **Notices** | `notices.cfg` holds short messages shown on the home screen |
 | **Bots** | `bots.cfg` sets how bots behave at each difficulty; `game.cfg` sets which difficulties players may pick. The game asks, the server approves |
 | **Cups** | `trophies.cfg` sets the Cups each mode pays: by place, or for a win, a draw and a defeat |
+| **Accounts** | `accounts.cfg` is written by the server: every account, leaderboard first. Change a value (Cups, a fighter's level, Crystals...) and save to force it |
 | **Daily offers** | `shop.cfg` is the pool; the server picks a few each day, the same for everyone, and says when the day ends |
 | **Time** | the day, when it ends, and every countdown come from the server's clock |
 | **Developers** | `game.cfg` lists the players who can switch on the debug menu, make shop deals and reset an account |

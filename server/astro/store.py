@@ -189,6 +189,56 @@ class Store:
             profile["credits"] = max(0, profile["credits"] + int(credits))
             self._keep(player_id, profile)
 
+    def accounts(self) -> list[dict]:
+        """Every account as accounts.cfg shows it, top of the leaderboard first."""
+        with self._lock:
+            rows = self._db.execute("SELECT id, name, cups, drops FROM players ORDER BY cups DESC, created_at ASC").fetchall()
+            out = []
+            for row in rows:
+                profile = self._profile(row["id"])
+                out.append({
+                    "id": row["id"], "name": row["name"], "cups": row["cups"], "drops": row["drops"],
+                    "best_cups": profile["bestCups"], "bolts": profile["bolts"], "prisms": profile["prisms"],
+                    "credits": profile["credits"], "glory": profile["glory"],
+                    "fighters": {
+                        name: {"unlocked": bool(entry.get("unlocked")), "level": int(entry.get("level") or 1), "cups": int(entry.get("cups") or 0)}
+                        for name, entry in profile["fighters"].items() if name in rules.FIGHTER_SKINS
+                    },
+                })
+            return out
+
+    def force(self, player_id: str, change: dict) -> bool:
+        """The operator's word (accounts.cfg): sets what `change` names, whatever it was. False if there is no such account."""
+        def number(value, high=2_000_000_000) -> int:
+            return min(max(int(value), 0), high)
+
+        with self._lock, self._db:
+            row = self._db.execute("SELECT cups, drops, boosted FROM players WHERE id = ?", (player_id,)).fetchone()
+            if row is None:
+                return False
+            cups = number(change.get("cups", row["cups"]))
+            drops = number(change.get("drops", row["drops"]))
+            self._db.execute(
+                "UPDATE players SET cups = ?, drops = ?, boosted = ? WHERE id = ?",
+                (cups, drops, min(row["boosted"], drops), player_id),
+            )
+            profile = self._profile(player_id)
+            for key, field in (("best_cups", "bestCups"), ("bolts", "bolts"), ("prisms", "prisms"), ("credits", "credits"), ("glory", "glory")):
+                if key in change:
+                    profile[field] = number(change[key])
+            for fighter, parts in (change.get("fighters") or {}).items():
+                entry = profile["fighters"].get(fighter)
+                if entry is None:
+                    continue
+                if "unlocked" in parts:
+                    entry["unlocked"] = bool(parts["unlocked"]) or fighter == rules.STARTING_FIGHTER
+                if "level" in parts:
+                    entry["level"] = min(max(int(parts["level"]), 1), economy.LEVEL_LIMIT)
+                if "cups" in parts:
+                    entry["cups"] = number(parts["cups"])
+            self._keep(player_id, profile)
+        return True
+
     def set_difficulty(self, player_id: str, difficulty: str) -> None:
         with self._lock, self._db:
             self._db.execute("UPDATE players SET difficulty = ? WHERE id = ?", (difficulty, player_id))

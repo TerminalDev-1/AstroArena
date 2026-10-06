@@ -29,8 +29,10 @@ def main() -> None:
     print(f"AstroArena server listening on port {args.port}")
     print(f"  In the game: Settings > Data > Server address:  http://{lan_address()}:{args.port}")
     print(f"  Database: {os.path.join(here, 'astroarena.db')}")
-    print("  Edit the .cfg files (versions_not_supported, notices, bots, game, shop) while it runs; changes apply at once.")
+    print("  Edit the .cfg files (versions_not_supported, notices, bots, game, shop, news, trophies) while it runs; changes apply at once.")
     print(f"  1v1 lobby: port {args.port + 1}" if httpd.duel is not None else f"  1v1 lobby: OFF, port {args.port + 1} is in use")
+    httpd.game.accounts.start()
+    print("  accounts.cfg lists every account; change a value there and save to force it.")
     referee = httpd.game.referee
     if referee is not None:
         print("  Referee: on. Every match is replayed here to decide its result.")

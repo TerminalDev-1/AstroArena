@@ -51,6 +51,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from . import economy, rules
+from .accounts import Accounts
 from .config import Config, parse_version
 from .economy import Refused
 from .referee import Referee, TICKS_PER_SECOND, count_ticks, decode_inputs
@@ -74,6 +75,8 @@ class Game:
         self.store = Store(db_path or os.path.join(directory, "astroarena.db"))
         self.store.import_progress = self.config.import_saves
         self.store.cups = self.config.cups
+        # accounts.cfg, the operator's view of every account. Whoever starts the server starts it running (run.py).
+        self.accounts = Accounts(self.store, directory)
         self.started = time.time()
         self._signups: dict[str, list[float]] = {}
         self._signup_lock = threading.Lock()

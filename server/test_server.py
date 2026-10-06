@@ -452,6 +452,59 @@ class Api(unittest.TestCase):
             self.assertEqual(set(item), {"title", "date", "tag", "text"})
             self.assertTrue(item["title"] and item["text"])
 
+    def test_accounts_cfg_forces_what_the_operator_changes(self):
+        cheat, fair = self.player("Cheat"), self.player("Fair")
+        self.store.grant(cheat["id"], cups=900, prisms=5000)
+        self.store.grant(fair["id"], cups=40)
+        accounts = self.httpd.game.accounts
+        accounts.quiet = True
+        path = os.path.join(self.dir, "accounts.cfg")
+
+        def edit(*swaps):
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            for old, new in swaps:
+                self.assertIn(old, text)
+                text = text.replace(old, new, 1)
+            return text
+
+        def save(text):
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            accounts.sync()
+
+        accounts.sync()
+        text = edit()
+        # Every account is there, top of the leaderboard first, and nobody's token is.
+        self.assertLess(text.index("[%s]" % cheat["id"]), text.index("[%s]" % fair["id"]))
+        self.assertNotIn(cheat["token"], text)
+        # The operator takes the cheat down a peg. While the file was open, the other player won some Cups.
+        text = edit(("cups = 900", "cups = 12"), ("prisms = 5000", "prisms = 1,000"),
+                    ("juno = unlocked, level 1, cups 0", "juno = locked, level 3, cups 7"), ("kito = locked, level 1, cups 0", "kito = unlocked, level 99999"))
+        self.store.grant(fair["id"], cups=25)
+        accounts.sync()  # the server writes the file again; the operator's editor still has the older one
+        save(text)
+        account = self.call("GET", "/v1/me", token=cheat["token"])[1]["account"]
+        self.assertEqual((account["cups"], account["profile"]["prisms"]), (12, 1000))
+        # The fighter everyone starts with stays unlocked; levels stop at the limit; what wasn't written stays.
+        juno, kito = account["profile"]["fighters"]["JUNO"], account["profile"]["fighters"]["KITO"]
+        self.assertEqual((juno["unlocked"], juno["level"], juno["cups"]), (True, 3, 7))
+        self.assertEqual((kito["unlocked"], kito["level"], kito["cups"]), (True, economy.LEVEL_LIMIT, 0))
+        # Only what was changed is forced: the other player keeps the Cups won in the meantime.
+        self.assertEqual(self.store.player(fair["id"])["cups"], 65)
+        # The file is written out again as things stand now, with the other player on top.
+        text = edit()
+        self.assertLess(text.index("[%s]" % fair["id"]), text.index("[%s]" % cheat["id"]))
+        self.assertIn("# Player, 2 on the leaderboard", text)
+        # A file that can't be read changes nothing and is left for the operator to fix; so are lines that make no sense.
+        save(text.replace("cups = 12", "cups = 5\n[%s]\ncups = 1" % cheat["id"], 1))
+        self.assertEqual(self.store.player(cheat["id"])["cups"], 12)
+        save(text.replace("cups = 12", "cups = lots", 1).replace("mira = locked", "mira = gone", 1))
+        self.assertEqual(self.store.player(cheat["id"])["cups"], 12)
+        # A copy from before the server started can't say what was changed: nothing is forced.
+        save(text.replace("cups = 12", "cups = 3", 1).replace("revision = ", "revision = 9", 1))
+        self.assertEqual(self.store.player(cheat["id"])["cups"], 12)
+
     def test_trophies_cfg_sets_the_cups(self):
         me = self.player()
         win = {"outcome": "VICTORY", "kos": 1, "deaths": 0, "damage": 9000, "mvp": True}

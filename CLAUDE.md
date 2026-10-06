@@ -70,6 +70,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   Settings > Developer, where the debug menu's D button is switched on (it is off by default); only they can
   make shop deals (the in-game Offer Creator) or reset an account. The server ignores luck, free drops, free
   upgrades and hand-outs from anyone else.
+- `server/accounts.cfg` is the owner's hand on every account (`astro/accounts.py`): the server writes it from the
+  database, leaderboard first, and forces whatever value the owner changes in it (`Store.force`). It holds player
+  ids and names, so it is gitignored: never commit it.
 - Bot difficulty: every player may pick, but the pick is a request (`POST /v1/settings/difficulty`); the server
   approves it against `allowed` in `game.cfg`, stores it, and uses its own copy when it plans a match.
 - Days and times are the server's: the day number, when it ends, the daily gift and the daily offers
