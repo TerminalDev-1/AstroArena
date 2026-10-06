@@ -29,7 +29,19 @@ data class MatchConfig(
     val serverMatchId: Long = 0,
     /** A 1v1 against a real player: who they are and which side this device plays. Null: a 1v1 is against a bot. */
     val duel: DuelSetup? = null,
+    /** Boss Mode or Knockout Rush with a team of real players: who they are, and which of them this device plays. */
+    val team: TeamSetup? = null,
 )
+
+/** One real player in a team. */
+data class TeamPlayer(val fighter: FighterId, val level: Int, val skin: Int, val name: String)
+
+/**
+ * A team of real players, each on their own device, sharing one match. Every device builds the same fighters in
+ * the same order ([players] first, then the bots), so that their simulations match; [slot] is which of the
+ * players this device's is.
+ */
+data class TeamSetup(val slot: Int, val players: List<TeamPlayer>)
 
 /**
  * The other player in a 1v1. Both devices build the same two fighters in the same order (side 0 first), so that
@@ -44,6 +56,7 @@ class Match(val config: MatchConfig) {
     val player: Fighter
     val brains: List<BotBrain>
     private val pathfinder: Pathfinder
+    private val botLevel: Int
     val freeForAll = config.mode == GameMode.LAST_SPARK
     val bossMode = config.mode == GameMode.BOSS
     /** Training Area: nothing at stake, and it never ends on its own. */
@@ -60,7 +73,13 @@ class Match(val config: MatchConfig) {
         val roster = ArrayList<Fighter>()
         var id = 0
         val duel = config.duel.takeIf { config.mode == GameMode.DUEL }
-        if (duel != null) {
+        val team = config.team.takeIf { config.mode == GameMode.BOSS || config.mode == GameMode.KNOCKOUT_RUSH }
+        // Bots are as strong as the player; in a team, as its first player, so that every device agrees.
+        botLevel = team?.players?.first()?.level ?: config.playerLevel
+        if (team != null) {
+            for (p in team.players) roster += Fighter(id++, Balance.fighter(p.fighter), p.level, p.skin, 0, p.name, isBot = false)
+            player = roster[team.slot]
+        } else if (duel != null) {
             // Two real players. Fighter 0 is side 0 on both devices, whoever's device this is.
             val mine = Fighter(duel.side, Balance.fighter(config.playerFighter), config.playerLevel, config.playerSkin, duel.side, config.playerName, isBot = false)
             val theirs = Fighter(1 - duel.side, Balance.fighter(duel.fighter), duel.level, duel.skin, 1 - duel.side, duel.name, isBot = false)
@@ -91,10 +110,12 @@ class Match(val config: MatchConfig) {
             repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true).also { m -> passive += m } }
         } else if (bossMode) {
             // One boss, always level 1: its stats are fixed and never follow the player's level.
-            val def = Balance.boss(config.boss ?: Balance.bosses[rng.nextInt(Balance.bosses.size)].boss!!)
+            val solo = Balance.boss(config.boss ?: Balance.bosses[rng.nextInt(Balance.bosses.size)].boss!!)
+            // Against a team it has more health: as much again for every extra player.
+            val def = if (team == null) solo else solo.copy(health = io.github.projectwip.data.StatLine(Math.round(solo.health.base * (1f + TEAM_BOSS_HEALTH * (team.players.size - 1))), 0))
             roster += Fighter(id++, def, 1, def.skins.lastIndex, 1, def.name, isBot = true)
         } else {
-            repeat(2) { roster += botFighter(id++, 0, names.next()) }
+            repeat(3 - (team?.players?.size ?: 1)) { roster += botFighter(id++, 0, names.next()) }
             repeat(3) { roster += botFighter(id++, 1, names.next()) }
         }
         val oneOnOne = config.mode == GameMode.DUEL
@@ -110,8 +131,11 @@ class Match(val config: MatchConfig) {
     private fun botFighter(id: Int, team: Int, name: String): Fighter {
         val def = Balance.fighters[rng.nextInt(Balance.fighters.size)]
         val skin = rng.nextInt(def.skins.size)
-        return Fighter(id, def, config.playerLevel, skin, team, name, isBot = true)
+        return Fighter(id, def, botLevel, skin, team, name, isBot = true)
     }
+
+    /** The real players' fighters, in the order every device has them (just the player, outside a team or a 1v1). */
+    val humans: List<Fighter> get() = world.fighters.filter { !it.isBot }.ifEmpty { listOf(player) }
 
     /** In a 1v1, the other fighter. */
     val opponent: Fighter? get() = if (config.mode == GameMode.DUEL) world.fighters.firstOrNull { it !== player } else null
@@ -173,6 +197,8 @@ class Match(val config: MatchConfig) {
 
     companion object {
         const val STEP = 1f / 60f
+        /** How much more health a boss has for every player in a team beyond the first. */
+        const val TEAM_BOSS_HEALTH = 1f
         /** How many minis make up the Training Area's swarm. */
         const val TRAINING_MINIS = 12
 

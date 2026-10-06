@@ -149,6 +149,16 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.End,
                 ) {
+                    // Boss Mode or 3v3 with one or two real players, by team code.
+                    ChunkyButton({ go(Screen.Team) }, Modifier.fillMaxWidth().height(50.dp), ButtonStyle.GLASS, lip = 4.dp) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            GameIcon(IconKind.FIGHTERS, Modifier.size(24.dp))
+                            Spacer(Modifier.width(8.dp))
+                            GameText("TEAM UP", Type.Heading, color = Palette.Positive, outline = 2.5.dp)
+                            PlainText("  ·  play with friends", Type.Small, color = Color.White, maxLines = 1)
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
                     CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online, openCapsule)
                     Spacer(Modifier.height(10.dp))
                     ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }

@@ -52,6 +52,7 @@ import time
 
 from . import rules
 from .economy import Refused
+from .team import TeamLobby
 
 FRAME_BYTES = 17  # flags (1) + moveX, moveY, aimX, aimY (4 floats)
 CHECK_BYTES = 8   # tick (int) + the number the device worked out for that tick (int)
@@ -122,6 +123,8 @@ class DuelLobby(socketserver.ThreadingTCPServer):
         self.stall_seconds = 8.0
         self.start_seconds = 45.0
         self._closing = False
+        # Teams (two or three players in one Boss Mode or 3v3 match) meet on this port too: see team.py.
+        self.teams = TeamLobby(game, self)
         super().__init__((host, port), _Handler)
 
     def start(self) -> "DuelLobby":
@@ -164,6 +167,7 @@ class DuelLobby(socketserver.ThreadingTCPServer):
                 gone.send(b"L"); there.send(b"X")
                 self.settle(gone, there, loser=gone)
             self._hang_up(a, b)
+        self.teams.watch(now, self.stall_seconds, self.start_seconds)
 
     @staticmethod
     def _hang_up(*seats: _Seat) -> None:
@@ -249,6 +253,8 @@ class DuelLobby(socketserver.ThreadingTCPServer):
             me.send(b"D"); peer.send(b"D")
         self._hang_up(me, peer)
 
+    text = staticmethod(lambda kind, value: _text(kind, value))
+
     def log(self, message: str) -> None:
         if not self.quiet:
             print("  1v1: " + message)
@@ -332,12 +338,15 @@ class _Handler(socketserver.BaseRequestHandler):
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.settimeout(10)
         head = _read(sock, 3)
-        if head is None or head[:1] != b"H":
+        if head is None or head[:1] not in (b"H", b"T"):
             return
         body = _read(sock, struct.unpack(">H", head[1:])[0])
         try:
             hello = json.loads(body or b"")
         except ValueError:
+            return
+        if head[:1] == b"T":
+            lobby.teams.handle(sock, hello if isinstance(hello, dict) else {}, _read)
             return
         me = lobby.seat(hello if isinstance(hello, dict) else {})
         if isinstance(me, str):

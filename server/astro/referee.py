@@ -126,3 +126,38 @@ class Referee:
             "sides": [{k: int(fields["%s%d" % (k, side)]) for k in ("kos", "deaths", "damage")} for side in (0, 1)],
             "wrong": [fields.get("wrong%d" % side) == "true" for side in (0, 1)],
         }
+
+    def judge_team(self, mode: str, seed: int, difficulty: str, names: list[str], bots: dict, boss: str,
+                   fighters: list[str], levels: list[int], frames: list[bytes], left: list[int], check: int | None = None) -> dict:
+        """Plays a team's match back from every player's input frames (in slot order), as the lobby recorded them.
+
+        `left` are the slots of players who walked out: their fighters stand still once their frames run out.
+        Returns {finished, ticks, winner (0 is the players' team; -1 a draw or an unfinished match), mvp (a slot,
+        or -1), sides: [{kos, deaths, damage}, ...], checksum (the replay's own number for tick `check`, or None)}.
+        """
+        lines = ["mode=%s" % mode, "seed=%d" % seed, "difficulty=%s" % difficulty, "names=%s" % ",".join(names), "players=%d" % len(fighters)]
+        if boss:
+            lines.append("boss=%s" % boss)
+        for key, value in sorted(bots.items()):
+            lines.append("bot.%s=%s" % (key, ("true" if value else "false") if isinstance(value, bool) else repr(float(value))))
+        for slot, fighter in enumerate(fighters):
+            lines += ["fighter%d=%s" % (slot, fighter), "level%d=%d" % (slot, levels[slot]),
+                      "frames%d=%s" % (slot, base64.b64encode(frames[slot]).decode("ascii"))]
+        if left:
+            lines.append("left=%s" % ",".join(str(slot) for slot in left))
+        if check is not None:
+            lines.append("check=%d" % check)
+        try:
+            done = subprocess.run(
+                [self.java, "-Xss4m", "-jar", self.jar], input=chr(10).join(lines) + chr(10), capture_output=True, text=True, timeout=self.timeout
+            )
+        except (OSError, subprocess.TimeoutExpired) as problem:
+            raise Refused(503, "the referee couldn't run: %s" % problem)
+        fields = dict(line.split("=", 1) for line in done.stdout.splitlines() if "=" in line)
+        if done.returncode != 0 or "winner" not in fields:
+            raise Refused(422, "the team's match can't be replayed (%s)" % fields.get("error", done.stderr.strip()[:200] or "no verdict"))
+        return {
+            "finished": fields["finished"] == "true", "ticks": int(fields["ticks"]), "winner": int(fields["winner"]), "mvp": int(fields["mvp"]),
+            "sides": [{k: int(fields["%s%d" % (k, slot)]) for k in ("kos", "deaths", "damage")} for slot in range(len(fighters))],
+            "checksum": int(fields["checksum"]) if "checksum" in fields else None,
+        }

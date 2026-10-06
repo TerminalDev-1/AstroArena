@@ -95,6 +95,56 @@ object Referee {
         return DuelVerdict(match.isOver, tick, if (match.isOver) match.world.winningTeam else -1, sides, wrong)
     }
 
+    class TeamVerdict(
+        /** The replay reached the end of the match. */
+        val finished: Boolean,
+        val ticks: Int,
+        /** The team that won (0 is the players'), or -1 for a draw or a match that wasn't played out. */
+        val winner: Int,
+        /** The players' fighters as the replay left them, in slot order. */
+        val fighters: List<Fighter>,
+        /** The slot of the match's most valuable player, or -1 if it was a bot (or the match wasn't played out). */
+        val mvp: Int,
+        /** The replay's own number for the tick it was asked to check (`World.checksum` before that tick ran), or null. */
+        val checksum: Int?,
+    )
+
+    /** Sets [c] to frame [index] of a 1v1 or team input log, or to nothing if the log doesn't reach that far. */
+    fun frame(log: ByteArray, index: Int, c: Control) {
+        if (index < 0 || (index + 1) * DUEL_FRAME_BYTES > log.size) { c.clear(); return }
+        val b = java.nio.ByteBuffer.wrap(log, index * DUEL_FRAME_BYTES, DUEL_FRAME_BYTES)
+        val flags = b.get().toInt()
+        c.moveX = b.getFloat(); c.moveY = b.getFloat(); c.aimX = b.getFloat(); c.aimY = b.getFloat()
+        c.aiming = flags and 1 != 0; c.attack = flags and 2 != 0; c.superAttack = flags and 4 != 0; c.hyper = flags and 8 != 0
+    }
+
+    /**
+     * Plays a team match back from every player's input frames ([frames], in slot order), exactly as their
+     * devices ran it: nothing for the first [DUEL_DELAY] ticks, then one frame from each player per tick. A
+     * player in [left] walked out (or was dropped): their fighter stands still once their frames run out, and
+     * the match goes on for as long as those who stayed kept playing. [config] is the match as the server set
+     * it up, with its team.
+     */
+    fun judgeTeam(config: MatchConfig, frames: List<ByteArray>, left: Set<Int> = emptySet(), checkTick: Int = -1): TeamVerdict {
+        val match = Match(config.copy(humanPlayer = true))
+        val players = match.humans
+        val lengths = frames.map { it.size / DUEL_FRAME_BYTES }
+        val stayed = lengths.filterIndexed { slot, _ -> slot !in left }
+        val last = (if (stayed.isEmpty()) lengths.max() else stayed.min()) + DUEL_DELAY
+        var tick = 0
+        var checksum: Int? = null
+        while (tick < last && tick < MAX_TICKS && !match.isOver) {
+            if (tick == checkTick) checksum = match.world.checksum()
+            for ((slot, f) in players.withIndex()) frame(frames[slot], if (tick < DUEL_DELAY) -1 else tick - DUEL_DELAY, f.control)
+            match.step(Match.STEP)
+            match.world.events.clear()
+            tick++
+        }
+        if (!match.isOver && tick == checkTick) checksum = match.world.checksum()
+        val mvp = if (match.isOver) players.indexOf(match.world.mvp()) else -1
+        return TeamVerdict(match.isOver, tick, if (match.isOver) match.world.winningTeam else -1, players, mvp, checksum)
+    }
+
     fun fingerprint(match: Match): Long {
         var h = 1125899906842597L
         for (f in match.world.fighters) {

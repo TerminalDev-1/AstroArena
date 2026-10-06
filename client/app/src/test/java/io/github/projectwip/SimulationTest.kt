@@ -172,7 +172,7 @@ class SimulationTest {
     /** Boss Mode: one giant with fixed stats; it ends when the boss falls or the player runs out of lives. */
     @Test fun bossModeIsOneFixedGiant() {
         val a = Arenas.provingGround()
-        assertEquals(1, a.spawns[0].size)
+        assertEquals("room for a team of three", 3, a.spawns[0].size)
         assertEquals(1, a.spawns[1].size)
         assertFalse("the boss needs room", a.circleBlocked(a.spawns[1][0].x, a.spawns[1][0].y, 1.25f))
 

@@ -57,6 +57,8 @@ data class MatchSummary(
     val inputs: ByteArray? = null,
     /** A 1v1 against a real player: the line to the lobby, which says what the match was worth. */
     val duel: io.github.projectwip.net.DuelLink? = null,
+    /** A match played with a team of real players: the line to them, which says what the match was worth. */
+    val team: io.github.projectwip.net.TeamLink? = null,
 ) {
     /** This summary with the server's findings in place of the device's own. */
     fun judged(j: io.github.projectwip.data.JudgedResult): MatchSummary = copy(
@@ -90,7 +92,14 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
 fun MatchScreen(
     config: MatchConfig, settings: Settings, sfx: Sfx, matchesPlayed: Int,
     server: io.github.projectwip.net.GameServer?, onCancel: () -> Unit, onFinish: (MatchSummary) -> Unit,
+    team: io.github.projectwip.net.TeamLink? = null,
 ) {
+    // A team's match is set up by the lobby and starts on every device at once: there is nothing to find.
+    if (config.team != null && team != null) {
+        val shared = remember { Match(config) }
+        MatchBody(shared, settings, sfx, matchesPlayed, onFinish, team = team)
+        return
+    }
     // Decided once, as the match is asked for: online it is against a real player, offline against a bot for practice.
     // (If the connection is still coming up, it gets a few seconds to, so a 1v1 asked for at start-up isn't offline.)
     var duelOnline by remember {
@@ -273,7 +282,12 @@ private fun Slot(fighter: io.github.projectwip.sim.Fighter?, you: Boolean, phase
 }
 
 @Composable
-private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed: Int, onFinish: (MatchSummary) -> Unit, duel: io.github.projectwip.net.DuelLink? = null) {
+private fun MatchBody(
+    match: Match, settings: Settings, sfx: Sfx, matchesPlayed: Int, onFinish: (MatchSummary) -> Unit,
+    duel: io.github.projectwip.net.DuelLink? = null, team: io.github.projectwip.net.TeamLink? = null,
+) {
+    /** Other real players are in this match: it can't be stopped for one of them. */
+    val shared = duel != null || team != null
     var paused by remember { mutableStateOf(false) }
     var view by remember { mutableStateOf<MatchView?>(null) }
     var done by remember { mutableStateOf(false) }
@@ -287,14 +301,14 @@ private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed:
         if (done) return
         done = true
         view?.paused = true
-        onFinish(summarize(match, report).copy(duel = duel))
+        onFinish(summarize(match, report).copy(duel = duel, team = team))
     }
 
     BackHandler(enabled = !done) {
         if (intro) return@BackHandler
         paused = !paused
         // A 1v1 can't be stopped: the other player is still playing. The menu opens over the running match.
-        if (duel != null) return@BackHandler
+        if (shared) return@BackHandler
         if (paused) view?.paused = true else view?.resumeGame()
     }
 
@@ -302,9 +316,9 @@ private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed:
         AndroidView(
             factory = { ctx ->
                 MatchView(ctx, match, settings, sfx, matchesPlayed,
-                    onPauseRequested = { if (!done && !intro) { paused = true; if (duel == null) view?.paused = true } },
+                    onPauseRequested = { if (!done && !intro) { paused = true; if (!shared) view?.paused = true } },
                     onFinished = { report -> finish(report) },
-                    duel = duel,
+                    duel = duel, team = team,
                 ).also { view = it; it.paused = intro }
             },
             modifier = Modifier.fillMaxSize(),
@@ -315,9 +329,9 @@ private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed:
                 Panel(cut = 20.dp) {
                     Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         GameText("PAUSED", Type.Display, outline = 4.dp)
-                        PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else if (duel != null) "The match is still going: your opponent can't be paused. Leaving hands them the win, and costs you Cups." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
+                        PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else if (team != null) "The match is still going: your team can't be paused. Leaving counts as a defeat for you, and they play on without you." else if (duel != null) "The match is still going: your opponent can't be paused. Leaving hands them the win, and costs you Cups." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
-                        ChunkyButton({ paused = false; if (duel == null) view?.resumeGame() }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN) { GameText("RESUME", Type.Title) }
+                        ChunkyButton({ paused = false; if (!shared) view?.resumeGame() }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN) { GameText("RESUME", Type.Title) }
                         ChunkyButton({ finish(match.forfeit()) }, Modifier.size(260.dp, 54.dp), ButtonStyle.RED) {
                             GameText("LEAVE MATCH", Type.Heading)
                         }

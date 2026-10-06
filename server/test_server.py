@@ -539,6 +539,111 @@ class Api(unittest.TestCase):
         self.assertEqual((verdict(h), cups(hal)), ({}, 0))
         h.close()
 
+    def test_a_team_shares_a_match_and_each_player_is_paid_by_the_replay(self):
+        import json as _json, socket
+
+        class Replay:
+            """Stands in for the referee: answers what it is told to, and keeps what it was asked."""
+            answer, asked = None, []
+
+            def judge_team(self, mode, seed, difficulty, names, bots, boss, fighters, levels, frames, left, check=None):
+                self.asked.append((mode, fighters, levels, [len(f) for f in frames], left, len(names)))
+                return self.answer
+
+        def exactly(sock, count):
+            data = b""
+            while len(data) < count:
+                data += sock.recv(count - len(data))
+            return data
+
+        def text(sock):
+            return _json.loads(exactly(sock, struct.unpack(">H", exactly(sock, 2))[0]))
+
+        def said(sock, kind):
+            self.assertEqual(exactly(sock, 1), kind)
+            body = exactly(sock, struct.unpack(">H", exactly(sock, 2))[0])
+            return body.decode() if kind in (b"E", b"N") else _json.loads(body)
+
+        def enter(player, **hello):
+            sock = socket.create_connection(("127.0.0.1", self.httpd.duel.server_address[1]), timeout=5)
+            body = _json.dumps({"token": player["token"], "version": VERSION, "fighter": "BYTE", "skin": 0, **hello}).encode()
+            sock.sendall(b"T" + struct.pack(">H", len(body)) + body)
+            return sock
+
+        def cups(player):
+            return self.call("GET", "/v1/me", token=player["token"])[1]["account"]["cups"]
+
+        replay = Replay()
+        self.httpd.game.referee = replay
+        ada, bo, cy, di = (self.player(name) for name in ("Ada", "Bo", "Cy", "Di"))
+        # Only Boss Mode and Knockout Rush are played in teams.
+        self.assertIn("Boss Mode or Knockout Rush", said(enter(ada, action="create", mode="LAST_SPARK"), b"E"))
+        # The one who makes a team is given its code, and leads it.
+        a = enter(ada, action="create", mode="KNOCKOUT_RUSH")
+        team = said(a, b"R")
+        self.assertEqual((len(team["code"]), team["mode"], team["you"], len(team["members"])), (4, "KNOCKOUT_RUSH", 0, 1))
+        # A wrong code finds nothing. A team of one can't start.
+        self.assertIn("no team", said(enter(bo, action="join", code="x" + team["code"]), b"E"))
+        a.sendall(b"G")
+        self.assertIn("two players", said(a, b"N"))
+        # Friends join with the code, and everyone is told who is in.
+        b = enter(bo, action="join", code=team["code"])
+        self.assertEqual((lambda r: (r["you"], len(r["members"])))(said(b, b"R")), (1, 2))
+        self.assertEqual(len(said(a, b"R")["members"]), 2)
+        c = enter(cy, action="join", code=team["code"])
+        for sock in (a, b, c):
+            self.assertEqual(len(said(sock, b"R")["members"]), 3)
+        self.assertIn("full", said(enter(di, action="join", code=team["code"]), b"E"))
+        # Only the leader starts the match. Each device gets the same match, and its own slot in it.
+        b.sendall(b"G")
+        a.sendall(b"G")
+        starts = [said(sock, b"S") for sock in (a, b, c)]
+        self.assertEqual([s["slot"] for s in starts], [0, 1, 2])
+        self.assertEqual(len({(s["seed"], s["mode"], s["difficulty"], tuple(s["botNames"])) for s in starts}), 1)
+        self.assertEqual(([p["fighter"] for p in starts[0]["players"]], len(starts[0]["botNames"])), (["BYTE"] * 3, 3))
+        self.assertIn("in a match", said(enter(di, action="join", code=team["code"]), b"E"))
+        # A frame one sends reaches the others, marked with whose it is.
+        frame = bytes(range(17))
+        b.sendall(b"I" + frame)
+        self.assertEqual((exactly(a, 19), exactly(c, 19)), (b"I\x01" + frame,) * 2)
+        a.sendall(b"I" + frame * 1 + b"I" + frame)
+        for sock in (b, c):
+            self.assertEqual(exactly(sock, 38), (b"I\x00" + frame) * 2)
+        # One walks out: the others are told how many of their frames count, and play on.
+        c.close()
+        for sock in (a, b):
+            self.assertEqual(exactly(sock, 6), b"Q" + struct.pack(">Bi", 2, 0))
+        # The match ends. The replay says how it went: those who stayed are paid for the win, the one who left has lost.
+        stats = [{"kos": 4, "deaths": 1, "damage": 9000}, {"kos": 2, "deaths": 2, "damage": 5000}, {"kos": 0, "deaths": 0, "damage": 0}]
+        replay.answer = {"finished": True, "ticks": 4000, "winner": 0, "mvp": 0, "sides": stats, "checksum": None}
+        with self.httpd.game.store._lock, self.httpd.game.store._db:  # (nobody wins a real match in under a second)
+            self.httpd.game.store._db.execute("UPDATE matches SET started_at = started_at - 120")
+        a.sendall(b"F")
+        first, second = said(a, b"V"), said(b, b"V")
+        self.assertEqual(replay.asked[-1], ("KNOCKOUT_RUSH", ["BYTE"] * 3, [1, 1, 1], [34, 17, 0], [2], 3))
+        self.assertEqual((first["report"]["outcome"], first["report"]["mvp"], first["cupDelta"], first["mvpCups"]), ("VICTORY", True, 10, 2))
+        self.assertEqual((second["report"]["outcome"], second["report"]["mvp"], second["cupDelta"], second["report"]["kos"]), ("VICTORY", False, 8, 2))
+        self.assertEqual((cups(ada), cups(bo), cups(cy)), (10, 8, 0))
+        with self.httpd.game.store._lock:
+            rows = self.httpd.game.store._db.execute("SELECT outcome FROM matches WHERE mode = 'KNOCKOUT_RUSH' ORDER BY id").fetchall()
+        self.assertEqual([row[0] for row in rows], ["VICTORY", "VICTORY", "DEFEAT"])
+        # Afterwards the team is still together, without the one who left, and can go again.
+        for sock in (a, b):
+            self.assertEqual(len(said(sock, b"R")["members"]), 2)
+        a.sendall(b"G")
+        self.assertEqual([said(sock, b"S")["slot"] for sock in (a, b)], [0, 1])
+        # Devices that disagree about the match can't go on: it is called off, and pays nothing.
+        a.sendall(b"C" + struct.pack(">ii", 30, 111))
+        b.sendall(b"C" + struct.pack(">ii", 30, 222))
+        self.assertEqual((exactly(a, 1), exactly(b, 1)), (b"D", b"D"))
+        self.assertEqual((cups(ada), cups(bo)), (10, 8))
+        for sock in (a, b):
+            said(sock, b"R")
+        # When the leader leaves, the next player leads.
+        a.close()
+        self.assertEqual((lambda r: (r["you"], len(r["members"])))(said(b, b"R")), (0, 1))
+        b.close()
+
     def test_the_news_tab_reads_news_cfg(self):
         status, body = self.call("GET", "/v1/news")
         self.assertEqual(status, 200)
@@ -1207,6 +1312,15 @@ class Refereed(Api):
         _, (status, body) = self.run_match(me["token"], "BOSS", log((60 * 400, 0, 0, 0, 0, 0)))
         self.assertEqual((status, body["verified"], body["cupDelta"]), (200, True, 0))
         self.assertNotEqual(body["report"]["outcome"], "VICTORY")
+
+    def test_the_referee_replays_a_teams_match(self):
+        # Two players who do nothing for a second of Boss Mode: the replay runs, and finds the match unfinished.
+        judged = REFEREE.judge_team("BOSS", 77, "NORMAL", [], {}, "SWEEPER", ["BYTE", "KITO"], [3, 5], [bytes(17 * 60), bytes(17 * 60)], [], check=30)
+        self.assertEqual((judged["finished"], judged["ticks"], judged["winner"], judged["mvp"], len(judged["sides"])), (False, 66, -1, -1, 2))
+        self.assertIsInstance(judged["checksum"], int)
+        # One of them left after half a second: the match goes on for as long as the other kept playing.
+        left = REFEREE.judge_team("KNOCKOUT_RUSH", 78, "HARD", ["A", "B", "C", "D"], {}, "", ["BYTE", "KITO"], [3, 5], [bytes(17 * 30), bytes(17 * 120)], [0])
+        self.assertEqual((left["finished"], left["ticks"]), (False, 126))
 
     def test_the_training_area_needs_no_referee(self):
         me = self.player()

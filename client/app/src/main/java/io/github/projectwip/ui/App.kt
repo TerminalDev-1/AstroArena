@@ -78,6 +78,7 @@ sealed interface Screen {
     data object Road : Screen { override val depth = 2 }
     data object Pass : Screen { override val depth = 1 }
     data object Settings : Screen { override val depth = 1 }
+    data object Team : Screen { override val depth = 1 }
     data class Match(val config: MatchConfig) : Screen { override val depth = 2 }
     data class Result(val summary: MatchSummary, val rewards: MatchRewards) : Screen { override val depth = 3 }
 }
@@ -231,7 +232,24 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     val blocked = update != null || (!serverStatus.supported && !unsupportedSkipped) || (disabledShown && !inMatch)
     LaunchedEffect(wantedTrack, booting, blocked) { music.play(if (booting || blocked) null else wantedTrack) }
 
-    val go: (Screen) -> Unit = { if (it !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f); screen = it }
+    /** The team of real players this player is in, if any. It outlasts the screens and the matches it plays. */
+    var team by remember { mutableStateOf<io.github.projectwip.net.TeamLink?>(null) }
+    val teamUp = team?.takeIf { !it.ended && it.error == null }
+    // In a team, matches are started by its leader, from the team screen: Play goes there.
+    val go: (Screen) -> Unit = {
+        val to = if (it is Screen.Match && it.config.team == null && teamUp != null) Screen.Team else it
+        if (to !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f)
+        screen = to
+    }
+    // The leader has pressed Play: everyone in the team goes into the match, from whatever screen they are on.
+    val teamStart = teamUp?.start
+    LaunchedEffect(teamStart, screen is Screen.Match) {
+        if (teamStart == null || screen is Screen.Match) return@LaunchedEffect
+        teamStart.bots?.let { server.useBots(teamStart.difficulty, it) }
+        val me = teamStart.setup.players[teamStart.setup.slot]
+        screen = Screen.Match(MatchConfig(me.fighter, me.level, me.skin, me.name, teamStart.difficulty, mode = teamStart.mode,
+            seed = teamStart.seed, boss = teamStart.boss, botNames = teamStart.botNames, team = teamStart.setup))
+    }
     val showReward: (RewardReveal) -> Unit = { reveal = it }
 
     /** A short message across the top of the screen (why a drop didn't open, say). */
@@ -333,21 +351,25 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.Road -> io.github.projectwip.ui.screens.RoadScreen(save, go, showReward)
                     Screen.Pass -> io.github.projectwip.ui.screens.PassScreen(save, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
+                    Screen.Team -> io.github.projectwip.ui.screens.TeamScreen(save, team, { team = it }, go)
                     is Screen.Match -> MatchScreen(
                         // The difficulty is the one the server last approved (it is kept in the settings), and the
                         // server's match plan has the final word.
                         s.config,
                         save.settings, sfx, save.matchesPlayed, server,
                         onCancel = { screen = Screen.Home },
+                        team = team,
                         onFinish = { summary ->
                             scope.launch {
                                 // The server replays the match from the player's inputs: the result and what it is worth are
                                 // its own. No answer means an offline match: the device's result is shown and nothing is earned.
                                 // (A 1v1 is settled by the lobby, from both players' inputs, and the answer comes down its line.)
                                 val duel = summary.duel
-                                judging = (summary.serverMatchId > 0 || duel != null) && serverStatus.online
+                                val squad = summary.team
+                                judging = (summary.serverMatchId > 0 || duel != null || squad != null) && serverStatus.online
                                 val verdict = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                     if (duel != null) duel.result()?.let { server.duelVerdict(it) }
+                                    else if (squad != null) squad.result()?.let { server.duelVerdict(it) }
                                     else server.reportMatch(summary.serverMatchId, summary.report, summary.inputs)
                                 }
                                 judging = false

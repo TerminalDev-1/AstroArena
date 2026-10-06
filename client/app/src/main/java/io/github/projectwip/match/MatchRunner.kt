@@ -38,7 +38,12 @@ class MatchRunner(
     private val onFinished: (MatchReport) -> Unit,
     /** In a 1v1 against a real player: the line to them. Ticks only run once both players' inputs are in. */
     private val duel: io.github.projectwip.net.DuelLink? = null,
+    /** In a team of real players: the line to them. Ticks only run once everyone's inputs are in. */
+    private val team: io.github.projectwip.net.TeamLink? = null,
 ) {
+    /** The match is shared with a team (the HUD words its notices for that). */
+    val teamMatch: Boolean get() = team != null
+    private val humans = match.humans
     /** The next tick the simulation will run (1v1 only). */
     private var simTick = 0
     /** Seconds spent waiting for the other player's inputs. */
@@ -140,6 +145,34 @@ class MatchRunner(
                 // Twice a second the devices compare what they make of the match so far (before this tick runs).
                 if (simTick % io.github.projectwip.net.DuelLink.CHECK_EVERY == 0) link.check(simTick, match.world.checksum())
                 link.apply(simTick, c, them.control)
+                simTick++
+            }
+        }
+
+        val squad = team
+        if (squad != null && !match.isOver) {
+            if (squad.dropped) {
+                // The lobby says this player stopped responding: they are out, and it counts as their defeat.
+                match.world.forfeit(p.team)
+            } else if (squad.calledOff) {
+                // The devices disagreed about the match, or the line went: it can't go on.
+                connectionLost = true
+                match.world.abandon()
+            } else {
+                if (squad.sent <= simTick) squad.sendLocal(c)
+                if (!squad.ready(simTick)) {
+                    c.attack = false; c.superAttack = false; c.hyper = false
+                    // Held up by someone's inputs. The lobby drops whoever has stopped; this device only gives up
+                    // by itself if the lobby has gone quiet too.
+                    stalled += Match.STEP
+                    waitingForOpponent = stalled > 0.4f
+                    if (stalled > 60f) squad.close()
+                    return
+                }
+                stalled = 0f
+                waitingForOpponent = false
+                if (simTick % io.github.projectwip.net.DuelLink.CHECK_EVERY == 0) squad.check(simTick, match.world.checksum())
+                squad.apply(simTick, humans.map { it.control })
                 simTick++
             }
         }

@@ -1020,7 +1020,7 @@ class MatchRenderer(
         s.autoTargetId = runner.autoTarget?.id ?: -1
         s.matchesPlayed = matchesPlayed
         s.fps = fps
-        s.duelNotice = if (runner.outOfStep) 2 else if (runner.connectionLost) 3 else if (runner.waitingForOpponent) 1 else 0
+        s.duelNotice = if (runner.outOfStep) 2 else if (runner.connectionLost) 3 else if (runner.waitingForOpponent) (if (runner.teamMatch) 4 else 1) else 0
         s.n = min(w.fighters.size, io.github.projectwip.match.HudSnapshot.MAX)
         for (i in 0 until s.n) {
             val f = w.fighters[i]

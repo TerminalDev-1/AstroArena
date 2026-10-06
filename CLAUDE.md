@@ -36,6 +36,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - `sim/`, `ai/`, `data/` and `audio/SfxSynth.kt` are pure Kotlin (no Android imports); they run in JVM tests.
 - Humans and bots drive fighters through the same `Control`. Visibility goes through `World.isVisibleTo`.
+- The starter fighter is Byte (`FighterId.BYTE`, `STARTING_FIGHTER`); Juno was removed, by the user's decision, and
+  accounts that had her lost her. Byte's kit is modelled on a familiar shotgun brawler at the user's request; her
+  name, look and words are ours and must stay so.
 - Boss Mode bosses are their own things (`BossKind`, `Balance.bosses`), not giant fighters: each fights through
   moves of its own in `sim/Boss.kt` (telegraphed ground hazards, sweeps, rings, charges) and has its own model.
   Keep their names, looks and moves original.
@@ -101,6 +104,13 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   Every 30 ticks the devices compare a checksum of the match and call it off (a draw) if they disagree.
   The lobby, not the devices, decides what happened when a match stops moving: the player whose inputs stopped
   first loses, and both are told (`DuelLobby.watch`). It only pairs players on the same build.
+- Teams are two or three real players in one Boss Mode or Knockout Rush match (`net/TeamLink.kt`, `astro/team.py`, on
+  the 1v1 lobby's port). One makes a team and gets a four-digit code, the others join with it, the leader starts.
+  It is the 1v1's lockstep with more players: every device runs the same match, bots included (`MatchConfig.team`;
+  the real players are the first fighters, in slot order), and the lobby replays it (`Referee.judgeTeam`) and pays
+  each player. Anything in `sim/` that reads `match.player` or `config.playerLevel` would put a team's devices out
+  of step: use what every device shares. A player who leaves takes a defeat and their fighter stands still; the
+  rest play on. Devices that disagree about a team match get it called off, unpaid (the 1v1 says who was wrong).
 - The leaderboard is the server's real accounts only (no made-up rivals; offline there is none). A new player
   is asked for a name before their account is made (`NameScreen`).
 - A new fighter or skin: also add it to `FIGHTER_SKINS` in `rules.py` and its price in `economy.py`; a new fighter

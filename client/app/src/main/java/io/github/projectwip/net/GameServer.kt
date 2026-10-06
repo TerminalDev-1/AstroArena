@@ -390,12 +390,7 @@ class GameServer(context: Context) {
         val names = o.optJSONArray("botNames")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() } } ?: emptyList()
         val planned = BotDifficulty.entries.firstOrNull { it.name == o.optString("difficulty") }
         // The bots must behave exactly as the server will have them behave when it replays this match.
-        o.optJSONObject("bots")?.let { settings ->
-            val d = planned ?: difficulty
-            val values = HashMap<String, Any>()
-            for (key in settings.keys()) values[key] = settings.get(key)
-            BotProfile.overrides = BotProfile.overrides + (d to BotProfile.builtIn(d).withOverrides(values))
-        }
+        o.optJSONObject("bots")?.let { useBots(planned ?: difficulty, it) }
         return MatchPlan(o.optLong("matchId"), o.optLong("seed"), names, planned, if (o.has("level")) o.optInt("level") else null)
     }
 
@@ -487,6 +482,28 @@ class GameServer(context: Context) {
             else -> null
         }
     }
+
+    /** Makes the bots of difficulty [d] behave as the server's [settings] say: the same as when it replays the match. */
+    fun useBots(d: BotDifficulty, settings: JSONObject) {
+        val values = HashMap<String, Any>()
+        for (key in settings.keys()) values[key] = settings.get(key)
+        BotProfile.overrides = BotProfile.overrides + (d to BotProfile.builtIn(d).withOverrides(values))
+    }
+
+    /** The line to the server's team lobby (the same port as the 1v1 lobby), or null when offline. */
+    fun teamLink(): TeamLink? {
+        if (!_status.value.online) return null
+        return try {
+            val url = URL(baseUrl)
+            TeamLink(url.host, (if (url.port > 0) url.port else 80) + 1)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** What this player tells the team lobby: who they are, the fighter they bring, and the team to make ([mode]) or join ([code]). */
+    fun teamHello(fighter: FighterId, skin: Int, action: String, mode: io.github.projectwip.data.GameMode?, boss: io.github.projectwip.data.BossKind?, code: String): JSONObject =
+        duelHello(fighter, skin).put("action", action).put("mode", mode?.name.orEmpty()).put("boss", boss?.name.orEmpty()).put("code", code)
 
     /** The line to the server's 1v1 lobby (it listens one port above the game server), or null when offline. */
     fun duelLink(): DuelLink? {
