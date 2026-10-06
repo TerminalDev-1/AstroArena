@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import backend
 import cfgfile
+import page_accounts
 
 FILES = ("game.cfg", "trophies.cfg", "bots.cfg", "shop.cfg", "news.cfg", "notices.cfg", "versions_not_supported.cfg")
 
@@ -132,6 +133,31 @@ class Pages(unittest.TestCase):
         self.assertTrue(page.length.get().startswith("Leave it: ends "))
         page._apply()
         self.assertEqual(backend._store.accounts()[0], account)
+        self.assertRegex(page.length.get(), r"ends \d\d/\d\d/20\d\d \d\d:\d\d$")  # day/month/year
+        # A date and time picked the UK way round: the 5th of November, not the 11th of May.
+        import datetime
+        year = datetime.date.today().year + 1
+        page.length.set(page_accounts.PICKED)
+        for var, value in ((page.day, "05"), (page.month, "11"), (page.year, str(year)), (page.hour, "18"), (page.minute, "30")):
+            var.set(value)
+        page._apply()
+        self.assertEqual(backend._store.accounts()[0]["disabled_until"], datetime.datetime(year, 11, 5, 18, 30).timestamp())
+        # A day that doesn't exist, or one that has gone, is refused and nothing changes.
+        page.length.set(page_accounts.PICKED)
+        page.day.set("31")
+        page._apply()
+        page.length.set(page_accounts.PICKED)
+        page.day.set("05")
+        page.year.set("2020")
+        page._apply()
+        self.assertEqual(backend._store.accounts()[0]["disabled_until"], datetime.datetime(year, 11, 5, 18, 30).timestamp())
+        # The reason box is a Windows text box; what is in it is still what gets saved.
+        page._show(page.current)
+        self.app.update()
+        page.reason.set("Said  out loud")
+        self.assertEqual(page.reason.get(), "Said  out loud")
+        page._apply()
+        self.assertEqual(backend._store.accounts()[0]["disabled_reason"], "Said out loud")
         page.disabled.set(False)
         page._apply()
         account = backend._store.accounts()[0]

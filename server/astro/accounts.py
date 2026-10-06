@@ -43,8 +43,8 @@ HEADER = """\
 #   disabled_reason   why, in your words: the player is shown it. Optional.
 #   disabled_until    when it ends by itself. Optional: leave it empty and it lasts until you write
 #               disabled = no. Write how long (30 minutes, 12 hours, 3 days, 2 weeks, 1 day 6 hours)
-#               or a date (2026-10-20 or 2026-10-20 18:00, this computer's time); the server turns
-#               it into the date. Both only count while disabled = yes.
+#               or a date (20/10/2026 18:00 or 2026-10-20 18:00, this computer's time); the server
+#               turns it into the date. Both only count while disabled = yes.
 #   cups        the player's Cups: their place on the leaderboard
 #   best_cups   the most Cups they have had: how far along the Cup Track they are
 #   drops       unopened Spark Drops
@@ -97,12 +97,12 @@ def _fighter_value(text: str) -> dict | None:
 
 
 def when(text: str, now: float | None = None) -> float | None:
-    """`3 days`, `1 day 6 hours` or `2026-10-20 18:00` as a time (seconds since 1970); 0 for nothing, which
-    means no end; None if it can't be read."""
+    """`3 days`, `1 day 6 hours`, `2026-10-20 18:00` or `20/10/2026 18:00` (day first, the UK way) as a time
+    (seconds since 1970); 0 for nothing, which means no end; None if it can't be read."""
     text = " ".join(text.strip().lower().split())
     if text in ("", "never", "forever"):
         return 0.0
-    for form in (_DATE, "%Y-%m-%d"):
+    for form in (_DATE, "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
         try:
             return time.mktime(time.strptime(text, form))
         except (ValueError, OverflowError):

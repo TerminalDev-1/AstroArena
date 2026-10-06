@@ -189,6 +189,9 @@ def apply(root: tk.Tk) -> None:
                        ("font", FONT), ("borderWidth", 0), ("relief", "flat")):
         root.option_add("*TCombobox*Listbox." + key, value)
 
+    style.layout("Field.TFrame", [("Round.field", {"sticky": "nswe"})])  # the outline round a DictationEntry (nativebox.py)
+    style.configure("Field.TFrame", background=BG)
+
     # Checkboxes: the theme's own marks "on" with a cross, which reads as "no". These get a tick.
     def check(fill: str, edge: str, tick: str | None) -> tk.PhotoImage:
         size = px(17)

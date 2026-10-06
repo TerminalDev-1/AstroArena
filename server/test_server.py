@@ -457,6 +457,8 @@ class Api(unittest.TestCase):
         self.assertEqual([when(text, 1000.0) for text in ("", "forever", "30 minutes", "12h", "3 days", "2 weeks", "1 day, 6 hours")],
                          [0.0, 0.0, 2800.0, 44200.0, 260200.0, 1210600.0, 109000.0])
         self.assertEqual(when("2026-10-20 18:00") - when("2026-10-20"), 18 * 3600)
+        # Day first, the UK way, means the same day.
+        self.assertEqual((when("20/10/2026 18:00"), when("05/11/2026")), (when("2026-10-20 18:00"), when("2026-11-05")))
         self.assertEqual([when(text) for text in ("soon", "3", "3 dys", "3 days maybe")], [None] * 4)
 
     def test_accounts_cfg_forces_what_the_operator_changes(self):

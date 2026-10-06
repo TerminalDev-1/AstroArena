@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import datetime
 import time
 import tkinter as tk
 from tkinter import ttk
 
 import backend
+from nativebox import DictationEntry
 from theme import BAD, Page, as_int, choice, entry, heading, number, px, table
 
 NUMBERS = [("cups", "Cups"), ("best_cups", "Best Cups"), ("drops", "Spark Drops"), ("bolts", "Power Ups"),
            ("prisms", "Crystals"), ("credits", "Credits"), ("glory", "Glory")]
 FOREVER = "Until I let them back in"
-TYPED = "A date or length I type →"
+TYPED = "Another length →"
+PICKED = "Until a date and time ↓"
 LENGTHS = ["15 minutes", "1 hour", "12 hours", "1 day", "3 days", "7 days", "30 days"]
+UK = "%d/%m/%Y %H:%M"  # dates are shown and picked the UK way: day, month, year, 24-hour clock
 
 
 class AccountsPage(Page):
@@ -49,18 +53,18 @@ class AccountsPage(Page):
         self.ident.pack(side="left", padx=px(12), pady=(px(3), 0))
         ttk.Button(who, text="Copy id", command=self._copy).pack(side="right")
 
-        heading(right, "Has").pack(anchor="w", pady=(px(14), px(6)))
+        heading(right, "Has").pack(anchor="w", pady=(px(12), px(4)))
         grid = ttk.Frame(right)
         grid.pack(fill="x")
         self.numbers: dict[str, tk.StringVar] = {}
         for i, (key, label) in enumerate(NUMBERS):
             cell = ttk.Frame(grid)
-            cell.grid(row=i // 4, column=i % 4, sticky="w", padx=(0, px(12)), pady=(0, px(8)))
+            cell.grid(row=i // 4, column=i % 4, sticky="w", padx=(0, px(12)), pady=(0, px(6)))
             ttk.Label(cell, text=label, style="Small.TLabel").pack(anchor="w")
             self.numbers[key] = tk.StringVar()
             entry(cell, self.numbers[key], width=12).pack(anchor="w")
 
-        heading(right, "Fighters", "locked, level and the fighter's own Cups (its rank follows them)").pack(anchor="w", pady=(px(10), px(4)))
+        heading(right, "Fighters", "locked, level and the fighter's own Cups (its rank follows them)").pack(anchor="w", pady=(px(8), px(4)))
         grid = ttk.Frame(right)
         grid.pack(fill="x")
         self.fighters: dict[str, tuple[tk.BooleanVar, tk.StringVar, tk.StringVar]] = {}
@@ -77,21 +81,38 @@ class AccountsPage(Page):
             ttk.Label(grid, text="Cups", style="Dim.TLabel").grid(row=row, column=4, padx=(0, px(6)))
             entry(grid, cups, width=9).grid(row=row, column=5)
 
-        heading(right, "Access", "a disabled account is kept, with all it has; the game shows the player a notice and nothing else").pack(anchor="w", pady=(px(14), px(6)))
-        access = ttk.Frame(right)
-        access.pack(fill="x")
+        heading(right, "Access", "a disabled account is kept, with all it has; the game shows the player a notice and nothing else").pack(anchor="w", pady=(px(12), px(4)))
         self.disabled = tk.BooleanVar()
-        self.reason, self.length, self.typed = tk.StringVar(), tk.StringVar(), tk.StringVar()
-        ttk.Checkbutton(access, text="Disabled", variable=self.disabled, command=self._access).grid(row=0, column=0, sticky="w", padx=(0, px(18)))
-        ttk.Label(access, text="Reason shown to the player", style="Dim.TLabel").grid(row=0, column=1, sticky="w", padx=(0, px(8)))
-        self.reason_box = entry(access, self.reason, width=28)
-        self.reason_box.grid(row=0, column=2, columnspan=2, sticky="w")
-        ttk.Label(access, text="For", style="Dim.TLabel").grid(row=1, column=1, sticky="e", padx=(0, px(8)), pady=(px(8), 0))
-        self.length_box = choice(access, self.length, [], width=26)
-        self.length_box.grid(row=1, column=2, sticky="w", pady=(px(8), 0))
+        self.length, self.typed = tk.StringVar(), tk.StringVar()
+        first = ttk.Frame(right)
+        first.pack(fill="x")
+        ttk.Checkbutton(first, text="Disabled", variable=self.disabled, command=self._access).pack(side="left", padx=(0, px(22)))
+        ttk.Label(first, text="For", style="Dim.TLabel").pack(side="left", padx=(0, px(8)))
+        self.length_box = choice(first, self.length, [], width=27)
+        self.length_box.pack(side="left")
         self.length_box.bind("<<ComboboxSelected>>", lambda e: self._access(), add="+")
-        self.typed_box = entry(access, self.typed, width=18)
-        self.typed_box.grid(row=1, column=3, sticky="w", padx=(px(8), 0), pady=(px(8), 0))
+        self.typed_box = entry(first, self.typed, width=16)
+        self.typed_box.pack(side="left", padx=(px(8), 0))
+
+        # The reason gets the full width, and is a real Windows text box so that voice typing (Win+H) works in it.
+        second = ttk.Frame(right)
+        second.pack(fill="x", pady=(px(8), 0))
+        ttk.Label(second, text="Reason shown to the player", style="Dim.TLabel").pack(side="left", padx=(0, px(8)))
+        self.reason = DictationEntry(second)
+        self.reason.pack(side="left", fill="x", expand=True)
+
+        # A date and time, picked the UK way round. Only shown when that is what "For" says.
+        self.when_row = ttk.Frame(right)
+        self.day, self.month, self.year, self.hour, self.minute = (tk.StringVar() for _ in range(5))
+        this_year = datetime.date.today().year
+        ttk.Label(self.when_row, text="Ends on", style="Dim.TLabel").pack(side="left", padx=(0, px(8)))
+        for var, values, width, after in (
+                (self.day, ["%02d" % d for d in range(1, 32)], 3, "/"), (self.month, ["%02d" % m for m in range(1, 13)], 3, "/"),
+                (self.year, [str(this_year + y) for y in range(0, 6)], 5, "at"),
+                (self.hour, ["%02d" % h for h in range(24)], 3, ":"), (self.minute, ["%02d" % m for m in range(0, 60, 5)], 3, "")):
+            choice(self.when_row, var, values, width=width).pack(side="left")
+            if after:
+                ttk.Label(self.when_row, text=after, style="Dim.TLabel").pack(side="left", padx=px(6))
 
         self.action("Apply changes", self._apply, "Accent.TButton")
         self.action("Undo edits", lambda: self._show(self.current))
@@ -133,7 +154,7 @@ class AccountsPage(Page):
     def _picked(self, _event=None) -> None:
         chosen = self.tree.selection()
         account = next((a for a in self.accounts if chosen and a["id"] == chosen[0]), None)
-        if account is not None and (self.current is None or account["id"] != self.current["id"] or account != self.current):
+        if account is not None and account != self.current:
             self._show(account)
 
     def _copy(self) -> None:
@@ -159,19 +180,44 @@ class AccountsPage(Page):
         self.reason.set(account["disabled_reason"] if account else "")
         self.typed.set("")
         until = account["disabled_until"] if account else 0
-        self._kept = "Leave it: ends " + time.strftime("%Y-%m-%d %H:%M", time.localtime(until)) if until > 0 else None
-        self.length_box.configure(values=([self._kept] if self._kept else []) + [FOREVER] + LENGTHS + [TYPED])
+        self._kept = "Leave it: ends " + time.strftime(UK, time.localtime(until)) if until > 0 else None
+        self.length_box.configure(values=([self._kept] if self._kept else []) + [FOREVER] + LENGTHS + [TYPED, PICKED])
         self.length.set(self._kept or FOREVER)
+        # The picker starts on the end it already has, or this time tomorrow, to the next five minutes.
+        start = datetime.datetime.fromtimestamp(until) if until > 0 else datetime.datetime.now() + datetime.timedelta(days=1)
+        start += datetime.timedelta(minutes=(-start.minute) % 5)
+        for var, value in ((self.day, start.day), (self.month, start.month), (self.hour, start.hour), (self.minute, start.minute)):
+            var.set("%02d" % value)
+        self.year.set(str(start.year))
         self._access()
 
     def _access(self) -> None:
         on = self.disabled.get()
-        self.reason_box.state(["!disabled" if on else "disabled"])
+        self.reason.enable(on)
         self.length_box.state(["!disabled" if on else "disabled"])
         typing = on and self.length.get() == TYPED
         self.typed_box.state(["!disabled" if typing else "disabled"])
         if typing:
-            self.say("Type a length (45 minutes, 2 weeks, 1 day 6 hours) or a date (2026-10-20 18:00, this PC's time).")
+            self.say("Type a length: 45 minutes, 2 weeks, 1 day 6 hours.")
+        if on and self.length.get() == PICKED:
+            self.when_row.pack(fill="x", pady=(px(8), 0))
+            self.say("Day / month / year, on the 24-hour clock, in this PC's time.")
+        else:
+            self.when_row.pack_forget()
+
+    def _until(self) -> float | str:
+        """When the account is let back in, as "For" has it (0 = never by itself); or, as text, why it can't be read."""
+        length = self.length.get()
+        if length == FOREVER:
+            return 0.0
+        if length == PICKED:
+            try:
+                end = datetime.datetime(int(self.year.get()), int(self.month.get()), int(self.day.get()), int(self.hour.get()), int(self.minute.get()))
+            except ValueError:
+                return "There is no %s/%s/%s." % (self.day.get(), self.month.get(), self.year.get())
+            return end.timestamp() if end > datetime.datetime.now() else "That date and time has already passed."
+        until = backend.when(self.typed.get() if length == TYPED else length)
+        return "I can't read that length. Try 3 days, or 1 day 6 hours." if until is None or (length == TYPED and until == 0) else until
 
     def _apply(self) -> None:
         was = self.current
@@ -194,13 +240,13 @@ class AccountsPage(Page):
         if disabled != was["disabled"]:
             change["disabled"] = disabled
         if disabled:
-            if self.reason.get().strip() != was["disabled_reason"]:
-                change["disabled_reason"] = self.reason.get().strip()
-            length = self.length.get()
-            if length != self._kept:
-                until = 0.0 if length == FOREVER else backend.when(self.typed.get() if length == TYPED else length)
-                if until is None:
-                    self.say("I can't read that length or date. Try 3 days, or 2026-10-20 18:00.", bad=True)
+            reason = " ".join(self.reason.get().split())
+            if reason != was["disabled_reason"]:
+                change["disabled_reason"] = reason
+            if self.length.get() != self._kept:
+                until = self._until()
+                if isinstance(until, str):
+                    self.say(until, bad=True)
                     return
                 if until != was["disabled_until"]:
                     change["disabled_until"] = until
