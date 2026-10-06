@@ -22,18 +22,26 @@ DEFAULT_CUPS = {
     "LAST_SPARK": {"places": [25, 22, 20, 17, 14, 12, 7, 3, 0, 0]},
     "KNOCKOUT_RUSH": {"win": 8, "mvp_bonus": 2, "draw": 1, "max_loss": 6, "loss_step": 80},
     "BOSS": {"win": 5},
+    # 1v1, against another real player (the lobby replays it and says who won: duel.py).
+    "DUEL": {"win": 8, "draw": 0, "max_loss": 6, "loss_step": 80},
 }
 # The Training Area is never played for Cups (nothing referees it), whatever trophies.cfg says.
 CUP_MODES = tuple(DEFAULT_CUPS)
 DIFFICULTIES = ("EASY", "NORMAL", "HARD", "ELITE")
 
 # A fighter has Cups of its own (won and lost while playing it) and a rank that follows them: rank 1 starts at
-# the first number here, rank 2 at the second, and so on. The last is the top rank, shown as MAX.
+# the first number here, rank 2 at the second, and so on. There is no top rank: past the end of the list every
+# further rank is another FIGHTER_RANK_STEP Cups, for as long as the Cups keep coming.
 FIGHTER_RANK_CUPS = [0, 10, 20, 35, 50, 75, 100, 140, 180, 230, 280, 340, 400, 470, 540, 620, 700, 790, 880, 1000]
+FIGHTER_RANK_STEP = 150
 
 
 def fighter_rank(cups: int) -> int:
+    if cups >= FIGHTER_RANK_CUPS[-1]:
+        return len(FIGHTER_RANK_CUPS) + (cups - FIGHTER_RANK_CUPS[-1]) // FIGHTER_RANK_STEP
     return max(1, sum(1 for start in FIGHTER_RANK_CUPS if start <= cups))
+
+
 OUTCOMES = ("VICTORY", "DEFEAT", "DRAW")
 
 # The bosses of Boss Mode. A player may ask for one; otherwise the match's seed picks. Keep in step with BossKind.
@@ -82,7 +90,7 @@ def earns_drop(mode: str, outcome: str, placement: int) -> bool:
 # Nobody wins a real match faster than this, and a match left open this long is abandoned.
 MIN_GOOD_RESULT_SECONDS = 20.0
 MAX_MATCH_SECONDS = 3600.0
-_MAX_KOS = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 40, "BOSS": 80, "TRAINING": 100000}
+_MAX_KOS = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 40, "BOSS": 80, "DUEL": 40, "TRAINING": 100000}
 _MAX_DAMAGE = 3_000_000
 
 
@@ -111,7 +119,8 @@ def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: i
         if placement == 1 and kos == 0 and damage == 0:
             return "a win without a fight"
     good = outcome == "VICTORY" or (mode == "LAST_SPARK" and placement <= 4)
-    if good and mode != "TRAINING" and elapsed < MIN_GOOD_RESULT_SECONDS:
+    # (A 1v1 is won the moment the other player walks out, and it is the lobby that says so, not the device.)
+    if good and mode not in ("TRAINING", "DUEL") and elapsed < MIN_GOOD_RESULT_SECONDS:
         return "finished faster than a match can be played"
     return None
 

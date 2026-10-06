@@ -21,6 +21,12 @@ import java.util.Base64
  * Output:
  *     outcome=DEFEAT placement=4 kos=2 deaths=1 damage=5120 mvp=false ticks=4328 finished=true fingerprint=...
  * or, if the input makes no sense, a single line `error=...` and exit code 2.
+ *
+ * A 1v1 (`mode=DUEL`) is two real players and no bots, so it is given both of them instead:
+ *     seed=123456   fighter0=KITO level0=10 frames0=<base64>   fighter1=JUNO level1=7 frames1=<base64>
+ *     check=600,123,456          (optional: a tick the devices disagreed on, and each one's number for it)
+ * and answers
+ *     finished=true ticks=4328 winner=1 kos0=1 deaths0=3 damage0=4100 kos1=3 deaths1=1 damage1=6200 wrong0=false wrong1=false
  */
 fun main() {
     val fields = HashMap<String, String>()
@@ -29,6 +35,26 @@ fun main() {
         if (at > 0) fields[line.substring(0, at).trim()] = line.substring(at + 1).trim()
     }
     try {
+        if (fields["mode"] == "DUEL") {
+            val check = fields["check"]?.split(',')?.map { it.trim().toInt() }
+            val verdict = Referee.judgeDuel(
+                fields.getValue("seed").toLong(),
+                listOf(FighterId.valueOf(fields.getValue("fighter0")), FighterId.valueOf(fields.getValue("fighter1"))),
+                listOf(fields.getValue("level0").toInt(), fields.getValue("level1").toInt()),
+                Base64.getDecoder().decode(fields["frames0"].orEmpty()), Base64.getDecoder().decode(fields["frames1"].orEmpty()),
+                check?.get(0) ?: -1, check?.let { intArrayOf(it[1], it[2]) },
+            )
+            println("finished=${verdict.finished}")
+            println("ticks=${verdict.ticks}")
+            println("winner=${verdict.winner}")
+            for ((side, f) in verdict.fighters.withIndex()) {
+                println("kos$side=${f.kos}")
+                println("deaths$side=${f.deaths}")
+                println("damage$side=${f.damageDealt}")
+                println("wrong$side=${verdict.wrong[side]}")
+            }
+            return
+        }
         val difficulty = BotDifficulty.valueOf(fields.getValue("difficulty"))
         // The bots behave as the server's settings say, exactly as they did on the device.
         val settings = HashMap<String, Any>()

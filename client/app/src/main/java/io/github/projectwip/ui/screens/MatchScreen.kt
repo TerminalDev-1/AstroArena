@@ -55,6 +55,8 @@ data class MatchSummary(
     val report: MatchReport, val players: List<PlayerLine>, val playerTeam: Int, val serverMatchId: Long = 0,
     /** What the player did, tick by tick: the server replays the match from this. */
     val inputs: ByteArray? = null,
+    /** A 1v1 against a real player: the line to the lobby, which says what the match was worth. */
+    val duel: io.github.projectwip.net.DuelLink? = null,
 ) {
     /** This summary with the server's findings in place of the device's own. */
     fun judged(j: io.github.projectwip.data.JudgedResult): MatchSummary = copy(
@@ -135,7 +137,7 @@ fun MatchScreen(
 
 /**
  * A 1v1 against a real player: joins the server's lobby, waits there for someone else to join, then plays the
- * match in step with their device. Leaving (or cancelling the wait) hangs up, which hands the other player the win.
+ * match in step with their device. Leaving the match hangs up, which hands the other player the win and its Cups.
  */
 @Composable
 private fun DuelMatch(
@@ -171,7 +173,7 @@ private fun DuelMatch(
                 PlainText("The match starts as soon as another player on this server picks 1v1. It waits for a real player, however long that takes.", Type.Body, color = Color.White, align = TextAlign.Center, modifier = Modifier.width(560.dp))
                 // (Read every frame, as the dots animate: the lobby may say why nobody is being found.)
                 link?.note?.let { PlainText(it, Type.Body, color = io.github.projectwip.ui.Palette.Red, align = TextAlign.Center, modifier = Modifier.width(560.dp)) }
-                PlainText("This is a test mode: nothing is earned or lost in it yet.", Type.Small, color = io.github.projectwip.ui.Palette.Gold)
+                PlainText("Played for Cups: the winner takes them, and leaving a match counts as a defeat.", Type.Small, color = io.github.projectwip.ui.Palette.Gold)
             } else {
                 GameText("NO 1V1 RIGHT NOW", Type.Title, color = io.github.projectwip.ui.Palette.Gold, outline = 3.5.dp)
                 PlainText(p, Type.Body, color = Color.White, align = TextAlign.Center, modifier = Modifier.width(520.dp))
@@ -285,7 +287,7 @@ private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed:
         if (done) return
         done = true
         view?.paused = true
-        onFinish(summarize(match, report))
+        onFinish(summarize(match, report).copy(duel = duel))
     }
 
     BackHandler(enabled = !done) {
@@ -313,7 +315,7 @@ private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed:
                 Panel(cut = 20.dp) {
                     Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         GameText("PAUSED", Type.Display, outline = 4.dp)
-                        PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else if (duel != null) "The match is still going: your opponent can't be paused. Leaving hands them the win." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
+                        PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else if (duel != null) "The match is still going: your opponent can't be paused. Leaving hands them the win, and costs you Cups." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
                         ChunkyButton({ paused = false; if (duel == null) view?.resumeGame() }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN) { GameText("RESUME", Type.Title) }
                         ChunkyButton({ finish(match.forfeit()) }, Modifier.size(260.dp, 54.dp), ButtonStyle.RED) {

@@ -10,6 +10,8 @@ player did. This module is the meeting point. It listens on its own TCP port (th
   * when one leaves, the other is told:           'X'   (the other left: you win)
   * a player whose inputs stopped is told:        'L'   (you were dropped: you lose), and the other gets 'X'
   * if both stopped at the same moment:           'D'   (called off: a draw)
+  * a device whose match has ended says so:       'F'
+  * and each is told what the match was worth:    'V' + text (the verdict, as for any match; {} if nothing)
   * while waiting, a note may be sent:            'N' + text
   * a device that can't play is told why:         'E' + text
 
@@ -17,9 +19,12 @@ player did. This module is the meeting point. It listens on its own TCP port (th
 kept to ASCII so the two agree). Who the player is, which fighter they may bring and what level it is are the
 server's to say, as everywhere else: the device's own word for its level is not asked for.
 
-Nothing is earned in a 1v1 yet. This is the first mode against real players and it is here to be tested, on a home
-network; the server doesn't referee these matches, and a device that sent false inputs would only put the two out
-of step.
+A 1v1 is played for Cups (trophies.cfg, [DUEL]), and who won is the server's to say. The lobby keeps every input
+frame it passes on, so when a match ends it has both players' whole matches: it replays them through the referee
+(the game's own simulation, as for matches against bots) and pays each player by what the replay shows. Neither
+device is asked how it went. A match that stops before the replay reaches its end is lost by whoever stopped it:
+the player who left, went quiet, or whose device disagreed with the replay about the match. Without a referee
+(no Java on the server) nothing can say who won, so a 1v1 is still played but pays nothing.
 
 A player who joins waits for another real player, for as long as that takes. There is no stand-in opponent.
 
@@ -31,7 +36,8 @@ is dropped and loses, and the other wins. Before either has sent anything (both 
 they get `start_seconds` instead.
 
 Every so often each device also sends a check ('C' + 8 bytes: a tick and a number worked out from where everything
-is on that tick). It is passed on like an input; the devices compare, and call the match off if they disagree.
+is on that tick). It is passed on like an input; the devices compare, and stop if they disagree. The lobby compares
+them too, and when they differ the replay says which device had it wrong: that one loses.
 """
 
 from __future__ import annotations
@@ -45,9 +51,11 @@ import threading
 import time
 
 from . import rules
+from .economy import Refused
 
 FRAME_BYTES = 17  # flags (1) + moveX, moveY, aimX, aimY (4 floats)
 CHECK_BYTES = 8   # tick (int) + the number the device worked out for that tick (int)
+MAX_FRAMES = 60 * 60 * 20  # as much of a match as is kept for the replay (20 minutes; a 1v1 lasts two)
 
 
 class _Seat:
@@ -59,6 +67,11 @@ class _Seat:
         self.player_id = player_id
         self.frames = 0          # input frames received from this player
         self.heard = 0.0         # when the last one arrived (or when the match was made)
+        self.record = bytearray()          # those frames, kept for the replay
+        self.checks: dict[int, int] = {}   # tick -> the number this device worked out, until the other's arrives
+        self.side = 0
+        self.seed = 0
+        self.match_id = 0        # this player's row for the match (0: nothing is at stake)
         self.name, self.fighter, self.level, self.skin = name, fighter, level, skin
         self.peer: _Seat | None = None
         self._write = threading.Lock()
@@ -149,11 +162,92 @@ class DuelLobby(socketserver.ThreadingTCPServer):
                 gone, there = (a, b) if a.frames < b.frames else (b, a)
                 self.log(f"{gone.name} stopped responding: {there.name} wins")
                 gone.send(b"L"); there.send(b"X")
+                self.settle(gone, there, loser=gone)
+            self._hang_up(a, b)
+
+    @staticmethod
+    def _hang_up(*seats: _Seat) -> None:
+        for seat in seats:
+            try:
+                seat.sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+    def _part(self, me: _Seat) -> _Seat | None:
+        """Ends the match [me] is in, if it is still going: whoever gets here first settles it. Returns the other player."""
+        with self._lock:
+            peer, me.peer = me.peer, None
+            if peer is not None:
+                peer.peer = None
+        return peer
+
+    def settle(self, a: _Seat, b: _Seat, loser: _Seat | None = None, check: tuple[int, int, int] | None = None) -> bool:
+        """Works out how the match between [a] and [b] went, pays both, and tells whoever is still there ('V').
+
+        The replay decides. If it doesn't reach the end of the match, [loser] (the player who stopped it) loses;
+        failing that, with `check` (a tick the devices disagreed on: tick, side 0's number, side 1's), the one the
+        replay says had it wrong. False if nothing could be decided: the match is called off and pays nothing.
+        """
+        first, second = (a, b) if a.side == 0 else (b, a)
+        referee = getattr(self.game, "referee", None)
+        winner, judged = None, None
+        if referee is not None and first.match_id and second.match_id:
+            frames = [bytes(seat.record[:len(seat.record) // FRAME_BYTES * FRAME_BYTES]) for seat in (first, second)]
+            try:
+                judged = referee.judge_duel(first.seed, [first.fighter, second.fighter], [first.level, second.level], frames, check)
+            except Refused as refused:
+                self.log(f"{a.name} v {b.name}: {refused.message}")
+        if self._closing:
+            return False
+        if judged is not None:
+            if judged["finished"]:
+                winner = judged["winner"]
+            elif loser is not None:
+                winner = 1 - loser.side
+            elif judged["wrong"][0] != judged["wrong"][1]:
+                winner = 1 if judged["wrong"][0] else 0
+        if winner is None:
             for seat in (a, b):
-                try:
-                    seat.sock.shutdown(socket.SHUT_RDWR)
-                except OSError:
-                    pass
+                seat.send(_text(b"V", {}))
+            return False
+        for seat in (first, second):
+            stats = judged["sides"][seat.side]
+            outcome = "DRAW" if winner < 0 else "VICTORY" if winner == seat.side else "DEFEAT"
+            report = {"outcome": outcome, "placement": 0, "kos": stats["kos"], "deaths": stats["deaths"], "damage": stats["damage"], "mvp": False}
+            verdict = self.game.store.finish_match(seat.player_id, seat.match_id, {**report, "ticks": judged["ticks"]}, verified=True)
+            if not verdict or "rejected" in verdict:
+                seat.send(_text(b"V", {}))
+                continue
+            account = self.game.account(seat.player_id)
+            seat.send(_text(b"V", {**verdict, "report": report, "account": {k: account[k] for k in ("drops", "dropsLeftToday")}}))
+            self.log(f"{seat.name}: {outcome}, {verdict['cupDelta']:+d} Cups" + ("" if judged["finished"] else " (the match was not played out)"))
+        return True
+
+    def finished(self, me: _Seat) -> None:
+        """[me]'s device says the match is over. The replay will show whether it is; if not, they have walked out."""
+        peer = self._part(me)
+        if peer is not None:
+            self.settle(me, peer, loser=me)
+
+    def checked(self, me: _Seat, tick: int, value: int) -> None:
+        """A device's number for [tick]. If the other's is in and differs, the match can't go on: the replay says who had it wrong."""
+        with self._lock:
+            peer = me.peer
+            if peer is None:
+                return
+            theirs = peer.checks.pop(tick, None)
+            if theirs is None:
+                if len(me.checks) < 64:
+                    me.checks[tick] = value
+                return
+            if theirs == value:
+                return
+            me.peer = peer.peer = None
+        self.log(f"{me.name} v {peer.name}: their devices disagree about the match at tick {tick}")
+        numbers = (value, theirs) if me.side == 0 else (theirs, value)
+        if not self.settle(me, peer, check=(tick, *numbers)):
+            me.send(b"D"); peer.send(b"D")
+        self._hang_up(me, peer)
 
     def log(self, message: str) -> None:
         if not self.quiet:
@@ -206,7 +300,14 @@ class DuelLobby(socketserver.ThreadingTCPServer):
             other.peer, me.peer = me, other
             other.heard = me.heard = time.monotonic()
             self._pairs.append((other, me))
-        seed = self._random.getrandbits(62)
+            seed = self._random.getrandbits(62)
+            for side, seat in enumerate((other, me)):
+                seat.side, seat.seed = side, seed
+                # Each player's side of the match is kept like any other match, to be closed when it is settled.
+                try:
+                    seat.match_id = self.game.store.plan_match(seat.player_id, "DUEL", seat.fighter, "", 0, seed=seed)["matchId"]
+                except Refused:
+                    seat.match_id = 0
         self.log(f"{other.name} ({other.fighter}) v {me.name} ({me.fighter})")
         for side, (seat, opponent) in enumerate(((other, me), (me, other))):
             seat.send(_text(b"S", {"seed": seed, "side": side, "level": seat.level, "opponent": opponent.describe()}))
@@ -221,6 +322,7 @@ class DuelLobby(socketserver.ThreadingTCPServer):
         if peer is not None:
             peer.send(b"X")
             self.log(f"{me.name} left the match with {peer.name}")
+            self.settle(me, peer, loser=me)
 
 
 class _Handler(socketserver.BaseRequestHandler):
@@ -249,6 +351,9 @@ class _Handler(socketserver.BaseRequestHandler):
             # one it sends nothing, so this read is also how a cancelled search is noticed.)
             while True:
                 kind = _read(sock, 1)
+                if kind == b"F":
+                    lobby.finished(me)
+                    continue
                 if kind not in (b"I", b"C"):
                     break
                 frame = _read(sock, FRAME_BYTES if kind == b"I" else CHECK_BYTES)
@@ -257,8 +362,12 @@ class _Handler(socketserver.BaseRequestHandler):
                 if kind == b"I":
                     me.frames += 1
                     me.heard = time.monotonic()
+                    if me.peer is not None and me.frames <= MAX_FRAMES:
+                        me.record += frame
                 peer = me.peer
                 if peer is not None:
                     peer.send(kind + frame)
+                if kind == b"C":
+                    lobby.checked(me, *struct.unpack(">ii", frame))
         finally:
             lobby.leave(me)

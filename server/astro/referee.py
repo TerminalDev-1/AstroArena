@@ -98,3 +98,31 @@ class Referee:
             "deaths": int(fields["deaths"]), "damage": int(fields["damage"]), "mvp": fields["mvp"] == "true",
             "ticks": int(fields["ticks"]), "finished": fields["finished"] == "true",
         }
+
+    def judge_duel(self, seed: int, fighters: list[str], levels: list[int], frames: list[bytes], check: tuple[int, int, int] | None = None) -> dict:
+        """Plays a 1v1 back from both players' input frames (side 0 first), as the lobby recorded them.
+
+        Returns {finished, ticks, winner (0, 1, or -1 for a draw or an unfinished match), sides: [{kos, deaths,
+        damage}, {...}], wrong: [bool, bool]}. `check` is (tick, side 0's number, side 1's number) for a tick on
+        which the two devices disagreed about the match; `wrong` says which of them disagrees with this replay.
+        """
+        lines = ["mode=DUEL", "seed=%d" % seed]
+        for side in (0, 1):
+            lines += ["fighter%d=%s" % (side, fighters[side]), "level%d=%d" % (side, levels[side]),
+                      "frames%d=%s" % (side, base64.b64encode(frames[side]).decode("ascii"))]
+        if check is not None:
+            lines.append("check=%d,%d,%d" % check)
+        try:
+            done = subprocess.run(
+                [self.java, "-Xss4m", "-jar", self.jar], input="\n".join(lines) + "\n", capture_output=True, text=True, timeout=self.timeout
+            )
+        except (OSError, subprocess.TimeoutExpired) as problem:
+            raise Refused(503, "the referee couldn't run: %s" % problem)
+        fields = dict(line.split("=", 1) for line in done.stdout.splitlines() if "=" in line)
+        if done.returncode != 0 or "winner" not in fields:
+            raise Refused(422, "the 1v1 can't be replayed (%s)" % fields.get("error", done.stderr.strip()[:200] or "no verdict"))
+        return {
+            "finished": fields["finished"] == "true", "ticks": int(fields["ticks"]), "winner": int(fields["winner"]),
+            "sides": [{k: int(fields["%s%d" % (k, side)]) for k in ("kos", "deaths", "damage")} for side in (0, 1)],
+            "wrong": [fields.get("wrong%d" % side) == "true" for side in (0, 1)],
+        }

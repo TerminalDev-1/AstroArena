@@ -137,4 +137,57 @@ class DuelLinkTest {
         assertFalse("and is not told anything else", b.link.outOfStep || b.link.dropped || b.link.lost)
         server.close()
     }
+
+    /**
+     * The server's replay of a 1v1 (from the frames its lobby passed on) is the match the devices played: it ends
+     * on the same tick with the same winner, whichever side's device it is held against.
+     */
+    @Test fun theRefereeReplaysA1v1Exactly() {
+        val ticks = 60 * 150
+        val hands = Random(5)
+        val fighters = listOf(FighterId.KITO, FighterId.JUNO)
+        val levels = listOf(9, 2)
+        // One device (side 1's), run the way MatchRunner runs it.
+        val start = DuelLink.Start(41L, levels[1], io.github.projectwip.sim.DuelSetup(1, fighters[0], levels[0], 0, "Them"))
+        val device = Match(MatchConfig(fighters[1], start.level, 0, "Me", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = start.seed, duel = start.setup))
+        val sides = listOf(device.opponent!!, device.player)
+        // What each player sent, as the lobby would have kept it.
+        val sent = List(2) { java.nio.ByteBuffer.allocate((ticks + DuelLink.DELAY) * 17) }
+        var tick = 0
+        var sumAt300 = 0
+        while (tick < ticks + DuelLink.DELAY && !device.isOver) {
+            if (tick == 300) sumAt300 = device.world.checksum()
+            // What each player wants now (to be played DELAY ticks from now): walk at the other and shoot at them.
+            for (side in 0..1) {
+                val me = sides[side]
+                val them = sides[1 - side]
+                sent[side].put((1 or (if (hands.nextInt(6) == 0) 2 else 0) or (if (hands.nextInt(25) == 0) 4 else 0) or (if (hands.nextInt(30) == 0) 8 else 0)).toByte())
+                sent[side].putFloat((them.x - me.x) * 0.3f + hands.nextFloat() - 0.5f); sent[side].putFloat((them.y - me.y) * 0.3f + hands.nextFloat() - 0.5f)
+                sent[side].putFloat(them.x - me.x); sent[side].putFloat(them.y - me.y)
+            }
+            for (side in 0..1) {
+                val c = sides[side].control
+                if (tick < DuelLink.DELAY) { c.clear(); continue }
+                val b = java.nio.ByteBuffer.wrap(sent[side].array(), (tick - DuelLink.DELAY) * 17, 17)
+                val flags = b.get().toInt()
+                c.moveX = b.getFloat(); c.moveY = b.getFloat(); c.aimX = b.getFloat(); c.aimY = b.getFloat()
+                c.aiming = flags and 1 != 0; c.attack = flags and 2 != 0; c.superAttack = flags and 4 != 0; c.hyper = flags and 8 != 0
+            }
+            device.step(Match.STEP)
+            device.world.events.clear()
+            tick++
+        }
+        val frames = sent.map { it.array().copyOf(it.position()) }
+        val verdict = io.github.projectwip.sim.Referee.judgeDuel(41L, fighters, levels, frames[0], frames[1], 300, intArrayOf(sumAt300, sumAt300 + 1))
+        println("referee 1v1: ${verdict.ticks} ticks, finished=${verdict.finished}, winner=${verdict.winner}, kos ${verdict.fighters.map { it.kos }}")
+        assertTrue("the match was played to its end", device.isOver && verdict.finished)
+        assertEquals("on the same tick", tick, verdict.ticks)
+        assertEquals("with the same winner", device.world.winningTeam, verdict.winner)
+        assertEquals("and the same fight", sides.map { Triple(it.kos, it.deaths, it.damageDealt) }, verdict.fighters.map { Triple(it.kos, it.deaths, it.damageDealt) })
+        assertTrue("the device whose number was off is the one found wrong", !verdict.wrong[0] && verdict.wrong[1])
+        // Cut short (a player left), it isn't finished, and nobody has won.
+        val cut = io.github.projectwip.sim.Referee.judgeDuel(41L, fighters, levels, frames[0].copyOf(17 * 60), frames[1])
+        assertFalse(cut.finished)
+        assertEquals(60 + DuelLink.DELAY to -1, cut.ticks to cut.winner)
+    }
 }

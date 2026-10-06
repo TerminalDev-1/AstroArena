@@ -39,6 +39,62 @@ object Referee {
     /** The match is reported this long after it is decided (the game lingers on the last moment). */
     const val END_SECONDS = 2.8f
 
+    /** In a 1v1, ticks between a player's input and when it is played, on both devices (6 ticks = a tenth of a second). */
+    const val DUEL_DELAY = 6
+    /** One input frame of a 1v1 as it crosses the network: flags, then moveX, moveY, aimX, aimY. */
+    const val DUEL_FRAME_BYTES = 17
+
+    class DuelVerdict(
+        /** The replay reached the end of the match. */
+        val finished: Boolean,
+        val ticks: Int,
+        /** The side that won (0 or 1), or -1 for a draw or a match that wasn't played out. */
+        val winner: Int,
+        /** The two fighters as the replay left them, side 0 first. */
+        val fighters: List<Fighter>,
+        /** For a tick the two devices disagreed on: whether each side's number differs from the replay's. */
+        val wrong: BooleanArray,
+    )
+
+    /**
+     * Plays a 1v1 back from both players' input frames ([frames0] is side 0's), exactly as the two devices ran
+     * it: nothing for the first [DUEL_DELAY] ticks, then one frame from each per tick, until the match ends or
+     * either player's frames run out. [checks] are the numbers the two devices gave for [checkTick]
+     * (`World.checksum` before that tick ran), to be held against the replay's own.
+     */
+    fun judgeDuel(seed: Long, fighters: List<io.github.projectwip.data.FighterId>, levels: List<Int>, frames0: ByteArray, frames1: ByteArray, checkTick: Int = -1, checks: IntArray? = null): DuelVerdict {
+        val match = Match(MatchConfig(
+            fighters[0], levels[0], 0, "Player", io.github.projectwip.data.BotDifficulty.NORMAL, mode = io.github.projectwip.data.GameMode.DUEL,
+            seed = seed, duel = DuelSetup(0, fighters[1], levels[1], 0, "Player"),
+        ))
+        val sides = listOf(match.player, match.opponent!!)
+        val logs = listOf(java.nio.ByteBuffer.wrap(frames0), java.nio.ByteBuffer.wrap(frames1))
+        val frames = minOf(frames0.size, frames1.size) / DUEL_FRAME_BYTES
+        val wrong = BooleanArray(2)
+        var tick = 0
+        fun check() {
+            if (tick != checkTick || checks == null) return
+            val sum = match.world.checksum()
+            for (side in 0..1) wrong[side] = checks[side] != sum
+        }
+        while (tick < frames + DUEL_DELAY && tick < MAX_TICKS && !match.isOver) {
+            check()
+            for (side in 0..1) {
+                val c = sides[side].control
+                if (tick < DUEL_DELAY) { c.clear(); continue }
+                val at = (tick - DUEL_DELAY) * DUEL_FRAME_BYTES
+                val flags = logs[side].get(at).toInt()
+                c.moveX = logs[side].getFloat(at + 1); c.moveY = logs[side].getFloat(at + 5); c.aimX = logs[side].getFloat(at + 9); c.aimY = logs[side].getFloat(at + 13)
+                c.aiming = flags and 1 != 0; c.attack = flags and 2 != 0; c.superAttack = flags and 4 != 0; c.hyper = flags and 8 != 0
+            }
+            match.step(Match.STEP)
+            match.world.events.clear()
+            tick++
+        }
+        if (!match.isOver) check()
+        return DuelVerdict(match.isOver, tick, if (match.isOver) match.world.winningTeam else -1, sides, wrong)
+    }
+
     fun fingerprint(match: Match): Long {
         var h = 1125899906842597L
         for (f in match.world.fighters) {

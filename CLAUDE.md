@@ -89,10 +89,14 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   players see. Offline there is none.
 - Cups don't depend on bot difficulty. What each mode pays (Boss Mode included) is `server/trophies.cfg`, over
   `DEFAULT_CUPS` in `rules.py`; the client has no copy and shows what the verdict says (`cupDelta`, `mvpCups`). Each fighter has Cups and a rank of its own
-  (`FIGHTER_RANK_CUPS` in `rules.py`, `FighterRanks` in `Catalog.kt`); only a judged match changes them.
+  (`FIGHTER_RANK_CUPS` in `rules.py`, `FighterRanks` in `Catalog.kt`); only a judged match changes them. Ranks have no
+  top: past the table every rank is another `FIGHTER_RANK_STEP` Cups.
 - 1v1 (`GameMode.DUEL`) is two real players, each on their own device. Both run the same simulation from the same
   seed and only exchange inputs (`net/DuelLink.kt`, lockstep in `MatchRunner`); the server's lobby (`astro/duel.py`,
-  the game port + 1) pairs them and passes the frames. Nothing is earned in it yet, and it is not refereed.
+  the game port + 1) pairs them and passes the frames. It is played for Cups (`[DUEL]` in `trophies.cfg`): the lobby
+  keeps both players' frames, replays the match through the referee (`Referee.judgeDuel`) and pays each by the
+  replay; neither device is asked who won. A match that isn't played out is lost by whoever left, stalled, or
+  disagreed with the replay. Without a referee a 1v1 pays nothing.
   A player waits for another real one for as long as it takes: there is no stand-in opponent, by the user's decision.
   Every 30 ticks the devices compare a checksum of the match and call it off (a draw) if they disagree.
   The lobby, not the devices, decides what happened when a match stops moving: the player whose inputs stopped

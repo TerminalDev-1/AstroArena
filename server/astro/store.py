@@ -436,11 +436,12 @@ class Store:
 
     # ------------------------------------------------------------------ matches
 
-    def plan_match(self, player_id: str, mode: str, fighter: str, difficulty: str, bots: int, bot_settings: dict | None = None, boss: str = "") -> dict:
+    def plan_match(self, player_id: str, mode: str, fighter: str, difficulty: str, bots: int, bot_settings: dict | None = None, boss: str = "", seed: int | None = None) -> dict:
         """The server decides the match: its seed (which fixes the bots' fighters and behaviour), the bots' names,
         the difficulty and how the bots behave. The fighter has to be one the player has unlocked, and it plays at
-        the level the server holds for it. All of this is kept, so the referee can replay the match later."""
-        seed = secrets.randbits(62)
+        the level the server holds for it. All of this is kept, so the referee can replay the match later.
+        (`seed`: the one a 1v1's two players share, picked by the lobby.)"""
+        seed = secrets.randbits(62) if seed is None else seed
         names = random.Random(seed).sample(BOT_NAMES, k=min(max(bots, 0), len(BOT_NAMES)))
         bot_settings = bot_settings or {}
         with self._lock, self._db:

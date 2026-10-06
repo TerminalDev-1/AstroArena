@@ -56,12 +56,15 @@ class Rules(unittest.TestCase):
         # Boss Mode pays for a win and costs nothing; the Training Area is never played for Cups.
         self.assertEqual([rules.cup_delta("BOSS", o, 0, 500, True) for o in ("VICTORY", "DRAW", "DEFEAT")], [5, 0, 0])
         self.assertEqual(rules.cup_delta("TRAINING", "VICTORY", 0, 100, True, {"TRAINING": {"win": 50}}), 0)
+        # A 1v1 pays the winner and costs the loser, like Knockout Rush without an MVP.
+        self.assertEqual([rules.cup_delta("DUEL", o, 0, 500, True) for o in ("VICTORY", "DRAW", "DEFEAT")], [8, 0, -6])
         # trophies.cfg's numbers are used when there are some, and Cups never go below zero.
         table = {"BOSS": {"win": 12, "mvp_bonus": 3, "draw": 2, "max_loss": 4}, "KNOCKOUT_RUSH": {"places": [9, -2]}}
         self.assertEqual([rules.cup_delta("BOSS", o, 0, 3, True, table) for o in ("VICTORY", "DRAW", "DEFEAT")], [15, 2, -3])
         self.assertEqual([rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", p, 50, False, table) for p in (1, 2, 7)], [9, -2, -2])
         # A fighter's rank follows its own Cups; the top one starts at 1000.
-        self.assertEqual([rules.fighter_rank(c) for c in (0, 9, 10, 999, 1000, 5000)], [1, 1, 2, 19, 20, 20])
+        # There is no top rank: past the end of the table every rank is another FIGHTER_RANK_STEP Cups.
+        self.assertEqual([rules.fighter_rank(c) for c in (0, 9, 10, 999, 1000, 1149, 1150, 5000, 1_000_000)], [1, 1, 2, 19, 20, 20, 21, 46, 6680])
         self.assertEqual(len(rules.FIGHTER_RANK_CUPS), 20)
 
     def test_unbelievable_results_are_caught(self):
@@ -449,6 +452,92 @@ class Api(unittest.TestCase):
         c.settimeout(5)
         self.assertEqual((c.recv(1), d.recv(1)), (b"D", b"D"))
         c.close(); d.close()
+
+    def test_a_1v1_is_settled_by_the_replay_and_pays_cups(self):
+        import json as _json, socket
+
+        class Replay:
+            """Stands in for the referee: answers what it is told to, and keeps what it was asked."""
+            answer, asked = None, []
+
+            def judge_duel(self, seed, fighters, levels, frames, check=None):
+                self.asked.append((fighters, levels, [len(f) for f in frames], check))
+                return self.answer
+
+        def exactly(sock, count):
+            data = b""
+            while len(data) < count:
+                data += sock.recv(count - len(data))
+            return data
+
+        def text(sock):
+            return _json.loads(exactly(sock, struct.unpack(">H", exactly(sock, 2))[0]))
+
+        def pair(*names):
+            socks = []
+            for name in names:
+                player = self.player(name)
+                sock = socket.create_connection(("127.0.0.1", self.httpd.duel.server_address[1]), timeout=5)
+                body = _json.dumps({"token": player["token"], "version": VERSION, "fighter": "JUNO", "skin": 0}).encode()
+                sock.sendall(b"H" + struct.pack(">H", len(body)) + body)
+                socks.append((sock, player))
+            for side, (sock, _) in enumerate(socks):
+                self.assertEqual(exactly(sock, 1), b"S")
+                self.assertEqual(text(sock)["side"], side)
+            return socks
+
+        def verdict(sock):
+            self.assertEqual(exactly(sock, 1), b"V")
+            return text(sock)
+
+        def cups(player):
+            return self.call("GET", "/v1/me", token=player["token"])[1]["account"]["cups"]
+
+        replay = Replay()
+        self.httpd.game.referee = replay
+        stats = [{"kos": 1, "deaths": 3, "damage": 900}, {"kos": 3, "deaths": 1, "damage": 2100}]
+        # A match played to its end: the replay says who won, and each player is paid by it.
+        (a, ada), (b, bo) = pair("Ada", "Bo")
+        frame = b"I" + bytes(17)
+        a.sendall(frame * 3); b.sendall(frame * 3)
+        exactly(a, 18 * 3); exactly(b, 18 * 3)
+        # (Nothing a device hands in over HTTP closes a 1v1: its result is the lobby's.)
+        with self.httpd.game.store._lock:
+            open_id = self.httpd.game.store._db.execute("SELECT id FROM matches WHERE mode = 'DUEL' AND finished_at IS NULL").fetchone()[0]
+        self.assertEqual(self.call("POST", "/v1/matches/%d/result" % open_id, {"outcome": "VICTORY", "kos": 3}, token=ada["token"])[0], 409)
+        replay.answer = {"finished": True, "ticks": 400, "winner": 1, "sides": stats, "wrong": [False, False]}
+        a.sendall(b"F")
+        lost, won = verdict(a), verdict(b)
+        self.assertEqual(replay.asked[-1], (["JUNO", "JUNO"], [1, 1], [51, 51], None))
+        self.assertEqual((lost["report"]["outcome"], lost["cupDelta"], lost["report"]["kos"]), ("DEFEAT", 0, 1))
+        self.assertEqual((won["report"]["outcome"], won["cupDelta"], won["cups"], won["report"]["kos"]), ("VICTORY", 8, 8, 3))
+        self.assertEqual((cups(ada), cups(bo)), (0, 8))
+        self.assertIn("dropsLeftToday", won["account"])
+        a.close(); b.close()
+        # A match one player walks out of: it wasn't played out, so the one who left takes the defeat.
+        (c, cy), (d, di) = pair("Cy", "Di")
+        replay.answer = {"finished": False, "ticks": 6, "winner": -1, "sides": stats, "wrong": [False, False]}
+        d.close()
+        self.assertEqual(exactly(c, 1), b"X")
+        self.assertEqual((verdict(c)["report"]["outcome"], cups(cy), cups(di)), ("VICTORY", 8, 0))
+        c.close()
+        # Two devices that disagree about the match: the replay says which had it wrong, and that one loses.
+        (e, ed), (f, flo) = pair("Ed", "Flo")
+        replay.answer = {"finished": False, "ticks": 30, "winner": -1, "sides": stats, "wrong": [True, False]}
+        e.sendall(b"C" + struct.pack(">ii", 30, 111))
+        exactly(f, 9)
+        f.sendall(b"C" + struct.pack(">ii", 30, 222))
+        exactly(e, 9)
+        self.assertEqual((verdict(e)["report"]["outcome"], verdict(f)["report"]["outcome"]), ("DEFEAT", "VICTORY"))
+        self.assertEqual(replay.asked[-1][3], (30, 111, 222))
+        e.close(); f.close()
+        # Without a referee nothing can say who won: the match is played, and pays nothing.
+        self.httpd.game.referee = None
+        (g, gil), (h, hal) = pair("Gil", "Hal")
+        g.close()
+        self.assertEqual(exactly(h, 1), b"X")
+        self.assertEqual((verdict(h), cups(hal)), ({}, 0))
+        h.close()
 
     def test_the_news_tab_reads_news_cfg(self):
         status, body = self.call("GET", "/v1/news")

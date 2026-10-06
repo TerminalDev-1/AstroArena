@@ -64,6 +64,11 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
     private val myChecks = HashMap<Int, Int>()
     private val theirChecks = HashMap<Int, Int>()
 
+    /** What the lobby says the match was worth, once it has settled it (empty: nothing). */
+    @Volatile private var verdict: JSONObject? = null
+    /** Nothing more will come from the lobby. */
+    @Volatile private var silent = false
+
     /** Why the lobby turned this player away, if it did. */
     @Volatile var error: String? = null
         private set
@@ -116,15 +121,33 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
                         val sum = input.readInt()
                         synchronized(lock) { theirChecks[tick] = sum; compare(tick) }
                     }
-                    'X' -> { remoteLeft = true; return }
-                    'L' -> { dropped = true; return }
+                    // (After either of these the lobby settles the match, and says what it was worth.)
+                    'X' -> remoteLeft = true
+                    'L' -> dropped = true
+                    'V' -> { verdict = JSONObject(input.readUTF()); silent = true; return }
                     else -> break   // 'D', or anything unexpected: called off
                 }
             }
+        } catch (_: Exception) {
+        }
+        silent = true
+        // The line went without the lobby saying whose doing it was.
+        if (!remoteLeft && !dropped) lost = true
+    }
+
+    /**
+     * Tells the lobby this device's match is over and waits for what it was worth: the lobby replays the match
+     * from both players' inputs and settles it. Blocking (the replay takes a second or two): call it off the main
+     * thread. Null if the lobby had nothing to give (the match was called off, or the server has no referee).
+     */
+    fun result(): JSONObject? {
+        try {
+            synchronized(lock) { out?.let { it.writeByte('F'.code); it.flush() } }
         } catch (_: IOException) {
         }
-        // The line went without the lobby saying whose doing it was.
-        lost = true
+        val until = System.currentTimeMillis() + 40_000
+        while (verdict == null && !silent && !closed && System.currentTimeMillis() < until) Thread.sleep(50)
+        return verdict?.takeIf { it.has("cups") }
     }
 
     /** Records what the player wants ([c], as it stands now) as their next frame, and sends it across. */
@@ -193,7 +216,7 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
 
     companion object {
         /** Ticks between a player's input and when it is played (6 ticks = a tenth of a second). */
-        const val DELAY = 6
+        const val DELAY = io.github.projectwip.sim.Referee.DUEL_DELAY
         /** The devices compare notes this often (30 ticks = twice a second). */
         const val CHECK_EVERY = 30
     }

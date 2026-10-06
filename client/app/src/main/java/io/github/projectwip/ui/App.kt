@@ -343,9 +343,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                             scope.launch {
                                 // The server replays the match from the player's inputs: the result and what it is worth are
                                 // its own. No answer means an offline match: the device's result is shown and nothing is earned.
-                                judging = summary.serverMatchId > 0 && serverStatus.online
+                                // (A 1v1 is settled by the lobby, from both players' inputs, and the answer comes down its line.)
+                                val duel = summary.duel
+                                judging = (summary.serverMatchId > 0 || duel != null) && serverStatus.online
                                 val verdict = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                    server.reportMatch(summary.serverMatchId, summary.report, summary.inputs)
+                                    if (duel != null) duel.result()?.let { server.duelVerdict(it) }
+                                    else server.reportMatch(summary.serverMatchId, summary.report, summary.inputs)
                                 }
                                 judging = false
                                 server.status.value.account?.let { repo.sync(it) }

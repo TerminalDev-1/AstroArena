@@ -419,6 +419,16 @@ class GameServer(context: Context) {
         val o = r?.body
         if (r == null) lost()
         if (r == null || r.code != 200 || o == null) return null
+        return verdict(o)
+    }
+
+    /** What a 1v1 was worth, as the lobby settled it ([DuelLink.result]), with the account brought up to date. */
+    fun duelVerdict(o: JSONObject): ServerVerdict {
+        refreshAccount()
+        return verdict(o)
+    }
+
+    private fun verdict(o: JSONObject): ServerVerdict {
         val account = o.optJSONObject("account")
         val judged = o.optJSONObject("report")?.let { j ->
             MatchOutcome.entries.firstOrNull { it.name == j.optString("outcome") }?.let {

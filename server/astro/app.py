@@ -384,7 +384,8 @@ def make_handler(game: Game, quiet: bool = False):
             if data is None:
                 return None
             match = game.store.open_match(player["id"], match_id)
-            if match is None:
+            # A 1v1 is settled by the lobby, which saw both players' inputs; nothing a device hands in here closes one.
+            if match is None or match["mode"] == "DUEL":
                 return self._error(409, "no open match with that id")
             result, judged = data, None
             if game.referee is not None and match["mode"] != "TRAINING":

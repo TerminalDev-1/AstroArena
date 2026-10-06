@@ -3,6 +3,7 @@ package io.github.projectwip.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -27,6 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -63,6 +70,10 @@ import io.github.projectwip.ui.startMatchConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/** How long the Cups a match paid take to fly to the counter, and the share of that one Cup is in the air for. */
+private const val FLIGHT_MS = 1500
+private const val FLIGHT_SPAN = 0.55f
+
 @Composable
 fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, go: (Screen) -> Unit) {
     val r = summary.report
@@ -88,6 +99,16 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     /** How many reward rows have popped in so far. */
     var rowsShown by remember { mutableIntStateOf(0) }
     val won = r.outcome == MatchOutcome.VICTORY
+    // Cups that were won fly from the banner to the counter, which counts up as they land. Each is thrown out to
+    // a spot of its own first (these, as a share of the throw's reach).
+    val flyingCups = remember {
+        val rng = kotlin.random.Random(rewards.cupsBefore * 31 + rewards.cupDelta)
+        List(if (rewards.cupDelta > 0) rewards.cupDelta.coerceIn(6, 14) else 0) { Offset(rng.nextFloat() * 2f - 1f, rng.nextFloat() * 2f - 1f) }
+    }
+    val flight = remember { Animatable(0f) }
+    var flyFrom by remember { mutableStateOf(Offset.Unspecified) }
+    var flyTo by remember { mutableStateOf(Offset.Unspecified) }
+    var flyOrigin by remember { mutableStateOf(Offset.Zero) }
     LaunchedEffect(Unit) {
         // The banner lands (lower and duller for a loss)...
         sfx?.play(Sound.BANNER, pitch = if (won) 1f else 0.72f)
@@ -107,12 +128,20 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
         }
         // ...and the Cups tick up to their new total.
         if (rewards.cupDelta != 0) {
+            val flying = flyingCups.isNotEmpty()
+            if (flying) {
+                sfx?.play(Sound.POP, 0.8f, 0.7f); sfx?.buzz(30, 160)
+                launch { flight.animateTo(1f, tween(FLIGHT_MS, easing = LinearEasing)) }
+                // The count starts as the first of them lands.
+                delay((FLIGHT_MS * FLIGHT_SPAN).toLong())
+            }
+            val counting = tween<Float>(if (flying) (FLIGHT_MS * (1f - FLIGHT_SPAN)).toInt() else 1000, easing = if (flying) LinearEasing else FastOutSlowInEasing)
             val ticking = launch {
                 var n = 0
                 while (true) { sfx?.play(Sound.COUNT, 0.6f, 0.85f + minOf(n, 12) * 0.05f); n++; delay(75) }
             }
-            launch { fighterCupsShown.animateTo(fighterCupsAfter.toFloat(), tween(1000, easing = FastOutSlowInEasing)) }
-            cupsShown.animateTo((rewards.cupsBefore + rewards.cupDelta).toFloat(), tween(1000, easing = FastOutSlowInEasing))
+            launch { fighterCupsShown.animateTo(fighterCupsAfter.toFloat(), counting) }
+            cupsShown.animateTo((rewards.cupsBefore + rewards.cupDelta).toFloat(), counting)
             ticking.cancel()
             if (rewards.cupDelta > 0) { sfx?.play(Sound.REWARD, 0.8f); sfx?.play(Sound.CHING, 0.9f, 1.15f) } else sfx?.play(Sound.DENIED, 0.8f)
         }
@@ -126,13 +155,13 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().onGloballyPositioned { flyOrigin = it.positionInRoot() }) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Row(Modifier.fillMaxSize().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // ---------------- left: banner + scoreboard
             Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.height(if (ui.roomy) 130.dp else 96.dp).fillMaxWidth()) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.height(if (ui.roomy) 130.dp else 96.dp).fillMaxWidth().onGloballyPositioned { flyFrom = it.boundsInRoot().center }) {
                     if (r.outcome == MatchOutcome.VICTORY) FighterRays(Modifier.size(360.dp), Palette.Gold)
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { scaleX = bannerPop.value; scaleY = bannerPop.value }) {
                         GameText(label, Type.Display.copy(fontSize = Type.Display.fontSize * if (ui.roomy) 1.7f else 1.35f), color = color, outline = 5.dp)
@@ -190,13 +219,21 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             }
                         }
                         ProgressBar(FighterRanks.progress(shownCups), Modifier.fillMaxWidth().height(14.dp), animate = false)
-                        PlainText(FighterRanks.nextAt(shownCups)?.let { "Rank ${FighterRanks.label(it)} at $it Cups" } ?: "Top rank reached", Type.Small, color = Palette.Text)
+                        PlainText(FighterRanks.nextAt(shownCups).let { "Rank ${FighterRanks.label(it)} at ${"%,d".format(it)} Cups" }, Type.Small, color = Palette.Text)
 
                         // The player's own Cups, and the Cup Track they climb.
                         var row = 0
-                        if (row++ < rowsShown) RewardRow(IconKind.CUP, "%,d".format(cupsShown.value.toInt()),
-                            (if (rewards.cupDelta >= 0) "+" else "") + rewards.cupDelta,
-                            if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
+                        val cupIcon = with(LocalDensity.current) { 27.dp.toPx() }
+                        if (row++ < rowsShown) Box(Modifier.fillMaxWidth().onGloballyPositioned { val b = it.boundsInRoot(); flyTo = Offset(b.left + cupIcon, b.center.y) }.graphicsLayer {
+                            // The counter jumps a little as each Cup lands in it.
+                            val landing = (flight.value - FLIGHT_SPAN) / (1f - FLIGHT_SPAN)
+                            val bump = if (landing > 0f && landing < 1f) 0.05f * kotlin.math.abs(kotlin.math.sin(landing * flyingCups.size * Math.PI.toFloat())) else 0f
+                            scaleX = 1f + bump; scaleY = 1f + bump
+                        }) {
+                            RewardRow(IconKind.CUP, "%,d".format(cupsShown.value.toInt()),
+                                (if (rewards.cupDelta >= 0) "+" else "") + rewards.cupDelta,
+                                if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
+                        }
                         val best = save.bestCups
                         val next = CupTrack.nextMilestone(best)
                         val prev = CupTrack.previousMilestoneCups(best)
@@ -221,7 +258,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         if (rewards.mvpCups > 0) PlainText("MVP: +${rewards.mvpCups} Cups", Type.Small, color = Palette.Gold)
                         val dropsHere = r.mode != io.github.projectwip.data.GameMode.BOSS && r.mode != io.github.projectwip.data.GameMode.DUEL && rewards.online
                         // Everything a match is worth is awarded by the server; without it a match is practice.
-                        if (r.mode == io.github.projectwip.data.GameMode.DUEL) PlainText("1v1 is a test mode · nothing is earned in it yet", Type.Small, color = Palette.Gold)
+                        if (r.mode == io.github.projectwip.data.GameMode.DUEL && !rewards.online) PlainText("This 1v1 wasn't settled by the server · nothing is earned", Type.Small, color = Palette.Gold)
                         else if (!rewards.online) PlainText("Offline match · rewards are only earned online", Type.Small, color = Palette.Gold)
                         if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
                             PlainText("All of today's Spark Drops are earned · more tomorrow", Type.Small, color = Palette.Text)
@@ -238,6 +275,35 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         GameText("PLAY AGAIN", Type.Heading)
                     }
                 }
+            }
+        }
+        // The Cups the match paid, on their way from the banner to the counter.
+        val f = flight.value
+        if (f > 0f && f < 1f && flyFrom.isSpecified && flyTo.isSpecified) {
+            for ((i, thrown) in flyingCups.withIndex()) {
+                val u = (f - i.toFloat() / (flyingCups.size - 1) * (1f - FLIGHT_SPAN)) / FLIGHT_SPAN
+                if (u <= 0f || u >= 1f) continue
+                GameIcon(IconKind.CUP, Modifier.size(36.dp).graphicsLayer {
+                    // Thrown out from the banner, slowing; then off to the counter along an arc, gathering speed.
+                    val reach = 110.dp.toPx()
+                    val out = Offset(flyFrom.x + thrown.x * reach, flyFrom.y + thrown.y * reach * 0.5f)
+                    val at = if (u < 0.3f) {
+                        val k = 1f - (1f - u / 0.3f) * (1f - u / 0.3f)
+                        Offset(flyFrom.x + (out.x - flyFrom.x) * k, flyFrom.y + (out.y - flyFrom.y) * k)
+                    } else {
+                        val k = (u - 0.3f) / 0.7f * ((u - 0.3f) / 0.7f)
+                        val top = Offset((out.x + flyTo.x) / 2f, minOf(out.y, flyTo.y) - 70.dp.toPx())
+                        Offset(
+                            (1f - k) * (1f - k) * out.x + 2f * (1f - k) * k * top.x + k * k * flyTo.x,
+                            (1f - k) * (1f - k) * out.y + 2f * (1f - k) * k * top.y + k * k * flyTo.y,
+                        )
+                    }
+                    translationX = at.x - flyOrigin.x - size.width / 2f
+                    translationY = at.y - flyOrigin.y - size.height / 2f
+                    val grow = if (u < 0.12f) u / 0.12f * 1.3f else 1.3f - 0.5f * (u - 0.12f) / 0.88f
+                    scaleX = grow; scaleY = grow
+                    rotationZ = thrown.x * 50f * (1f - u)
+                })
             }
         }
     }
@@ -257,7 +323,7 @@ fun RankBadge(label: String, modifier: Modifier = Modifier) {
         drawCircle(Palette.Gold, r * 0.74f)
         drawCircle(Color.White.copy(alpha = 0.35f), r * 0.5f, center.copy(y = center.y - r * 0.22f))
     }, contentAlignment = Alignment.Center) {
-        GameText(label, if (label.length > 2) Type.Label else Type.Title, outline = 2.5.dp)
+        GameText(label, if (label.length > 3) Type.Small else if (label.length > 2) Type.Label else Type.Title, outline = 2.5.dp)
     }
 }
 
