@@ -78,6 +78,11 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   play, by the user's decision: its only way on is Jail (`GameMode.JAIL`, `--es screen jail`), where every boss
   hunts the player at once, more arrive over time, the player's weapons don't work, and it never ends. Jail is
   played on the device only and is never offered in the mode picker.
+- `server_manager/` is the owner's window onto all of this (`Server Manager.bat`, or `python manager.py`): tkinter,
+  standard library only. It starts and stops the server (logging to `server/logs/server.log`), edits the `.cfg`
+  files in place so their comments survive (`cfgfile.py`), and changes accounts through the server's own
+  `Store.force`. A new `.cfg` file or account field gets a place in it; `python -m unittest` there drives its pages
+  against a copy of `server/`. Check its looks with a screenshot, as for the game's UI.
 - Bot difficulty: every player may pick, but the pick is a request (`POST /v1/settings/difficulty`); the server
   approves it against `allowed` in `game.cfg`, stores it, and uses its own copy when it plans a match.
 - Days and times are the server's: the day number, when it ends, the daily gift and the daily offers
