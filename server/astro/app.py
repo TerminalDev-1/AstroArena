@@ -65,6 +65,9 @@ _DEAL_DELETE = re.compile(r"^/v1/dev/deals/(\d+)/delete$")
 _DAILY_BUY = re.compile(r"^/v1/shop/daily/(\d+)/buy$")
 
 
+DISABLED = "This account has been disabled by the server's owner."
+
+
 class Game:
     """What the HTTP layer talks to: the config files plus the database."""
 
@@ -192,6 +195,17 @@ def make_handler(game: Game, quiet: bool = False):
             player = game.store.player_for(token, version)
             if player is None:
                 self._error(401, "unknown or missing token")
+                return None
+            # An account the operator has disabled (accounts.cfg) is told so, and gets nothing else.
+            if player["disabled"]:
+                game.store.lift_expired()
+                player = game.store.player(player["id"])
+            if player["disabled"]:
+                # `until` is 0 when only the operator ends it; `now` lets the game count down on its own clock.
+                self._send(403, {
+                    "error": DISABLED, "disabled": True, "reason": player["disabled_reason"],
+                    "until": int(player["disabled_until"] * 1000), "now": int(time.time() * 1000),
+                })
                 return None
             # The version gate is enforced here too, not just advertised by /v1/status.
             if parse_version(version) is None:

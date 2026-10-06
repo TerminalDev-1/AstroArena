@@ -25,6 +25,10 @@ NAME = "accounts.cfg"
 # The whole numbers of an account, as the file calls them.
 NUMBERS = ("cups", "best_cups", "drops", "bolts", "prisms", "credits", "glory")
 _KEPT_REVISIONS = 500
+_YES, _NO = ("yes", "true", "on", "1"), ("no", "false", "off", "0")
+_DATE = "%Y-%m-%d %H:%M"
+_SPAN = re.compile(r"(\d+)\s*(minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w)(?![a-z])")
+_SECONDS = {"m": 60, "h": 3600, "d": 86400, "w": 7 * 86400}
 _ID = re.compile(r"^.*\(([0-9a-f]+)\)\s*$")
 
 HEADER = """\
@@ -32,6 +36,15 @@ HEADER = """\
 # up to date. Change a value and save: the server forces it onto that account within a few seconds,
 # then writes the file out again. Only the values you changed are applied.
 #
+#   disabled    yes shuts the account out: the game tells the player it is disabled and they can only
+#               play offline, and they are taken off the leaderboard. no lets them back in. The
+#               account stays in the database and nothing they have is lost.
+#               (It can't stop them starting over with a new account.)
+#   disabled_reason   why, in your words: the player is shown it. Optional.
+#   disabled_until    when it ends by itself. Optional: leave it empty and it lasts until you write
+#               disabled = no. Write how long (30 minutes, 12 hours, 3 days, 2 weeks, 1 day 6 hours)
+#               or a date (2026-10-20 or 2026-10-20 18:00, this computer's time); the server turns
+#               it into the date. Both only count while disabled = yes.
 #   cups        the player's Cups: their place on the leaderboard
 #   best_cups   the most Cups they have had: how far along the Cup Track they are
 #   drops       unopened Spark Drops
@@ -83,11 +96,31 @@ def _fighter_value(text: str) -> dict | None:
     return out
 
 
+def when(text: str, now: float | None = None) -> float | None:
+    """`3 days`, `1 day 6 hours` or `2026-10-20 18:00` as a time (seconds since 1970); 0 for nothing, which
+    means no end; None if it can't be read."""
+    text = " ".join(text.strip().lower().split())
+    if text in ("", "never", "forever"):
+        return 0.0
+    for form in (_DATE, "%Y-%m-%d"):
+        try:
+            return time.mktime(time.strptime(text, form))
+        except (ValueError, OverflowError):
+            pass
+    spans = _SPAN.findall(text)
+    if not spans or _SPAN.sub("", text).strip(" ,"):
+        return None
+    return (time.time() if now is None else now) + sum(int(n) * _SECONDS[unit[0]] for n, unit in spans)
+
+
 def render(accounts: list[dict], revision: int) -> str:
     lines = [HEADER % (economy.LEVEL_LIMIT, rules.STARTING_FIGHTER.lower(), revision)]
     for place, account in enumerate(accounts, start=1):
         lines.append("[%s (%s)]" % (account["name"], account["id"]))
-        lines.append("# %d on the leaderboard" % place)
+        lines.append("# disabled: off the leaderboard" if account["disabled"] else "# %d on the leaderboard" % place)
+        lines.append("disabled = %s" % ("yes" if account["disabled"] else "no"))
+        lines.append("disabled_reason = %s" % account["disabled_reason"])
+        lines.append("disabled_until = %s" % (time.strftime(_DATE, time.localtime(account["disabled_until"])) if account["disabled_until"] > 0 else ""))
         lines.extend("%s = %d" % (key, account[key]) for key in NUMBERS)
         lines.extend("%s = %s" % (name.lower(), _fighter_text(entry)) for name, entry in account["fighters"].items())
         lines.append("")
@@ -118,7 +151,17 @@ def edits(written: dict[str, dict[str, str]], now: dict[str, dict[str, str]]) ->
         for key, value in lines.items():
             if key not in before or value.strip() == before[key].strip():
                 continue
-            if key in NUMBERS:
+            if key == "disabled":
+                word = value.strip().lower()
+                if word in _YES or word in _NO:
+                    change["disabled"] = word in _YES
+            elif key == "disabled_reason":
+                change["disabled_reason"] = value
+            elif key == "disabled_until":
+                until = when(value)
+                if until is not None:
+                    change["disabled_until"] = until
+            elif key in NUMBERS:
                 try:
                     change[key] = int(value.replace(",", "").replace("_", ""))
                 except ValueError:
@@ -175,6 +218,7 @@ class Accounts:
 
     def sync(self) -> None:
         with self._lock:
+            self.store.lift_expired()
             text = self._read()
             if self._text is not None and text is not None and text != self._text:
                 if not self._apply(text):

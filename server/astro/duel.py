@@ -165,6 +165,9 @@ class DuelLobby(socketserver.ThreadingTCPServer):
         player = store.player_for(str(hello.get("token") or ""), str(hello.get("version") or ""))
         if player is None:
             return "Sign in to the server first."
+        store.lift_expired()
+        if store.player(player["id"])["disabled"]:
+            return "This account has been disabled."
         fighter = str(hello.get("fighter") or "")
         entry = store.profile(player["id"])["fighters"].get(fighter)
         if fighter not in rules.FIGHTER_SKINS or not entry or not entry.get("unlocked"):

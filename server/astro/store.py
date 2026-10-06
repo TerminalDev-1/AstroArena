@@ -81,6 +81,9 @@ PLAYER_COLUMNS = [
     ("imported", "INTEGER NOT NULL DEFAULT 0"),    # 1 once the starting Cups and drops have been settled
     ("flags", "INTEGER NOT NULL DEFAULT 0"),       # results the server refused to believe
     ("profile", "TEXT"),                           # Bolts, Prisms, fighters, claimed rewards (economy.py); NULL until started
+    ("disabled", "INTEGER NOT NULL DEFAULT 0"),    # 1 = the operator has shut this account out (accounts.cfg); nothing is deleted
+    ("disabled_reason", "TEXT NOT NULL DEFAULT ''"),  # what the player is told
+    ("disabled_until", "REAL NOT NULL DEFAULT 0"),    # when it ends by itself (seconds since 1970); 0 = when the operator says
     ("difficulty", "TEXT"),                        # the bot difficulty this player picked (and the server approved); NULL = the default
 ]
 
@@ -192,12 +195,13 @@ class Store:
     def accounts(self) -> list[dict]:
         """Every account as accounts.cfg shows it, top of the leaderboard first."""
         with self._lock:
-            rows = self._db.execute("SELECT id, name, cups, drops FROM players ORDER BY cups DESC, created_at ASC").fetchall()
+            rows = self._db.execute("SELECT id, name, cups, drops, disabled, disabled_reason, disabled_until FROM players ORDER BY disabled ASC, cups DESC, created_at ASC").fetchall()
             out = []
             for row in rows:
                 profile = self._profile(row["id"])
                 out.append({
-                    "id": row["id"], "name": row["name"], "cups": row["cups"], "drops": row["drops"],
+                    "id": row["id"], "name": row["name"], "cups": row["cups"], "drops": row["drops"], "disabled": bool(row["disabled"]),
+                    "disabled_reason": row["disabled_reason"], "disabled_until": row["disabled_until"],
                     "best_cups": profile["bestCups"], "bolts": profile["bolts"], "prisms": profile["prisms"],
                     "credits": profile["credits"], "glory": profile["glory"],
                     "fighters": {
@@ -213,14 +217,18 @@ class Store:
             return min(max(int(value), 0), high)
 
         with self._lock, self._db:
-            row = self._db.execute("SELECT cups, drops, boosted FROM players WHERE id = ?", (player_id,)).fetchone()
+            row = self._db.execute("SELECT cups, drops, boosted, disabled, disabled_reason, disabled_until FROM players WHERE id = ?", (player_id,)).fetchone()
             if row is None:
                 return False
             cups = number(change.get("cups", row["cups"]))
             drops = number(change.get("drops", row["drops"]))
+            # Disabling marks the account and nothing more; a reason and an end only mean something while it is disabled.
+            disabled = bool(change.get("disabled", row["disabled"]))
+            reason = " ".join(str(change.get("disabled_reason", row["disabled_reason"])).split())[:200] if disabled else ""
+            until = max(0.0, float(change.get("disabled_until", row["disabled_until"]))) if disabled else 0.0
             self._db.execute(
-                "UPDATE players SET cups = ?, drops = ?, boosted = ? WHERE id = ?",
-                (cups, drops, min(row["boosted"], drops), player_id),
+                "UPDATE players SET cups = ?, drops = ?, boosted = ?, disabled = ?, disabled_reason = ?, disabled_until = ? WHERE id = ?",
+                (cups, drops, min(row["boosted"], drops), 1 if disabled else 0, reason, until, player_id),
             )
             profile = self._profile(player_id)
             for key, field in (("best_cups", "bestCups"), ("bolts", "bolts"), ("prisms", "prisms"), ("credits", "credits"), ("glory", "glory")):
@@ -238,6 +246,14 @@ class Store:
                     entry["cups"] = number(parts["cups"])
             self._keep(player_id, profile)
         return True
+
+    def lift_expired(self, now: float | None = None) -> None:
+        """Lets back in every account whose time disabled has run out."""
+        with self._lock, self._db:
+            self._db.execute(
+                "UPDATE players SET disabled = 0, disabled_reason = '', disabled_until = 0 WHERE disabled = 1 AND disabled_until > 0 AND disabled_until <= ?",
+                (time.time() if now is None else now,),
+            )
 
     def set_difficulty(self, player_id: str, difficulty: str) -> None:
         with self._lock, self._db:
@@ -263,9 +279,9 @@ class Store:
         """Where a player stands by Cups (1 = top; ties go to the older account), and how many players there are."""
         with self._lock:
             me = self._db.execute("SELECT cups, created_at FROM players WHERE id = ?", (player_id,)).fetchone()
-            total = self._db.execute("SELECT COUNT(*) FROM players").fetchone()[0]
+            total = self._db.execute("SELECT COUNT(*) FROM players WHERE disabled = 0").fetchone()[0]
             ahead = self._db.execute(
-                "SELECT COUNT(*) FROM players WHERE cups > ? OR (cups = ? AND created_at < ?)", (me["cups"], me["cups"], me["created_at"])
+                "SELECT COUNT(*) FROM players WHERE disabled = 0 AND (cups > ? OR (cups = ? AND created_at < ?))", (me["cups"], me["cups"], me["created_at"])
             ).fetchone()[0]
         return ahead + 1, total
 
@@ -564,7 +580,7 @@ class Store:
     def leaderboard(self, limit: int) -> list[dict]:
         with self._lock:
             rows = self._db.execute(
-                "SELECT id, name, cups, fighter, profile FROM players ORDER BY cups DESC, created_at ASC LIMIT ?", (max(1, min(limit, 200)),)
+                "SELECT id, name, cups, fighter, profile FROM players WHERE disabled = 0 ORDER BY cups DESC, created_at ASC LIMIT ?", (max(1, min(limit, 200)),)
             ).fetchall()
         # Glory is shown beside a player's name; it lives in their profile.
         board = []

@@ -17,6 +17,7 @@ from astro import economy, rules
 from astro.economy import Refused
 from astro.referee import Referee, count_ticks, decode_inputs
 from astro.app import serve
+from astro.accounts import when
 from astro.config import matches, parse_version
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -452,6 +453,12 @@ class Api(unittest.TestCase):
             self.assertEqual(set(item), {"title", "date", "tag", "text"})
             self.assertTrue(item["title"] and item["text"])
 
+    def test_how_long_an_account_is_disabled_for(self):
+        self.assertEqual([when(text, 1000.0) for text in ("", "forever", "30 minutes", "12h", "3 days", "2 weeks", "1 day, 6 hours")],
+                         [0.0, 0.0, 2800.0, 44200.0, 260200.0, 1210600.0, 109000.0])
+        self.assertEqual(when("2026-10-20 18:00") - when("2026-10-20"), 18 * 3600)
+        self.assertEqual([when(text) for text in ("soon", "3", "3 dys", "3 days maybe")], [None] * 4)
+
     def test_accounts_cfg_forces_what_the_operator_changes(self):
         cheat, fair = self.player("Cheat"), self.player("Fair")
         self.store.grant(cheat["id"], cups=900, prisms=5000)
@@ -496,6 +503,32 @@ class Api(unittest.TestCase):
         text = edit()
         self.assertLess(text.index("(%s)]" % fair["id"]), text.index("(%s)]" % cheat["id"]))
         self.assertIn("[Player (%s)]\n# 2 on the leaderboard" % cheat["id"], text)
+        # Disabling an account shuts it out everywhere and takes it off the leaderboard; enabling it lets it back in.
+        # (The account stays in the database, with all it has.) The first account in the file is the fair player.
+        save(edit(("\ndisabled = no", "\ndisabled = yes"), ("disabled_reason = ", "disabled_reason = Being   too fair")))
+        status, body = self.call("GET", "/v1/me", token=fair["token"])
+        self.assertEqual((status, body["disabled"], body["reason"], body["until"]), (403, True, "Being too fair", 0))
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, fair["token"])[0], 403)
+        board = self.call("GET", "/v1/leaderboard", token=cheat["token"])[1]
+        self.assertEqual([row["id"] for row in board["players"]], [cheat["id"]])
+        account = self.call("GET", "/v1/me", token=cheat["token"])[1]["account"]
+        self.assertEqual((account["rank"], account["players"]), (1, 1))
+        self.assertIn("# disabled: off the leaderboard\ndisabled = yes\ndisabled_reason = Being too fair\ndisabled_until = \n", edit())
+        save(edit(("\ndisabled = yes", "\ndisabled = no")))
+        self.assertEqual(self.call("GET", "/v1/me", token=fair["token"])[0], 200)
+        self.assertEqual(self.store.player(fair["id"])["cups"], 65)
+        self.assertIn("disabled = no\ndisabled_reason = \n", edit())  # the reason goes when the account is let back in
+        # With a timer it ends by itself: the server turns "how long" into a date, and tells the game when.
+        save(edit(("\ndisabled = no", "\ndisabled = yes"), ("disabled_until = ", "disabled_until = 1 day 6 hours")))
+        body = self.call("GET", "/v1/me", token=fair["token"])[1]
+        self.assertAlmostEqual((body["until"] - body["now"]) / 3600000, 30, delta=0.01)
+        self.assertRegex(edit(), r"disabled_until = 20\d\d-\d\d-\d\d \d\d:\d\d")
+        self.store.lift_expired(now=body["until"] / 1000 - 5)
+        self.assertEqual(self.call("GET", "/v1/me", token=fair["token"])[0], 403)
+        self.store.lift_expired(now=body["until"] / 1000 + 5)
+        self.assertEqual(self.call("GET", "/v1/me", token=fair["token"])[0], 200)
+        accounts.sync()
+        text = edit()
         # A file that can't be read changes nothing and is left for the operator to fix; so are lines that make no sense.
         save(text.replace("cups = 12", "cups = 5\n[Player (%s)]\ncups = 1" % cheat["id"], 1))
         self.assertEqual(self.store.player(cheat["id"])["cups"], 12)
