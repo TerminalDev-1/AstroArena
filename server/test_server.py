@@ -476,7 +476,7 @@ class Api(unittest.TestCase):
         accounts.sync()
         text = edit()
         # Every account is there, top of the leaderboard first, and nobody's token is.
-        self.assertLess(text.index("[%s]" % cheat["id"]), text.index("[%s]" % fair["id"]))
+        self.assertLess(text.index("(%s)]" % cheat["id"]), text.index("(%s)]" % fair["id"]))
         self.assertNotIn(cheat["token"], text)
         # The operator takes the cheat down a peg. While the file was open, the other player won some Cups.
         text = edit(("cups = 900", "cups = 12"), ("prisms = 5000", "prisms = 1,000"),
@@ -494,10 +494,10 @@ class Api(unittest.TestCase):
         self.assertEqual(self.store.player(fair["id"])["cups"], 65)
         # The file is written out again as things stand now, with the other player on top.
         text = edit()
-        self.assertLess(text.index("[%s]" % fair["id"]), text.index("[%s]" % cheat["id"]))
-        self.assertIn("# Player, 2 on the leaderboard", text)
+        self.assertLess(text.index("(%s)]" % fair["id"]), text.index("(%s)]" % cheat["id"]))
+        self.assertIn("[Player (%s)]\n# 2 on the leaderboard" % cheat["id"], text)
         # A file that can't be read changes nothing and is left for the operator to fix; so are lines that make no sense.
-        save(text.replace("cups = 12", "cups = 5\n[%s]\ncups = 1" % cheat["id"], 1))
+        save(text.replace("cups = 12", "cups = 5\n[Player (%s)]\ncups = 1" % cheat["id"], 1))
         self.assertEqual(self.store.player(cheat["id"])["cups"], 12)
         save(text.replace("cups = 12", "cups = lots", 1).replace("mira = locked", "mira = gone", 1))
         self.assertEqual(self.store.player(cheat["id"])["cups"], 12)

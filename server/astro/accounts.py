@@ -25,6 +25,7 @@ NAME = "accounts.cfg"
 # The whole numbers of an account, as the file calls them.
 NUMBERS = ("cups", "best_cups", "drops", "bolts", "prisms", "credits", "glory")
 _KEPT_REVISIONS = 500
+_ID = re.compile(r"^.*\(([0-9a-f]+)\)\s*$")
 
 HEADER = """\
 # Every account on this server, top of the leaderboard first. The server writes this file and keeps it
@@ -42,8 +43,8 @@ HEADER = """\
 #                   mira = unlocked, level 4, cups 120
 #               %s can't be locked: everyone starts with it.
 #
-# A section is one account, named by its player id (shown in the game under Settings > Data). The
-# line under it says who that is; names are the players' own to choose and can't be set here.
+# A section is one account: [the player's name (their player id)]. The id is the one shown in the
+# game under Settings > Data. Names are the players' own to choose and can't be set here.
 # Removing a line or a section changes nothing; accounts are not deleted from here.
 # Edit it while the server is running. This file is private: it is not committed.
 
@@ -85,8 +86,8 @@ def _fighter_value(text: str) -> dict | None:
 def render(accounts: list[dict], revision: int) -> str:
     lines = [HEADER % (economy.LEVEL_LIMIT, rules.STARTING_FIGHTER.lower(), revision)]
     for place, account in enumerate(accounts, start=1):
-        lines.append("[%s]" % account["id"])
-        lines.append("# %s, %d on the leaderboard" % (account["name"], place))
+        lines.append("[%s (%s)]" % (account["name"], account["id"]))
+        lines.append("# %d on the leaderboard" % place)
         lines.extend("%s = %d" % (key, account[key]) for key in NUMBERS)
         lines.extend("%s = %s" % (name.lower(), _fighter_text(entry)) for name, entry in account["fighters"].items())
         lines.append("")
@@ -101,7 +102,8 @@ def parse(text: str) -> tuple[int, dict[str, dict[str, str]]]:
         revision = int(parser.get("file", "revision", fallback="-1"))
     except ValueError:
         revision = -1
-    return revision, {section: dict(parser.items(section)) for section in parser.sections() if section != "file"}
+    # A section is `name (id)`; the id is what counts.
+    return revision, {_ID.sub(r"\1", section): dict(parser.items(section)) for section in parser.sections() if section != "file"}
 
 
 def edits(written: dict[str, dict[str, str]], now: dict[str, dict[str, str]]) -> dict[str, dict]:
@@ -138,7 +140,8 @@ class Accounts:
         self.store = store
         self.path = os.path.join(directory, NAME)
         self.quiet = quiet
-        self._revision = 0
+        # Revisions start from the clock, so a copy of the file from an earlier run is never taken for this run's.
+        self._revision = int(time.time())
         self._text: str | None = None  # the file as the server last wrote it
         self._written: dict[int, dict[str, dict[str, str]]] = {}  # what each revision said
         self._unreadable: str | None = None  # an edit that couldn't be read, so it is reported once
