@@ -446,7 +446,7 @@ object SfxSynth {
 
     // ------------------------------------------------------------------ weapons
 
-    /** Juno's coil blaster: three quick zaps, timed to the burst leaving the barrel. */
+    /** A coil blaster: three quick zaps, timed to the burst leaving the barrel. */
     private fun sparkShot() = Clip(0.36f).apply {
         for (k in 0 until 3) {
             val at = k * 0.075f

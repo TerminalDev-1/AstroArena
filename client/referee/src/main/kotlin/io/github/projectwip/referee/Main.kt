@@ -23,7 +23,7 @@ import java.util.Base64
  * or, if the input makes no sense, a single line `error=...` and exit code 2.
  *
  * A 1v1 (`mode=DUEL`) is two real players and no bots, so it is given both of them instead:
- *     seed=123456   fighter0=KITO level0=10 frames0=<base64>   fighter1=JUNO level1=7 frames1=<base64>
+ *     seed=123456   fighter0=KITO level0=10 frames0=<base64>   fighter1=BYTE level1=7 frames1=<base64>
  *     check=600,123,456          (optional: a tick the devices disagreed on, and each one's number for it)
  * and answers
  *     finished=true ticks=4328 winner=1 kos0=1 deaths0=3 damage0=4100 kos1=3 deaths1=1 damage1=6200 wrong0=false wrong1=false

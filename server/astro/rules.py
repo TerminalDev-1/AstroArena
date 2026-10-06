@@ -139,8 +139,8 @@ DROP_BUFF = 3
 MAX_OPEN_ALL = 10000
 
 # Every fighter and how many colourways it has (index 0 is the one it comes with). Keep in step with Balance.kt.
-FIGHTER_SKINS = {name: 3 for name in ("JUNO", "BRAKK", "MIRA", "KITO", "VARUN")}
-STARTING_FIGHTER = "JUNO"
+FIGHTER_SKINS = {name: 3 for name in ("BYTE", "BRAKK", "MIRA", "KITO", "VARUN")}
+STARTING_FIGHTER = "BYTE"
 
 
 def odds(luck: float = 0.0) -> list[float]:

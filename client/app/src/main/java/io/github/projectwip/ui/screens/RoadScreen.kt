@@ -107,7 +107,7 @@ fun RoadScreen(save: SaveData, go: (Screen) -> Unit, showReward: (RewardReveal) 
                     // How much of this stop's stretch of road is lit: all of it once the fighter is unlocked; for the
                     // next one, the half that leads up to it fills with the Credits; none beyond.
                     val lit = when { unlocked -> 1f; isNext -> 0.5f * (save.credits.toFloat() / step!!.cost).coerceIn(0f, 1f); else -> 0f }
-                    RoadStop(step?.fighter ?: FighterId.JUNO, stopW, lit, unlocked, isNext, first = i == 0, last = i == stops.lastIndex) {
+                    RoadStop(step?.fighter ?: FighterId.BYTE, stopW, lit, unlocked, isNext, first = i == 0, last = i == stops.lastIndex) {
                         when {
                             step == null -> Badge("START", color = Palette.CyanDeep)
                             unlocked -> Badge("UNLOCKED", color = Palette.GreenDeep)

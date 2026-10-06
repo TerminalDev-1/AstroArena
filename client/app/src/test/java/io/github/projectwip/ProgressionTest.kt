@@ -26,7 +26,7 @@ import org.junit.Test
 class ProgressionTest {
 
     private fun report(outcome: MatchOutcome, kos: Int = 2, d: BotDifficulty = BotDifficulty.NORMAL) =
-        MatchReport(outcome = outcome, fighter = FighterId.JUNO, kos = kos, deaths = 1, damageDealt = 1000,
+        MatchReport(outcome = outcome, fighter = FighterId.BYTE, kos = kos, deaths = 1, damageDealt = 1000,
             mvp = false, difficulty = d, blueScore = 10, redScore = 5)
 
     @Test fun statLineIsLinear() {
@@ -38,7 +38,7 @@ class ProgressionTest {
     }
 
     @Test fun upgradePreviewShowsExactDelta() {
-        val juno = Balance.fighter(FighterId.JUNO)
+        val juno = Balance.fighter(FighterId.BYTE)
         val rows = Progression.statPreview(juno, 4)
         val dmg = rows[1]
         assertEquals(juno.attackDamage.at(4), dmg.current)
@@ -120,12 +120,12 @@ class ProgressionTest {
         val local = SaveData(
             bolts = 5, prisms = 5, selectedFighter = FighterId.MIRA,
             fighters = SaveData.defaultFighters() + (FighterId.MIRA to io.github.projectwip.data.FighterProgress(true, 3, skin = 2, ownedSkins = setOf(0, 2))) +
-                (FighterId.JUNO to io.github.projectwip.data.FighterProgress(true, 9, skin = 1, ownedSkins = setOf(0, 1))),
+                (FighterId.BYTE to io.github.projectwip.data.FighterProgress(true, 9, skin = 1, ownedSkins = setOf(0, 1))),
         )
         val profile = io.github.projectwip.data.ServerProfile(
             bolts = 900, prisms = 40, bestCups = 250,
             fighters = mapOf(
-                FighterId.JUNO to io.github.projectwip.data.FighterProgress(true, 4, ownedSkins = setOf(0, 1)),
+                FighterId.BYTE to io.github.projectwip.data.FighterProgress(true, 4, ownedSkins = setOf(0, 1)),
                 FighterId.BRAKK to io.github.projectwip.data.FighterProgress(true, 2, ownedSkins = setOf(0)),
             ),
             claimedMilestones = setOf(10, 25), lastDailyGiftDay = 7, lastFirstWinDay = 6,
@@ -135,11 +135,11 @@ class ProgressionTest {
         assertEquals(900, synced.bolts)
         assertEquals(40, synced.prisms)
         assertEquals(250, synced.bestCups)
-        assertEquals("the server's level wins", 4, synced.progress(FighterId.JUNO).level)
-        assertEquals("the colourway being worn is kept", 1, synced.progress(FighterId.JUNO).skin)
+        assertEquals("the server's level wins", 4, synced.progress(FighterId.BYTE).level)
+        assertEquals("the colourway being worn is kept", 1, synced.progress(FighterId.BYTE).skin)
         assertTrue(synced.progress(FighterId.BRAKK).unlocked)
         assertFalse("a fighter the server doesn't list as unlocked is locked", synced.progress(FighterId.MIRA).unlocked)
-        assertEquals("and can't stay selected", FighterId.JUNO, synced.selectedFighter)
+        assertEquals("and can't stay selected", FighterId.BYTE, synced.selectedFighter)
         assertEquals(setOf(10, 25), synced.claimedMilestones)
         assertFalse(Progression.dailyGiftAvailable(synced, 7))
         assertEquals(listOf(deal), synced.customOffers)
@@ -175,26 +175,26 @@ class ProgressionTest {
         assertEquals(Balance.upgradeCost.last() + Balance.UPGRADE_COST_STEP, Balance.upgradeCostFrom(Balance.upgradeCost.size + 1))
         assertTrue((1..300).zipWithNext().all { (a, b) -> Balance.upgradeCostFrom(b) >= Balance.upgradeCostFrom(a) })
         // Normally the cap holds at MAX_LEVEL, and the dev toggle lifts it.
-        val top = SaveData.defaultFighters() + (FighterId.JUNO to io.github.projectwip.data.FighterProgress(true, Balance.MAX_LEVEL))
+        val top = SaveData.defaultFighters() + (FighterId.BYTE to io.github.projectwip.data.FighterProgress(true, Balance.MAX_LEVEL))
         val capped = SaveData(bolts = 10_000_000, fighters = top)
-        assertTrue(Progression.levelCapped(capped, FighterId.JUNO))
-        assertFalse(Progression.canUpgrade(capped, FighterId.JUNO))
-        assertTrue(Progression.canUpgrade(capped.copy(settings = io.github.projectwip.data.Settings(debugNoLevelCap = true)), FighterId.JUNO))
-        val juno = Balance.fighter(FighterId.JUNO)
+        assertTrue(Progression.levelCapped(capped, FighterId.BYTE))
+        assertFalse(Progression.canUpgrade(capped, FighterId.BYTE))
+        assertTrue(Progression.canUpgrade(capped.copy(settings = io.github.projectwip.data.Settings(debugNoLevelCap = true)), FighterId.BYTE))
+        val juno = Balance.fighter(FighterId.BYTE)
         assertEquals(juno.health.base + juno.health.perLevel * 60, juno.health.at(61))
     }
 
     @Test fun debugUpgradeCostScalesThePriceShown() {
         val normal = SaveData(bolts = 1000)
-        assertEquals(Balance.upgradeCost[0], Progression.upgradeCost(normal, FighterId.JUNO))
+        assertEquals(Balance.upgradeCost[0], Progression.upgradeCost(normal, FighterId.BYTE))
         val free = normal.copy(bolts = 0, settings = io.github.projectwip.data.Settings(debugUpgradeCost = 0f))
-        assertEquals(0, Progression.upgradeCost(free, FighterId.JUNO))
-        assertTrue(Progression.canUpgrade(free, FighterId.JUNO))
-        assertEquals(Balance.upgradeCost[0] * 3, Progression.upgradeCost(normal.copy(settings = io.github.projectwip.data.Settings(debugUpgradeCost = 3f)), FighterId.JUNO))
+        assertEquals(0, Progression.upgradeCost(free, FighterId.BYTE))
+        assertTrue(Progression.canUpgrade(free, FighterId.BYTE))
+        assertEquals(Balance.upgradeCost[0] * 3, Progression.upgradeCost(normal.copy(settings = io.github.projectwip.data.Settings(debugUpgradeCost = 3f)), FighterId.BYTE))
     }
 
     @Test fun walkingOutOfAFreeForAllIsLastPlaceNotFirst() {
-        val config = io.github.projectwip.sim.MatchConfig(FighterId.JUNO, 1, 0, "Me", BotDifficulty.EASY, mode = GameMode.LAST_SPARK)
+        val config = io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 1, 0, "Me", BotDifficulty.EASY, mode = GameMode.LAST_SPARK)
         val match = io.github.projectwip.sim.Match(config)
         assertEquals("still standing reads as first...", 1, match.report().placement)
         val left = match.forfeit()
@@ -238,7 +238,7 @@ class ProgressionTest {
     }
 
     @Test fun theRefereeIgnoresWhatTheDeviceClaims() {
-        val config = io.github.projectwip.sim.MatchConfig(FighterId.JUNO, 1, 0, "Me", BotDifficulty.EASY, mode = GameMode.LAST_SPARK, seed = 5L)
+        val config = io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 1, 0, "Me", BotDifficulty.EASY, mode = GameMode.LAST_SPARK, seed = 5L)
         // No inputs at all: the player never showed up, which is walking out, in last place.
         val nothing = io.github.projectwip.sim.Referee.judge(config, ByteArray(0))
         assertFalse(nothing.finished)

@@ -73,7 +73,7 @@ class SimulationTest {
     /** Thickets hide a fighter only after it settles in, and a spotter doesn't lose it the instant it backs off. */
     @Test fun thicketConcealmentIsStable() {
         val a = Arenas.staticCanyon()
-        val def = Balance.fighter(FighterId.JUNO)
+        val def = Balance.fighter(FighterId.BYTE)
         val hider = Fighter(0, def, 1, 0, 0, "H", true)
         val seeker = Fighter(1, def, 1, 0, 1, "S", true)
         val w = World(a, listOf(hider, seeker), io.github.projectwip.sim.MatchRules.lastSpark())
@@ -109,7 +109,7 @@ class SimulationTest {
         var shortHides = 0
         var shortShows = 0
         for (mode in GameMode.entries) repeat(3) { seed ->
-            val m = Match(MatchConfig(FighterId.JUNO, 3, 0, "T", BotDifficulty.NORMAL, mode = mode, humanPlayer = false, seed = 100L + seed))
+            val m = Match(MatchConfig(FighterId.BYTE, 3, 0, "T", BotDifficulty.NORMAL, mode = mode, humanPlayer = false, seed = 100L + seed))
             val seen = HashMap<Int, Boolean>()
             val since = HashMap<Int, Float>()
             var t = 0f
@@ -136,7 +136,7 @@ class SimulationTest {
     /** Auto-aim falls back to a Spark Crate it can actually hit, never one behind a wall. */
     @Test fun autoAimFindsHittableCrates() {
         val a = Arenas.staticCanyon()
-        val def = Balance.fighter(FighterId.JUNO)
+        val def = Balance.fighter(FighterId.BYTE)
         val f = Fighter(0, def, 1, 0, 0, "A", true)
         val w = World(a, listOf(f, Fighter(1, def, 1, 0, 2, "B", true)), io.github.projectwip.sim.MatchRules.lastSpark())
         // Quadrant row 1 is "gggg.c##..": a crate at (5,1) with open floor to its left and wall to its right.
@@ -153,7 +153,7 @@ class SimulationTest {
         var samples = 0
         var mobbed = 0
         repeat(3) { seed ->
-            val m = Match(MatchConfig(FighterId.JUNO, 3, 0, "T", BotDifficulty.HARD, mode = GameMode.LAST_SPARK, humanPlayer = false, seed = 300L + seed))
+            val m = Match(MatchConfig(FighterId.BYTE, 3, 0, "T", BotDifficulty.HARD, mode = GameMode.LAST_SPARK, humanPlayer = false, seed = 300L + seed))
             var t = 0f
             while (!m.isOver && t < 200f) {
                 m.step(Match.STEP); t += Match.STEP
@@ -178,8 +178,8 @@ class SimulationTest {
 
         // Each boss is its own thing, and its strength ignores the player's level.
         for (kind in io.github.projectwip.data.BossKind.entries) {
-            val low = Match(MatchConfig(FighterId.JUNO, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = kind))
-            val high = Match(MatchConfig(FighterId.JUNO, 60, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = kind))
+            val low = Match(MatchConfig(FighterId.BYTE, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = kind))
+            val high = Match(MatchConfig(FighterId.BYTE, 60, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = kind))
             val b1 = low.world.fighters.single { it.team != low.player.team }
             val b2 = high.world.fighters.single { it.team != high.player.team }
             assertEquals(kind, b1.def.boss)
@@ -231,7 +231,7 @@ class SimulationTest {
             }
         }
         // A mark hurts whoever is still standing in it when it goes off, and nobody outside it.
-        val m = Match(MatchConfig(FighterId.JUNO, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 3L, boss = io.github.projectwip.data.BossKind.BARRAGE))
+        val m = Match(MatchConfig(FighterId.BYTE, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 3L, boss = io.github.projectwip.data.BossKind.BARRAGE))
         while (m.world.phase != Phase.PLAYING) m.step(Match.STEP)
         val boss = m.world.fighters.first { it.def.boss != null }
         val me = m.player
@@ -255,7 +255,7 @@ class SimulationTest {
         assertTrue("the sentry's island can't be walked onto", a.circleBlocked(sentrySpot.x + 1f, sentrySpot.y, 0.4f))
         assertTrue("but it can shoot out over the coolant", a.shotClear(sentrySpot.x, sentrySpot.y, sentrySpot.x + 4f, sentrySpot.y))
 
-        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, humanPlayer = false, seed = 9L))
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, humanPlayer = false, seed = 9L))
         assertEquals(19, m.world.fighters.size)
         assertTrue(m.world.fighters.size <= io.github.projectwip.match.HudSnapshot.MAX)
         val targets = m.world.fighters.filter { it.team != m.player.team }
@@ -312,7 +312,7 @@ class SimulationTest {
 
     @Test fun fullBotMatchFinishes() {
         for (d in BotDifficulty.entries) {
-            val m = Match(MatchConfig(FighterId.JUNO, 3, 0, "Test", d, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 42L + d.ordinal))
+            val m = Match(MatchConfig(FighterId.BYTE, 3, 0, "Test", d, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 42L + d.ordinal))
             var t = 0f
             while (!m.isOver && t < 400f) { m.step(Match.STEP); t += Match.STEP }
             println("$d: ${"%.1f".format(t)}s score=${m.world.score.toList()} " +
@@ -326,7 +326,7 @@ class SimulationTest {
 
     @Test fun fightersAlwaysHealBotsMoreSlowlyAndGiantsSlowest() {
         // A human player and a bot of the same kind, in the same match.
-        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 4L))
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 4L))
         val me = m.world.fighters.first { !it.isBot }
         val bot = m.world.fighters.first { it.isBot }
         me.hp = me.maxHp / 2; bot.hp = bot.maxHp / 2
@@ -338,7 +338,7 @@ class SimulationTest {
         assertTrue("the player heals even while being hit", myShare > 0.1f)
         assertEquals("a bot heals at half the pace", myShare / 2, botShare, 0.005f)
         // A giant waits a few seconds after being hit, and then heals far more slowly.
-        val b = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
+        val b = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
         val boss = b.world.fighters.first { it.scale > 1f }
         boss.hp = boss.maxHp / 2; boss.sinceDamaged = 1f
         b.world.regenerate(boss, 1f)
@@ -350,7 +350,7 @@ class SimulationTest {
     }
 
     @Test fun aShieldBuildsOnTopOfFullHealth() {
-        val m = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 4L))
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 4L))
         val me = m.player
         me.hp = me.maxHp - 1; me.sinceDamaged = 60f
         m.world.regenerate(me, 1f)
@@ -366,7 +366,7 @@ class SimulationTest {
         assertTrue("which is well short of a second health bar", me.shieldHp < me.maxHp / 2)
         assertEquals(me.maxHp, me.hp)
         // Boss Mode has no shields at all: not the boss, and not the player either.
-        val b = Match(MatchConfig(FighterId.JUNO, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
+        val b = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
         for (f in b.world.fighters) {
             f.sinceDamaged = 60f
             repeat(50) { b.world.regenerate(f, 1f) }
@@ -487,7 +487,7 @@ class SimulationTest {
         assertEquals("and the charge is spent", 0f, varun.hyperCharge, 0f)
         var t = 0f
         while (varun.hyperActive && t < 20f) { w.step(Match.STEP); t += Match.STEP }
-        assertEquals("Varun's own hyper runs fourteen seconds; a plain one eight", 14f to 8f, varun.hyperSeconds to Fighter(9, Balance.fighter(FighterId.JUNO), 1, 0, 0, "J", true).hyperSeconds)
+        assertEquals("Varun's own hyper runs fourteen seconds; a plain one eight", 14f to 8f, varun.hyperSeconds to Fighter(9, Balance.fighter(FighterId.BYTE), 1, 0, 0, "J", true).hyperSeconds)
         assertEquals(varun.hyperSeconds, t, 0.1f)
         assertEquals("then everything is as it was", Triple(hp, hp, dmg), Triple(varun.maxHp, varun.hp, varun.attackDamage))
         assertTrue(varun.shieldHp <= varun.shieldMax)
@@ -548,15 +548,15 @@ class SimulationTest {
         assertEquals("after $t ticks the two devices agree on everything", state(a), state(b))
         assertTrue("and something happened", a.world.fighters.sumOf { it.damageDealt } > 0)
         // One player leaving hands the other the win.
-        val c = Match(MatchConfig(FighterId.JUNO, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L, duel = io.github.projectwip.sim.DuelSetup(1, FighterId.JUNO, 1, 0, "B")))
+        val c = Match(MatchConfig(FighterId.BYTE, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L, duel = io.github.projectwip.sim.DuelSetup(1, FighterId.BYTE, 1, 0, "B")))
         c.world.forfeit(c.opponent!!.team)
         assertEquals(io.github.projectwip.data.MatchOutcome.VICTORY, c.report().outcome)
         // A match the devices disagree about is called off: a draw.
-        val e = Match(MatchConfig(FighterId.JUNO, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L, duel = io.github.projectwip.sim.DuelSetup(0, FighterId.JUNO, 1, 0, "B")))
+        val e = Match(MatchConfig(FighterId.BYTE, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L, duel = io.github.projectwip.sim.DuelSetup(0, FighterId.BYTE, 1, 0, "B")))
         e.world.abandon()
         assertEquals(io.github.projectwip.data.MatchOutcome.DRAW, e.report().outcome)
         // Offline, a 1v1 is practice against one bot.
-        val d = Match(MatchConfig(FighterId.JUNO, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L))
+        val d = Match(MatchConfig(FighterId.BYTE, 1, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 2L))
         assertEquals(1, d.brains.size)
     }
 

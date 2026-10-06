@@ -35,7 +35,7 @@ class BalanceReport {
     @Test fun lastSparkLengths() {
         for (d in listOf(BotDifficulty.EASY, BotDifficulty.NORMAL, BotDifficulty.HARD)) {
             val times = (0 until 10).map { i ->
-                val m = Match(MatchConfig(FighterId.JUNO, 3, 0, "P", d, mode = io.github.projectwip.data.GameMode.LAST_SPARK, humanPlayer = false, seed = 500L + i))
+                val m = Match(MatchConfig(FighterId.BYTE, 3, 0, "P", d, mode = io.github.projectwip.data.GameMode.LAST_SPARK, humanPlayer = false, seed = 500L + i))
                 var t = 0f
                 var firstOut = -1f
                 while (m.world.phase != io.github.projectwip.sim.Phase.ENDED && t < 300f) {

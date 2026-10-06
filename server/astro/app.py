@@ -370,7 +370,7 @@ def make_handler(game: Game, quiet: bool = False):
             boss = boss if mode == "BOSS" and boss in rules.BOSSES else ""
             try:
                 plan = game.store.plan_match(
-                    player["id"], mode, str(data.get("fighter") or "JUNO"), difficulty, rules.MODES[mode], game.config.bots().get(difficulty, {}), boss
+                    player["id"], mode, str(data.get("fighter") or "BYTE"), difficulty, rules.MODES[mode], game.config.bots().get(difficulty, {}), boss
                 )
             except Refused as refused:
                 return self._error(refused.status, refused.message)

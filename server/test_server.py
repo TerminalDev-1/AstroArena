@@ -127,7 +127,7 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.SPARK_ROAD[-1], ("VARUN", 1600))
         self.assertEqual(economy.shop_item("skin_VARUN_2"), ({"type": "skin", "fighter": "VARUN", "skin": 2}, 20))
         self.assertEqual(economy.shop_item("skin_MIRA_2"), ({"type": "skin", "fighter": "MIRA", "skin": 2}, 20))
-        for missing in ("fighter_JUNO", "skin_MIRA_0", "skin_MIRA_3", "skin_NOBODY_1", "crate_xl", ""):
+        for missing in ("fighter_BYTE", "skin_MIRA_0", "skin_MIRA_3", "skin_NOBODY_1", "crate_xl", ""):
             self.assertIsNone(economy.shop_item(missing))
         self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "VICTORY", 0, 2, "NORMAL"), 28)
         self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "DEFEAT", 0, 9, "ELITE"), 33)
@@ -137,20 +137,20 @@ class Economy(unittest.TestCase):
 
     def test_upgrades(self):
         p = economy.new_profile()
-        self.assertEqual(economy.upgrade(p, "JUNO"), 10)
-        self.assertEqual((p["bolts"], p["fighters"]["JUNO"]["level"]), (50, 2))
+        self.assertEqual(economy.upgrade(p, "BYTE"), 10)
+        self.assertEqual((p["bolts"], p["fighters"]["BYTE"]["level"]), (50, 2))
         with self.assertRaises(Refused) as caught:
             economy.upgrade(p, "BRAKK")  # locked
         self.assertEqual(caught.exception.status, 409)
         p["bolts"] = 5
         with self.assertRaises(Refused) as caught:
-            economy.upgrade(p, "JUNO")
+            economy.upgrade(p, "BYTE")
         self.assertEqual(caught.exception.status, 402)
-        self.assertEqual((p["bolts"], p["fighters"]["JUNO"]["level"]), (5, 2))
-        p["bolts"], p["fighters"]["JUNO"]["level"] = 99999, economy.MAX_LEVEL
+        self.assertEqual((p["bolts"], p["fighters"]["BYTE"]["level"]), (5, 2))
+        p["bolts"], p["fighters"]["BYTE"]["level"] = 99999, economy.MAX_LEVEL
         with self.assertRaises(Refused):
-            economy.upgrade(p, "JUNO")
-        self.assertEqual(economy.upgrade(p, "JUNO", no_cap=True), 450)
+            economy.upgrade(p, "BYTE")
+        self.assertEqual(economy.upgrade(p, "BYTE", no_cap=True), 450)
 
     def test_shop_gift_and_track(self):
         p = economy.new_profile()
@@ -189,11 +189,11 @@ class Economy(unittest.TestCase):
 
     def test_profiles_start_from_a_save(self):
         save = {"bolts": 900, "prisms": "lots", "bestCups": 77, "claimedMilestones": [10, 11, 25], "lastDailyGiftDay": 5,
-                "fighters": {"MIRA": {"unlocked": True, "level": 4, "ownedSkins": [0, 2, 9]}, "JUNO": {"unlocked": False, "level": -3}}}
+                "fighters": {"MIRA": {"unlocked": True, "level": 4, "ownedSkins": [0, 2, 9]}, "BYTE": {"unlocked": False, "level": -3}}}
         p = economy.profile_from_save(save)
         self.assertEqual((p["bolts"], p["prisms"], p["bestCups"], p["claimedMilestones"], p["lastDailyGiftDay"]), (900, 0, 77, [10, 25], 5))
         self.assertEqual(p["fighters"]["MIRA"], {"unlocked": True, "level": 4, "ownedSkins": [0, 2], "cups": 0})
-        self.assertEqual(p["fighters"]["JUNO"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
+        self.assertEqual(p["fighters"]["BYTE"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
         self.assertFalse(p["fighters"]["KITO"]["unlocked"])
         self.assertEqual(economy.profile_from_save({}), economy.new_profile())
 
@@ -296,7 +296,7 @@ class Api(unittest.TestCase):
         account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]
         self.assertEqual((account["name"], account["rank"], account["players"]), ("Nova_Fox", 1, 1))
         self.assertEqual(self.store.player(me["id"])["name"], "Nova_Fox")
-        self.assertEqual(self.call("GET", "/v1/leaderboard")[1]["players"], [{"id": me["id"], "name": "Nova_Fox", "cups": 0, "fighter": "JUNO", "glory": 0}])
+        self.assertEqual(self.call("GET", "/v1/leaderboard")[1]["players"], [{"id": me["id"], "name": "Nova_Fox", "cups": 0, "fighter": "BYTE", "glory": 0}])
 
     def test_accounts_saves_and_leaderboard(self):
         self.assertEqual(self.call("GET", "/v1/save")[0], 401)
@@ -340,7 +340,7 @@ class Api(unittest.TestCase):
             (length,) = struct.unpack(">H", sock.recv(2))
             return sock.recv(length).decode()
 
-        def join(player, fighter="JUNO"):
+        def join(player, fighter="BYTE"):
             sock = socket.create_connection(("127.0.0.1", self.httpd.duel.server_address[1]), timeout=5)
             body = _json.dumps({"token": player["token"], "version": VERSION, "fighter": fighter, "skin": 0}).encode()
             sock.sendall(b"H" + struct.pack(">H", len(body)) + body)
@@ -362,7 +362,7 @@ class Api(unittest.TestCase):
         self.assertEqual(starts[0]["seed"], starts[1]["seed"])
         self.assertEqual({starts[0]["side"], starts[1]["side"]}, {0, 1})
         self.assertTrue(all(isinstance(s["opponent"]["name"], str) and s["opponent"]["name"] for s in starts))
-        self.assertEqual((starts[0]["level"], starts[0]["opponent"]["fighter"]), (1, "JUNO"))
+        self.assertEqual((starts[0]["level"], starts[0]["opponent"]["fighter"]), (1, "BYTE"))
         # A frame one sends reaches the other untouched.
         frame = b"I" + bytes(range(17))
         a.sendall(frame)
@@ -374,7 +374,7 @@ class Api(unittest.TestCase):
         # A player on another build isn't paired with one on this build: they wait for their own kind.
         def join_as(player, version):
             sock = socket.create_connection(("127.0.0.1", self.httpd.duel.server_address[1]), timeout=5)
-            body = _json.dumps({"token": player["token"], "version": version, "fighter": "JUNO", "skin": 0}).encode()
+            body = _json.dumps({"token": player["token"], "version": version, "fighter": "BYTE", "skin": 0}).encode()
             sock.sendall(b"H" + struct.pack(">H", len(body)) + body)
             return sock
         old, new = join_as(self.player("Di"), "46"), join_as(self.player("Ed"), "47")
@@ -417,7 +417,7 @@ class Api(unittest.TestCase):
 
         def join(player):
             sock = socket.create_connection(("127.0.0.1", self.httpd.duel.server_address[1]), timeout=5)
-            body = _json.dumps({"token": player["token"], "version": VERSION, "fighter": "JUNO", "skin": 0}).encode()
+            body = _json.dumps({"token": player["token"], "version": VERSION, "fighter": "BYTE", "skin": 0}).encode()
             sock.sendall(b"H" + struct.pack(">H", len(body)) + body)
             return sock
 
@@ -478,7 +478,7 @@ class Api(unittest.TestCase):
             for name in names:
                 player = self.player(name)
                 sock = socket.create_connection(("127.0.0.1", self.httpd.duel.server_address[1]), timeout=5)
-                body = _json.dumps({"token": player["token"], "version": VERSION, "fighter": "JUNO", "skin": 0}).encode()
+                body = _json.dumps({"token": player["token"], "version": VERSION, "fighter": "BYTE", "skin": 0}).encode()
                 sock.sendall(b"H" + struct.pack(">H", len(body)) + body)
                 socks.append((sock, player))
             for side, (sock, _) in enumerate(socks):
@@ -508,7 +508,7 @@ class Api(unittest.TestCase):
         replay.answer = {"finished": True, "ticks": 400, "winner": 1, "sides": stats, "wrong": [False, False]}
         a.sendall(b"F")
         lost, won = verdict(a), verdict(b)
-        self.assertEqual(replay.asked[-1], (["JUNO", "JUNO"], [1, 1], [51, 51], None))
+        self.assertEqual(replay.asked[-1], (["BYTE", "BYTE"], [1, 1], [51, 51], None))
         self.assertEqual((lost["report"]["outcome"], lost["cupDelta"], lost["report"]["kos"]), ("DEFEAT", 0, 1))
         self.assertEqual((won["report"]["outcome"], won["cupDelta"], won["cups"], won["report"]["kos"]), ("VICTORY", 8, 8, 3))
         self.assertEqual((cups(ada), cups(bo)), (0, 8))
@@ -583,14 +583,14 @@ class Api(unittest.TestCase):
         self.assertNotIn(cheat["token"], text)
         # The operator takes the cheat down a peg. While the file was open, the other player won some Cups.
         text = edit(("cups = 900", "cups = 12"), ("prisms = 5000", "prisms = 1,000"),
-                    ("juno = unlocked, level 1, cups 0", "juno = locked, level 3, cups 7"), ("kito = locked, level 1, cups 0", "kito = unlocked, level 99999"))
+                    ("byte = unlocked, level 1, cups 0", "byte = locked, level 3, cups 7"), ("kito = locked, level 1, cups 0", "kito = unlocked, level 99999"))
         self.store.grant(fair["id"], cups=25)
         accounts.sync()  # the server writes the file again; the operator's editor still has the older one
         save(text)
         account = self.call("GET", "/v1/me", token=cheat["token"])[1]["account"]
         self.assertEqual((account["cups"], account["profile"]["prisms"]), (12, 1000))
         # The fighter everyone starts with stays unlocked; levels stop at the limit; what wasn't written stays.
-        juno, kito = account["profile"]["fighters"]["JUNO"], account["profile"]["fighters"]["KITO"]
+        juno, kito = account["profile"]["fighters"]["BYTE"], account["profile"]["fighters"]["KITO"]
         self.assertEqual((juno["unlocked"], juno["level"], juno["cups"]), (True, 3, 7))
         self.assertEqual((kito["unlocked"], kito["level"], kito["cups"]), (True, economy.LEVEL_LIMIT, 0))
         # Only what was changed is forced: the other player keeps the Cups won in the meantime.
@@ -699,10 +699,10 @@ class Api(unittest.TestCase):
         other = self.player("Other")
         self.assertEqual(self.call("POST", "/v1/matches", {"mode": "NOPE"}, me["token"])[0], 400)
         # An ordinary player asks for Elite bots and gets the server's difficulty.
-        status, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "fighter": "JUNO", "level": 3, "difficulty": "ELITE"}, me["token"])
+        status, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "fighter": "BYTE", "level": 3, "difficulty": "ELITE"}, me["token"])
         self.assertEqual((status, plan["difficulty"]), (201, "EASY"))
         # The level is the server's (1 here), not the 3 the device asked for, and a locked fighter can't be played.
-        self.assertEqual((plan["fighter"], plan["level"], plan["refereed"]), ("JUNO", 1, False))
+        self.assertEqual((plan["fighter"], plan["level"], plan["refereed"]), ("BYTE", 1, False))
         self.assertEqual(plan["bots"]["reactiontime"], 0.9)
         self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "fighter": "KITO"}, me["token"])[0], 409)
         self.assertEqual(len(plan["botNames"]), 9)
@@ -845,6 +845,13 @@ class Api(unittest.TestCase):
         done["fighters"]["AURA"] = {"unlocked": True, "level": 1, "ownedSkins": [0]}
         economy.complete(done)
         self.assertEqual((done["credits"], done["glory"]), (0, 1600))
+        # An account from when Juno was the starter: she is gone, with her levels and Cups, and Byte is there instead.
+        old = economy.new_profile()
+        del old["fighters"]["BYTE"]
+        old["fighters"]["JUNO"] = {"unlocked": True, "level": 9, "ownedSkins": [0, 1], "cups": 300}
+        economy.complete(old)
+        self.assertEqual(sorted(old["fighters"]), sorted(rules.FIGHTER_SKINS))
+        self.assertEqual(old["fighters"]["BYTE"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
 
     def test_matches_fill_the_spark_pass(self):
         me = self.player()
@@ -927,9 +934,9 @@ class Api(unittest.TestCase):
         self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (500, 100))
         self.assertFalse(body["account"]["profile"]["fighters"]["KITO"]["unlocked"])
 
-        status, body = self.call("POST", "/v1/fighters/upgrade", {"fighter": "JUNO", "costFactor": 0, "noCap": True}, token)
+        status, body = self.call("POST", "/v1/fighters/upgrade", {"fighter": "BYTE", "costFactor": 0, "noCap": True}, token)
         self.assertEqual((status, body["cost"]), (200, 10))  # an ordinary player's cost factor is ignored
-        self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["fighters"]["JUNO"]["level"]), (490, 2))
+        self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["fighters"]["BYTE"]["level"]), (490, 2))
         self.assertEqual(self.call("POST", "/v1/fighters/upgrade", {"fighter": "KITO"}, token)[0], 409)
 
         status, body = self.call("POST", "/v1/shop/buy", {"item": "fighter_MIRA"}, token)
@@ -954,7 +961,7 @@ class Api(unittest.TestCase):
         self.make_developer(me["id"])
         body = self.call("POST", "/v1/dev/grant", {"bolts": 1000, "prisms": 5}, token)[1]
         before = body["account"]["profile"]["bolts"]
-        body = self.call("POST", "/v1/fighters/upgrade", {"fighter": "JUNO", "costFactor": 0}, token)[1]
+        body = self.call("POST", "/v1/fighters/upgrade", {"fighter": "BYTE", "costFactor": 0}, token)[1]
         self.assertEqual((body["cost"], body["account"]["profile"]["bolts"]), (0, before))  # a developer's free upgrade
 
         # Starting over wipes progress and keeps the account.
@@ -1052,7 +1059,7 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("GET", "/v1/me", token=other["token"])[1]["account"]["dailyOffers"][0]["purchased"], 0)
         self.assertFalse(self.call("POST", "/v1/shop/gift", {}, me["token"])[1]["account"]["giftAvailable"])
         # The operator edits shop.cfg: the shop follows, and a broken entry is left out.
-        self.write_cfg("shop.cfg", "[settings]\noffers_per_day = 5\n[Only One]\nbolts = 10\ncurrency = FREE\n[Broken]\nskin_fighter = JUNO\nskin = 9\n[Empty]\nprice = 5\n")
+        self.write_cfg("shop.cfg", "[settings]\noffers_per_day = 5\n[Only One]\nbolts = 10\ncurrency = FREE\n[Broken]\nskin_fighter = BYTE\nskin = 9\n[Empty]\nprice = 5\n")
         offers = self.call("GET", "/v1/me", token=me["token"])[1]["account"]["dailyOffers"]
         self.assertEqual([o["title"] for o in offers], ["Only One"])
 
@@ -1064,7 +1071,7 @@ class Api(unittest.TestCase):
         self.assertGreater(len(set(days)), 20)  # and different from day to day
         # Something already owned isn't sold again.
         p = economy.new_profile()
-        owned = economy.daily_offers([{"title": "Skin", "skinFighter": "JUNO", "skinIndex": 0, "currency": "FREE"}], 1, 5)
+        owned = economy.daily_offers([{"title": "Skin", "skinFighter": "BYTE", "skinIndex": 0, "currency": "FREE"}], 1, 5)
         with self.assertRaises(Refused):
             economy.buy_daily(p, owned, 0, 5)
 
@@ -1073,9 +1080,9 @@ class Api(unittest.TestCase):
         path = os.path.join(self.dir, "old.db")
         db = sqlite3.connect(path)
         db.execute("CREATE TABLE players (id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, name TEXT NOT NULL DEFAULT 'Player', "
-                   "cups INTEGER NOT NULL DEFAULT 0, fighter TEXT NOT NULL DEFAULT 'JUNO', version TEXT NOT NULL DEFAULT '', "
+                   "cups INTEGER NOT NULL DEFAULT 0, fighter TEXT NOT NULL DEFAULT 'BYTE', version TEXT NOT NULL DEFAULT '', "
                    "created_at REAL NOT NULL, last_seen REAL NOT NULL)")
-        db.execute("INSERT INTO players VALUES ('abc', 'tok', 'Old', 40, 'JUNO', '6', 1, 1)")
+        db.execute("INSERT INTO players VALUES ('abc', 'tok', 'Old', 40, 'BYTE', '6', 1, 1)")
         db.commit()
         db.close()
         from astro.store import Store
@@ -1152,7 +1159,7 @@ class Refereed(Api):
         self.assertTrue(body["verified"])
         report = body["report"]
         # The server's result is its own replay of the match, the same as running the referee by hand...
-        mine = REFEREE.judge("LAST_SPARK", "JUNO", 1, "EASY", plan["seed"], plan["botNames"], plan["bots"], decode_inputs(still))
+        mine = REFEREE.judge("LAST_SPARK", "BYTE", 1, "EASY", plan["seed"], plan["botNames"], plan["bots"], decode_inputs(still))
         self.assertEqual(report, {k: mine[k] for k in ("outcome", "placement", "kos", "deaths", "damage", "mvp")})
         # ...and nothing like what the device claimed.
         self.assertEqual((report["kos"], report["damage"]), (0, 0))

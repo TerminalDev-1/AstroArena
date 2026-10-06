@@ -31,7 +31,7 @@ import kotlin.random.Random
 
 /** What the stage should show. Written from the UI thread, read by the GL thread. */
 class StageParams {
-    @Volatile var fighter = FighterId.JUNO
+    @Volatile var fighter = FighterId.BYTE
     /** Set to show a Boss Mode boss instead of [fighter]. */
     @Volatile var boss: io.github.projectwip.data.BossKind? = null
     @Volatile var skin = 0

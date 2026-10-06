@@ -73,7 +73,7 @@ data class SaveData(
     /** What Credits are earned as once every fighter is unlocked. */
     val glory: Int = 0,
     val fighters: Map<FighterId, FighterProgress> = defaultFighters(),
-    val selectedFighter: FighterId = FighterId.JUNO,
+    val selectedFighter: FighterId = FighterId.BYTE,
     val selectedMode: GameMode = GameMode.LAST_SPARK,
     /** Boss Mode: the boss the player wants to fight. Null = a random one each time. */
     val selectedBoss: BossKind? = null,
@@ -104,6 +104,6 @@ data class SaveData(
         const val VERSION = 1
 
         fun defaultFighters(): Map<FighterId, FighterProgress> =
-            FighterId.entries.associateWith { FighterProgress(unlocked = it == FighterId.JUNO) }
+            FighterId.entries.associateWith { FighterProgress(unlocked = it == FighterId.BYTE) }
     }
 }

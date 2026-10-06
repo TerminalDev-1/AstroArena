@@ -120,7 +120,7 @@ class Fighter(
     val isDashing get() = dashTime > 0f
 }
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT }
 
 class Projectile(
     val ownerId: Int,
@@ -137,6 +137,8 @@ class Projectile(
     val style: ShotStyle,
     /** Bursts where it lands, hitting every enemy within this many tiles (0 = only what it touches). */
     val blast: Float = 0f,
+    /** Shoves whoever it hits this many tiles the way it is flying. */
+    val knock: Float = 0f,
 ) {
     var prevX = x
     var prevY = y

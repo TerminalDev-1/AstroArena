@@ -27,7 +27,7 @@ enum class LobbyShot { HOME, FIGHTER, BACKDROP }
 
 /** What the lobby shows. Written by the UI thread, read by the GL thread. */
 class LobbyParams {
-    @Volatile var fighter = FighterId.JUNO
+    @Volatile var fighter = FighterId.BYTE
     @Volatile var skin = 0
     @Volatile var locked = false
     @Volatile var showFighter = true

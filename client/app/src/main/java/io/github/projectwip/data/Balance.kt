@@ -13,7 +13,7 @@ data class StatLine(val base: Int, val perLevel: Int) {
     fun at(level: Int): Int = base + perLevel * (level.coerceAtLeast(1) - 1)
 }
 
-enum class FighterId { JUNO, BRAKK, MIRA, KITO, VARUN }
+enum class FighterId { BYTE, BRAKK, MIRA, KITO, VARUN }
 
 /** [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. */
 enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS }
@@ -52,6 +52,8 @@ data class AttackSpec(
     val blast: Float = 0f,
     /** Rockets: how many leave side by side in each row. */
     val lanes: Int = 1,
+    /** The shots are square bits of light rather than pellets (and so are the super's). */
+    val bits: Boolean = false,
 )
 
 data class SuperSpec(
@@ -63,6 +65,8 @@ data class SuperSpec(
     val range: Float,
     val speed: Float,
     val radius: Float,
+    /** A volley: every shot that lands shoves its target this many tiles the way it was flying. */
+    val knockback: Float = 0f,
 )
 
 /** A colourway. Index 0 is the default and always owned. */
@@ -230,27 +234,28 @@ object Balance {
 
     val fighters: List<FighterDef> = listOf(
         FighterDef(
-            id = FighterId.JUNO,
+            id = FighterId.BYTE,
             rarity = Rarity.STARTER,
-            name = "Juno",
-            title = "Spark Courier",
-            role = "Skirmisher",
-            lore = "Delivers parcels and bad news at the same speed. Her coil blaster was a toaster once.",
-            attackName = "Spark Burst",
+            name = "Byte",
+            title = "Lab Runaway",
+            role = "Scattergunner",
+            lore = "Half lab assistant, half lab equipment. Her rifle prints its own rounds, and she never asked what from.",
+            attackName = "Bit Scatter",
             health = StatLine(5600, 280),
-            attackDamage = StatLine(500, 25),
-            superDamage = StatLine(560, 28),
-            moveSpeed = 3.7f,
-            attack = AttackSpec(AttackShape.BURST, projectiles = 3, spreadDegrees = 6f, range = 7.5f, speed = 17f, radius = 0.16f, burstInterval = 0.075f),
-            superSpec = SuperSpec(SuperKind.VOLLEY, "Overcharge Volley", "Unloads a wide fan of 9 charged sparks.", projectiles = 9, spreadDegrees = 50f, range = 8.5f, speed = 18f, radius = 0.2f),
+            attackDamage = StatLine(300, 15),
+            superDamage = StatLine(330, 16),
+            moveSpeed = 3.6f,
+            attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 28f, range = 6.4f, speed = 16f, radius = 0.16f, burstInterval = 0f, bits = true),
+            superSpec = SuperSpec(SuperKind.VOLLEY, "Hard Reset", "A wide blast of 9 heavy bits that shoves back everyone it hits.", projectiles = 9, spreadDegrees = 46f, range = 6.8f, speed = 17f, radius = 0.2f, knockback = 0.4f),
             ammoMax = 3,
-            reloadSeconds = 1.25f,
-            superChargePerHit = 0.075f,
+            reloadSeconds = 1.5f,
+            superChargePerHit = 0.05f,
             skins = listOf(
-                Skin("Courier", 0xFFFF8A1F, 0xFF2EC4F1, 0xFFFFE066, 0),
-                Skin("Night Shift", 0xFF5B5BD6, 0xFFFF4FA3, 0xFFB8F2FF, 20),
-                Skin("Mint Rush", 0xFF2ED8A3, 0xFFFFD23F, 0xFFFFFFFF, 20),
+                Skin("Test Build", 0xFF19B8C4, 0xFFE84FD8, 0xFFB6FF3C, 0),
+                Skin("Mainframe", 0xFF27324F, 0xFF3CFF9E, 0xFFEAFBFF, 20),
+                Skin("Sunset Patch", 0xFFFF7A3D, 0xFF7B4DFF, 0xFFFFE066, 20),
             ),
+            hyper = HyperSpec("Overclock", "Lasts 8 seconds. Her bits fly faster, and her super charges half as fast again.", seconds = 8f, shotSpeed = 1.35f, superCharge = 1.5f),
         ),
         FighterDef(
             id = FighterId.BRAKK,
@@ -368,14 +373,14 @@ object Balance {
      * here only tell the bot brain how far to stand off, and set the speed and damage of a charge.
      */
     private fun bossDef(kind: BossKind, name: String, title: String, lore: String, health: Int, speed: Float, standOff: Float, skin: Skin) = FighterDef(
-        id = FighterId.JUNO, rarity = Rarity.STARTER, boss = kind,
+        id = FighterId.BYTE, rarity = Rarity.STARTER, boss = kind,
         name = name, title = title, role = "Boss", lore = lore, attackName = "",
         health = StatLine(health, 0), attackDamage = StatLine(400, 0), superDamage = StatLine(950, 0),
         moveSpeed = speed,
         attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 30f, range = standOff, speed = 14f, radius = 0.24f, burstInterval = 0f),
         superSpec = SuperSpec(SuperKind.RAM, "Charge", "", range = 7f, speed = 12.5f, radius = 0.9f),
         ammoMax = 3, reloadSeconds = 1.5f, superChargePerHit = 0f,
-        radius = fighter(FighterId.JUNO).radius * 2.5f,
+        radius = fighter(FighterId.BYTE).radius * 2.5f,
         skins = listOf(skin),
     )
 
@@ -396,10 +401,10 @@ object Balance {
     // Everything here is created at level 1 with flat stat lines, like the boss: it is a fixed yardstick.
 
     /** A target dummy: never attacks, soaks up damage and regenerates like anyone else. */
-    val dummy: FighterDef = fighter(FighterId.JUNO).let { it.copy(name = "Dummy", title = "Target", health = StatLine(16000, 0)) }
+    val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(16000, 0)) }
 
     /** One of the swarm: a little over half size and fragile. In the Training Area it is a target and never attacks. */
-    val mini: FighterDef = fighter(FighterId.JUNO).let {
+    val mini: FighterDef = fighter(FighterId.BYTE).let {
         it.copy(
             name = "Mini", title = "Swarm", health = StatLine(6000, 0),
             attackDamage = StatLine(Math.round(it.attackDamage.base * 0.3f), 0), superDamage = StatLine(Math.round(it.superDamage.base * 0.3f), 0),

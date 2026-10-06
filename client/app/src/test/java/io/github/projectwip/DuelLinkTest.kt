@@ -115,8 +115,8 @@ class DuelLinkTest {
 
     @Test fun aDeviceThatComputesSomethingElseIsCaught() {
         val server = lobby()
-        val a = Device(server.localPort, FighterId.JUNO, 1L, cheatAt = 100)
-        val b = Device(server.localPort, FighterId.JUNO, 2L)
+        val a = Device(server.localPort, FighterId.BYTE, 1L, cheatAt = 100)
+        val b = Device(server.localPort, FighterId.BYTE, 2L)
         run(a, b, 60 * 20)
         assertTrue("both devices see that they disagree", a.link.outOfStep && b.link.outOfStep)
         assertTrue("within a second of it happening", a.ticksRun < 100 + 4 * DuelLink.CHECK_EVERY && b.ticksRun < 100 + 4 * DuelLink.CHECK_EVERY)
@@ -125,8 +125,8 @@ class DuelLinkTest {
 
     @Test fun leavingIsNoticedByTheOther() {
         val server = lobby()
-        val a = Device(server.localPort, FighterId.JUNO, 1L)
-        val b = Device(server.localPort, FighterId.JUNO, 2L)
+        val a = Device(server.localPort, FighterId.BYTE, 1L)
+        val b = Device(server.localPort, FighterId.BYTE, 2L)
         val ta = thread { a.play(120) }
         val tb = thread { b.play(60 * 60) }
         ta.join(20_000)
@@ -145,7 +145,7 @@ class DuelLinkTest {
     @Test fun theRefereeReplaysA1v1Exactly() {
         val ticks = 60 * 150
         val hands = Random(5)
-        val fighters = listOf(FighterId.KITO, FighterId.JUNO)
+        val fighters = listOf(FighterId.KITO, FighterId.BYTE)
         val levels = listOf(9, 2)
         // One device (side 1's), run the way MatchRunner runs it.
         val start = DuelLink.Start(41L, levels[1], io.github.projectwip.sim.DuelSetup(1, fighters[0], levels[0], 0, "Them"))

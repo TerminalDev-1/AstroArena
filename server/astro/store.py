@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS players (
     token       TEXT NOT NULL UNIQUE,
     name        TEXT NOT NULL DEFAULT 'Player',
     cups        INTEGER NOT NULL DEFAULT 0,
-    fighter     TEXT NOT NULL DEFAULT 'JUNO',
+    fighter     TEXT NOT NULL DEFAULT 'BYTE',
     version     TEXT NOT NULL DEFAULT '',
     created_at  REAL NOT NULL,
     last_seen   REAL NOT NULL
@@ -408,7 +408,7 @@ class Store:
         cups = max(0, int(save.get("cups") or 0))
         drops = min(max(0, int(save.get("capsules") or 0)), rules.MAX_IMPORTED_DROPS)
         boosted = min(max(0, int(save.get("boostedCapsules") or 0)), drops)
-        fighter = str(save.get("selectedFighter") or "JUNO")[:16]
+        fighter = str(save.get("selectedFighter") or "BYTE")[:16]
         with self._lock, self._db:
             row = self._db.execute("SELECT revision FROM saves WHERE player_id = ?", (player_id,)).fetchone()
             revision = (row["revision"] if row else 0) + 1

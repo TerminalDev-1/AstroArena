@@ -92,7 +92,7 @@ class DuelLink(private val host: String, private val port: Int) : Closeable {
                 'S' -> {
                     val j = JSONObject(input.readUTF())
                     val them = j.getJSONObject("opponent")
-                    val fighter = FighterId.entries.firstOrNull { it.name == them.optString("fighter") } ?: FighterId.JUNO
+                    val fighter = FighterId.entries.firstOrNull { it.name == them.optString("fighter") } ?: FighterId.BYTE
                     Thread({ listen(input) }, "duel-link").apply { isDaemon = true }.start()
                     start = Start(j.getLong("seed"), j.optInt("level", 1), DuelSetup(j.getInt("side"), fighter, them.optInt("level", 1), them.optInt("skin"), them.optString("name", "Player")))
                     break@waiting

@@ -144,7 +144,7 @@ object Progression {
         )
         if (profile == null) return base
         val fighters = FighterId.entries.associateWith { id ->
-            val theirs = profile.fighters[id] ?: FighterProgress(unlocked = id == FighterId.JUNO)
+            val theirs = profile.fighters[id] ?: FighterProgress(unlocked = id == FighterId.BYTE)
             val owned = theirs.ownedSkins + 0
             // The colourway being worn is kept, as long as it is still owned.
             theirs.copy(ownedSkins = owned, skin = save.progress(id).skin.takeIf { it in owned } ?: 0)
@@ -154,7 +154,7 @@ object Progression {
             glory = profile.glory.coerceAtLeast(0),
             bestCups = maxOf(profile.bestCups, cups),
             fighters = fighters,
-            selectedFighter = if (fighters[save.selectedFighter]?.unlocked == true) save.selectedFighter else FighterId.JUNO,
+            selectedFighter = if (fighters[save.selectedFighter]?.unlocked == true) save.selectedFighter else FighterId.BYTE,
             claimedMilestones = profile.claimedMilestones,
             lastDailyGiftDay = profile.lastDailyGiftDay, lastFirstWinDay = profile.lastFirstWinDay,
         )

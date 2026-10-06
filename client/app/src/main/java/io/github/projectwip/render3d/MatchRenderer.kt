@@ -50,6 +50,7 @@ class MatchRenderer(
 
     private lateinit var sphere: Mesh
     private lateinit var octa: Mesh
+    private lateinit var bit: Mesh
     /** A rocket lying along +X, one unit long: the body, and (drawn in a second colour) its nose cone, fins and nozzle. */
     private lateinit var rocketBody: Mesh
     private lateinit var rocketTrim: Mesh
@@ -120,6 +121,7 @@ class MatchRenderer(
         sprites = SpriteBatch()
         sphere = MeshBuilder().apply { sphere(1f, 10, 14) }.build()
         octa = MeshBuilder().apply { ellipsoid(1f, 1f, 1f, 2, 4) }.build()
+        bit = MeshBuilder().apply { box(1f, 1f, 1f) }.build()
         rocketBody = MeshBuilder().apply { with { rotate(-90f, 0f, 0f, 1f); cylinder(0.14f, 0.56f, 12) } }.build()
         rocketTrim = MeshBuilder().apply {
             with { translate(0.42f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); cylinder(0.14f, 0.28f, 12, topRadius = 0f) }
@@ -715,6 +717,12 @@ class MatchRenderer(
                     tint(if (pr.style == ShotStyle.VOLLEY) 0xFFFFD640 else skin.accent)
                     setModel(x, 0.7f, z, pr.radius * 1.6f, pr.radius * 1.1f, pr.radius * 1.1f, yaw); sphere.draw()
                 }
+                ShotStyle.BIT -> {
+                    // A square bit of light, tumbling as it flies.
+                    tint(skin.accent)
+                    val size = pr.radius * (if (pr.isSuper) 1.5f else 1.25f)
+                    setModel(x, 0.7f, z, size, size, size, yaw + pr.age * 900f); bit.draw()
+                }
                 ShotStyle.PELLET -> {
                     tint(skin.secondary)
                     setModel(x, 0.7f, z, pr.radius * 1.1f, pr.radius * 1.1f, pr.radius * 1.1f); sphere.draw()
@@ -837,7 +845,7 @@ class MatchRenderer(
         val s = f.def.skins[f.skin]
         return when (style) {
             ShotStyle.VOLLEY -> 0xFFFFD640.toInt()
-            ShotStyle.SPARK -> s.accent.toInt()
+            ShotStyle.SPARK, ShotStyle.BIT -> s.accent.toInt()
             ShotStyle.ROCKET -> 0xFFFF9A2E.toInt()
             else -> s.secondary.toInt()
         }
@@ -1040,7 +1048,7 @@ class MatchRenderer(
     }
 
     private fun headHeight(id: FighterId) = FIGHTER_SCALE * when (id) {
-        FighterId.JUNO -> 1.85f
+        FighterId.BYTE -> 1.85f
         FighterId.BRAKK -> 1.8f
         FighterId.MIRA -> 2.0f
         FighterId.KITO -> 1.9f

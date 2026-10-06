@@ -162,7 +162,7 @@ class SaveStore(context: Context) {
                 credits = o.optInt("credits", d.credits).coerceAtLeast(0),
                 glory = o.optInt("glory", d.glory).coerceAtLeast(0),
                 fighters = fighters,
-                selectedFighter = if (fighters[selected]?.unlocked == true) selected else FighterId.JUNO,
+                selectedFighter = if (fighters[selected]?.unlocked == true) selected else FighterId.BYTE,
                 selectedMode = enumOr(o.optString("selectedMode"), d.selectedMode),
                 selectedBoss = BossKind.entries.firstOrNull { it.name == o.optString("selectedBoss") },
                 claimedMilestones = o.optJSONArray("claimedMilestones")?.ints()?.toSet() ?: emptySet(),

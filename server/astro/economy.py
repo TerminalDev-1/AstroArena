@@ -55,7 +55,8 @@ def _round(x: float) -> int:
 FIGHTER_RARITY = {"BRAKK": "RARE", "MIRA": "EPIC", "KITO": "MYTHIC", "VARUN": "LEGENDARY"}
 # Fighters that were in the game for a few builds and were taken out again, with the Credits each took on the
 # Spark Road. A profile that still holds one loses it and gets those Credits back.
-REMOVED_FIGHTERS = {"PIP": 160, "DOZER": 160, "NOVA": 420, "FENN": 420, "VOLT": 900, "ONYX": 900, "AURA": 1600, "ZERO": 2600}
+# (Juno was the starter until Byte took her place: she cost nothing, so nothing comes back for her.)
+REMOVED_FIGHTERS = {"JUNO": 0, "PIP": 160, "DOZER": 160, "NOVA": 420, "FENN": 420, "VOLT": 900, "ONYX": 900, "AURA": 1600, "ZERO": 2600}
 RARITY_PRICE = {"RARE": 40, "EPIC": 70, "MYTHIC": 90, "LEGENDARY": 160, "ULTRA": 250}
 FIGHTER_PRICE = {name: RARITY_PRICE[rarity] for name, rarity in FIGHTER_RARITY.items()}
 SKIN_PRICE = 20  # Prisms, for every colourway but a fighter's first
@@ -125,9 +126,9 @@ def _s(name, i): return {"type": "skin", "fighter": name, "skin": i}
 
 
 CUP_TRACK = {
-    10: _b(40), 25: _p(10), 40: _b(75), 60: _s("JUNO", 1), 80: _p(20), 100: _c(80), 130: _b(150), 160: _p(25),
+    10: _b(40), 25: _p(10), 40: _b(75), 60: _s("BYTE", 1), 80: _p(20), 100: _c(80), 130: _b(150), 160: _p(25),
     200: _s("BRAKK", 1), 250: _b(250), 300: _p(40), 350: _c(200), 420: _b(400), 500: _s("MIRA", 1), 600: _p(60),
-    700: _b(600), 850: _s("JUNO", 2), 1000: _p(100), 1200: _c(400), 1500: _s("KITO", 1),
+    700: _b(600), 850: _s("BYTE", 2), 1000: _p(100), 1200: _c(400), 1500: _s("KITO", 1),
 }
 
 
@@ -260,6 +261,8 @@ def complete(profile: dict) -> dict:
         if isinstance(entry, dict) and entry.get("unlocked"):
             # Back onto the road if there is still road left; Glory otherwise.
             profile["credits" if road_next(profile) is not None else "glory"] += cost
+    # Everyone has the starter, including accounts made when it was a different fighter.
+    profile["fighters"].setdefault(rules.STARTING_FIGHTER, {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
     return profile
 
 

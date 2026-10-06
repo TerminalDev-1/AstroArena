@@ -393,7 +393,7 @@ class World(
         val a = f.def.attack
         val style = when (a.shape) {
             AttackShape.BURST -> ShotStyle.SPARK
-            AttackShape.SPREAD -> ShotStyle.PELLET
+            AttackShape.SPREAD -> if (a.bits) ShotStyle.BIT else ShotStyle.PELLET
             AttackShape.LANCE -> ShotStyle.PRISM
             AttackShape.ROCKETS -> ShotStyle.ROCKET
         }
@@ -417,7 +417,7 @@ class World(
                 val spread = Math.toRadians(s.spreadDegrees.toDouble()).toFloat()
                 for (i in 0 until s.projectiles) {
                     val ang = baseAng - spread / 2 + spread * i / (s.projectiles - 1)
-                    spawnProjectile(f, ang, s.speed, s.radius, f.superDamage, s.range, false, true, ShotStyle.VOLLEY)
+                    spawnProjectile(f, ang, s.speed, s.radius, f.superDamage, s.range, false, true, if (f.def.attack.bits) ShotStyle.BIT else ShotStyle.VOLLEY, knock = s.knockback)
                 }
             }
             SuperKind.PIERCE -> spawnProjectile(f, baseAng, s.speed, s.radius, f.superDamage, s.range, true, true, ShotStyle.LANCE)
@@ -449,7 +449,7 @@ class World(
 
     private fun spawnProjectile(
         f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float,
-        pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f,
+        pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f, knock: Float = 0f,
     ) {
         val dx = cos(ang)
         val dy = sin(ang)
@@ -457,7 +457,7 @@ class World(
         val off = f.radius * 0.6f
         val sx = f.x + dx * off - dy * side
         val sy = f.y + dy * off + dx * side
-        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast)
+        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock)
         if (arena.tileAt(sx, sy).blocksShots) {
             events += GameEvent.WallHit(sx, sy, style)
             return
@@ -567,6 +567,10 @@ class World(
                         if (p.blast > 0f) { detonate(p, p.x, p.y); p.alive = false; break@loop }
                         val owner = fighter(p.ownerId)
                         damage(f, owner, p.damage, p.isSuper, p.x, p.y)
+                        if (p.knock > 0f && f.alive && !f.rooted && speed > 0f) {
+                            arena.moveCircle(f.x, f.y, f.radius, p.vx / speed * p.knock, p.vy / speed * p.knock, tmp)
+                            f.x = tmp[0]; f.y = tmp[1]
+                        }
                         if (!p.pierce) { p.alive = false; break@loop }
                     }
                 }

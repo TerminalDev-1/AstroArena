@@ -218,7 +218,7 @@ class GameServer(context: Context) {
             fighters = FighterId.entries.associateWith { id ->
                 val f = fighters?.optJSONObject(id.name)
                 FighterProgress(
-                    unlocked = f?.optBoolean("unlocked") ?: (id == FighterId.JUNO), level = (f?.optInt("level", 1) ?: 1).coerceAtLeast(1), cups = (f?.optInt("cups", 0) ?: 0).coerceAtLeast(0),
+                    unlocked = f?.optBoolean("unlocked") ?: (id == FighterId.BYTE), level = (f?.optInt("level", 1) ?: 1).coerceAtLeast(1), cups = (f?.optInt("cups", 0) ?: 0).coerceAtLeast(0),
                     ownedSkins = (f?.let { ints(it, "ownedSkins") } ?: emptySet()) + 0,
                 )
             },
@@ -521,7 +521,7 @@ class GameServer(context: Context) {
             val p = players.optJSONObject(i) ?: return@mapNotNull null
             RemotePlayer(
                 p.optString("id"), p.optString("name", "Player"), p.optInt("cups"),
-                FighterId.entries.firstOrNull { it.name == p.optString("fighter") } ?: FighterId.JUNO,
+                FighterId.entries.firstOrNull { it.name == p.optString("fighter") } ?: FighterId.BYTE,
                 p.optInt("glory"),
             )
         }
