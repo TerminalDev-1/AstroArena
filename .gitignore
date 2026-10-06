@@ -22,6 +22,7 @@ __pycache__/
 # Every account, written out by the server for its operator: players' ids and names.
 /server/accounts.cfg
 /server/accounts.cfg.new
+/server/deleted_accounts.log
 
 # The referee module builds into server/referee/referee.jar; its own build folder is scratch.
 client/referee/build/

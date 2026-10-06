@@ -12,6 +12,7 @@ It holds players' ids and names, so it is not committed (see .gitignore), and it
 from __future__ import annotations
 
 import configparser
+import json
 import os
 import re
 import sys
@@ -22,6 +23,7 @@ from . import economy, rules
 from .store import Store
 
 NAME = "accounts.cfg"
+DELETED = "deleted_accounts.log"
 # The whole numbers of an account, as the file calls them.
 NUMBERS = ("cups", "best_cups", "drops", "bolts", "prisms", "credits", "glory")
 _KEPT_REVISIONS = 500
@@ -58,7 +60,12 @@ HEADER = """\
 #
 # A section is one account: [the player's name (their player id)]. The id is the one shown in the
 # game under Settings > Data. Names are the players' own to choose and can't be set here.
-# Removing a line or a section changes nothing; accounts are not deleted from here.
+#   delete      yes deletes the account for good: its progress, its matches, its place on the
+#               leaderboard. There is no undo in the game. (A copy of what it held is added to
+#               deleted_accounts.log beside this file, in case it was the wrong one.) If the
+#               player opens the game again they simply start over as a new account.
+#
+# Removing a line or a section changes nothing: an account is only deleted by delete = yes.
 # Edit it while the server is running. This file is private: it is not committed.
 
 [file]
@@ -123,6 +130,7 @@ def render(accounts: list[dict], revision: int) -> str:
         lines.append("disabled_until = %s" % (time.strftime(_DATE, time.localtime(account["disabled_until"])) if account["disabled_until"] > 0 else ""))
         lines.extend("%s = %d" % (key, account[key]) for key in NUMBERS)
         lines.extend("%s = %s" % (name.lower(), _fighter_text(entry)) for name, entry in account["fighters"].items())
+        lines.append("delete = no")
         lines.append("")
     return "\n".join(lines)
 
@@ -151,7 +159,10 @@ def edits(written: dict[str, dict[str, str]], now: dict[str, dict[str, str]]) ->
         for key, value in lines.items():
             if key not in before or value.strip() == before[key].strip():
                 continue
-            if key == "disabled":
+            if key == "delete":
+                if value.strip().lower() in _YES:
+                    change["delete"] = True
+            elif key == "disabled":
                 word = value.strip().lower()
                 if word in _YES or word in _NO:
                     change["disabled"] = word in _YES
@@ -212,7 +223,15 @@ class Accounts:
                 _say("that copy is from before the server started, so it can't tell what was changed. Written out again: edit this one.")
             return True
         for player_id, change in edits(written, now).items():
-            if self.store.force(player_id, change) and not self.quiet:
+            if change.get("delete"):
+                # Deleting wins over anything else written for that account. What it held is kept in a log first.
+                gone = self.store.delete(player_id)
+                if gone is not None:
+                    with open(os.path.join(os.path.dirname(self.path), DELETED), "a", encoding="utf-8") as log:
+                        log.write(json.dumps({"deleted": time.strftime(_DATE), **gone}) + "\n")
+                    if not self.quiet:
+                        _say("%s (%s) deleted. What it held is in %s." % (gone["name"], player_id, DELETED))
+            elif self.store.force(player_id, change) and not self.quiet:
                 _say("%s forced: %s" % (player_id, change))
         return True
 

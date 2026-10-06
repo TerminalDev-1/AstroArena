@@ -247,6 +247,21 @@ class Store:
             self._keep(player_id, profile)
         return True
 
+    def delete(self, player_id: str) -> dict | None:
+        """Deletes an account and everything that hangs off it, for good. Returns what it held (so the caller can
+        keep a record), or None if there is no such account. Shop deals it made stay in the shop."""
+        with self._lock, self._db:
+            row = self._db.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+            if row is None:
+                return None
+            held = dict(row)
+            held.pop("token", None)  # the key to the account is not something to leave lying in a log
+            held["profile"] = self._profile(player_id)
+            for table in ("deal_purchases", "matches", "saves"):
+                self._db.execute("DELETE FROM %s WHERE player_id = ?" % table, (player_id,))
+            self._db.execute("DELETE FROM players WHERE id = ?", (player_id,))
+            return held
+
     def lift_expired(self, now: float | None = None) -> None:
         """Lets back in every account whose time disabled has run out."""
         with self._lock, self._db:

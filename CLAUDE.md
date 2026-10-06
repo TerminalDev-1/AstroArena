@@ -74,14 +74,13 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   database, leaderboard first, and forces whatever value the owner changes in it (`Store.force`). It holds player
   ids and names, so it is gitignored: never commit it. `disabled = yes` there marks an account (never deletes it),
   with an optional `disabled_reason` and `disabled_until`: the server answers it 403 everywhere and the game
-  shows `DisabledScreen` (`--es screen disabled` previews it), which has nothing to press. A disabled account
+  shows `DisabledScreen` (`--es screen disabled` previews it), which has nothing to press. `delete = yes`
+  there deletes an account for good (`Store.delete`; what it held is appended to the gitignored
+  `server/deleted_accounts.log`). A disabled account
   can do nothing, by the user's decision: no menus, no offline play, and no Jail mode (there was one in build 50;
   it was removed). Don't give it anything to play.
-- `server_manager/` is the owner's window onto all of this (`Server Manager.bat`, or `python manager.py`): tkinter,
-  standard library only. It starts and stops the server (logging to `server/logs/server.log`), edits the `.cfg`
-  files in place so their comments survive (`cfgfile.py`), and changes accounts through the server's own
-  `Store.force`. A new `.cfg` file or account field gets a place in it; `python -m unittest` there drives its pages
-  against a copy of `server/`. Check its looks with a screenshot, as for the game's UI.
+- There is no GUI for running the server, by the user's decision: one was built (`server_manager/`) and removed
+  as clunky. The owner edits the `.cfg` files by hand and starts the server with `run.bat`. Don't build another.
 - Bot difficulty: every player may pick, but the pick is a request (`POST /v1/settings/difficulty`); the server
   approves it against `allowed` in `game.cfg`, stores it, and uses its own copy when it plans a match.
 - Days and times are the server's: the day number, when it ends, the daily gift and the daily offers

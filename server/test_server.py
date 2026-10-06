@@ -206,6 +206,11 @@ class Api(unittest.TestCase):
         # The tests' own cut-off, so that raising the real one (it moves with releases) doesn't turn them away.
         with open(os.path.join(self.dir, "versions_not_supported.cfg"), "w", encoding="utf-8") as cfg:
             cfg.write("<11 | This version of AstroArena is no longer supported. Please update to v11 or later.\n")
+        # And the tests' own shop: the real one is the owner's to change as they please.
+        with open(os.path.join(self.dir, "shop.cfg"), "w", encoding="utf-8") as cfg:
+            cfg.write("[settings]\noffers_per_day = 3\n" + "".join(
+                "[Test Offer %d]\nbolts = %d\nprisms = %d\ncurrency = %s\nprice = %d\n" % offer for offer in (
+                    (1, 60, 0, "FREE", 0), (2, 0, 3, "FREE", 0), (3, 300, 0, "PRISMS", 6), (4, 1000, 0, "PRISMS", 18), (5, 0, 12, "BOLTS", 500))))
         self.httpd = serve(self.dir, "127.0.0.1", 0, quiet=True, referee=self.referee)
         self.base = "http://127.0.0.1:%d" % self.httpd.server_address[1]
         self.store = self.httpd.game.store
@@ -530,6 +535,25 @@ class Api(unittest.TestCase):
         self.store.lift_expired(now=body["until"] / 1000 + 5)
         self.assertEqual(self.call("GET", "/v1/me", token=fair["token"])[0], 200)
         accounts.sync()
+        text = edit()
+        # delete = yes removes an account for good, whatever else was written for it, and keeps a record of what it held.
+        spare = self.player("Spare")
+        accounts.sync()
+        section = "(%s)]" % spare["id"]
+        text = edit()
+        at = text.index("\ndelete = no", text.index(section))
+        save(text[:at] + "\ndelete = yes" + text[at + len("\ndelete = no"):])
+        self.assertIsNone(self.store.player(spare["id"]))
+        self.assertEqual(self.call("GET", "/v1/me", token=spare["token"])[0], 401)
+        self.assertNotIn(section, edit())
+        with open(os.path.join(self.dir, "deleted_accounts.log"), encoding="utf-8") as log:
+            record = json.loads(log.read().splitlines()[-1])
+        self.assertEqual((record["id"], record["profile"]["bolts"], "token" in record), (spare["id"], 60, False))
+        # Nobody else is touched, and taking a section out of the file deletes nothing.
+        self.assertEqual((self.store.player(fair["id"])["cups"], self.store.player(cheat["id"])["cups"]), (65, 12))
+        text = edit()
+        save(text[:text.index("[Player (%s)]" % cheat["id"])])
+        self.assertIsNotNone(self.store.player(cheat["id"]))
         text = edit()
         # A file that can't be read changes nothing and is left for the operator to fix; so are lines that make no sense.
         save(text.replace("cups = 12", "cups = 5\n[Player (%s)]\ncups = 1" % cheat["id"], 1))
