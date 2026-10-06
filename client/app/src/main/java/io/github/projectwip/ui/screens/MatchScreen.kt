@@ -313,7 +313,7 @@ private fun MatchBody(match: Match, settings: Settings, sfx: Sfx, matchesPlayed:
                 Panel(cut = 20.dp) {
                     Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         GameText("PAUSED", Type.Display, outline = 4.dp)
-                        PlainText(if (match.jail) "You're in jail. There is nothing to win here, and leaving only takes you back to the notice." else if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else if (duel != null) "The match is still going: your opponent can't be paused. Leaving hands them the win." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
+                        PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else if (duel != null) "The match is still going: your opponent can't be paused. Leaving hands them the win." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
                         ChunkyButton({ paused = false; if (duel == null) view?.resumeGame() }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN) { GameText("RESUME", Type.Title) }
                         ChunkyButton({ finish(match.forfeit()) }, Modifier.size(260.dp, 54.dp), ButtonStyle.RED) {

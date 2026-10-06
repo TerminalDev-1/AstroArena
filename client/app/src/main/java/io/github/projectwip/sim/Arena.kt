@@ -307,19 +307,6 @@ object Arenas {
     }
 
     /**
-     * "The Jail": the Proving Ground with the player put down in the middle of it and the bosses coming in
-     * from all round the edge.
-     */
-    fun jail(): Arena {
-        val base = provingGround()
-        val w = base.width.toFloat()
-        val h = base.height.toFloat()
-        val edge = listOf(0.5f to 0.14f, 0.5f to 0.86f, 0.14f to 0.5f, 0.86f to 0.5f, 0.2f to 0.2f, 0.8f to 0.8f, 0.8f to 0.2f, 0.2f to 0.8f)
-        val inmate = base.nearestOpen(w * 0.5f, h * 0.5f, 0.5f)
-        return base.withSpawns(listOf(listOf(inmate), edge.map { (x, y) -> base.nearestOpen(w * x, h * y, 1.3f) }))
-    }
-
-    /**
      * "Training Area". You start at the bottom. Four dummies (`d`) stand in the lower corners, the boss (`B`)
      * sits in the middle between four bushes with a coolant pool below it, the sentry (`T`) is on an island of
      * coolant to the right (it can shoot out, you can't walk in), and the swarm (`m`) is lined up at the top.

@@ -90,20 +90,19 @@ fun MatchIntro(match: Match, onDone: () -> Unit) {
                 }
             } else {
                 Row(Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TeamColumn(if (match.bossMode || match.jail) "YOU" else "YOUR TEAM", match.world.fighters.filter { it.team == me.team }, me, Palette.CyanDeep, Palette.Ally,
+                    TeamColumn(if (match.bossMode) "YOU" else "YOUR TEAM", match.world.fighters.filter { it.team == me.team }, me, Palette.CyanDeep, Palette.Ally,
                         Modifier.weight(1f).graphicsLayer { translationX = -(1f - slide.value) * size.width * 1.2f })
                     Box(Modifier.width(if (ui.wide) 190.dp else 130.dp), contentAlignment = Alignment.Center) {
                         GameText("VS", Type.Display.copy(fontSize = Type.Display.fontSize * if (ui.roomy) 3f else 2.2f), color = Palette.Gold, outline = 7.dp,
                             modifier = Modifier.graphicsLayer { scaleX = vs.value; scaleY = vs.value; alpha = vsAlpha.value; rotationZ = -8f })
                     }
-                    TeamColumn(if (match.jail) "THE BOSSES" else if (match.bossMode) "THE BOSS" else "OPPONENTS", match.world.fighters.filter { it.team != me.team }, me, Palette.RedDeep, Palette.Enemy,
+                    TeamColumn(if (match.bossMode) "THE BOSS" else "OPPONENTS", match.world.fighters.filter { it.team != me.team }, me, Palette.RedDeep, Palette.Enemy,
                         Modifier.weight(1f).graphicsLayer { translationX = (1f - slide.value) * size.width * 1.2f })
                 }
             }
             Spacer(Modifier.height(8.dp))
             PlainText(
                 if (match.freeForAll) "Last one standing wins"
-                else if (match.jail) "Your account is disabled. Your weapons don't work here, and more bosses are on the way"
                 else if (match.bossMode) "Knock out the boss. Watch the marked ground. You have unlimited lives"
                 else "First team to ${match.world.rules.koTarget} knockouts wins",
                 Type.Label, color = Color.White,

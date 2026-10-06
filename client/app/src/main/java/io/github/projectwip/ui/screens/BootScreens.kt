@@ -229,11 +229,11 @@ private fun timeLeft(ms: Long): String {
 
 /**
  * The server's owner has disabled this account (the server's accounts.cfg). Says so, with the owner's reason
- * and how long is left if there is an end ([until], on this device's clock; 0 = none). There is no offline play
- * for a disabled account: the only thing to do is go to jail.
+ * and how long is left if there is an end ([until], on this device's clock; 0 = none). There is nothing to press:
+ * a disabled account can't play at all, online or off, until the server lets it back in.
  */
 @Composable
-fun DisabledScreen(reason: String, until: Long, onJail: () -> Unit) {
+fun DisabledScreen(reason: String, until: Long) {
     val left by androidx.compose.runtime.produceState(until - System.currentTimeMillis(), until) {
         while (true) { value = until - System.currentTimeMillis(); kotlinx.coroutines.delay(1000) }
     }
@@ -249,8 +249,7 @@ fun DisabledScreen(reason: String, until: Long, onJail: () -> Unit) {
                 PlainText(
                     if (until > 0) "You're back in ${timeLeft(left)}." else "It stays disabled until the owner lets you back in.",
                     Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 2)
-                PlainText("Your progress is kept. Until then there is nothing to play but jail.", Type.Small, align = TextAlign.Center)
-                ChunkyButton(onJail, Modifier.size(320.dp, 64.dp), ButtonStyle.RED) { GameText("GO TO JAIL", Type.Heading) }
+                PlainText("Your progress is kept. You can't play until then.", Type.Small, align = TextAlign.Center)
             }
         }
     }

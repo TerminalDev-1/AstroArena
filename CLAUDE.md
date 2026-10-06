@@ -61,7 +61,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   upgraded or claimed (`server/astro/rules.py`, `economy.py`). The client's save is a copy of what the server
   sent (`Progression.syncAccount`). Don't add client-side ways to earn, spend, grant or roll anything.
 - Menus ask the server through `LocalServerCall` (`ui/ServerCall.kt`): `ask({ buy(key) }) { reward -> ... }`.
-- Offline mode still has to work (except for a disabled account, which only gets Jail), as practice: every mode plays against bots, but nothing is earned, bought,
+- Offline mode still has to work (except for a disabled account, which gets nothing), as practice: every mode plays against bots, but nothing is earned, bought,
   upgraded, claimed or opened. The loading screen tries the server for 60 seconds, then offers Retry or Offline mode.
 - Prices and tables shown by the client (`Balance.kt`, `Catalog.kt`) are copies for display; the server's are
   the ones that count. Change both.
@@ -74,10 +74,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   database, leaderboard first, and forces whatever value the owner changes in it (`Store.force`). It holds player
   ids and names, so it is gitignored: never commit it. `disabled = yes` there marks an account (never deletes it),
   with an optional `disabled_reason` and `disabled_until`: the server answers it 403 everywhere and the game
-  shows `DisabledScreen` (`--es screen disabled` previews it). A disabled account gets no menus and no offline
-  play, by the user's decision: its only way on is Jail (`GameMode.JAIL`, `--es screen jail`), where every boss
-  hunts the player at once, more arrive over time, the player's weapons don't work, and it never ends. Jail is
-  played on the device only and is never offered in the mode picker.
+  shows `DisabledScreen` (`--es screen disabled` previews it), which has nothing to press. A disabled account
+  can do nothing, by the user's decision: no menus, no offline play, and no Jail mode (there was one in build 50;
+  it was removed). Don't give it anything to play.
 - `server_manager/` is the owner's window onto all of this (`Server Manager.bat`, or `python manager.py`): tkinter,
   standard library only. It starts and stops the server (logging to `server/logs/server.log`), edits the `.cfg`
   files in place so their comments survive (`cfgfile.py`), and changes accounts through the server's own

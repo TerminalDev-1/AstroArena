@@ -36,8 +36,8 @@ HEADER = """\
 # up to date. Change a value and save: the server forces it onto that account within a few seconds,
 # then writes the file out again. Only the values you changed are applied.
 #
-#   disabled    yes shuts the account out: the game tells the player it is disabled, the only thing
-#               they can play is Jail, and they are taken off the leaderboard. no lets them back in. The
+#   disabled    yes shuts the account out: the game tells the player it is disabled and they can't
+#               play at all, and they are taken off the leaderboard. no lets them back in. The
 #               account stays in the database and nothing they have is lost.
 #               (It can't stop them starting over with a new account.)
 #   disabled_reason   why, in your words: the player is shown it. Optional.

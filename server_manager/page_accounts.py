@@ -77,7 +77,7 @@ class AccountsPage(Page):
             ttk.Label(grid, text="Cups", style="Dim.TLabel").grid(row=row, column=4, padx=(0, px(6)))
             entry(grid, cups, width=9).grid(row=row, column=5)
 
-        heading(right, "Access", "a disabled account is kept, with all it has; in the game it can only go to Jail").pack(anchor="w", pady=(px(10), px(4)))
+        heading(right, "Access", "a disabled account is kept, with all it has; the game shows the player a notice and nothing else").pack(anchor="w", pady=(px(10), px(4)))
         access = ttk.Frame(right)
         access.pack(fill="x")
         self.disabled = tk.BooleanVar()

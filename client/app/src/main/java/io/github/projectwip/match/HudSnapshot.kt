@@ -37,8 +37,6 @@ class HudSnapshot {
     var freeForAll = false
     /** Boss Mode: the giant's health and the player's remaining lives go on the HUD instead of a score. */
     var bossMode = false
-    /** Jail: Boss Mode's panel, but there is no one boss whose health to show. */
-    var jail = false
     /** How often the player has been knocked out (Boss Mode has no life limit, it just counts). */
     var timesDown = 0
     /** Training Area: no clock, no target. */
@@ -79,7 +77,7 @@ class HudSnapshot {
         playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; ammo = o.ammo; ammoMax = o.ammoMax; superCharge = o.superCharge
         hyperCharge = o.hyperCharge; hyperLeft = o.hyperLeft; duelNotice = o.duelNotice
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
-        bossMode = o.bossMode; jail = o.jail; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
+        bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
         freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
         stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm
         n = o.n
