@@ -72,7 +72,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   upgrades and hand-outs from anyone else.
 - `server/accounts.cfg` is the owner's hand on every account (`astro/accounts.py`): the server writes it from the
   database, leaderboard first, and forces whatever value the owner changes in it (`Store.force`). It holds player
-  ids and names, so it is gitignored: never commit it.
+  ids and names, so it is gitignored: never commit it. `disabled = yes` there marks an account (never deletes it),
+  with an optional `disabled_reason` and `disabled_until`: the server answers it 403 everywhere and the game
+  shows `DisabledScreen` and drops to offline practice (`--es screen disabled` previews it).
 - Bot difficulty: every player may pick, but the pick is a request (`POST /v1/settings/difficulty`); the server
   approves it against `allowed` in `game.cfg`, stores it, and uses its own copy when it plans a match.
 - Days and times are the server's: the day number, when it ends, the daily gift and the daily offers

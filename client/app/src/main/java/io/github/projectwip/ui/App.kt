@@ -136,6 +136,11 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     val dev = account?.developer == true
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var unsupportedSkipped by remember { mutableStateOf(false) }
+    // A disabled account is told so once each time it happens; after that the game is in offline mode.
+    // Debug: `--es screen disabled` shows the screen with made-up details.
+    var disabledSeen by remember { mutableStateOf(false) }
+    val disabledShown = (serverStatus.disabled || startScreen == "disabled") && !disabledSeen
+    LaunchedEffect(serverStatus.disabled) { if (!serverStatus.disabled && startScreen != "disabled") disabledSeen = false }
     var booting by remember { mutableStateOf(true) }
     var bootProgress by remember { mutableStateOf(0f) }
     var bootStatus by remember { mutableStateOf("Connecting to server…") }
@@ -160,7 +165,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { connectToServer(server, repo) }
             if (connection != Connection.CONNECTING) break // the player stopped waiting
             val now = server.status.value
-            if (now.online || !now.supported || now.url.isEmpty()) { connection = Connection.SETTLED; break }
+            if (now.online || !now.supported || now.disabled || now.url.isEmpty()) { connection = Connection.SETTLED; break }
             if (System.currentTimeMillis() - started >= CONNECT_PATIENCE_MS) { connection = Connection.FAILED; break }
             delay(1500)
         }
@@ -225,7 +230,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         is Screen.Result -> if (s.summary.report.outcome == io.github.projectwip.data.MatchOutcome.VICTORY) io.github.projectwip.audio.Track.VICTORY else io.github.projectwip.audio.Track.DEFEAT
         else -> io.github.projectwip.audio.Track.LOBBY
     }
-    val blocked = update != null || (!serverStatus.supported && !unsupportedSkipped)
+    val blocked = update != null || (!serverStatus.supported && !unsupportedSkipped) || (disabledShown && !inMatch)
     LaunchedEffect(wantedTrack, booting, blocked) { music.play(if (booting || blocked) null else wantedTrack) }
 
     val go: (Screen) -> Unit = { if (it !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f); screen = it }
@@ -381,6 +386,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             if (!booting) update?.let { io.github.projectwip.ui.screens.UpdateScreen(it) { update = null } }
             if (!booting && update == null && !serverStatus.supported && !unsupportedSkipped) {
                 io.github.projectwip.ui.screens.UnsupportedScreen(serverStatus.message, REPO_RELEASES) { unsupportedSkipped = true }
+            }
+            if (!booting && update == null && disabledShown && !inMatch) {
+                if (serverStatus.disabled) io.github.projectwip.ui.screens.DisabledScreen(serverStatus.disabledReason, serverStatus.disabledUntil) { disabledSeen = true }
+                else io.github.projectwip.ui.screens.DisabledScreen("An example reason, as the server's owner wrote it.", System.currentTimeMillis() + 54 * 3600_000L) { disabledSeen = true }
             }
             if (judging) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
                 GameText("THE SERVER IS CHECKING THE MATCH…", Type.Title, outline = 3.5.dp)

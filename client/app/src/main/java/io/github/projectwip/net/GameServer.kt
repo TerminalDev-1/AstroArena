@@ -70,6 +70,12 @@ data class ServerStatus(
     val url: String = "",
     /** Null until the server has said who this player is. */
     val account: Account? = null,
+    /** The server's owner has disabled this account: the game is offline (practice) until they let it back in. */
+    val disabled: Boolean = false,
+    /** Why, in the owner's words ("" if they gave none). */
+    val disabledReason: String = "",
+    /** When it ends by itself, on this device's clock (ms since 1970); 0 = when the owner says. */
+    val disabledUntil: Long = 0,
 )
 
 /** A match as the server set it up. */
@@ -121,7 +127,19 @@ class GameServer(context: Context) {
     /** Has this install already got an account on the server at [url]? */
     fun hasAccount(url: String): Boolean = prefs.contains("token@" + url.trim().trimEnd('/'))
 
-    private class Reply(val code: Int, val body: JSONObject?)
+    private class Reply(val code: Int, val body: JSONObject?) {
+        /** The server's owner has disabled this account. */
+        val disabled get() = code == 403 && body?.optBoolean("disabled") == true
+    }
+
+    /** [base], shut out as [body] says. The end is the server's time; it is moved onto this device's clock. */
+    private fun shutOut(base: ServerStatus, body: JSONObject?): ServerStatus {
+        val until = body?.optLong("until") ?: 0L
+        return base.copy(
+            online = false, disabled = true, disabledReason = body?.optString("reason").orEmpty(),
+            disabledUntil = if (until > 0) System.currentTimeMillis() + until - body!!.optLong("now", until) else 0,
+        )
+    }
 
     /** One request. Null means the server couldn't be reached at all. */
     private fun call(method: String, path: String, body: JSONObject? = null, auth: Boolean = false, timeoutMs: Int = 3000): Reply? = try {
@@ -143,6 +161,7 @@ class GameServer(context: Context) {
             val reply = Reply(code, text?.let { runCatching { JSONObject(it) }.getOrNull() })
             // 426: the server has stopped supporting this version since we connected.
             if (code == 426) _status.value = _status.value.copy(supported = false, message = reply.body?.optString("error").orEmpty())
+            if (reply.disabled) _status.value = shutOut(_status.value, reply.body)
             reply.body?.optJSONObject("account")?.let { noteAccount(it) }
             reply
         } finally {
@@ -313,6 +332,7 @@ class GameServer(context: Context) {
             saved = call("GET", "/v1/save", auth = true)
         }
         if (saved == null) { _status.value = state.copy(online = false); return null }
+        if (saved.disabled) { _status.value = shutOut(state, saved.body); return null }
         if (saved.code == 426) { _status.value = state.copy(supported = false, message = saved.body?.optString("error").orEmpty()); return null }
         _status.value = state
         return if (saved.code == 200) saved.body?.optJSONObject("save") else null

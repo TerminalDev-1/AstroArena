@@ -215,3 +215,42 @@ fun UnsupportedScreen(message: String, releasesUrl: String, onSkip: () -> Unit) 
         }
     }
 }
+
+/** How long is left, roughly: "2 days 6 hours", "3 hours 20 minutes", "5 minutes". */
+private fun timeLeft(ms: Long): String {
+    val minutes = (ms.coerceAtLeast(0) + 59_999) / 60_000
+    fun some(n: Long, unit: String) = "$n $unit" + if (n == 1L) "" else "s"
+    return when {
+        minutes >= 2880 -> some(minutes / 1440, "day") + ((minutes % 1440) / 60).let { if (it > 0) " " + some(it, "hour") else "" }
+        minutes >= 60 -> some(minutes / 60, "hour") + (minutes % 60).let { if (it > 0) " " + some(it, "minute") else "" }
+        else -> some(minutes.coerceAtLeast(1), "minute")
+    }
+}
+
+/**
+ * The server's owner has disabled this account (the server's accounts.cfg). Says so, with the owner's reason
+ * and how long is left if there is an end ([until], on this device's clock; 0 = none). Offline practice is still there.
+ */
+@Composable
+fun DisabledScreen(reason: String, until: Long, onOffline: () -> Unit) {
+    val left by androidx.compose.runtime.produceState(until - System.currentTimeMillis(), until) {
+        while (true) { value = until - System.currentTimeMillis(); kotlinx.coroutines.delay(1000) }
+    }
+    Box(
+        Modifier.fillMaxSize().background(Color(0xF00B0620)).clickable(remember { MutableInteractionSource() }, null) { },
+        contentAlignment = Alignment.Center,
+    ) {
+        Panel(Modifier.widthIn(max = 680.dp).padding(18.dp), cut = 20.dp) {
+            Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                GameText("ACCOUNT DISABLED", Type.Display, color = Palette.Enemy, outline = 4.dp)
+                PlainText("The owner of this server has disabled your account.", Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 3)
+                if (reason.isNotBlank()) PlainText("Reason: $reason", Type.Body, color = Palette.Gold, align = TextAlign.Center, maxLines = 5)
+                PlainText(
+                    if (until > 0) "You're back in ${timeLeft(left)}." else "It stays disabled until the owner lets you back in.",
+                    Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 2)
+                PlainText("Your progress is kept. Until then you can play against bots for practice; nothing is earned.", Type.Small, align = TextAlign.Center)
+                ChunkyButton(onOffline, Modifier.size(320.dp, 64.dp), ButtonStyle.GREEN) { GameText("PLAY OFFLINE", Type.Heading) }
+            }
+        }
+    }
+}

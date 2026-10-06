@@ -255,6 +255,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     SectionTitle("SERVER", when {
         status == null -> "No server connection in this build."
         !status.supported -> "The server at ${status.url} doesn't support this version."
+        status.disabled -> "Your account on ${status.url} has been disabled by the server's owner. You can still play against bots for practice; nothing is earned or spent."
         status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Spark Drops, Power Ups, Crystals and fighters, sets matches up and decides their results."
         else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You can still play against bots for practice; nothing is earned or spent until you're back online."
     })
