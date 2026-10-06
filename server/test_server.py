@@ -52,7 +52,13 @@ class Rules(unittest.TestCase):
         self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", 0, 500, False), -6)
         # Last Spark pays by place, whatever the bots' difficulty, and last place costs nothing.
         self.assertEqual([rules.cup_delta("LAST_SPARK", "DEFEAT", place, 100, False) for place in range(1, 11)], [25, 22, 20, 17, 14, 12, 7, 3, 0, 0])
-        self.assertEqual(rules.cup_delta("BOSS", "VICTORY", 0, 100, True), 0)
+        # Boss Mode pays for a win and costs nothing; the Training Area is never played for Cups.
+        self.assertEqual([rules.cup_delta("BOSS", o, 0, 500, True) for o in ("VICTORY", "DRAW", "DEFEAT")], [5, 0, 0])
+        self.assertEqual(rules.cup_delta("TRAINING", "VICTORY", 0, 100, True, {"TRAINING": {"win": 50}}), 0)
+        # trophies.cfg's numbers are used when there are some, and Cups never go below zero.
+        table = {"BOSS": {"win": 12, "mvp_bonus": 3, "draw": 2, "max_loss": 4}, "KNOCKOUT_RUSH": {"places": [9, -2]}}
+        self.assertEqual([rules.cup_delta("BOSS", o, 0, 3, True, table) for o in ("VICTORY", "DRAW", "DEFEAT")], [15, 2, -3])
+        self.assertEqual([rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", p, 50, False, table) for p in (1, 2, 7)], [9, -2, -2])
         # A fighter's rank follows its own Cups; the top one starts at 1000.
         self.assertEqual([rules.fighter_rank(c) for c in (0, 9, 10, 999, 1000, 5000)], [1, 1, 2, 19, 20, 20])
         self.assertEqual(len(rules.FIGHTER_RANK_CUPS), 20)
@@ -445,6 +451,28 @@ class Api(unittest.TestCase):
         for item in body["news"]:
             self.assertEqual(set(item), {"title", "date", "tag", "text"})
             self.assertTrue(item["title"] and item["text"])
+
+    def test_trophies_cfg_sets_the_cups(self):
+        me = self.player()
+        win = {"outcome": "VICTORY", "kos": 1, "deaths": 0, "damage": 9000, "mvp": True}
+
+        def play(mode, result):
+            _, plan = self.call("POST", "/v1/matches", {"mode": mode}, me["token"])
+            self.age_matches()
+            return self.call("POST", "/v1/matches/%d/result" % plan["matchId"], result, me["token"])[1]
+
+        # With no trophies.cfg the built-in numbers apply: a boss is worth 5, and the fighter gets them too.
+        body = play("BOSS", win)
+        self.assertEqual((body["cupDelta"], body["cups"], body["fighterCups"], body["mvpCups"], body["drop"]), (5, 5, 5, 0, False))
+        # The operator writes one: it applies from the next match, and what it leaves out stays as it was.
+        self.write_cfg("trophies.cfg", "[boss]\nwin = 12\nmvp_bonus = 3\nmax_loss = 4\ndraw = lots\n[LAST_SPARK]\nplaces = 40, 30 20\n[TRAINING]\nwin = 99\n")
+        body = play("BOSS", win)
+        self.assertEqual((body["cupDelta"], body["cups"], body["mvpCups"]), (15, 20, 3))
+        self.assertEqual(play("BOSS", {"outcome": "DEFEAT"})["cups"], 16)
+        self.assertEqual(play("LAST_SPARK", {"outcome": "DEFEAT", "placement": 9, "deaths": 1})["cupDelta"], 20)
+        self.assertEqual(play("TRAINING", win)["cupDelta"], 0)
+        body = play("KNOCKOUT_RUSH", win)
+        self.assertEqual((body["cupDelta"], body["mvpCups"]), (10, 2))
 
     def test_the_server_awards_cups_and_drops(self):
         me = self.player()
@@ -888,6 +916,9 @@ class Refereed(Api):
     def test_a_claimed_instant_win_is_refused(self):
         pass
 
+    def test_trophies_cfg_sets_the_cups(self):
+        pass
+
     def test_matches_fill_the_spark_pass(self):
         pass
 
@@ -942,6 +973,13 @@ class Refereed(Api):
         account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]
         self.assertEqual((account["cups"], account["drops"], account["profile"]["bolts"]), (0, 1, 60))
         self.assertEqual(self.store.player(me["id"])["flags"], 3)
+
+    def test_boss_mode_pays_what_trophies_cfg_says(self):
+        me = self.player()
+        # Left alone, the boss wins (or the clock runs out): nothing is lost for that.
+        _, (status, body) = self.run_match(me["token"], "BOSS", log((60 * 400, 0, 0, 0, 0, 0)))
+        self.assertEqual((status, body["verified"], body["cupDelta"]), (200, True, 0))
+        self.assertNotEqual(body["report"]["outcome"], "VICTORY")
 
     def test_the_training_area_needs_no_referee(self):
         me = self.player()

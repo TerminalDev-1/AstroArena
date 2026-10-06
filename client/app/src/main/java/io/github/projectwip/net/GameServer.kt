@@ -408,7 +408,7 @@ class GameServer(context: Context) {
         return ServerVerdict(
             o.optInt("cupDelta"), o.optInt("cups"), o.optBoolean("drop"), account?.optInt("drops") ?: 0, account?.optInt("dropsLeftToday") ?: 0,
             bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"), credits = o.optInt("credits"), passPoints = o.optInt("passPoints"), glory = o.optInt("glory"), judged = judged,
-            fighterCupsBefore = o.optInt("fighterCupsBefore"), fighterCups = o.optInt("fighterCups"),
+            fighterCupsBefore = o.optInt("fighterCupsBefore"), fighterCups = o.optInt("fighterCups"), mvpCups = o.optInt("mvpCups"),
         )
     }
 

@@ -1,6 +1,6 @@
 """The rules the server enforces itself rather than taking the client's word for them.
 
-  * how many Cups a match is worth (the same table as the client's `Balance.kt`; keep the two in step)
+  * how many Cups a match is worth (by trophies.cfg; the client has no copy and shows what it is told)
   * which finishes earn a Spark Drop, and how many a day
   * whether a reported result is believable at all
   * what comes out of a Spark Drop
@@ -12,10 +12,19 @@ import math
 
 # ---------------------------------------------------------------------------- Cups
 
-# Cups don't depend on how hard the bots are: a place in Last Spark is worth what this table says, and nothing is
-# lost for finishing last.
-PLACEMENT_CUPS = [25, 22, 20, 17, 14, 12, 7, 3, 0, 0]
-TEAM_WIN_CUPS = 8
+# Cups don't depend on how hard the bots are. What each mode pays is the operator's to set, in trophies.cfg
+# (`Config.cups`); these are the numbers for whatever that file leaves out.
+#   places      Cups by finishing place, first to last. A mode that has them is paid by place and nothing else.
+#   win, draw   Cups for a victory and for a draw; mvp_bonus is added to a victory as the match's MVP.
+#   max_loss    the most a defeat costs. With loss_step, a defeat costs 1 Cup for every loss_step Cups the
+#               player has, up to max_loss, so new players lose nothing.
+DEFAULT_CUPS = {
+    "LAST_SPARK": {"places": [25, 22, 20, 17, 14, 12, 7, 3, 0, 0]},
+    "KNOCKOUT_RUSH": {"win": 8, "mvp_bonus": 2, "draw": 1, "max_loss": 6, "loss_step": 80},
+    "BOSS": {"win": 5},
+}
+# The Training Area is never played for Cups (nothing referees it), whatever trophies.cfg says.
+CUP_MODES = tuple(DEFAULT_CUPS)
 DIFFICULTIES = ("EASY", "NORMAL", "HARD", "ELITE")
 
 # A fighter has Cups of its own (won and lost while playing it) and a rank that follows them: rank 1 starts at
@@ -34,17 +43,22 @@ BOSSES = ("BARRAGE", "SWEEPER", "STAMPEDE")
 MODES = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 5, "BOSS": 0, "TRAINING": 0}
 
 
-def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool) -> int:
-    """How a match changes a player's Cups. Never takes them below zero."""
-    if mode == "LAST_SPARK":
-        return PLACEMENT_CUPS[min(max(placement - 1, 0), len(PLACEMENT_CUPS) - 1)]
-    if mode == "KNOCKOUT_RUSH":
-        if outcome == "VICTORY":
-            return TEAM_WIN_CUPS + (2 if mvp else 0)
-        if outcome == "DRAW":
-            return 1
-        return -min(6, cups // 80, cups)
-    return 0  # Boss Mode and the Training Area are not played for Cups
+def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, table: dict | None = None) -> int:
+    """How a match changes a player's Cups, by `table` (trophies.cfg). Never takes them below zero."""
+    pays = (DEFAULT_CUPS if table is None else table).get(mode) if mode in CUP_MODES else None
+    if not pays:
+        return 0
+    places = pays.get("places")
+    if places:
+        delta = places[min(max(placement - 1, 0), len(places) - 1)]
+    elif outcome == "VICTORY":
+        delta = pays.get("win", 0) + (pays.get("mvp_bonus", 0) if mvp else 0)
+    elif outcome == "DRAW":
+        delta = pays.get("draw", 0)
+    else:
+        loss, step = pays.get("max_loss", 0), pays.get("loss_step", 0)
+        delta = -(min(loss, cups // step) if step > 0 else loss)
+    return max(delta, -cups)
 
 
 # ---------------------------------------------------------------------------- Spark Drops: earning

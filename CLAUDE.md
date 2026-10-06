@@ -76,7 +76,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (`server/shop.cfg`). The client moves server times onto its own clock on receipt and only counts down.
 - The News tab shows `server/news.cfg` (`GET /v1/news`), newest first; add an item there when a release changes what
   players see. Offline there is none.
-- Cups don't depend on bot difficulty (`PLACEMENT_CUPS` in `rules.py`). Each fighter has Cups and a rank of its own
+- Cups don't depend on bot difficulty. What each mode pays (Boss Mode included) is `server/trophies.cfg`, over
+  `DEFAULT_CUPS` in `rules.py`; the client has no copy and shows what the verdict says (`cupDelta`, `mvpCups`). Each fighter has Cups and a rank of its own
   (`FIGHTER_RANK_CUPS` in `rules.py`, `FighterRanks` in `Catalog.kt`); only a judged match changes them.
 - 1v1 (`GameMode.DUEL`) is two real players, each on their own device. Both run the same simulation from the same
   seed and only exchange inputs (`net/DuelLink.kt`, lockstep in `MatchRunner`); the server's lobby (`astro/duel.py`,

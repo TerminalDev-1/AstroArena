@@ -73,6 +73,7 @@ class Game:
         self.referee = referee if referee is not None and referee.available else None
         self.store = Store(db_path or os.path.join(directory, "astroarena.db"))
         self.store.import_progress = self.config.import_saves
+        self.store.cups = self.config.cups
         self.started = time.time()
         self._signups: dict[str, list[float]] = {}
         self._signup_lock = threading.Lock()

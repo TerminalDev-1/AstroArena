@@ -449,7 +449,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 when (m) {
                     GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the Static Storm. The higher you finish, the more Cups."
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win to earn Cups."
-                    GameMode.BOSS -> "One of three bosses, each with moves of its own: rockets, sweeping beams, charges. Watch the marked ground. Knock it out to win; you have unlimited lives. Pays Power Ups only."
+                    GameMode.BOSS -> "One of three bosses, each with moves of its own: rockets, sweeping beams, charges. Watch the marked ground. Knock it out to win; you have unlimited lives. Win to earn Cups."
                     GameMode.DUEL -> "Against one real player on this server, each on their own device. First to 3 knockouts. A test mode: nothing is earned yet."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a boss that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },

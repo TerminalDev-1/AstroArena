@@ -218,7 +218,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardChip(IconKind.PRISM, "+${rewards.firstWinPrisms}")
                             if (rewards.capsuleEarned && row++ < rowsShown) RewardChip(IconKind.CAPSULE, "+1")
                         }
-                        if (r.mvp && r.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH) PlainText("MVP: +2 Cups", Type.Small, color = Palette.Gold)
+                        if (rewards.mvpCups > 0) PlainText("MVP: +${rewards.mvpCups} Cups", Type.Small, color = Palette.Gold)
                         val dropsHere = r.mode != io.github.projectwip.data.GameMode.BOSS && r.mode != io.github.projectwip.data.GameMode.DUEL && rewards.online
                         // Everything a match is worth is awarded by the server; without it a match is practice.
                         if (r.mode == io.github.projectwip.data.GameMode.DUEL) PlainText("1v1 is a test mode · nothing is earned in it yet", Type.Small, color = Palette.Gold)

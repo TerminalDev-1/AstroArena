@@ -131,6 +131,8 @@ class Store:
         self._lock = threading.Lock()
         # Whether a new account's first save sets its starting progress (the operator's choice; see game.cfg).
         self.import_progress = lambda: True
+        # The Cups each mode pays (the operator's choice; see trophies.cfg).
+        self.cups = lambda: None
         with self._lock, self._db:
             self._db.executescript(SCHEMA)
             have = {row["name"] for row in self._db.execute("PRAGMA table_info(players)")}
@@ -426,7 +428,10 @@ class Store:
                 (now, outcome, placement, kos, deaths, damage, result.get("ticks"), 1 if verified else 0, match_id),
             )
             player = self._db.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
-            cups = max(0, player["cups"] + rules.cup_delta(mode, outcome, placement, player["cups"], mvp))
+            table = self.cups()
+            cups = max(0, player["cups"] + rules.cup_delta(mode, outcome, placement, player["cups"], mvp, table))
+            # How many of those Cups were the MVP's bonus, for the result screen to say so.
+            mvp_cups = rules.cup_delta(mode, outcome, placement, 10 ** 9, mvp, table) - rules.cup_delta(mode, outcome, placement, 10 ** 9, False, table)
             day = today()
             earned = player["drops_today"] if player["drops_day"] == day else 0
             drop = rules.earns_drop(mode, outcome, placement) and earned < rules.DROPS_PER_DAY
@@ -456,7 +461,7 @@ class Store:
             return {
                 "cupDelta": cups - player["cups"], "cups": cups, "drop": drop, "bolts": bolts, "firstWinPrisms": prisms,
                 "credits": paid["amount"] if paid["type"] == "credits" else 0, "glory": paid["amount"] if paid["type"] == "glory" else 0,
-                "passPoints": points,
+                "passPoints": points, "mvpCups": mvp_cups,
                 "fighter": match["fighter"], "fighterCupsBefore": fighter_before, "fighterCups": fighter_cups,
                 "fighterRank": rules.fighter_rank(fighter_cups),
             }
