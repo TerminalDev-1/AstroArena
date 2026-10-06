@@ -13,7 +13,7 @@ from theme import Page, as_int, choice, entry, heading, number, px, table
 
 class TrophiesPage(Page):
     title = "Trophies"
-    about = "The Cups each mode pays. A fighter wins and loses the same Cups as the player who plays it. Saved changes count from the next match that finishes; no restart, no new build."
+    about = "The Cups each mode pays, to the player and to the fighter they played. Changes count from the next match that finishes."
 
     FIELDS = [("win", "A win pays", -1000), ("mvp_bonus", "Extra as the MVP", -1000), ("draw", "A draw pays", -1000),
               ("max_loss", "A defeat costs, at most", 0), ("loss_step", "…1 Cup for every this many Cups held", 0)]
@@ -168,7 +168,7 @@ class GamePage(Page):
 
 class BotsPage(Page):
     title = "Bots"
-    about = "How bots behave at each difficulty. Difficulty never changes a bot's health or damage, only how well it plays. Saved changes reach each game the next time it connects."
+    about = "How well bots play at each difficulty (never their health or damage). Each game picks changes up the next time it connects."
 
     LABELS = {
         "reactiontime": ("Reaction time", "seconds a target must be in view before it shoots"),
@@ -208,7 +208,7 @@ class BotsPage(Page):
             ttk.Label(self.grid_frame, text=level.title(), style="Head.TLabel").grid(row=0, column=column, sticky="w", padx=(0, px(22)), pady=(0, px(6)))
         for row, key in enumerate(keys, start=1):
             label, hint = self.LABELS.get(key, (key, ""))
-            ttk.Label(self.grid_frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, px(20)), pady=px(2))
+            ttk.Label(self.grid_frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, px(20)), pady=px(3))
             for column, level in enumerate(levels, start=1):
                 raw = bots.get(level, key, fallback="").strip()
                 if raw.lower() in ("true", "false"):
@@ -216,7 +216,7 @@ class BotsPage(Page):
                     ttk.Checkbutton(self.grid_frame, variable=var).grid(row=row, column=column, sticky="w")
                 else:
                     var = tk.StringVar(value=raw)
-                    entry(self.grid_frame, var, width=8).grid(row=row, column=column, sticky="w", padx=(0, px(22)))
+                    entry(self.grid_frame, var, width=8).grid(row=row, column=column, sticky="w", padx=(0, px(22)), pady=px(2))
                 self.values[(level, key)] = var
             ttk.Label(self.grid_frame, text=hint, style="Small.TLabel").grid(row=row, column=len(levels) + 1, sticky="w")
 

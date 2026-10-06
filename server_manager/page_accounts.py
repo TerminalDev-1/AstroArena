@@ -18,14 +18,14 @@ LENGTHS = ["15 minutes", "1 hour", "12 hours", "1 day", "3 days", "7 days", "30 
 
 class AccountsPage(Page):
     title = "Accounts"
-    about = "Pick a player, change what you like, then apply. It is forced onto the account at once; the player sees it the next time their game talks to the server."
+    about = "Pick a player, change what you like, then apply. The player sees it the next time their game talks to the server."
 
     def __init__(self, parent, app):
         super().__init__(parent, app)
         self.accounts: list[dict] = []
         self.current: dict | None = None
 
-        left = ttk.Frame(self.body, width=px(318))
+        left = ttk.Frame(self.body, width=px(304))
         left.pack(side="left", fill="y")
         left.pack_propagate(False)
         find = ttk.Frame(left)
@@ -34,13 +34,13 @@ class AccountsPage(Page):
         self.query = tk.StringVar()
         self.query.trace_add("write", lambda *_: self._fill())
         entry(find, self.query).pack(side="left", fill="x", expand=True, padx=(px(8), 0))
-        frame, self.tree = table(left, [("place", "#", 30, "e"), ("name", "Player", 128, "w"), ("cups", "Cups", 62, "e"), ("state", "", 70, "w")], height=14)
+        frame, self.tree = table(left, [("place", "#", 30, "e"), ("name", "Player", 120, "w"), ("cups", "Cups", 60, "e"), ("state", "", 70, "w")], height=14)
         frame.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self._picked)
         self.tree.tag_configure("disabled", foreground=BAD)
 
         right = ttk.Frame(self.body)
-        right.pack(side="left", fill="both", expand=True, padx=(px(22), 0))
+        right.pack(side="left", fill="both", expand=True, padx=(px(20), 0))
         who = ttk.Frame(right)
         who.pack(fill="x")
         self.name = ttk.Label(who, text="", font=("Segoe UI Semibold", 14))
@@ -49,42 +49,42 @@ class AccountsPage(Page):
         self.ident.pack(side="left", padx=px(12), pady=(px(3), 0))
         ttk.Button(who, text="Copy id", command=self._copy).pack(side="right")
 
-        heading(right, "Has").pack(anchor="w", pady=(px(10), px(4)))
+        heading(right, "Has").pack(anchor="w", pady=(px(14), px(6)))
         grid = ttk.Frame(right)
         grid.pack(fill="x")
         self.numbers: dict[str, tk.StringVar] = {}
         for i, (key, label) in enumerate(NUMBERS):
             cell = ttk.Frame(grid)
-            cell.grid(row=i // 4, column=i % 4, sticky="w", padx=(0, px(16)), pady=(0, px(6)))
+            cell.grid(row=i // 4, column=i % 4, sticky="w", padx=(0, px(12)), pady=(0, px(8)))
             ttk.Label(cell, text=label, style="Small.TLabel").pack(anchor="w")
             self.numbers[key] = tk.StringVar()
-            entry(cell, self.numbers[key], width=13).pack(anchor="w")
+            entry(cell, self.numbers[key], width=12).pack(anchor="w")
 
-        heading(right, "Fighters", "locked, level and the fighter's own Cups (its rank follows them)").pack(anchor="w", pady=(px(6), px(4)))
+        heading(right, "Fighters", "locked, level and the fighter's own Cups (its rank follows them)").pack(anchor="w", pady=(px(10), px(4)))
         grid = ttk.Frame(right)
         grid.pack(fill="x")
         self.fighters: dict[str, tuple[tk.BooleanVar, tk.StringVar, tk.StringVar]] = {}
         for row, fighter in enumerate(backend.FIGHTERS):
             unlocked, level, cups = tk.BooleanVar(), tk.StringVar(), tk.StringVar()
             self.fighters[fighter] = (unlocked, level, cups)
-            ttk.Label(grid, text=fighter.title(), font=("Segoe UI Semibold", 10), width=8).grid(row=row, column=0, sticky="w", pady=px(1))
+            ttk.Label(grid, text=fighter.title(), font=("Segoe UI Semibold", 10), width=8).grid(row=row, column=0, sticky="w", pady=px(3))
             box = ttk.Checkbutton(grid, text="Unlocked", variable=unlocked)
             box.grid(row=row, column=1, padx=(0, px(18)))
             if fighter == backend.rules.STARTING_FIGHTER:
                 box.state(["disabled"])  # everyone starts with it
             ttk.Label(grid, text="Level", style="Dim.TLabel").grid(row=row, column=2, padx=(0, px(6)))
-            number(grid, level, 1, backend.economy.LEVEL_LIMIT, width=6).grid(row=row, column=3, padx=(0, px(18)))
+            number(grid, level, 1, backend.economy.LEVEL_LIMIT, width=6).grid(row=row, column=3, padx=(0, px(18)), pady=px(2))
             ttk.Label(grid, text="Cups", style="Dim.TLabel").grid(row=row, column=4, padx=(0, px(6)))
             entry(grid, cups, width=9).grid(row=row, column=5)
 
-        heading(right, "Access", "a disabled account is kept, with all it has; the game shows the player a notice and nothing else").pack(anchor="w", pady=(px(10), px(4)))
+        heading(right, "Access", "a disabled account is kept, with all it has; the game shows the player a notice and nothing else").pack(anchor="w", pady=(px(14), px(6)))
         access = ttk.Frame(right)
         access.pack(fill="x")
         self.disabled = tk.BooleanVar()
         self.reason, self.length, self.typed = tk.StringVar(), tk.StringVar(), tk.StringVar()
         ttk.Checkbutton(access, text="Disabled", variable=self.disabled, command=self._access).grid(row=0, column=0, sticky="w", padx=(0, px(18)))
         ttk.Label(access, text="Reason shown to the player", style="Dim.TLabel").grid(row=0, column=1, sticky="w", padx=(0, px(8)))
-        self.reason_box = entry(access, self.reason, width=36)
+        self.reason_box = entry(access, self.reason, width=28)
         self.reason_box.grid(row=0, column=2, columnspan=2, sticky="w")
         ttk.Label(access, text="For", style="Dim.TLabel").grid(row=1, column=1, sticky="e", padx=(0, px(8)), pady=(px(8), 0))
         self.length_box = choice(access, self.length, [], width=26)
@@ -92,7 +92,6 @@ class AccountsPage(Page):
         self.length_box.bind("<<ComboboxSelected>>", lambda e: self._access(), add="+")
         self.typed_box = entry(access, self.typed, width=18)
         self.typed_box.grid(row=1, column=3, sticky="w", padx=(px(8), 0), pady=(px(8), 0))
-        ttk.Label(right, text="Typed: 45 minutes, 2 weeks, 1 day 6 hours, 2026-10-20 or 2026-10-20 18:00 (this PC's time).", style="Small.TLabel").pack(anchor="w", pady=(px(6), 0))
 
         self.action("Apply changes", self._apply, "Accent.TButton")
         self.action("Undo edits", lambda: self._show(self.current))
@@ -169,7 +168,10 @@ class AccountsPage(Page):
         on = self.disabled.get()
         self.reason_box.state(["!disabled" if on else "disabled"])
         self.length_box.state(["!disabled" if on else "disabled"])
-        self.typed_box.state(["!disabled" if on and self.length.get() == TYPED else "disabled"])
+        typing = on and self.length.get() == TYPED
+        self.typed_box.state(["!disabled" if typing else "disabled"])
+        if typing:
+            self.say("Type a length (45 minutes, 2 weeks, 1 day 6 hours) or a date (2026-10-20 18:00, this PC's time).")
 
     def _apply(self) -> None:
         was = self.current

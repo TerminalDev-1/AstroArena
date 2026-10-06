@@ -19,7 +19,7 @@ TAGS = ["NEW", "BALANCE", "EVENT", "FIX", "NEWS"]
 
 def _row(parent, row: int, label: str, widget_maker, note: str = "") -> None:
     ttk.Label(parent, text=label, style="Dim.TLabel").grid(row=row, column=0, sticky="w", padx=(0, px(14)), pady=px(3))
-    widget_maker(parent).grid(row=row, column=1, sticky="w", columnspan=1 if note else 2)
+    widget_maker(parent).grid(row=row, column=1, sticky="w", columnspan=1 if note else 2, pady=px(3))
     if note:
         ttk.Label(parent, text=note, style="Small.TLabel").grid(row=row, column=2, sticky="w", padx=(px(10), 0))
 
@@ -222,7 +222,7 @@ class NewsPage(Page):
 
 class MessagesPage(Page):
     title = "Messages"
-    about = "The line on the home screen, and which builds of the game are turned away. Each rule says who it is for; the first rule that fits a player's build wins."
+    about = "The line on the home screen, and which builds are turned away. The first rule that fits a player's build wins."
 
     WHO = "*  everyone      50  only build 50      <50  older than 50      >=50  build 50 and newer"
 

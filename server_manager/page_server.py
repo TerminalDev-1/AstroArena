@@ -7,7 +7,7 @@ import threading
 from tkinter import messagebox, ttk
 
 import backend
-from theme import BAD, DIM, GOOD, Page, heading, px, text_box
+from theme import BAD, GOOD, Page, Tile, heading, px, text_box
 
 
 class ServerPage(Page):
@@ -16,41 +16,49 @@ class ServerPage(Page):
 
     def __init__(self, parent, app):
         super().__init__(parent, app)
-        top = ttk.Frame(self.body)
-        top.pack(fill="x")
-        self.dot = ttk.Label(top, text="●", font=("Segoe UI", 20), foreground=DIM)
-        self.dot.pack(side="left")
-        words = ttk.Frame(top)
-        words.pack(side="left", padx=(px(10), 0))
-        self.state = ttk.Label(words, text="Checking…", font=("Segoe UI Semibold", 13))
-        self.state.pack(anchor="w")
-        self.detail = ttk.Label(words, text="", style="Dim.TLabel")
-        self.detail.pack(anchor="w")
-
-        address = ttk.Frame(self.body)
-        address.pack(fill="x", pady=(px(16), 0))
-        ttk.Label(address, text="Address for the game", style="Dim.TLabel").pack(side="left")
+        tiles = ttk.Frame(self.body)
+        tiles.pack(anchor="w")
+        self.state = Tile(tiles, "Status", 190)
+        self.accounts = Tile(tiles, "Accounts", 150)
+        self.disabled = Tile(tiles, "Disabled", 150)
+        self.address = Tile(tiles, "Address for the game · click to copy", 300)
+        for tile in (self.state, self.accounts, self.disabled, self.address):
+            tile.pack(side="left", padx=(0, px(12)))
         self.url = "http://%s:%d" % (backend.lan_address(), backend.PORT)
-        ttk.Label(address, text=self.url, font=("Consolas", 11)).pack(side="left", padx=px(10))
-        ttk.Button(address, text="Copy", command=self._copy).pack(side="left")
+        self.address.set(self.url)
+        self.address.configure(cursor="hand2")
+        self.address.bind("<Button-1>", lambda e: self._copy())
 
-        heading(self.body, "Log", "what the server prints: requests, matches the referee judged, forced account changes").pack(anchor="w", pady=(px(20), px(6)))
+        heading(self.body, "Log", "what the server prints: requests, matches the referee judged, forced account changes").pack(anchor="w", pady=(px(20), px(8)))
         self.log = text_box(self.body, height=8, mono=True)
         self.log.pack(fill="both", expand=True)
         self.log.configure(state="disabled")
-        self._offset, self._showing = 0, None
+        self._offset, self._showing, self._here = 0, None, False
 
         self.start = self.action("Start", lambda: self._do(True, backend.start_server), "Accent.TButton")
-        self.stop = self.action("Stop", self._stop, "Danger.TButton")
         self.restart = self.action("Restart", self._restart)
+        self.stop = self.action("Stop", self._stop, "Danger.TButton")
+        self.primary = None  # Ctrl+S has no business starting a server
+        self._quiet()
         self._busy = False
         self.update_state(app.health, app.started_here)
         self._tail()
+
+    def shown(self) -> None:
+        self._count()
 
     def _copy(self) -> None:
         self.clipboard_clear()
         self.clipboard_append(self.url)
         self.say("Address copied.")
+
+    def _count(self) -> None:
+        try:
+            accounts = backend.store().accounts()
+        except Exception:
+            return
+        self.accounts.set("{:,}".format(len(accounts)))
+        self.disabled.set("{:,}".format(sum(1 for a in accounts if a["disabled"])))
 
     # ------------------------------------------------------------------ state
 
@@ -58,24 +66,19 @@ class ServerPage(Page):
         if self._busy:
             return
         running = health is not None
-        self.dot.configure(foreground=GOOD if running else BAD)
-        self.state.configure(text="Running" if running else "Stopped")
-        if running:
-            players = health.get("players")
-            self.detail.configure(text="Port %d · %s" % (backend.PORT, "1 account" if players == 1 else "%s accounts" % players))
-        else:
-            self.detail.configure(text="Nobody can play online until it is started.")
+        self.state.set("Running" if running else "Stopped", GOOD if running else BAD)
         self.start.state(["disabled" if running else "!disabled"])
         self.stop.state(["!disabled" if running else "disabled"])
         self.restart.state(["!disabled" if running else "disabled"])
         self._here = here
+        self._count()
 
     def _do(self, ends_running: bool, *steps) -> None:
         """Runs the steps off the window's thread, then waits for the server to be up (or gone)."""
         self._busy = True
         for button in (self.start, self.stop, self.restart):
             button.state(["disabled"])
-        self.state.configure(text="Working…")
+        self.state.set("Working…")
 
         def work() -> None:
             for step in steps:
@@ -87,7 +90,7 @@ class ServerPage(Page):
             self._busy = False
             self.update_state(self.app.health, self.app.started_here)
             if (self.app.health is not None) != ends_running:
-                self.say("The server didn't %s. The log below may say why." % ("start" if ends_running else "stop"), bad=True)
+                self.say("The server didn't %s. The log may say why." % ("start" if ends_running else "stop"), bad=True)
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -114,9 +117,9 @@ class ServerPage(Page):
             self.log.see("end")
 
     def _tail(self) -> None:
-        running, here = self.app.health is not None, getattr(self, "_here", False)
-        if running and not here:
-            note = "This server was started outside the manager, so what it prints is in its own window.\nRestart it here to see its log."
+        running = self.app.health is not None
+        if running and not self._here:
+            note = "This server was started outside the manager, so what it prints is in its own window.\nPress Restart to run it from here and see its log."
             if self._showing != note:
                 self._show(note, True)
                 self._showing, self._offset = note, 0

@@ -16,6 +16,10 @@ server already uses) and nothing else.
 | **Messages** | The home screen notice, and which builds are turned away | `server/notices.cfg`, `server/versions_not_supported.cfg` |
 | **Bots** | How bots play at each difficulty | `server/bots.cfg` |
 
+**Getting around:** the sidebar groups the pages (Players, Rules, In the game), and `Ctrl+1` to `Ctrl+8` jump to
+them in order. `Ctrl+S` presses the page's main (orange) button. The pill at the bottom of the sidebar always
+shows whether the server is running; click it to go to the Server page.
+
 The server re-reads its `.cfg` files when they change, so a save here applies without a restart. The comments
 in those files are kept.
 
