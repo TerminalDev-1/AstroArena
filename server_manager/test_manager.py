@@ -208,7 +208,7 @@ class Pages(unittest.TestCase):
         self.app.update()
         page.headline.set("From the manager")
         page.tag.set("EVENT")
-        page.text.insert("1.0", "Two lines\nbecome one.")
+        page.text.set("Two lines\nbecome one.")
         page._save()
         news = backend.Config(self.dir).news()
         self.assertEqual((news[0]["title"], news[0]["tag"], news[0]["text"]), ("From the manager", "EVENT", "Two lines become one."))

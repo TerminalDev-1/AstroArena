@@ -37,7 +37,7 @@ class AccountsPage(Page):
         ttk.Label(find, text="Find", style="Dim.TLabel").pack(side="left")
         self.query = tk.StringVar()
         self.query.trace_add("write", lambda *_: self._fill())
-        entry(find, self.query).pack(side="left", fill="x", expand=True, padx=(px(8), 0))
+        DictationEntry(find, self.query).pack(side="left", fill="x", expand=True, padx=(px(8), 0))
         frame, self.tree = table(left, [("place", "#", 30, "e"), ("name", "Player", 120, "w"), ("cups", "Cups", 60, "e"), ("state", "", 70, "w")], height=14)
         frame.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self._picked)

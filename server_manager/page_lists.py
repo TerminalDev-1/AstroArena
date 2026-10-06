@@ -9,7 +9,8 @@ from tkinter import ttk
 import backend
 import cfgfile
 from listeditor import ListEditor
-from theme import Page, as_int, choice, entry, heading, number, px, text_box
+from nativebox import DictationEntry, DictationText
+from theme import Page, as_int, choice, entry, heading, number, px
 
 NONE = "None"
 PAID_WITH = {"FREE": "Free", "PRISMS": "Crystals", "BOLTS": "Power Ups"}
@@ -72,7 +73,7 @@ class ShopPage(Page):
     def _build(self, form) -> None:
         fighters = [NONE] + [f.title() for f in backend.FIGHTERS]
         heading(form, "The offer").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, px(6)))
-        _row(form, 1, "Title", lambda p: entry(p, self.v["title"], width=28), "24 characters at most")
+        _row(form, 1, "Title", lambda p: DictationEntry(p, self.v["title"], chars=28, limit=24), "24 characters at most")
         heading(form, "It gives").grid(row=2, column=0, columnspan=3, sticky="w", pady=(px(10), px(4)))
         _row(form, 3, "Power Ups", lambda p: number(p, self.v["bolts"]))
         _row(form, 4, "Crystals", lambda p: number(p, self.v["prisms"]))
@@ -179,7 +180,7 @@ class NewsPage(Page):
 
     def _build(self, form) -> None:
         ttk.Label(form, text="Headline", style="Dim.TLabel").pack(anchor="w")
-        entry(form, self.headline).pack(fill="x", pady=(px(2), px(10)))
+        DictationEntry(form, self.headline, limit=80).pack(fill="x", pady=(px(2), px(10)))
         row = ttk.Frame(form)
         row.pack(anchor="w", pady=(0, px(10)))
         ttk.Label(row, text="Date", style="Dim.TLabel").pack(side="left")
@@ -187,21 +188,19 @@ class NewsPage(Page):
         ttk.Label(row, text="Tag", style="Dim.TLabel").pack(side="left")
         choice(row, self.tag, TAGS, width=10).pack(side="left", padx=px(8))
         ttk.Label(form, text="Text", style="Dim.TLabel").pack(anchor="w")
-        self.text = text_box(form, height=8)
+        self.text = DictationText(form)
         self.text.pack(fill="both", expand=True, pady=(px(2), 0))
 
     def _show(self, n: dict) -> None:
         self.headline.set(n["title"])
         self.date.set(n["date"])
         self.tag.set(n["tag"] if n["tag"] in TAGS else "NEWS")
-        self.text.delete("1.0", "end")
-        self.text.insert("1.0", n["text"])
-        self.text.edit_reset()
+        self.text.set(n["text"])
 
     def _keep(self, n: dict) -> None:
         n["title"] = " ".join(self.headline.get().split())[:80]
         n["date"], n["tag"] = self.date.get().strip()[:20], self.tag.get()
-        n["text"] = " ".join(self.text.get("1.0", "end").split())
+        n["text"] = " ".join(self.text.get().split())
 
     def _load(self) -> None:
         news = cfgfile.read_ini(backend.cfg("news.cfg"))
@@ -246,7 +245,7 @@ class MessagesPage(Page):
             ttk.Label(form, text="For", style="Dim.TLabel").pack(side="left")
             entry(form, who, width=10).pack(side="left", padx=(px(8), px(18)))
             ttk.Label(form, text="Message", style="Dim.TLabel").pack(side="left")
-            entry(form, text).pack(side="left", fill="x", expand=True, padx=(px(8), 0))
+            DictationEntry(form, text, limit=300).pack(side="left", fill="x", expand=True, padx=(px(8), 0))
 
         def show(item: dict) -> None:
             who.set(item["rule"])
