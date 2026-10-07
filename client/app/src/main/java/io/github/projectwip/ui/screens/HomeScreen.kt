@@ -157,7 +157,7 @@ fun HomeScreen(
                         }
                     }
                     if (!dropsOnly) Spacer(Modifier.height(10.dp))
-                    CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online, dropsOnly, openCapsule)
+                    CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online || io.github.projectwip.ui.LocalOfflineMode.current, dropsOnly, openCapsule)
                     // Glitch Drops only: no fights, just drops.
                     if (!dropsOnly) {
                         Spacer(Modifier.height(10.dp))
@@ -288,7 +288,8 @@ private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) 
 }
 
 @Composable
-private fun CapsuleButton(count: Int, leftToday: Int, online: Boolean, big: Boolean, onOpen: () -> Unit) {
+/** [canOpen]: the server is there to open them, or the game is on its offline profile, which opens its own. */
+private fun CapsuleButton(count: Int, leftToday: Int, canOpen: Boolean, big: Boolean, onOpen: () -> Unit) {
     Box {
         ChunkyButton(onOpen, Modifier.fillMaxWidth().height(if (big) 150.dp else 62.dp), ButtonStyle.CYAN, enabled = count > 0, cut = 14.dp, lip = 4.dp) {
             Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -300,7 +301,7 @@ private fun CapsuleButton(count: Int, leftToday: Int, online: Boolean, big: Bool
                     GameText(if (count > 0) "OPEN DROP" else "GLITCH DROPS", Type.Heading, outline = 2.5.dp)
                     PlainText(
                         when {
-                            !online -> if (count > 0) "Opens when you're back online" else "Earned and opened online"
+                            !canOpen -> if (count > 0) "Opens when you're back online" else "Earned and opened online"
                             count > 0 -> "Tap it to charge it up"
                             leftToday > 0 -> "Win or top 4 earns one · $leftToday left today"
                             else -> "Today's are all earned · more tomorrow"

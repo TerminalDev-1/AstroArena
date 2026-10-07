@@ -93,8 +93,8 @@ data class RemotePlayer(val id: String, val name: String, val cups: Int, val fig
  * The game's connection to the AstroArena server (see the `server/` directory of the repository).
  *
  * The server is in charge of Cups, Glitch Drops, Bolts, Prisms, fighters, the shop and its deals, the bot
- * difficulty and who gets the debug menu. Without it the game still plays, in offline mode: matches are set up
- * on the device, but nothing is earned and nothing can be bought, upgraded, claimed or opened.
+ * difficulty and who gets the debug menu. Without it the game still plays, in offline mode: on a separate
+ * offline profile kept on the device ([LocalGame]), which the server never sees.
  *
  * A match is still played on the device, but its result is the server's: the device hands in what the player did
  * and the server replays the match itself ([reportMatch]). Nothing here may ever block
@@ -103,7 +103,7 @@ data class RemotePlayer(val id: String, val name: String, val cups: Int, val fig
  * The blocking calls ([connect], [syncSave], [planMatch], [reportMatch], [openDrop], [leaderboard]) must be made
  * off the main thread.
  */
-class GameServer(context: Context) {
+class GameServer(context: Context) : GameActions {
     private val prefs = context.getSharedPreferences("server", Context.MODE_PRIVATE)
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "server-io").apply { isDaemon = true } }
     private val pendingSave = AtomicReference<JSONObject?>(null)
@@ -119,7 +119,7 @@ class GameServer(context: Context) {
     private val usable get() = _status.value.online && _status.value.supported
 
     /** Why the server refused the last request, in its own words ("" if it didn't). */
-    @Volatile var lastError = ""
+    @Volatile override var lastError = ""
         private set
 
     /** Has this install already got an account on the server at [url]? */
@@ -235,39 +235,39 @@ class GameServer(context: Context) {
     }
 
     /** Asks the server to let this player fight bots of [difficulty]. Null if it says no (see [lastError]). */
-    fun setDifficulty(difficulty: BotDifficulty): Boolean? = act("/v1/settings/difficulty", JSONObject().put("difficulty", difficulty.name))?.let { true }
+    override fun setDifficulty(difficulty: BotDifficulty): Boolean? = act("/v1/settings/difficulty", JSONObject().put("difficulty", difficulty.name))?.let { true }
 
     /** Buys one of today's offers ([index] in [Account.dailyOffers]) as shown on [day]; after the server's midnight it no longer counts. */
-    fun buyDaily(index: Long, day: Long): Reward? = act("/v1/shop/daily/$index/buy", JSONObject().put("day", day))?.optJSONObject("reward")?.let { reward(it) }
+    override fun buyDaily(index: Long, day: Long): Reward? = act("/v1/shop/daily/$index/buy", JSONObject().put("day", day))?.optJSONObject("reward")?.let { reward(it) }
 
     /** Levels a fighter up. Returns what it cost, or null if the server said no. [costFactor] and [noCap] count for developers only. */
-    fun upgrade(fighter: FighterId, costFactor: Float = 1f, noCap: Boolean = false): Int? =
+    override fun upgrade(fighter: FighterId, costFactor: Float, noCap: Boolean): Int? =
         act("/v1/fighters/upgrade", JSONObject().put("fighter", fighter.name).put("costFactor", costFactor.toDouble()).put("noCap", noCap))?.optInt("cost")
 
     /** Buys a standing shop item (see [io.github.projectwip.data.ShopItem.key]) and returns what was received. */
-    fun buy(itemKey: String): Reward? = act("/v1/shop/buy", JSONObject().put("item", itemKey))?.optJSONObject("reward")?.let { reward(it) }
+    override fun buy(itemKey: String): Reward? = act("/v1/shop/buy", JSONObject().put("item", itemKey))?.optJSONObject("reward")?.let { reward(it) }
 
-    fun claimGift(): Reward? = act("/v1/shop/gift")?.optJSONObject("reward")?.let { reward(it) }
+    override fun claimGift(): Reward? = act("/v1/shop/gift")?.optJSONObject("reward")?.let { reward(it) }
 
     /** Claims the Cup Track reward at [cups]. What comes back is what was actually given (owned things are paid out instead). */
-    fun claimMilestone(cups: Int): Reward? = act("/v1/track/claim", JSONObject().put("cups", cups))?.optJSONObject("reward")?.let { reward(it) }
+    override fun claimMilestone(cups: Int): Reward? = act("/v1/track/claim", JSONObject().put("cups", cups))?.optJSONObject("reward")?.let { reward(it) }
 
-    fun buyDeal(id: Long): Reward? = act("/v1/shop/deals/$id/buy")?.optJSONObject("reward")?.let { reward(it) }
+    override fun buyDeal(id: Long): Reward? = act("/v1/shop/deals/$id/buy")?.optJSONObject("reward")?.let { reward(it) }
 
     /** Developers: puts a deal in every player's shop. */
-    fun createDeal(o: CustomOffer): Long? = act("/v1/dev/deals", JSONObject()
+    override fun createDeal(o: CustomOffer): Long? = act("/v1/dev/deals", JSONObject()
         .put("title", o.title).put("bolts", o.bolts).put("prisms", o.prisms).put("fighter", o.fighter?.name ?: "")
         .put("skinFighter", o.skinFighter?.name ?: "").put("skinIndex", o.skinIndex).put("currency", o.currency.name)
         .put("price", o.price).put("wasPrice", o.wasPrice).put("expiresAt", o.expiresAt).put("limit", o.limit).put("theme", o.theme))?.optLong("id")
 
     /** Developers: takes a deal out of the shop. */
-    fun deleteDeal(id: Long): Boolean? = act("/v1/dev/deals/$id/delete")?.optBoolean("deleted")
+    override fun deleteDeal(id: Long): Boolean? = act("/v1/dev/deals/$id/delete")?.optBoolean("deleted")
 
     /** Starts this account's progress over on the server. */
-    fun reset(): Boolean? = act("/v1/reset")?.let { true }
+    override fun reset(): Boolean? = act("/v1/reset")?.let { true }
 
     /** Developer hand-outs (the server refuses anyone else). */
-    fun devGrant(cups: Int = 0, drops: Int = 0, bolts: Int = 0, prisms: Int = 0, credits: Int = 0): Boolean? =
+    override fun devGrant(cups: Int, drops: Int, bolts: Int, prisms: Int, credits: Int): Boolean? =
         act("/v1/dev/grant", JSONObject().put("cups", cups).put("drops", drops).put("bolts", bolts).put("prisms", prisms).put("credits", credits))?.let { true }
 
     private fun register(name: String): Boolean {
@@ -341,7 +341,7 @@ class GameServer(context: Context) {
     }
 
     /** Asks the server who this player is (Cups, drops, developer or not). */
-    fun refreshAccount(): Boolean {
+    override fun refreshAccount(): Boolean {
         if (!usable) return false
         val r = call("GET", "/v1/me", auth = true)
         if (r == null) lost()

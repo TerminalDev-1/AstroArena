@@ -95,6 +95,9 @@ data class SaveData(
     val boostedCapsules: Int = 0,
     /** Seeds the next capsule roll; stored so reloading the game can't re-roll a capsule. */
     val capsuleSeed: Long = 0,
+    /** Offline profile: the day [dailyBought] counts for, and the titles of that day's offers already bought. (Online the server keeps these.) */
+    val dailyDay: Long = -1,
+    val dailyBought: Set<String> = emptySet(),
 ) {
     fun progress(id: FighterId): FighterProgress = fighters[id] ?: FighterProgress()
 

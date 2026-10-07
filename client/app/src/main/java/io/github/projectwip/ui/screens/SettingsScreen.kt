@@ -260,7 +260,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
         !status.supported -> "The server at ${status.url} doesn't support this version."
         status.disabled -> "Your account on ${status.url} has been disabled by the server's owner."
         status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Glitch Drops, Upgrade Credits, CPU Chips and fighters, sets matches up and decides their results."
-        else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You can still play against bots for practice; nothing is earned or spent until you're back online."
+        else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You are on your offline profile, which is kept on this device: what you earn and spend here stays here, and your server account is untouched. The game keeps trying, and goes back online by itself."
     })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ServerField(address, BuildConfig.SERVER_URL) { url -> repo.updateSettings { it.copy(serverUrl = url) } }

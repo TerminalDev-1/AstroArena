@@ -66,11 +66,24 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - The server is in charge, by the user's decision. It owns each player's Cups, Glitch Drops, Bolts, Prisms,
   fighters (unlocked, level, colourways), Cup Track claims, the daily gift and the shop deals. It works out what
   a match is worth, refuses results that can't be real, rolls drops, and is the only place anything is bought,
-  upgraded or claimed (`server/astro/rules.py`, `economy.py`). The client's save is a copy of what the server
-  sent (`Progression.syncAccount`). Don't add client-side ways to earn, spend, grant or roll anything.
+  upgraded or claimed (`server/astro/rules.py`, `economy.py`). The client's online save is a copy of what the server
+  sent (`Progression.syncAccount`). Don't add client-side ways to earn, spend, grant or roll anything in it: the
+  offline profile (below) is the only thing the device decides for itself.
 - Menus ask the server through `LocalServerCall` (`ui/ServerCall.kt`): `ask({ buy(key) }) { reward -> ... }`.
-- Offline mode still has to work (except for a disabled account, which gets nothing), as practice: every mode plays against bots, but nothing is earned, bought,
-  upgraded, claimed or opened. The loading screen tries the server for 60 seconds, then offers Retry or Offline mode.
+- Offline mode is a profile of its own, by the user's decision. While the server can't be reached the game plays on
+  an *offline profile* kept on the device (`files/offline.json`; `GameRepository.offlineMode`): its own Cups, drops,
+  currencies and fighters, earned and spent by the same rules as the server's, run on the device (`data/Economy.kt`,
+  through `net/LocalGame.kt`). It starts as a new account and is never sent to the server; the online save
+  (`save.json`, a copy of the server's account) is untouched while offline. The switch is automatic and only ever
+  made by the connection: offline when the server doesn't answer (at start-up after `CONNECT_PATIENCE_MS`, or when
+  it stops answering later), back online by itself when it does, and never in the middle of a match (a match belongs
+  to the profile it started on; one started online that can't be handed in pays nothing). There is no button for
+  it. A disabled account or an unsupported version gets no offline play. Offline nobody is a developer, and there
+  is no leaderboard, News, 1v1 against a real player or team play.
+- `Economy.kt` must say what `server/astro/economy.py` and `rules.py` say: change a price, a cost, a drop table or
+  what a match pays in both, and `EconomyTest` and `test_server.py` both check the numbers.
+- Menus ask through `LocalServerCall` whichever profile is showing: the request is written against `GameActions`
+  (`net/LocalGame.kt`), which the server connection and `LocalGame` both implement.
 - Prices and tables shown by the client (`Balance.kt`, `Catalog.kt`) are copies for display; the server's are
   the ones that count. Change both.
 - Developers = the player ids in `server/game.cfg` (the tablet's is listed), and nobody else: a debug build is

@@ -1001,6 +1001,16 @@ class Api(unittest.TestCase):
         economy.complete(rich)
         self.assertEqual((rich["fighters"]["BRAKK"]["unlocked"], rich["credits"]), (True, 5))
 
+    def test_a_jackpot_whose_credits_unlock_a_fighter_comes_back_as_one_flat_list(self):
+        profile = economy.new_profile()
+        profile["credits"] = dict(economy.SPARK_ROAD)["BRAKK"] - 10
+        jackpot = {"type": "bundle", "items": [{"type": "credits", "amount": 3000}, {"type": "prisms", "amount": 1200}, {"type": "bolts", "amount": 6000}]}
+        given = economy.grant(profile, jackpot)
+        self.assertEqual(given, {"type": "bundle", "items": [
+            {"type": "credits", "amount": 3000}, {"type": "fighter", "fighter": "BRAKK"}, {"type": "prisms", "amount": 1200}, {"type": "bolts", "amount": 6000}]})
+        self.assertTrue(profile["fighters"]["BRAKK"]["unlocked"])
+        self.assertEqual(profile["credits"], 2990)
+
     def test_drops_give_twelve_times_the_credits(self):
         rng = random.Random(8)
         amounts = set()
@@ -1023,9 +1033,13 @@ class Api(unittest.TestCase):
         left = sum(r["pieces"] - 1 for r in results)
         self.assertEqual(body["account"]["drops"], left)
         # Everything that came out is in the profile the server keeps.
+        # (A drop never holds a fighter: one in a result is the fighter its Credits unlocked on the Spark Road, and
+        # putting the Credits back on the road unlocks it again.)
         expected = economy.profile_from_save(save)
         for r in results:
-            economy.grant(expected, r["reward"])
+            for item in r["reward"].get("items", [r["reward"]]):
+                if item["type"] != "fighter":
+                    economy.grant(expected, item)
         self.assertEqual(body["account"]["profile"], expected)
         while left > 0:
             left = self.call("POST", "/v1/drops/open-all", {}, me["token"])[1]["account"]["drops"]

@@ -301,7 +301,12 @@ def compensation(reward: dict) -> dict:
 def grant(profile: dict, reward: dict) -> dict:
     """Adds a reward to a profile (in place) and returns what was actually given: anything already owned is paid out instead."""
     if reward.get("type") == "bundle":
-        return {"type": "bundle", "items": [grant(profile, item) for item in reward.get("items", [])]}
+        # One flat list: Credits that unlocked a fighter come back as a bundle of their own, which is unpacked here.
+        given = []
+        for item in reward.get("items", []):
+            got = grant(profile, item)
+            given.extend(got["items"] if got.get("type") == "bundle" else [got])
+        return {"type": "bundle", "items": given}
     if reward.get("type") == "credits":
         return fill_road(profile, reward["amount"])
     actual = compensation(reward) if owns(profile, reward) else reward

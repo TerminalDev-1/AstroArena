@@ -22,9 +22,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         hideSystemBars()
 
-        val repo = (application as? GameApp)?.repository ?: GameRepository(SaveStore(this))
+        val repo = (application as? GameApp)?.repository ?: GameRepository(SaveStore(this), SaveStore(this, GameApp.OFFLINE_SAVE))
         val server = (application as? GameApp)?.server ?: io.github.projectwip.net.GameServer(this)
-        // Every save also goes to the server (when there is one), so a fresh install can get it back.
+        // Every online save also goes to the server (when there is one), so a fresh install can get it back. The offline profile never does.
         repo.onCommit = { server.pushSave(SaveStore.toJson(it)) }
         // Debug: `--es server http://host:port` points this install at another server ("default" clears it).
         if (BuildConfig.DEBUG) intent?.getStringExtra("server")?.let { url -> repo.updateSettings { it.copy(serverUrl = if (url == "default") "" else url) } }

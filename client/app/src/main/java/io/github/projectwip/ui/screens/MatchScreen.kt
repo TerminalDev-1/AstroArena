@@ -255,7 +255,7 @@ private fun Matchmaking(config: MatchConfig, match: Match?, onCancel: () -> Unit
                     }
                 }
                 GameText("$found / $total FIGHTERS", Type.Heading, color = io.github.projectwip.ui.Palette.Gold, outline = 2.5.dp)
-                PlainText(if (match != null && match.config.serverMatchId <= 0L) "Offline match against bots · practice, nothing is earned" else "Your opponents are bots, picked by the server", Type.Small)
+                PlainText(if (match != null && match.config.serverMatchId <= 0L) "Offline match against bots" else "Your opponents are bots, picked by the server", Type.Small)
                 Spacer(Modifier.height(2.dp))
                 PlainText(tip, Type.Body, color = Color.White, align = TextAlign.Center)
                 if (!done) ChunkyButton(onCancel, Modifier.size(200.dp, 52.dp), ButtonStyle.RED, lip = 4.dp, sound = io.github.projectwip.audio.Sound.UI_BACK) { GameText("CANCEL", Type.Heading) }

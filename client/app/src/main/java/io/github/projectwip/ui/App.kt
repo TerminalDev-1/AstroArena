@@ -134,8 +134,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // ---- start-up: connect to the game server, ask GitHub whether a newer release exists, load sounds and music
     val serverStatus by server.status.collectAsState()
     val account = serverStatus.account
-    // The debug menu and its cheats belong to developers, and the server says who those are. A dev build is not enough.
-    val dev = account?.developer == true
+    // While the server can't be reached the game is on its offline profile, answered on the device.
+    val local = remember { io.github.projectwip.net.LocalGame(repo) }
+    val offline by repo.offline.collectAsState()
+    // The debug menu and its cheats belong to developers, and the server says who those are. A dev build is not enough,
+    // and offline nobody is one.
+    val dev = account?.developer == true && serverStatus.online
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var unsupportedSkipped by remember { mutableStateOf(false) }
     // A disabled account gets nothing: no menus, no offline play. The notice stays up until the server lets it back in.
@@ -145,7 +149,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     var bootProgress by remember { mutableStateOf(0f) }
     var bootStatus by remember { mutableStateOf("Connecting to server…") }
     var connection by remember { mutableStateOf(Connection.CONNECTING) }
-    var connectAttempt by remember { mutableStateOf(0) }
     // A new player picks their name first; only then is an account made for them on the server.
     var needsName by remember {
         val settings = repo.save.value.settings
@@ -157,7 +160,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     }
     // The server: is this version welcome, sign in, fetch live settings, and sync the save. The game keeps trying
     // for a minute; after that the player chooses between trying again and offline mode.
-    LaunchedEffect(connectAttempt, needsName) {
+    LaunchedEffect(needsName) {
         if (needsName) return@LaunchedEffect
         val started = System.currentTimeMillis()
         connection = Connection.CONNECTING
@@ -166,7 +169,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             if (connection != Connection.CONNECTING) break // the player stopped waiting
             val now = server.status.value
             if (now.online || !now.supported || now.disabled || now.url.isEmpty()) { connection = Connection.SETTLED; break }
-            if (System.currentTimeMillis() - started >= CONNECT_PATIENCE_MS) { connection = Connection.FAILED; break }
+            // No answer: the game goes on, offline, and keeps trying in the background.
+            if (System.currentTimeMillis() - started >= CONNECT_PATIENCE_MS) { connection = Connection.SETTLED; break }
             delay(1500)
         }
     }
@@ -206,9 +210,15 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // Cups, Glitch Drops, currencies, fighters and shop deals are the server's: whatever it says this player has is what the game shows.
     LaunchedEffect(account) { account?.let { repo.sync(it) } }
     // Anyone who isn't a developer plays without the debug menu's cheats, even if their save has some switched on.
-    LaunchedEffect(dev, booting) { if (!booting && !dev) repo.clearCheats() }
-    // Offline in the menus: quietly keep trying to get back online.
+    LaunchedEffect(dev, booting, serverStatus.online, account) { if (!booting && serverStatus.online && account != null && !dev) repo.clearCheats() }
     val inMatch = screen is Screen.Match
+    // Which profile is being played on: the server's account while it answers, the offline profile kept on this
+    // device while it doesn't. It is never swapped in the middle of a match (the match belongs to the profile it
+    // started on), and a disabled account or an unsupported version gets no offline play.
+    LaunchedEffect(serverStatus.online, serverStatus.disabled, serverStatus.supported, booting, inMatch) {
+        if (!booting && !inMatch) repo.setOffline(!serverStatus.online && !serverStatus.disabled && serverStatus.supported)
+    }
+    // Offline in the menus: quietly keep trying to get back online.
     LaunchedEffect(serverStatus.online, serverStatus.supported, booting, inMatch) {
         if (booting || inMatch || serverStatus.online || !serverStatus.supported) return@LaunchedEffect
         while (true) {
@@ -259,11 +269,13 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     var opening by remember { mutableStateOf(false) }
     /** A match has just ended and the server is replaying it to decide the result. */
     var judging by remember { mutableStateOf(false) }
-    val ask = remember { ServerCall(scope, server, repo, sfx) { toast = it } }
-    // Glitch Drops are opened by the server: it rolls the drop, the game shows what came out.
+    val ask = remember { ServerCall(scope, server, local, repo, sfx) { toast = it } }
+    // Glitch Drops are opened by the server: it rolls the drop, the game shows what came out. (Offline they are the
+    // offline profile's, and are rolled on the device.)
     val openCapsule: () -> Unit = {
         if (!opening) {
-            if (!serverStatus.online) toast = "Glitch Drops are opened by the server, and you're offline."
+            if (repo.offlineMode) local.openDrop().let { if (it != null) capsule = it else toast = "No Glitch Drops to open." }
+            else if (!serverStatus.online) toast = "Couldn't reach the server. Try again in a moment."
             else {
                 opening = true
                 scope.launch {
@@ -287,7 +299,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // Opens every drop that is left. [first] is the one on screen, when its own reveal is being skipped.
     val openAll: (CapsuleResult?) -> Unit = { first ->
         if (!opening) {
-            if (!serverStatus.online) toast = "Glitch Drops are opened by the server, and you're offline."
+            if (repo.offlineMode) local.openAllDrops().let { if (it != null) { capsule = null; haul = listOfNotNull(first) + it } else toast = "No Glitch Drops to open." }
+            else if (!serverStatus.online) toast = "Couldn't reach the server. Try again in a moment."
             else {
                 opening = true
                 scope.launch {
@@ -317,7 +330,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         val metrics = UiMetrics(maxWidth.value / scale, maxHeight.value / scale, scale)
 
         val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
-        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalDev provides dev, LocalServerCall provides ask) {
+        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalOfflineGame provides local, LocalOfflineMode provides offline, LocalDev provides dev, LocalServerCall provides ask) {
             if (screen !is Screen.Match) {
                 androidx.compose.ui.viewinterop.AndroidView(
                     factory = { ctx -> io.github.projectwip.render3d.LobbyView(ctx, lobby) },
@@ -390,7 +403,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             // Server status in the corner. (Its notice is part of the home screen.)
             if (screen !is Screen.Match && capsule == null && haul == null && reveal == null) {
                 PlainText(
-                    if (serverStatus.online) "● ONLINE" else "● OFFLINE MODE · practice only", Type.Small,
+                    if (serverStatus.online && !offline) "● ONLINE" else "● OFFLINE MODE · your offline profile, kept on this device", Type.Small,
                     if (screen is Screen.Home) Modifier.align(Alignment.TopStart).padding(start = 22.dp, top = 68.dp)
                     else Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 12.dp),
                     color = if (serverStatus.online) Palette.Positive else Palette.TextDim,
@@ -417,11 +430,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 repo.updateSettings { it.copy(playerName = name, nameChosen = true) }
                 needsName = false
             }
-            if (booting && connection == Connection.FAILED) {
-                io.github.projectwip.ui.screens.ConnectFailedScreen(
-                    serverStatus.url, onRetry = { connectAttempt++ }, onOffline = { connection = Connection.SETTLED },
-                )
-            }
             AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
                 capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, roadNow(save), roadGoal(save), onNext = openCapsule, onOpenAll = openAll, onDone = { capsule = null }) }
             }
@@ -446,11 +454,11 @@ private fun previewResult(save: io.github.projectwip.data.SaveData): Screen {
 
 private const val REPO_RELEASES = "https://github.com/TerminalDev-1/AstroArena/releases"
 
-/** How long the loading screen keeps trying to reach the server before offering offline mode. */
-private const val CONNECT_PATIENCE_MS = 60_000L
+/** How long the loading screen keeps trying to reach the server before the game goes on in offline mode. */
+private const val CONNECT_PATIENCE_MS = 8_000L
 
-/** CONNECTING: trying to reach the server. FAILED: a minute went by, the player decides. SETTLED: online, or offline by choice. */
-private enum class Connection { CONNECTING, FAILED, SETTLED }
+/** CONNECTING: trying to reach the server. SETTLED: online, or it didn't answer in time and the game is offline. */
+private enum class Connection { CONNECTING, SETTLED }
 
 /**
  * Says hello to the game server and syncs the save with it. Blocking: call it off the main thread.
@@ -459,16 +467,18 @@ private enum class Connection { CONNECTING, FAILED, SETTLED }
  * or not), which the game takes on.
  */
 fun connectToServer(server: io.github.projectwip.net.GameServer, repo: GameRepository) {
-    val save = repo.save.value
-    val url = save.settings.serverUrl.ifBlank { io.github.projectwip.BuildConfig.SERVER_URL }
-    val stored = server.connect(url, io.github.projectwip.BuildConfig.VERSION_CODE.toString(), save.settings.playerName)
+    // (The online save, whichever profile is showing: the offline profile is never the server's business.)
+    val save = repo.online
+    val settings = repo.save.value.settings
+    val url = settings.serverUrl.ifBlank { io.github.projectwip.BuildConfig.SERVER_URL }
+    val stored = server.connect(url, io.github.projectwip.BuildConfig.VERSION_CODE.toString(), settings.playerName)
     val status = server.status.value
     if (!status.online || !status.supported) return
     val restored = stored?.let { runCatching { io.github.projectwip.data.SaveStore.fromJson(it) }.getOrNull() }
     if (restored != null && io.github.projectwip.data.Progression.isFresh(save) && !io.github.projectwip.data.Progression.isFresh(restored)) {
         repo.restore(restored)
         server.refreshAccount()
-    } else server.syncSave(io.github.projectwip.data.SaveStore.toJson(repo.save.value))
+    } else server.syncSave(io.github.projectwip.data.SaveStore.toJson(repo.online.copy(settings = settings)))
 }
 
 fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {

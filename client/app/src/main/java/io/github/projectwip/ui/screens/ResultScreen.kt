@@ -258,7 +258,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         val dropsHere = r.mode != io.github.projectwip.data.GameMode.BOSS && r.mode != io.github.projectwip.data.GameMode.DUEL && rewards.online
                         // Everything a match is worth is awarded by the server; without it a match is practice.
                         if (r.mode == io.github.projectwip.data.GameMode.DUEL && !rewards.online) PlainText("This 1v1 wasn't settled by the server · nothing is earned", Type.Small, color = Palette.Gold)
-                        else if (!rewards.online) PlainText("Offline match · rewards are only earned online", Type.Small, color = Palette.Gold)
+                        else if (!rewards.online) PlainText("The server couldn't be reached · this match wasn't counted", Type.Small, color = Palette.Gold)
                         if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
                             PlainText("All of today's Glitch Drops are earned · more tomorrow", Type.Small, color = Palette.Text)
                         }

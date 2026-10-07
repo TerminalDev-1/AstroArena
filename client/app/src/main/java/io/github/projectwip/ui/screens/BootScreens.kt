@@ -124,36 +124,6 @@ fun NameScreen(onDone: (String) -> Unit) {
 }
 
 /**
- * The server didn't answer for a whole minute. The player chooses: keep trying, or play in offline mode, where
- * matches against bots still work but nothing is earned or spent.
- */
-@Composable
-fun ConnectFailedScreen(url: String, onRetry: () -> Unit, onOffline: () -> Unit) {
-    Box(
-        Modifier.fillMaxSize().background(Color(0xF00B0620)).clickable(remember { MutableInteractionSource() }, null) { },
-        contentAlignment = Alignment.Center,
-    ) {
-        Panel(Modifier.widthIn(max = 700.dp).padding(18.dp), cut = 20.dp) {
-            Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                GameText("CAN'T REACH THE SERVER", Type.Display, color = Palette.Gold, outline = 4.dp)
-                PlainText(
-                    "The game tried for a minute and got no answer" + (if (url.isNotBlank()) " from $url" else "") + ". Check your connection, or that the server is running, and try again.",
-                    Type.Body, color = Color.White, align = TextAlign.Center, maxLines = 4,
-                )
-                PlainText(
-                    "In offline mode you can still play every mode against bots, for practice. Cups, Upgrade Credits, CPU Chips and Glitch Drops are only earned online, and the shop, upgrades and drops wait until you are back.",
-                    Type.Small, align = TextAlign.Center, maxLines = 4,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    ChunkyButton(onRetry, Modifier.size(230.dp, 64.dp), ButtonStyle.GREEN) { GameText("RETRY", Type.Heading) }
-                    ChunkyButton(onOffline, Modifier.size(260.dp, 64.dp), ButtonStyle.PURPLE) { GameText("OFFLINE MODE", Type.Heading) }
-                }
-            }
-        }
-    }
-}
-
-/**
  * A newer release exists: the game stops here until it is installed, and says why. Dev builds can carry on
  * regardless, so testing an old build is still possible.
  */

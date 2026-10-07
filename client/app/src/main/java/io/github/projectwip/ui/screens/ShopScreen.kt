@@ -75,9 +75,11 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
     val cardW = ((ui.heightDp - 120f) * 0.62f).coerceIn(176f, 300f).dp
     val dev = io.github.projectwip.ui.LocalDev.current
     val ask = io.github.projectwip.ui.LocalServerCall.current
-    // Today's offers and the clock they run on come from the server; offline there are none to show.
+    // Today's offers and the clock they run on come from the server. Offline they are the offline profile's own,
+    // by this device's clock.
     val status = io.github.projectwip.ui.LocalServer.current?.status?.collectAsState()?.value
-    val account = status?.account?.takeIf { status.online }
+    val account = if (io.github.projectwip.ui.LocalOfflineMode.current) io.github.projectwip.ui.LocalOfflineGame.current?.account(save)
+        else status?.account?.takeIf { status.online }
     val untilRefresh = account?.let { secondsUntil(it.dayEndsAt) }
     // The server's day has ended: ask it for the new one (new offers, a new gift).
     LaunchedEffect(untilRefresh == 0L) { if (untilRefresh == 0L) ask({ refreshAccount().takeIf { it } }) }

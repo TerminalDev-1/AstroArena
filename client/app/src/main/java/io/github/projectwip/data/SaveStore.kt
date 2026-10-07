@@ -12,8 +12,9 @@ import java.io.File
  * Writes go through [AtomicFile] so a crash mid-write never corrupts progress.
  * Unknown/missing fields fall back to defaults, so old saves keep loading as the game grows.
  */
-class SaveStore(context: Context) {
-    private val file = AtomicFile(File(context.filesDir, "save.json"))
+/** [name]: `save.json` is the copy of the server's account; the offline profile is kept in a file of its own. */
+class SaveStore(context: Context, name: String = "save.json") {
+    private val file = AtomicFile(File(context.filesDir, name))
 
     fun load(): SaveData = try {
         if (!file.baseFile.exists()) SaveData(capsuleSeed = System.nanoTime()) else fromJson(JSONObject(String(file.readFully(), Charsets.UTF_8)))
@@ -58,6 +59,8 @@ class SaveStore(context: Context) {
             put("capsulesOpened", s.capsulesOpened)
             put("boostedCapsules", s.boostedCapsules)
             put("capsuleSeed", s.capsuleSeed)
+            put("dailyDay", s.dailyDay)
+            put("dailyBought", JSONArray(s.dailyBought.sorted()))
             put("fighters", JSONObject().apply {
                 s.fighters.forEach { (id, p) ->
                     put(id.name, JSONObject().apply {
@@ -175,6 +178,8 @@ class SaveStore(context: Context) {
                 capsulesOpened = o.optInt("capsulesOpened", 0).coerceAtLeast(0),
                 boostedCapsules = o.optInt("boostedCapsules", 0).coerceAtLeast(0),
                 capsuleSeed = if (o.has("capsuleSeed")) o.optLong("capsuleSeed") else System.nanoTime(),
+                dailyDay = o.optLong("dailyDay", -1),
+                dailyBought = o.optJSONArray("dailyBought")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet(),
                 settings = settings,
                 customOffers = o.optJSONArray("customOffers")?.let { arr ->
                     (0 until arr.length()).mapNotNull { i ->

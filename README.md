@@ -43,8 +43,9 @@ The server is in charge of what matters: it keeps each player's Cups, Glitch Dro
 referees every match (it replays the match from the player's inputs and the result is its own), works out what
 a match is worth, rolls what comes out of a drop, runs the shop and its deals, sets how tough the bots are,
 decides who gets the debug menu, and turns away versions that are no longer supported. If it can't be
-reached, the game offers offline mode after a minute of trying: every mode still plays against bots, as
-practice, and nothing is earned or spent until you are back online.
+reached, the game switches by itself to an offline profile kept on the device: a separate account with its own
+Cups, drops, currencies and fighters, run by the same rules on the device. It goes back to the server's account
+by itself when the server answers, and nothing from the offline profile is ever sent to it.
 
 ## Build & run
 
