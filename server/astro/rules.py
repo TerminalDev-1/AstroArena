@@ -1,9 +1,9 @@
 """The rules the server enforces itself rather than taking the client's word for them.
 
   * how many Cups a match is worth (by trophies.cfg; the client has no copy and shows what it is told)
-  * which finishes earn a Spark Drop, and how many a day
+  * which finishes earn a Glitch Drop, and how many a day
   * whether a reported result is believable at all
-  * what comes out of a Spark Drop
+  * what comes out of a Glitch Drop
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, tab
     return max(delta, -cups)
 
 
-# ---------------------------------------------------------------------------- Spark Drops: earning
+# ---------------------------------------------------------------------------- Glitch Drops: earning
 
 DROPS_PER_DAY = 3
 STARTING_DROPS = 1
@@ -125,7 +125,7 @@ def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: i
     return None
 
 
-# ---------------------------------------------------------------------------- Spark Drops: opening
+# ---------------------------------------------------------------------------- Glitch Drops: opening
 
 TIERS = [("SCRAP", 40), ("TUNED", 28), ("CHARGED", 18), ("OVERCLOCKED", 8), ("PRISMATIC", 4), ("ULTRA", 2)]
 MAX_LUCK = 14.0
@@ -134,12 +134,15 @@ MAX_PIECES = 8
 SPLIT_LUCK = 0.6
 # Every Bolt and Prism amount a drop gives is multiplied by this (3 = the amounts below, plus 200%).
 DROP_BUFF = 3
+# Every Credit amount a drop gives is multiplied by this: the Spark Road asks for thousands, and drops are the
+# way to get them in any number.
+CREDIT_BUFF = 12
 # "Open all" opens the drops the player holds at that moment; the pieces that split off wait for the next one.
 # (Chasing the splits has no end when luck makes every drop split.) This is the most one request goes through.
 MAX_OPEN_ALL = 10000
 
 # Every fighter and how many colourways it has (index 0 is the one it comes with). Keep in step with Balance.kt.
-FIGHTER_SKINS = {name: 3 for name in ("BYTE", "BRAKK", "MIRA", "KITO", "VARUN")}
+FIGHTER_SKINS = {name: 3 for name in ("BYTE", "BRAKK", "MIRA", "KITO", "VARUN", "BUDDY")}
 STARTING_FIGHTER = "BYTE"
 
 
@@ -208,9 +211,8 @@ def roll_reward(tier: int, save: dict, rng) -> dict:
         return rng.choice(choices) if choices else None
 
     def credits(lo: int, hi: int) -> dict:
-        # Credits unlock fighters on the Spark Road. (Drops don't hand out fighters themselves.) The buff leaves
-        # them alone: they are worth what the road charges.
-        return {"type": "credits", "amount": rng.randint(lo, hi)}
+        # Credits unlock fighters on the Spark Road. (Drops don't hand out fighters themselves.)
+        return {"type": "credits", "amount": rng.randint(lo, hi) * CREDIT_BUFF}
 
     name = TIERS[tier][0]
     if name == "SCRAP":
@@ -244,8 +246,6 @@ def apply_reward(save: dict, reward: dict) -> None:
         save["prisms"] = int(save.get("prisms") or 0) + int(reward["amount"])
     elif kind == "credits":
         save["credits"] = int(save.get("credits") or 0) + int(reward["amount"])
-    elif kind == "glory":
-        save["glory"] = int(save.get("glory") or 0) + int(reward["amount"])
     elif kind in ("fighter", "skin"):
         fighters = save.setdefault("fighters", {})
         if not isinstance(fighters, dict):

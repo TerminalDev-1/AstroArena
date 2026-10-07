@@ -128,11 +128,11 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
                     }
                 }
                 item {
-                    Section("POWER UP SUPPLIES") {
+                    Section("UPGRADE CREDIT SUPPLIES") {
                         Shop.boltCrates.forEachIndexed { i, c ->
                             OfferCard(cardW, c.pricePrisms, owned = false, tag = if (i == 2) "BEST VALUE" else null, onBuy = { pending = c }) {
                                 BoltPile(i + 1)
-                                Title(c.title, "+${c.bolts} Power Ups")
+                                Title(c.title, "+${c.bolts} Upgrade Credits")
                             }
                         }
                     }
@@ -173,7 +173,7 @@ fun ShopScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit, showR
         pending?.let { item ->
             ConfirmDialog(
                 title = "BUY ${item.title.uppercase()}?",
-                body = "Costs ${item.pricePrisms} Crystals. You have ${save.prisms}.",
+                body = "Costs ${item.pricePrisms} CPU Chips. You have ${save.prisms}.",
                 confirmLabel = "BUY",
                 onDismiss = { pending = null },
                 onConfirm = {

@@ -2,7 +2,7 @@
 
 Tables
   players         one row per installed game: an id, a secret token, its name, and what the server keeps for it:
-                  Cups, unopened Spark Drops, how many drops it has earned today, and its profile (Bolts, Prisms,
+                  Cups, unopened Glitch Drops, how many drops it has earned today, and its profile (Bolts, Prisms,
                   fighters, claimed rewards: see economy.py) as JSON
   saves           the latest copy of each player's save file (the JSON the client writes), with a revision counter
   matches         every match the server planned: who, which mode, the seed it handed out, and the reported result
@@ -115,12 +115,6 @@ def today() -> int:
     return (datetime.date.today() - _EPOCH).days
 
 
-def season_ends_ms(day: int) -> int:
-    """When the Spark Pass season that `day` falls in ends (ms since 1970, the server's midnight)."""
-    last = _EPOCH + datetime.timedelta(days=(economy.pass_season(day) + 1) * economy.PASS_SEASON_DAYS)
-    return int(datetime.datetime.combine(last, datetime.time.min).timestamp() * 1000)
-
-
 def clock() -> dict:
     """The server's time, for the game to count down from: now, today's number, and when today ends (ms since 1970)."""
     midnight = datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time.min)
@@ -189,7 +183,11 @@ class Store:
             profile = self._profile(player_id)
             profile["bolts"] = max(0, profile["bolts"] + int(bolts))
             profile["prisms"] = max(0, profile["prisms"] + int(prisms))
-            profile["credits"] = max(0, profile["credits"] + int(credits))
+            # Credits go onto the Spark Road, and unlock whatever they cover.
+            if int(credits) > 0:
+                economy.grant(profile, {"type": "credits", "amount": int(credits)})
+            else:
+                profile["credits"] = max(0, profile["credits"] + int(credits))
             self._keep(player_id, profile)
 
     def accounts(self) -> list[dict]:
@@ -203,7 +201,7 @@ class Store:
                     "id": row["id"], "name": row["name"], "cups": row["cups"], "drops": row["drops"], "disabled": bool(row["disabled"]),
                     "disabled_reason": row["disabled_reason"], "disabled_until": row["disabled_until"],
                     "best_cups": profile["bestCups"], "bolts": profile["bolts"], "prisms": profile["prisms"],
-                    "credits": profile["credits"], "glory": profile["glory"],
+                    "credits": profile["credits"],
                     "fighters": {
                         name: {"unlocked": bool(entry.get("unlocked")), "level": int(entry.get("level") or 1), "cups": int(entry.get("cups") or 0)}
                         for name, entry in profile["fighters"].items() if name in rules.FIGHTER_SKINS
@@ -231,7 +229,7 @@ class Store:
                 (cups, drops, min(row["boosted"], drops), 1 if disabled else 0, reason, until, player_id),
             )
             profile = self._profile(player_id)
-            for key, field in (("best_cups", "bestCups"), ("bolts", "bolts"), ("prisms", "prisms"), ("credits", "credits"), ("glory", "glory")):
+            for key, field in (("best_cups", "bestCups"), ("bolts", "bolts"), ("prisms", "prisms"), ("credits", "credits")):
                 if key in change:
                     profile[field] = number(change[key])
             for fighter, parts in (change.get("fighters") or {}).items():
@@ -244,6 +242,7 @@ class Store:
                     entry["level"] = min(max(int(parts["level"]), 1), economy.LEVEL_LIMIT)
                 if "cups" in parts:
                     entry["cups"] = number(parts["cups"])
+            economy.settle_road(profile)
             self._keep(player_id, profile)
         return True
 
@@ -342,12 +341,6 @@ class Store:
     def claim_milestone(self, player_id: str, cups: int) -> dict:
         return self._change(player_id, lambda p: economy.claim_milestone(p, cups))
 
-    def road_unlock(self, player_id: str) -> dict:
-        return self._change(player_id, economy.road_unlock)
-
-    def claim_pass(self, player_id: str, tier: int) -> dict:
-        return self._change(player_id, lambda p: economy.claim_pass(p, tier, today()))
-
     # ------------------------------------------------------------------ deals
 
     def create_deal(self, player_id: str, data: dict) -> int:
@@ -399,7 +392,7 @@ class Store:
     def put_save(self, player_id: str, save: dict, import_progress: bool = True) -> int:
         """Stores the player's save and returns its new revision.
 
-        The name and fighter are copied out for the leaderboard. Cups, Spark Drops, Bolts, Prisms and everything
+        The name and fighter are copied out for the leaderboard. Cups, Glitch Drops, Bolts, Prisms and everything
         else in the profile are the server's own: they are read from a save only once, the first time an account
         uploads one (and only if `import_progress` allows it), so that earlier progress carries over.
         """
@@ -484,7 +477,7 @@ class Store:
 
         None if there is no open match with that id for this player. Otherwise a dict: either
         {"rejected": reason} when the result isn't believable (the match is closed and the player flagged), or
-        {"cupDelta", "cups", "drop", "bolts", "firstWinPrisms"} with what the server awarded.
+        {"cupDelta", "cups", "drop", "bolts", "firstWinPrisms", "credits", "unlocked"} with what the server awarded.
         """
         outcome = str(result.get("outcome") or "")[:12]
         placement = int(result.get("placement") or 0)
@@ -535,23 +528,22 @@ class Store:
             fighter_cups = max(0, fighter_before + cups - player["cups"])
             if entry:
                 entry["cups"] = fighter_cups
-            # Credits for the Spark Road (Glory once it is finished) and points for the Spark Pass.
+            # Credits for the Spark Road: they may unlock the fighter they were filling. (Bolts instead, once it is finished.)
             paid = economy.grant(profile, {"type": "credits", "amount": economy.match_credits(mode, outcome, placement)})
-            points = economy.pass_points(mode, outcome, placement)
-            economy.add_pass_points(profile, points, day)
+            if paid["type"] == "bolts":
+                bolts += paid["amount"]
             self._keep(player_id, profile)
             return {
                 "cupDelta": cups - player["cups"], "cups": cups, "drop": drop, "bolts": bolts, "firstWinPrisms": prisms,
-                "credits": paid["amount"] if paid["type"] == "credits" else 0, "glory": paid["amount"] if paid["type"] == "glory" else 0,
-                "passPoints": points, "mvpCups": mvp_cups,
+                "credits": economy.credits_in(paid), "unlocked": economy.fighters_in(paid), "mvpCups": mvp_cups,
                 "fighter": match["fighter"], "fighterCupsBefore": fighter_before, "fighterCups": fighter_cups,
                 "fighterRank": rules.fighter_rank(fighter_cups),
             }
 
-    # ------------------------------------------------------------------ Spark Drops
+    # ------------------------------------------------------------------ Glitch Drops
 
     def open_drop(self, player_id: str, luck: float = 0.0, free: bool = False) -> dict | None:
-        """Opens one of the player's Spark Drops: the server rolls it and adds the reward to their profile.
+        """Opens one of the player's Glitch Drops: the server rolls it and adds the reward to their profile.
 
         None if they have none to open. `luck` and `free` (the drop isn't used up) are for developers; the
         caller decides whether this player may use them.
@@ -560,7 +552,7 @@ class Store:
         return results[0] if results else None
 
     def open_all_drops(self, player_id: str, luck: float = 0.0) -> list[dict]:
-        """Opens every Spark Drop the player holds right now, one after another (up to `rules.MAX_OPEN_ALL`). The
+        """Opens every Glitch Drop the player holds right now, one after another (up to `rules.MAX_OPEN_ALL`). The
         pieces that split off on the way are left for them to open next. The results come back in the order they
         were opened; empty if there were none."""
         return self._open_drops(player_id, luck, False, None)
@@ -598,12 +590,10 @@ class Store:
             rows = self._db.execute(
                 "SELECT id, name, cups, fighter, profile FROM players WHERE disabled = 0 ORDER BY cups DESC, created_at ASC LIMIT ?", (max(1, min(limit, 200)),)
             ).fetchall()
-        # Glory is shown beside a player's name; it lives in their profile.
         board = []
         for r in rows:
             row = dict(r)
-            stored = row.pop("profile")
-            row["glory"] = int((json.loads(stored) if stored else {}).get("glory") or 0)
+            row.pop("profile")
             board.append(row)
         return board
 

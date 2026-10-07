@@ -187,7 +187,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.shieldHp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits())
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy)
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -281,7 +281,8 @@ class World(
         }
 
         // --- super
-        if (c.superAttack && f.superReady && !f.isDashing) {
+        // (Malformed code needs someone to compile it into: with nobody in sight the charge is kept.)
+        if (c.superAttack && f.superReady && !f.isDashing && (f.def.superSpec.kind != SuperKind.CORRUPT || corruptTarget(f) != null)) {
             val (dx, dy) = aimDirection(f)
             f.facing = atan2(dy, dx)
             fireSuper(f, dx, dy)
@@ -305,7 +306,27 @@ class World(
             f.ammo = (f.ammo + dt / f.def.reloadSeconds).coerceAtMost(f.def.ammoMax.toFloat())
         }
 
-        regenerate(f, dt)
+        // Malformed code stops its victim healing, and bites until they are knocked out.
+        if (f.poisoned) stepPoison(f, dt) else regenerate(f, dt)
+    }
+
+    /** Who [f]'s malformed code would go into: the nearest enemy it can see, within the super's reach. */
+    fun corruptTarget(f: Fighter): Fighter? = nearestVisibleEnemy(f, f.def.superSpec.range)
+
+    private fun stepPoison(f: Fighter, dt: Float) {
+        if (phase != Phase.PLAYING) return
+        f.poisonLeft -= dt
+        f.poisonTick -= dt
+        if (f.poisonTick <= 0f) {
+            f.poisonTick += Balance.POISON_TICK_SECONDS
+            damage(f, fighter(f.poisonBy), (f.poisonDamage * Balance.POISON_TICK_SECONDS).toInt().coerceAtLeast(1), true, f.x, f.y)
+        }
+        if (f.alive && f.poisonLeft <= 0f) cure(f)
+    }
+
+    private fun cure(f: Fighter) {
+        f.poisonBy = -1
+        f.poisonDamage = 0
     }
 
     /**
@@ -396,6 +417,7 @@ class World(
             AttackShape.SPREAD -> if (a.bits) ShotStyle.BIT else ShotStyle.PELLET
             AttackShape.LANCE -> ShotStyle.PRISM
             AttackShape.ROCKETS -> ShotStyle.ROCKET
+            AttackShape.SMASH -> ShotStyle.COMPUTER
         }
         val baseAng = atan2(dy, dx)
         val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
@@ -443,6 +465,14 @@ class World(
                 f.dashHits.clear()
                 f.pending.clear()
                 events += GameEvent.Dash(f.id)
+            }
+            SuperKind.CORRUPT -> corruptTarget(f)?.let { t ->
+                f.facing = atan2(t.y - f.y, t.x - f.x)
+                t.poisonBy = f.id
+                t.poisonDamage = f.superDamage
+                t.poisonTick = Balance.POISON_TICK_SECONDS
+                t.poisonLeft = if (t.scale > 1f) Balance.POISON_GIANT_SECONDS else Float.MAX_VALUE
+                t.revealTimer = maxOf(t.revealTimer, 1.5f)
             }
         }
     }
@@ -623,6 +653,7 @@ class World(
         victim.pending.clear()
         victim.dashTime = 0f
         victim.shieldHp = 0
+        cure(victim)
         if (victim.hyperActive) endHyper(victim)
         // The super and hyper charges are kept: whatever was charged is still there after the respawn.
         events += GameEvent.Ko(killer?.id ?: -1, victim.id, victim.x, victim.y)

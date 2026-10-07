@@ -163,8 +163,8 @@ fun OfferCreatorDialog(onCreate: (CustomOffer) -> Unit, onDismiss: () -> Unit) {
                     Field("NAME") { TitleField(title) { title = it } }
                     Field("CONTENTS") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Stepper(IconKind.BOLT, "Power Ups", bolts, 0, 10_000, listOf(50, 500)) { bolts = it }
-                            Stepper(IconKind.PRISM, "Crystals", prisms, 0, 1_000, listOf(5, 50)) { prisms = it }
+                            Stepper(IconKind.BOLT, "Upgrade Credits", bolts, 0, 10_000, listOf(50, 500)) { bolts = it }
+                            Stepper(IconKind.PRISM, "CPU Chips", prisms, 0, 1_000, listOf(5, 50)) { prisms = it }
                             Choice("Fighter", listOf("None") + Balance.fighters.map { it.name.substringBefore(' ') }, fighter?.let { it.ordinal + 1 } ?: 0) { i ->
                                 fighter = if (i == 0) null else FighterId.entries[i - 1]
                             }
@@ -176,7 +176,7 @@ fun OfferCreatorDialog(onCreate: (CustomOffer) -> Unit, onDismiss: () -> Unit) {
                     }
                     Field("PRICE") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Choice("Pay with", listOf("Free", "Power Ups", "Crystals"), currency.ordinal) { currency = Currency.entries[it] }
+                            Choice("Pay with", listOf("Free", "Upgrade Credits", "CPU Chips"), currency.ordinal) { currency = Currency.entries[it] }
                             if (currency != Currency.FREE) {
                                 Stepper(if (currency == Currency.BOLTS) IconKind.BOLT else IconKind.PRISM, "Price", price, 0, 10_000, listOf(5, 50)) { price = it }
                                 Stepper(IconKind.STAR, "Was (discount)", wasPrice, 0, 20_000, listOf(5, 50)) { wasPrice = it }

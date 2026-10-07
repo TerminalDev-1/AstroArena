@@ -30,19 +30,17 @@ server never locks anyone out.
 | **Notices** | `notices.cfg` holds short messages shown on the home screen |
 | **Bots** | `bots.cfg` sets how bots behave at each difficulty; `game.cfg` sets which difficulties players may pick. The game asks, the server approves |
 | **Cups** | `trophies.cfg` sets the Cups each mode pays: by place, or for a win, a draw and a defeat |
-| **Accounts** | `accounts.cfg` is written by the server: every account, leaderboard first. Change a value (Cups, a fighter's level, Crystals...) and save to force it, or `disabled = yes` (with a reason and an end, if you like) to shut an account out |
+| **Accounts** | `accounts.cfg` is written by the server: every account, leaderboard first. Change a value (Cups, a fighter's level, CPU Chips...) and save to force it, or `disabled = yes` (with a reason and an end, if you like) to shut an account out |
 | **Daily offers** | `shop.cfg` is the pool; the server picks a few each day, the same for everyone, and says when the day ends |
 | **Time** | the day, when it ends, and every countdown come from the server's clock |
 | **Developers** | `game.cfg` lists the players who can switch on the debug menu, make shop deals and reset an account |
 | **Accounts** | a new player picks a name, then the install registers once and gets an id and a secret token |
 | **Cups** | the server works out what each match is worth and keeps the total |
-| **Credits and the Spark Road** | Credits (from matches, drops, the Cup Track, the Spark Pass and the shop) are not a wallet: they go straight into the Spark Road, toward the next fighter along it (a fixed order, the cheapest rarity first) |
-| **Glory** | once every fighter is unlocked, Credits are earned as Glory instead: a rank shown beside the player's name, which buys nothing |
-| **Spark Pass** | a 28-day season of 30 tiers; matches earn pass points, each tier has a reward to claim |
+| **Credits and the Spark Road** | Credits (from matches, drops, the Cup Track and the shop) are not a wallet: they go straight into the Spark Road, toward the next fighter along it (a fixed order, the cheapest rarity first). The moment they cover it the fighter is unlocked; once every fighter is unlocked they are paid as Upgrade Credits |
 | **Bolts and Prisms** | kept by the server: match pay, upgrades, shop purchases, the daily gift and Cup Track rewards all happen there |
 | **Deals** | shop offers made by developers in the game's Offer Creator, stored here and shown to every player |
 | **Leaderboard** | the real accounts on this server, ranked by Cups; there are no made-up names |
-| **Spark Drops** | the server decides when one is earned (three a day) and rolls what comes out when it is opened |
+| **Glitch Drops** | the server decides when one is earned (three a day) and rolls what comes out when it is opened |
 | **Matches** | the server plans each match (seed, bots, difficulty, fighter level). The game hands in what the player did, and the server replays the whole match to get the result |
 | **Saves** | the game uploads its save (settings and local statistics) after every change; a fresh install restores it |
 
@@ -74,7 +72,7 @@ result from its replay. So:
 - A match that is handed in unfinished counts as walking out: a defeat, in last place.
 - A match can't be handed in faster than it could have been played.
 
-- A save file can't set Cups, Spark Drops, Bolts, Prisms, levels or what is owned. They are read from a save
+- A save file can't set Cups, Glitch Drops, Bolts, Prisms, levels or what is owned. They are read from a save
   once, when an account first uploads one (so earlier progress carries over); set `import_saves = no` in
   `game.cfg` to stop even that.
 - Buying, upgrading and claiming are checked on the server: the price is the server's, the player has to be
@@ -127,15 +125,13 @@ All bodies are JSON. Endpoints marked * need `Authorization: Bearer <token>` and
 | `POST /v1/shop/gift` * | `{reward, account}`; 409 once claimed today |
 | `POST /v1/shop/deals/<id>/buy` * | `{reward, account}` |
 | `POST /v1/track/claim` * `{cups}` | `{reward, account}` |
-| `POST /v1/road/unlock` * | `{reward, account}`: claims the Spark Road fighter the Credits have covered; 402 if they haven't yet, 409 when the road is finished |
-| `POST /v1/pass/claim` * `{tier}` | `{reward, account}`: a Spark Pass tier; 409 if not reached or already claimed |
 | `POST /v1/shop/daily/<n>/buy` * `{day}` | `{reward, account}`: one of today's offers; 409 if bought already or the day has changed |
 | `POST /v1/settings/difficulty` * `{difficulty}` | `{ok, account}`, or 403 if the server doesn't allow it |
 | `POST /v1/reset` * | `{account}`: starts this account's progress over (developers only) |
 | `POST /v1/dev/grant` * `{cups, drops, bolts, prisms}` | `{account}` (developers only) |
 | `POST /v1/dev/deals` * `{title, bolts, prisms, fighter, skinFighter, skinIndex, currency, price, wasPrice, expiresAt, limit, theme}` | `{id, account}` (developers only) |
 | `POST /v1/dev/deals/<id>/delete` * | `{deleted, account}` (developers only) |
-| `GET /v1/leaderboard?limit=50` | `{players: [{id, name, cups, fighter, glory}]}` |
+| `GET /v1/leaderboard?limit=50` | `{players: [{id, name, cups, fighter}]}` |
 
 `account` is `{id, name, developer, cups, rank, players, drops, dropsLeftToday, difficulty, difficulties, profile,
 deals, dailyOffers, giftAvailable, time}`; `time` is `{now, day, dayEndsAt}` on the server's clock.

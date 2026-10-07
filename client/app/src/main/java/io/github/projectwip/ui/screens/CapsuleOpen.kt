@@ -166,7 +166,7 @@ fun CapsuleOpenOverlay(
         val capsuleRoom = maxHeight * 0.46f
         if (!opened) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                GameText("SPARK DROP", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
+                GameText("GLITCH DROP", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
                 GlitchText(shown.label.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), color, 5.dp, time, 0.5f + 0.2f * tier,
                     Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value })
                 // Room for the 3D capsule, which sits in the middle of the screen.

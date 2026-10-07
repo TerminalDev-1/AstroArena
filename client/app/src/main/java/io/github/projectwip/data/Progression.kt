@@ -27,12 +27,11 @@ data class MatchRewards(
     val capsuleEarned: Boolean = false,
     /** Spark Capsules that can still be earned today, after this match. */
     val capsulesLeftToday: Int = 0,
-    /** False for an offline match: the server wasn't there to award Cups or a Spark Drop. */
+    /** False for an offline match: the server wasn't there to award Cups or a Glitch Drop. */
     val online: Boolean = true,
-    /** Credits for the Spark Road (Glory once it is finished), and points for the Spark Pass. */
+    /** Credits for the Spark Road, and the fighters they unlocked. */
     val credits: Int = 0,
-    val passPoints: Int = 0,
-    val glory: Int = 0,
+    val unlocked: List<FighterId> = emptyList(),
     /** The Cups of the fighter that was played, before the match and what it changed them by: its rank follows them. */
     val fighterCupsBefore: Int = 0,
     val fighterCupDelta: Int = 0,
@@ -41,16 +40,16 @@ data class MatchRewards(
 )
 
 /**
- * What the game server decided a match was worth. Cups and Spark Drops are the server's to give, so these are
+ * What the game server decided a match was worth. Cups and Glitch Drops are the server's to give, so these are
  * totals to adopt, not amounts to add up on the device.
  */
 data class ServerVerdict(
     val cupDelta: Int,
     /** The player's Cups after this match. */
     val cups: Int,
-    /** This match earned a Spark Drop. */
+    /** This match earned a Glitch Drop. */
     val drop: Boolean,
-    /** Unopened Spark Drops after this match. */
+    /** Unopened Glitch Drops after this match. */
     val drops: Int,
     val dropsLeftToday: Int,
     /** Bolts this match paid. */
@@ -58,8 +57,8 @@ data class ServerVerdict(
     /** Prisms for the first win of the day (0 if this wasn't it). */
     val firstWinPrisms: Int = 0,
     val credits: Int = 0,
-    val passPoints: Int = 0,
-    val glory: Int = 0,
+    /** The fighters those Credits unlocked on the Spark Road. */
+    val unlocked: List<FighterId> = emptyList(),
     /** How the match went according to the server's own replay of it. Null if the server has no referee running. */
     val judged: JudgedResult? = null,
     /** The Cups of the fighter that was played, before and after this match. */
@@ -84,7 +83,6 @@ data class ServerProfile(
     val prisms: Int,
     val bestCups: Int,
     val credits: Int = 0,
-    val glory: Int = 0,
     /** [FighterProgress.skin] is not the server's business: which colourway is worn is chosen on the device. */
     val fighters: Map<FighterId, FighterProgress>,
     val claimedMilestones: Set<Int>,
@@ -123,13 +121,13 @@ object Progression {
             victories = save.victories + if (report.outcome == MatchOutcome.VICTORY) 1 else 0,
             totalKos = save.totalKos + report.kos,
         )
-        val rewards = MatchRewards(newCups - cupDelta, cupDelta, verdict?.bolts ?: 0, verdict?.firstWinPrisms ?: 0, reached, verdict?.drop == true, leftToday, online = verdict != null, credits = verdict?.credits ?: 0, passPoints = verdict?.passPoints ?: 0, glory = verdict?.glory ?: 0,
+        val rewards = MatchRewards(newCups - cupDelta, cupDelta, verdict?.bolts ?: 0, verdict?.firstWinPrisms ?: 0, reached, verdict?.drop == true, leftToday, online = verdict != null, credits = verdict?.credits ?: 0, unlocked = verdict?.unlocked ?: emptyList(),
             fighterCupsBefore = verdict?.fighterCupsBefore ?: save.progress(save.selectedFighter).cups, fighterCupDelta = verdict?.let { it.fighterCups - it.fighterCupsBefore } ?: 0, mvpCups = verdict?.mvpCups ?: 0)
         return next to rewards
     }
 
     /**
-     * Takes on what the server holds for this player: Cups and Spark Drops, and (when given) the [profile] and
+     * Takes on what the server holds for this player: Cups and Glitch Drops, and (when given) the [profile] and
      * the shop [deals]. These are totals to show, so applying the same ones twice changes nothing.
      */
     fun syncAccount(
@@ -151,7 +149,6 @@ object Progression {
         }
         return base.copy(
             bolts = profile.bolts.coerceAtLeast(0), prisms = profile.prisms.coerceAtLeast(0), credits = profile.credits.coerceAtLeast(0),
-            glory = profile.glory.coerceAtLeast(0),
             bestCups = maxOf(profile.bestCups, cups),
             fighters = fighters,
             selectedFighter = if (fighters[save.selectedFighter]?.unlocked == true) save.selectedFighter else FighterId.BYTE,
@@ -170,12 +167,12 @@ object Progression {
     fun capsulesLeftToday(save: SaveData, today: Long): Int =
         SparkCapsules.PER_DAY - if (save.capsuleDay == today) save.capsulesEarnedToday else 0
 
-    /** Counts a Spark Drop as opened. (Its reward arrives with the profile the server sends.) */
+    /** Counts a Glitch Drop as opened. (Its reward arrives with the profile the server sends.) */
     fun dropOpened(save: SaveData, count: Int = 1): SaveData = save.copy(capsulesOpened = save.capsulesOpened + count)
 
     /** Puts the debug menu's cheats back to normal (for players the server doesn't list as developers). */
     fun withoutCheats(settings: Settings): Settings =
-        settings.copy(debugLuck = 0f, debugInfiniteCapsules = false, debugNoLevelCap = false, debugUpgradeCost = 1f, devMenu = false)
+        settings.copy(debugLuck = 0f, debugInfiniteCapsules = false, debugNoLevelCap = false, debugUpgradeCost = 1f)
 
     // ---------------- Upgrades ----------------
 

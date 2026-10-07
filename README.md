@@ -19,12 +19,12 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 |---|---|
 | **Modes** | **Last Spark** — 10-fighter free-for-all, last one standing; break Spark Crates for stacking Power Cells (+10% health & damage each) while the Static Storm closes in. **Knockout Rush** — 3v3, first team to 10 KOs, your team starts at the bottom. **Boss Mode** — you against a giant version of a random fighter; knock it out to win, with unlimited lives. The boss's strength is fixed and it pays Bolts only. **Training Area** — a practice ground with four dummies, a swarm of twelve minis, a sentry gun and a boss, none of which move; nothing at stake |
 | **Arenas** | *Static Canyon* (44×44, free-for-all) and *Foundry Yard* (vertical 3v3): walls, tall-grass thickets (hide inside), coolant pools (block movement, not shots), destructible crates |
-| **Fighters** | **Byte** (scatter rifle, knockback super, starter) · **Brakk** (shotgun tank, ram super) · **Mira** (sniper, piercing super) · **Kito** (fast blade assassin, dash super) · **Varun** (rocket firefighter: three rockets a shot, a super of eight seekers that fly over walls, hunt enemies and never land the knockout). Every fighter also has a **Hyper**: 8 seconds of +25% damage, health and shield |
+| **Fighters** | **Byte** (scatter rifle, knockback super, starter) · **Brakk** (shotgun tank, ram super) · **Mira** (sniper, piercing super) · **Kito** (fast blade assassin, dash super) · **Buddy** (Ultra: a rogue AI that smashes a computer into whoever is close, and whose super poisons the nearest enemy until they are knocked out) · **Varun** (rocket firefighter: three rockets a shot, a super of eight seekers that fly over walls, hunt enemies and never land the knockout). Every fighter also has a **Hyper**: 8 seconds of +25% damage, health and shield |
 | **Graphics** | Custom OpenGL ES 3.0: toon lighting, real-time shadows, inked outlines, 4× MSAA, up to 120 Hz |
 | **Controls** | Floating/fixed move stick · drag-to-aim attack stick (tap anywhere on it = auto-aim that locks the nearest enemy and leads moving targets; visible target marker; drag back to centre = cancel) · super stick · optional aim assist · camera centred on you |
 | **Bots** | Easy / Normal / Hard / Elite — behaviour only (reaction, aim, leading, dodging, spacing, targeting, supers) |
 | **Progression** | Levels 1–10 with linear, fully visible stat gains · Bolts (upgrades) · Prisms (shop) · Cups · Cup Track rewards |
-| **Spark Drops** | Earned from your first three good finishes a day (a team win, or top 4 in Last Spark). Tap to charge one through six tiers — Scrap, Tuned, Charged, Overclocked, Prismatic, Ultra — then it bursts open: Bolts, Prisms, a colourway or a new fighter, never a duplicate. A drop can split into two, four or eight, and the pieces roll better than a plain one |
+| **Glitch Drops** | Earned from your first three good finishes a day (a team win, or top 4 in Last Spark). Tap to charge one through six tiers — Scrap, Tuned, Charged, Overclocked, Prismatic, Ultra — then it bursts open: Bolts, Prisms, a colourway or a new fighter, never a duplicate. A drop can split into two, four or eight, and the pieces roll better than a plain one |
 | **Leaderboard** | A Cup ladder of 100. There is no online play yet, so the other 99 are simulated rivals whose Cups drift from day to day |
 | **Sound** | Music (a sixteen-bar dark-electro lobby loop in four sections, plus separate victory and defeat themes) and every effect are designed in code by a small synth (`audio/SfxSynth.kt`): band-limited oscillators, FM bells, filtered noise, drive, echo and reverb |
 | **Shop** | Daily free gift · fighter unlocks · Bolt supplies · colourways · **Offer Creator**: design your own deals (bundle contents, price in Bolts/Prisms/free, discount display, expiry, purchase limit, colour theme) |
@@ -39,7 +39,7 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 | [`client/`](client) | The Android game: Kotlin, Jetpack Compose menus, a custom OpenGL ES 3.0 renderer |
 | [`server/`](server) | The game server: Python (standard library only) with a SQLite database. See [server/README.md](server/README.md) |
 
-The server is in charge of what matters: it keeps each player's Cups, Spark Drops, Bolts, Prisms and fighters,
+The server is in charge of what matters: it keeps each player's Cups, Glitch Drops, Bolts, Prisms and fighters,
 referees every match (it replays the match from the player's inputs and the result is its own), works out what
 a match is worth, rolls what comes out of a drop, runs the shop and its deals, sets how tough the bots are,
 decides who gets the debug menu, and turns away versions that are no longer supported. If it can't be
@@ -76,7 +76,7 @@ Almost every number lives in two files:
   (`StatLine(base, perLevel)`: e.g. damage `100 + 5/level`), upgrade costs, match length, reward formulas,
   bot difficulty reward bonuses.
 * [`data/Catalog.kt`](client/app/src/main/java/io/github/projectwip/data/Catalog.kt) — Cup Track milestones, Shop
-  items, daily gift, Spark Drop tiers, odds and rewards.
+  items, daily gift, Glitch Drop tiers, odds and rewards.
 
 Bot behaviour per difficulty: [`ai/BotProfile.kt`](client/app/src/main/java/io/github/projectwip/ai/BotProfile.kt).
 The arena is ASCII: edit the quadrant in [`sim/Arena.kt`](client/app/src/main/java/io/github/projectwip/sim/Arena.kt).

@@ -70,7 +70,7 @@ import androidx.compose.runtime.collectAsState
 
 const val REPO_URL = "https://github.com/TerminalDev-1/AstroArena"
 
-private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), DEVELOPER("Developer") }
+private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), CHAOS("Chaos Command Center") }
 
 @Composable
 fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
@@ -88,7 +88,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
             ScreenHeader("SETTINGS", { go(Screen.Home) }, null, null)
             Row(Modifier.weight(1f).padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
                 Column(Modifier.width(if (ui.roomy) 200.dp else 170.dp), verticalArrangement = Arrangement.spacedBy(if (ui.roomy) 10.dp else 7.dp)) {
-                    for (t in Tab.entries.filter { it != Tab.DEVELOPER || dev }) {
+                    for (t in Tab.entries.filter { it != Tab.CHAOS || dev }) {
                         ChunkyButton({ tab = t }, Modifier.fillMaxWidth().height(if (ui.roomy) 58.dp else 42.dp),
                             if (t == tab) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
                             GameText(t.label.uppercase(), Type.Label, outline = 2.dp)
@@ -104,7 +104,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                             Tab.AUDIO -> AudioTab(s, set)
                             Tab.DISPLAY -> DisplayTab(s, set)
                             Tab.DATA -> DataTab(repo, dev)
-                            Tab.DEVELOPER -> if (dev) DeveloperTab(s, set)
+                            Tab.CHAOS -> if (dev) ChaosCommandCenter(save, repo)
                         }
                     }
                 }
@@ -130,11 +130,14 @@ private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
                         Spacer(Modifier.height(4.dp))
                         PlainText(d.blurb, Type.Small, color = Color.White.copy(alpha = 0.9f), maxLines = 5, align = androidx.compose.ui.text.style.TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
-                        PlainText("Power Ups ×${d.boltMultiplier}", Type.Small, color = Palette.Gold, align = androidx.compose.ui.text.style.TextAlign.Center)
+                        PlainText("Upgrade Credits ×${d.boltMultiplier}", Type.Small, color = Palette.Gold, align = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                 }
             }
         }
+    }
+    ToggleRow("GLITCH DROPS ONLY", "The home screen becomes just the Glitch Drop button. No fights. Turn it off to get the fights back.", s.glitchDropsOnly) { v ->
+        set { it.copy(glitchDropsOnly = v) }
     }
     SectionTitle("PLAYER NAME", "Shown above your fighter in matches.")
     NameField(s.playerName) { n -> set { it.copy(playerName = n, nameChosen = true) } }
@@ -256,7 +259,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
         status == null -> "No server connection in this build."
         !status.supported -> "The server at ${status.url} doesn't support this version."
         status.disabled -> "Your account on ${status.url} has been disabled by the server's owner."
-        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Spark Drops, Power Ups, Crystals and fighters, sets matches up and decides their results."
+        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Glitch Drops, Upgrade Credits, CPU Chips and fighters, sets matches up and decides their results."
         else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You can still play against bots for practice; nothing is earned or spent until you're back online."
     })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -280,18 +283,6 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     if (confirm) {
         ConfirmDialog("RESET EVERYTHING?", "All progress will be lost.", "RESET", { confirm = false; ask({ reset() }) { repo.resetProgress() } }, { confirm = false }, ButtonStyle.RED)
     }
-}
-
-/** Developers only: whether the "D" button (the debug menu) is on the menu screens. It is off until switched on here. */
-@Composable
-private fun DeveloperTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
-    val server = io.github.projectwip.ui.LocalServer.current
-    val listed = server?.status?.collectAsState()?.value?.account?.developer == true
-    SectionTitle("DEVELOPER", if (listed) "The server lists you as a developer." else "The server no longer lists you as a developer.")
-    ToggleRow("DEVELOPER MENU", "Shows a small D button in the corner of the menu screens. It opens the debug menu: drop luck, upgrade cost, hand-outs.", s.devMenu) { v ->
-        set { it.copy(devMenu = v) }
-    }
-    server?.playerId?.let { PlainText("Player ID: $it", Type.Body, color = Color.White) }
 }
 
 // ---------------------------------------------------------------------------------------------- controls

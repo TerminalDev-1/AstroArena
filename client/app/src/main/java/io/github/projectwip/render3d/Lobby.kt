@@ -23,7 +23,8 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /** Camera framings the menus can ask for. */
-enum class LobbyShot { HOME, FIGHTER, BACKDROP }
+/** [ROAD] is the Spark Road: a road off to one side of the lobby with every fighter standing along it. */
+enum class LobbyShot { HOME, FIGHTER, BACKDROP, ROAD }
 
 /** What the lobby shows. Written by the UI thread, read by the GL thread. */
 class LobbyParams {
@@ -39,6 +40,15 @@ class LobbyParams {
     @Volatile var dragYaw = 0f
     @Volatile var celebrateAt = 0L
     @Volatile var cheerAt = 0L
+
+    // The Spark Road (the ROAD shot). Stop 0 is the starting fighter, the rest follow in the order they unlock.
+    /** A bit per stop: set once that stop's fighter is unlocked. */
+    @Volatile var roadUnlocked = 1
+    /** The stop the Credits are filling (-1 once the road is finished), and how full it is, 0..1. */
+    @Volatile var roadNext = -1
+    @Volatile var roadFill = 0f
+    /** Where along the road the camera is, in stops. */
+    @Volatile var roadScroll = 0f
 
     // Spark Capsule opening (see Capsule3D): the menu sets these, the GL thread animates from them.
     @Volatile var capsuleShown = false
@@ -84,6 +94,15 @@ class LobbyScene {
     private val bolt: Mesh
     private val cell: Mesh
     private val pillarTops = ArrayList<FloatArray>()
+
+    // The Spark Road: the starting fighter, then every fighter in the order the road unlocks them.
+    private val roadStops: List<FighterId> = listOf(FighterId.BYTE) + io.github.projectwip.data.SparkRoad.steps.map { it.fighter }
+    private val roadGround: Mesh
+    private val roadBand: Mesh
+    private val roadDashes: Mesh
+    private val roadLit: Mesh
+    private val roadAnim = FighterAnim()
+    private var wasRoad = false
 
     private val proj = FloatArray(16)
     private val view = FloatArray(16)
@@ -189,21 +208,100 @@ class LobbyScene {
             color(0.22f, 0.16f, 0.36f); with { translate(0f, 0.2f, 0f); cylinder(0.17f, 0.07f, 14) }; with { translate(0f, -0.2f, 0f); cylinder(0.17f, 0.07f, 14) }
         }.build()
 
-        Matrix.setLookAtM(lightView, 0, -Toon.LIGHT[0] * 14f, -Toon.LIGHT[1] * 14f, -Toon.LIGHT[2] * 14f, 0f, 0f, 0f, 0f, 1f, 0f)
-        Matrix.orthoM(lightProj, 0, -6f, 6f, -6f, 6f, 1f, 40f)
+        val roadEnd = (roadStops.size - 1) * ROAD_SPACING
+        roadGround = MeshBuilder().apply {
+            color(0.15f, 0.11f, 0.33f); groundQuad(-16f, -12f, roadEnd + 16f, 10f, -0.03f)
+            color(0.2f, 0.15f, 0.42f)
+            for (k in -3..(roadEnd / 2f).toInt() + 3) groundQuad(k * 2f - 0.03f, -12f, k * 2f + 0.03f, 10f, -0.025f)
+        }.build()
+        roadBand = MeshBuilder().apply {
+            color(0.1f, 0.07f, 0.22f); with { translate(roadEnd / 2f, 0f, 0f); box(roadEnd + 3.4f, 0.06f, 2.9f) }
+            color(0.3f, 0.24f, 0.68f); with { translate(roadEnd / 2f, 0.04f, 0f); box(roadEnd + 3f, 0.06f, 2.5f) }
+        }.build()
+        roadDashes = MeshBuilder().apply {
+            color(1f, 1f, 1f)
+            var x = -1.2f
+            while (x < roadEnd + 1.2f) { with { translate(x, 0.08f, 0f); box(0.5f, 0.012f, 0.09f) }; x += 1f }
+        }.build()
+        // One unit of lit road, stretched to however far the Credits have reached.
+        roadLit = MeshBuilder().apply { color(1f, 1f, 1f); with { translate(0.5f, 0.078f, 0f); box(1f, 0.012f, 2.1f) } }.build()
+    }
+
+    private fun aimLight(x: Float, z: Float, reach: Float) {
+        Matrix.setLookAtM(lightView, 0, x - Toon.LIGHT[0] * 14f, -Toon.LIGHT[1] * 14f, z - Toon.LIGHT[2] * 14f, x, 0f, z, 0f, 1f, 0f)
+        Matrix.orthoM(lightProj, 0, -reach, reach, -reach, reach, 1f, 40f)
         Matrix.multiplyMM(lightVP, 0, lightProj, 0, lightView, 0)
     }
 
-    private fun shotEye(s: LobbyShot): FloatArray = when (s) {
+    private fun shotEye(p: LobbyParams): FloatArray = when (p.shot) {
         LobbyShot.HOME -> floatArrayOf(0f, 2.3f, 7.6f)
         LobbyShot.FIGHTER -> floatArrayOf(0.4f, 2.4f, 8.0f)
         LobbyShot.BACKDROP -> floatArrayOf(0f, 3.4f, 9.5f)
+        LobbyShot.ROAD -> floatArrayOf(p.roadScroll * ROAD_SPACING, 3.3f, ROAD_Z + 9.6f)
     }
 
-    private fun shotTarget(s: LobbyShot): FloatArray = when (s) {
+    private fun shotTarget(p: LobbyParams): FloatArray = when (p.shot) {
         LobbyShot.HOME -> floatArrayOf(0f, 1.2f, 0f)
         LobbyShot.FIGHTER -> floatArrayOf(0f, 0.95f, 0f)
         LobbyShot.BACKDROP -> floatArrayOf(0f, 3.6f, -8f)
+        LobbyShot.ROAD -> floatArrayOf(p.roadScroll * ROAD_SPACING, 1.5f, ROAD_Z)
+    }
+
+    /** The stops near enough to the camera to be worth drawing. */
+    private inline fun forEachRoadStop(block: (index: Int, id: FighterId, x: Float) -> Unit) {
+        for ((i, id) in roadStops.withIndex()) {
+            val x = i * ROAD_SPACING
+            if (abs(x - target[0]) < 13f) block(i, id, x)
+        }
+    }
+
+    private fun roadFighter(prog: Program, p: LobbyParams, i: Int, id: FighterId, x: Float, time: Float, pass: Pass) {
+        val isNext = i == p.roadNext
+        roadAnim.time = time + i * 1.7f; roadAnim.walk = 0f; roadAnim.moving = 0f; roadAnim.recoil = 0f; roadAnim.flash = 0f; roadAnim.spin = 0f
+        roadAnim.scale = if (isNext) 1.12f else 1f
+        roadAnim.jump = 0.1f + if (isNext) abs(sin(time * 2.2f)) * 0.1f else 0f
+        models.draw(prog, Balance.fighter(id), 0, x, ROAD_Z, (PI / 2 - 0.3).toFloat() + sin(time * 0.6f + i) * 0.1f, roadAnim, pass)
+    }
+
+    /** The road itself: the ground it runs over, the band, how far it is lit, and a marker under every fighter. */
+    private fun drawRoad(p: LobbyParams, time: Float) {
+        Matrix.setIdentityM(model, 0)
+        Matrix.translateM(model, 0, 0f, 0f, ROAD_Z)
+        lit.mat4("uModel", model)
+        lit.f("uRim", 0.05f)
+        roadGround.draw()
+        roadBand.draw()
+        lit.f("uEmissive", 0.5f)
+        roadDashes.draw()
+        // Lit as far as the Credits have reached: all the way to the last unlocked stop, and part of the way to the next.
+        val reached = if (p.roadNext < 0) (roadStops.size - 1).toFloat() else (p.roadNext - 1 + p.roadFill.coerceIn(0f, 1f)).coerceAtLeast(0f)
+        if (reached > 0f) {
+            Matrix.scaleM(model, 0, reached * ROAD_SPACING, 1f, 1f)
+            lit.mat4("uModel", model)
+            lit.v4("uTint", 0.25f, 0.92f, 0.55f, 1f)
+            lit.f("uEmissive", 0.75f + 0.15f * sin(time * 3f))
+            roadLit.draw()
+            lit.v4("uTint", 1f, 1f, 1f, 1f)
+        }
+        lit.f("uEmissive", 0f)
+        lit.f("uRim", 0.25f)
+        forEachRoadStop { i, id, x ->
+            val unlocked = (p.roadUnlocked shr i) and 1 != 0
+            Matrix.setIdentityM(model, 0)
+            Matrix.translateM(model, 0, x, 0.1f, ROAD_Z)
+            Matrix.scaleM(model, 0, 0.78f, 0.6f, 0.78f)
+            lit.mat4("uModel", model)
+            pedestal.draw(); pedestalTop.draw()
+            // The rim is the fighter's rarity: bright once reached, dim before.
+            val c = Balance.fighter(id).rarity.color.toInt()
+            val glow = if (unlocked || i == p.roadNext) 1f else 0.35f
+            lit.v4("uTint", r(c) * glow, g(c) * glow, b(c) * glow, 1f)
+            lit.f("uEmissive", if (i == p.roadNext) 0.7f + 0.3f * sin(time * 4f) else if (unlocked) 0.6f else 0f)
+            pedestalRim.draw()
+            lit.f("uEmissive", 0f)
+            lit.v4("uTint", 1f, 1f, 1f, 1f)
+        }
+        lit.mat4("uModel", Toon.IDENTITY)
     }
 
     fun render(width: Int, height: Int, p: LobbyParams, time: Float, dt: Float) {
@@ -213,13 +311,17 @@ class LobbyScene {
 
         // Camera glides between shots.
         val k = 1f - exp(-dt * 3.2f)
-        val e = shotEye(p.shot); val t = shotTarget(p.shot)
+        val e = shotEye(p); val t = shotTarget(p)
+        val road = p.shot == LobbyShot.ROAD
+        // The road is a place of its own, a long way from the pedestal: the camera cuts to it rather than flying there.
+        if (road != wasRoad) { wasRoad = road; for (i in 0..2) { eye[i] = e[i]; target[i] = t[i] } }
         for (i in 0..2) { eye[i] += (e[i] - eye[i]) * k; target[i] += (t[i] - target[i]) * k }
-        val wantShift = if (p.shot == LobbyShot.BACKDROP) 0f else (p.fighterScreenX * 2f - 1f)
+        if (road) aimLight(target[0], ROAD_Z, 9f) else aimLight(0f, 0f, 6f)
+        val wantShift = if (p.shot == LobbyShot.BACKDROP || road) 0f else (p.fighterScreenX * 2f - 1f)
         shift += (wantShift - shift) * k
         val wantShiftY = if (p.shot == LobbyShot.FIGHTER) (1f - 2f * p.fighterScreenY) * 0.9f else 0f
         shiftY += (wantShiftY - shiftY) * k
-        val wantAlpha = if (p.showFighter && p.shot != LobbyShot.BACKDROP) 1f else 0f
+        val wantAlpha = if (p.showFighter && p.shot != LobbyShot.BACKDROP && !road) 1f else 0f
         fighterAlpha += (wantAlpha - fighterAlpha) * (1f - exp(-dt * 6f))
         val sway = sin(time * 0.25f) * 0.25f
 
@@ -259,7 +361,8 @@ class LobbyScene {
         depth.use()
         depth.mat4("uViewProj", lightVP); depth.mat4("uLightVP", lightVP); depth.f("uOutline", 0f); depth.f("uSway", 0f); depth.f("uTime", time)
         if (drawFighter) models.draw(depth, def, p.skin, 0f, 0f, facing, anim, Pass.SHADOW)
-        drawProps(depth, time, shadowPass = true)
+        if (road) forEachRoadStop { i, id, x -> roadFighter(depth, p, i, id, x, time, Pass.SHADOW) }
+        else drawProps(depth, time, shadowPass = true)
         shadow.end()
 
         GLES30.glViewport(0, 0, width, height)
@@ -307,6 +410,20 @@ class LobbyScene {
         lit.f("uEmissive", 0f)
         lit.v4("uTint", 1f, 1f, 1f, 1f)
         drawProps(lit, time, shadowPass = false)
+        if (road) {
+            drawRoad(p, time)
+            lit.f("uRim", 0.5f)
+            forEachRoadStop { i, id, x ->
+                if ((p.roadUnlocked shr i) and 1 != 0) roadFighter(lit, p, i, id, x, time, Pass.COLOR)
+                else {
+                    // Not unlocked yet: only its shape, dark.
+                    lit.i("uMode", 2); lit.v4("uTint", 0.13f, 0.09f, 0.28f, 1f)
+                    roadFighter(lit, p, i, id, x, time, Pass.SILHOUETTE)
+                    lit.i("uMode", 0); lit.v4("uTint", 1f, 1f, 1f, 1f)
+                }
+            }
+            lit.f("uFlash", 0f); lit.f("uEmissive", 0f)
+        }
         // Fighter
         if (drawFighter) {
             lit.f("uRim", 0.5f)
@@ -323,6 +440,10 @@ class LobbyScene {
         lit.i("uMode", 1)
         lit.v4("uTint", Toon.INK[0], Toon.INK[1], Toon.INK[2], 1f)
         if (drawFighter) { lit.f("uOutline", FighterModels.OUTLINE); models.draw(lit, def, p.skin, 0f, 0f, facing, anim, Pass.OUTLINE) }
+        if (road) {
+            lit.f("uOutline", FighterModels.OUTLINE)
+            forEachRoadStop { i, id, x -> if ((p.roadUnlocked shr i) and 1 != 0) roadFighter(lit, p, i, id, x, time, Pass.OUTLINE) }
+        }
         lit.f("uOutline", 0.03f)
         lit.mat4("uModel", Toon.IDENTITY)
         pedestal.draw()
@@ -350,6 +471,8 @@ class LobbyScene {
         sprites.begin()
         for ((i, tp) in pillarTops.withIndex()) sprites.add(tp[0], tp[1], tp[2], 1.4f + 0.1f * sin(time * 2f + i), if (i % 2 == 0) 0.3f else 1f, if (i % 2 == 0) 0.8f else 0.4f, 1f, 0.5f)
         sprites.add(0f, 5.6f, -12f, 4.5f, 1f, 0.7f, 0.3f, 0.25f)
+        // A beacon over the fighter the road is filling.
+        if (road && p.roadNext >= 0) sprites.add(p.roadNext * ROAD_SPACING, 1.4f, ROAD_Z, 3.4f + 0.3f * sin(time * 3f), 0.25f, 0.95f, 0.55f, 0.22f)
         particles.emit(sprites, true)
         sprites.flush()
         GLES30.glDepthMask(true)
@@ -377,6 +500,12 @@ class LobbyScene {
         }
         if (!shadowPass) p.f("uEmissive", 0f)
         p.mat4("uModel", Toon.IDENTITY)
+    }
+
+    private companion object {
+        /** Where the Spark Road runs (along X at this Z), and how far apart its stops are. */
+        const val ROAD_Z = 40f
+        const val ROAD_SPACING = 4.2f
     }
 
     private fun smooth(t: Float): Float { val x = t.coerceIn(0f, 1f); return x * x * (3 - 2 * x) }

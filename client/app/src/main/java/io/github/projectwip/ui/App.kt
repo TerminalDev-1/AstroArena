@@ -76,7 +76,6 @@ sealed interface Screen {
     data object News : Screen { override val depth = 1 }
     data object Shop : Screen { override val depth = 1 }
     data object Road : Screen { override val depth = 2 }
-    data object Pass : Screen { override val depth = 1 }
     data object Settings : Screen { override val depth = 1 }
     data object Team : Screen { override val depth = 1 }
     data class Match(val config: MatchConfig) : Screen { override val depth = 2 }
@@ -100,11 +99,13 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "roster" -> { io.github.projectwip.ui.screens.rosterPreview = true; Screen.Fighters() }
                 "kito" -> Screen.Fighters(FighterId.KITO)
                 "varun" -> Screen.Fighters(FighterId.VARUN)
+                "buddy" -> Screen.Fighters(FighterId.BUDDY)
+                // The Training Area as Buddy, unlocked or not.
+                "trybuddy" -> Screen.Match(startMatchConfig(repo.save.value).copy(playerFighter = FighterId.BUDDY, playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
                 // The Training Area as Varun, unlocked or not, for looking at him in play.
                 "tryvarun" -> Screen.Match(startMatchConfig(repo.save.value).copy(playerFighter = FighterId.VARUN, playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road
-                "pass" -> Screen.Pass
                 "track" -> Screen.CupTrack
                 "settings" -> Screen.Settings
                 "leaders" -> Screen.Leaderboard
@@ -202,7 +203,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         booting = false
     }
 
-    // Cups, Spark Drops, currencies, fighters and shop deals are the server's: whatever it says this player has is what the game shows.
+    // Cups, Glitch Drops, currencies, fighters and shop deals are the server's: whatever it says this player has is what the game shows.
     LaunchedEffect(account) { account?.let { repo.sync(it) } }
     // Anyone who isn't a developer plays without the debug menu's cheats, even if their save has some switched on.
     LaunchedEffect(dev, booting) { if (!booting && !dev) repo.clearCheats() }
@@ -259,10 +260,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     /** A match has just ended and the server is replaying it to decide the result. */
     var judging by remember { mutableStateOf(false) }
     val ask = remember { ServerCall(scope, server, repo, sfx) { toast = it } }
-    // Spark Drops are opened by the server: it rolls the drop, the game shows what came out.
+    // Glitch Drops are opened by the server: it rolls the drop, the game shows what came out.
     val openCapsule: () -> Unit = {
         if (!opening) {
-            if (!serverStatus.online) toast = "Spark Drops are opened by the server, and you're offline."
+            if (!serverStatus.online) toast = "Glitch Drops are opened by the server, and you're offline."
             else {
                 opening = true
                 scope.launch {
@@ -273,7 +274,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     opening = false
                     server.status.value.account?.let { repo.sync(it) }
                     if (result != null) { repo.dropOpened(); capsule = result }
-                    else toast = if (server.status.value.online) "No Spark Drops to open." else "Couldn't reach the server. Try again in a moment."
+                    else toast = if (server.status.value.online) "No Glitch Drops to open." else "Couldn't reach the server. Try again in a moment."
                 }
             }
         }
@@ -286,7 +287,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // Opens every drop that is left. [first] is the one on screen, when its own reveal is being skipped.
     val openAll: (CapsuleResult?) -> Unit = { first ->
         if (!opening) {
-            if (!serverStatus.online) toast = "Spark Drops are opened by the server, and you're offline."
+            if (!serverStatus.online) toast = "Glitch Drops are opened by the server, and you're offline."
             else {
                 opening = true
                 scope.launch {
@@ -295,12 +296,11 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     opening = false
                     server.status.value.account?.let { repo.sync(it) }
                     if (rest != null) { repo.dropOpened(rest.size); capsule = null; haul = listOfNotNull(first) + rest }
-                    else toast = if (server.status.value.online) "No Spark Drops to open." else "Couldn't reach the server. Try again in a moment."
+                    else toast = if (server.status.value.online) "No Glitch Drops to open." else "Couldn't reach the server. Try again in a moment."
                 }
             }
         }
     }
-    var debugMenu by remember { mutableStateOf(false) }
 
     BackHandler(enabled = screen !is Screen.Home && screen !is Screen.Match) {
         screen = Screen.Home
@@ -349,7 +349,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     Screen.News -> io.github.projectwip.ui.screens.NewsScreen(go)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
                     Screen.Road -> io.github.projectwip.ui.screens.RoadScreen(save, go, showReward)
-                    Screen.Pass -> io.github.projectwip.ui.screens.PassScreen(save, go, showReward)
                     Screen.Settings -> SettingsScreen(save, repo, go)
                     Screen.Team -> io.github.projectwip.ui.screens.TeamScreen(save, team, { team = it }, go)
                     is Screen.Match -> MatchScreen(
@@ -387,22 +386,13 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             AnimatedVisibility(reveal != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
                 reveal?.let { RewardRevealOverlay(it, save.bolts, save.prisms, roadNow(save), roadGoal(save)) { reveal = null } }
             }
-            // The debug menu hides behind a small "D" in the corner of every menu screen.
-            // Developers only, and only if they switched it on in Settings > Developer.
-            val devMenu = dev && save.settings.devMenu
-            if (devMenu && screen !is Screen.Match && capsule == null && haul == null && reveal == null) {
-                // On the home screen the bottom-left corner belongs to the Spark Pass and Spark Road cards, so the
-                // button sits under the settings gear instead, in line with it.
-                io.github.projectwip.ui.screens.DebugButton(if (screen is Screen.Home) Modifier.align(Alignment.TopEnd).padding(top = 70.dp, end = 27.dp) else Modifier.align(Alignment.BottomStart)) { debugMenu = true }
-            }
-            if (debugMenu && devMenu) io.github.projectwip.ui.screens.DebugMenu(save, repo) { debugMenu = false }
             // On top of everything: the loading screen, then (if a newer release exists) the update screen.
             // Server status in the corner. (Its notice is part of the home screen.)
             if (screen !is Screen.Match && capsule == null && haul == null && reveal == null) {
                 PlainText(
                     if (serverStatus.online) "● ONLINE" else "● OFFLINE MODE · practice only", Type.Small,
                     if (screen is Screen.Home) Modifier.align(Alignment.TopStart).padding(start = 22.dp, top = 68.dp)
-                    else Modifier.align(Alignment.BottomStart).padding(start = if (devMenu) 48.dp else 14.dp, bottom = 12.dp),
+                    else Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 12.dp),
                     color = if (serverStatus.online) Palette.Positive else Palette.TextDim,
                 )
             }
@@ -465,7 +455,7 @@ private enum class Connection { CONNECTING, FAILED, SETTLED }
 /**
  * Says hello to the game server and syncs the save with it. Blocking: call it off the main thread.
  * A save nobody has played on is replaced by the copy the server holds; otherwise this device's save wins
- * and is uploaded. Either way the server then says who this player is (its Cups, its Spark Drops, developer
+ * and is uploaded. Either way the server then says who this player is (its Cups, its Glitch Drops, developer
  * or not), which the game takes on.
  */
 fun connectToServer(server: io.github.projectwip.net.GameServer, repo: GameRepository) {
@@ -488,10 +478,9 @@ fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
 }
 
 fun rewardLabel(r: Reward): String = when (r) {
-    is Reward.Bolts -> "+${r.amount} Power Ups"
-    is Reward.Prisms -> "+${r.amount} Crystals"
+    is Reward.Bolts -> "+${r.amount} Upgrade Credits"
+    is Reward.Prisms -> "+${r.amount} CPU Chips"
     is Reward.Credits -> "+${r.amount} Credits"
-    is Reward.Glory -> "+${r.amount} Glory"
     is Reward.UnlockFighter -> "${Balance.fighter(r.fighter).name} unlocked!"
     is Reward.SkinReward -> "${Balance.fighter(r.fighter).skins[r.skinIndex].name} colorway"
     is Reward.Bundle -> r.items.joinToString(", ") { rewardLabel(it) }
@@ -503,7 +492,6 @@ fun RewardVisual(r: Reward, modifier: Modifier = Modifier) {
         is Reward.Bolts -> GameIcon(IconKind.BOLT, modifier)
         is Reward.Prisms -> GameIcon(IconKind.PRISM, modifier)
         is Reward.Credits -> GameIcon(IconKind.CREDIT, modifier)
-        is Reward.Glory -> GameIcon(IconKind.GLORY, modifier)
         is Reward.UnlockFighter -> FighterView(Balance.fighter(r.fighter), 0, modifier, pedestal = false)
         is Reward.SkinReward -> FighterView(Balance.fighter(r.fighter), r.skinIndex, modifier, pedestal = false)
         is Reward.Bundle -> GameIcon(IconKind.GIFT, modifier)
@@ -523,11 +511,11 @@ private fun RewardRevealOverlay(r: RewardReveal, boltsNow: Int, prismsNow: Int, 
     }
 }
 
-/** What the Spark Road is asking for the fighter being unlocked; 0 once the road is finished (Credits are Glory from then on). */
+/** What the Spark Road is asking for the fighter being unlocked; 0 once the road is finished. */
 fun roadGoal(save: io.github.projectwip.data.SaveData): Int = io.github.projectwip.data.SparkRoad.next(save)?.cost ?: 0
 
-/** What a [RoadMeter] shows: the Credits on the road, or (road finished) the Glory earned. */
-fun roadNow(save: io.github.projectwip.data.SaveData): Int = if (roadGoal(save) > 0) save.credits else save.glory
+/** What a [RoadMeter] shows: the Credits on the road. */
+fun roadNow(save: io.github.projectwip.data.SaveData): Int = save.credits
 
 /** Confirm dialog in game style. */
 @Composable

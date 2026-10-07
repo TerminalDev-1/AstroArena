@@ -290,7 +290,7 @@ fun compactNumber(n: Int): String = when {
 
 /**
  * Where Credits go. They are not held in a wallet: this shows how far along the Spark Road the fighter being
- * unlocked is ([value] of [goal]). With the road finished ([goal] 0) it shows the Glory earned instead.
+ * unlocked is ([value] of [goal]).
  */
 @Composable
 fun RoadMeter(value: Int, goal: Int, modifier: Modifier = Modifier) {
@@ -304,7 +304,7 @@ fun RoadMeter(value: Int, goal: Int, modifier: Modifier = Modifier) {
         ) {
             GameText(if (goal > 0) "${"%,d".format(shown)} / ${"%,d".format(goal)}" else compactNumber(shown), Type.Label, outline = 2.dp)
         }
-        GameIcon(if (goal > 0) IconKind.CREDIT else IconKind.GLORY, Modifier.size(40.dp))
+        GameIcon(IconKind.CREDIT, Modifier.size(40.dp))
     }
 }
 

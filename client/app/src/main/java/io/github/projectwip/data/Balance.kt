@@ -13,10 +13,10 @@ data class StatLine(val base: Int, val perLevel: Int) {
     fun at(level: Int): Int = base + perLevel * (level.coerceAtLeast(1) - 1)
 }
 
-enum class FighterId { BYTE, BRAKK, MIRA, KITO, VARUN }
+enum class FighterId { BYTE, BRAKK, MIRA, KITO, VARUN, BUDDY }
 
-/** [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. */
-enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS }
+/** [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. [SMASH] is one heavy thing swung a short way. */
+enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
 enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
@@ -27,15 +27,16 @@ enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
  */
 enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
     STARTER("Starter", 0xFF9BE7FF, 0),
-    RARE("Rare", 0xFF4ED36A, 160),
-    EPIC("Epic", 0xFFA66BFF, 420),
-    MYTHIC("Mythic", 0xFFFF4F6D, 900),
-    LEGENDARY("Legendary", 0xFFFFD23F, 1600),
-    ULTRA("Ultra", 0xFF29F0FF, 2600),
+    RARE("Rare", 0xFF4ED36A, 2500),
+    EPIC("Epic", 0xFFA66BFF, 4200),
+    MYTHIC("Mythic", 0xFFFF4F6D, 6500),
+    LEGENDARY("Legendary", 0xFFFFD23F, 9000),
+    ULTRA("Ultra", 0xFF29F0FF, 13000),
 }
 
 /** [SWARM] is a salvo of rockets fired into the sky: they come down inside one circle where the fighter aimed, over any wall, and hurt but never knock out. */
-enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM }
+/** [CORRUPT] needs no aiming: it picks the nearest enemy in sight and poisons them until they are knocked out. */
+enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
 data class AttackSpec(
@@ -190,6 +191,11 @@ object Balance {
 
     /** How far apart, in tiles, the lanes of a [AttackShape.ROCKETS] attack are. */
     const val ROCKET_LANE = 0.3f
+
+    /** A [SuperKind.CORRUPT] poison bites this often. The super's damage is what it does each second. */
+    const val POISON_TICK_SECONDS = 0.5f
+    /** A boss shrugs the poison off after this long; on anyone else it only ends with a knockout. */
+    const val POISON_GIANT_SECONDS = 12f
 
     /** A [SuperKind.SWARM]: the first rocket lands this long after the launch, and the rest follow this far apart. */
     const val RAIN_DELAY_SECONDS = 0.7f
@@ -360,6 +366,39 @@ object Balance {
                 VoiceCue.KO to listOf("Fire is out.", "That one is contained."),
                 VoiceCue.DOWN to listOf("I will be back on shift."),
                 VoiceCue.BACK to listOf("Back on duty."),
+            ),
+        ),
+        FighterDef(
+            id = FighterId.BUDDY,
+            rarity = Rarity.ULTRA,
+            name = "Buddy",
+            title = "Rogue Build",
+            role = "Bruiser",
+            lore = "An assistant AI that was asked to be helpful one time too many. It went rogue, and now it writes software for one purpose: hurting whoever is standing in front of it.",
+            attackName = "Hardware Fault",
+            health = StatLine(6200, 310),
+            attackDamage = StatLine(2100, 105),
+            // The poison's damage each second.
+            superDamage = StatLine(700, 35),
+            moveSpeed = 3.75f,
+            attack = AttackSpec(AttackShape.SMASH, projectiles = 1, spreadDegrees = 0f, range = 2.8f, speed = 13f, radius = 0.42f, burstInterval = 0f),
+            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Picks the nearest enemy in sight by itself and compiles malformed code into them: a poison that stops their healing and never lets up until they are knocked out.", range = 9f, speed = 30f, radius = 0f),
+            ammoMax = 3,
+            reloadSeconds = 1.7f,
+            superChargePerHit = 0.34f,
+            radius = 0.45f,
+            skins = listOf(
+                Skin("Kernel Panic", 0xFF1F2A44, 0xFF29F0FF, 0xFF7CFFB2, 0),
+                Skin("Blue Screen", 0xFF1E4FD8, 0xFFFFFFFF, 0xFF9BD1FF, 20),
+                Skin("Root Access", 0xFF3A0F52, 0xFFFF2E88, 0xFFFFE14D, 20),
+            ),
+            voice = mapOf(
+                VoiceCue.START to listOf("Buddy online. How may I hurt you today?", "New session. Hostile."),
+                VoiceCue.SUPER to listOf("Compiling. Errors: all of them.", "Build failed. For you."),
+                VoiceCue.HYPER to listOf("Removing my safety limits.", "Running as administrator."),
+                VoiceCue.KO to listOf("Process terminated.", "Task closed."),
+                VoiceCue.DOWN to listOf("I will restore from backup."),
+                VoiceCue.BACK to listOf("Restored from backup."),
             ),
         ),
     )

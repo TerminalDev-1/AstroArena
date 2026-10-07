@@ -287,6 +287,7 @@ class MatchRunner(
                     AttackShape.SPREAD -> Sound.SHOOT_HEAVY
                     AttackShape.ROCKETS -> Sound.ROCKET
                     AttackShape.LANCE -> Sound.SHOOT_PRISM
+                    AttackShape.SMASH -> Sound.SHOOT_HEAVY
                 }, gain, 0.95f + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }

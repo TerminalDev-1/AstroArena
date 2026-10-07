@@ -135,11 +135,8 @@ fun HomeScreen(
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    // ---------------- bottom left: the Spark Pass, and the Spark Road beside it
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        PassButton(serverStatus?.account?.takeIf { online }?.pass, Modifier.width(if (ui.wide) 220.dp else 190.dp)) { go(Screen.Pass) }
-                        RoadButton(save, Modifier.width(if (ui.wide) 220.dp else 190.dp)) { go(Screen.Road) }
-                    }
+                    // ---------------- bottom left: the Spark Road
+                    RoadButton(save, Modifier.width(if (ui.wide) 220.dp else 190.dp)) { go(Screen.Road) }
                 }
                 Spacer(Modifier.width(12.dp))
 
@@ -149,8 +146,9 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.End,
                 ) {
+                    val dropsOnly = save.settings.glitchDropsOnly
                     // Boss Mode or 3v3 with one or two real players, by team code.
-                    ChunkyButton({ go(Screen.Team) }, Modifier.fillMaxWidth().height(50.dp), ButtonStyle.GLASS, lip = 4.dp) {
+                    if (!dropsOnly) ChunkyButton({ go(Screen.Team) }, Modifier.fillMaxWidth().height(50.dp), ButtonStyle.GLASS, lip = 4.dp) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             GameIcon(IconKind.FIGHTERS, Modifier.size(24.dp))
                             Spacer(Modifier.width(8.dp))
@@ -158,12 +156,15 @@ fun HomeScreen(
                             PlainText("  ·  play with friends", Type.Small, color = Color.White, maxLines = 1)
                         }
                     }
-                    Spacer(Modifier.height(10.dp))
-                    CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online, openCapsule)
-                    Spacer(Modifier.height(10.dp))
-                    ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
-                    Spacer(Modifier.height(12.dp))
-                    PlayButton { go(Screen.Match(startMatchConfig(save))) }
+                    if (!dropsOnly) Spacer(Modifier.height(10.dp))
+                    CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online, dropsOnly, openCapsule)
+                    // Glitch Drops only: no fights, just drops.
+                    if (!dropsOnly) {
+                        Spacer(Modifier.height(10.dp))
+                        ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
+                        Spacer(Modifier.height(12.dp))
+                        PlayButton { go(Screen.Match(startMatchConfig(save))) }
+                    }
                 }
             }
         }
@@ -193,9 +194,7 @@ private fun ProfileAndCups(save: SaveData, claimable: Int, onCups: () -> Unit) {
             Row(Modifier.padding(start = 66.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.width(110.dp)) {
                     GameText(save.settings.playerName, Type.Label, outline = 2.dp)
-                    // With every fighter unlocked, the Glory rank takes the place of the win count.
-                    if (io.github.projectwip.data.SparkRoad.next(save) == null) PlainText(io.github.projectwip.data.Glory.rank(save.glory).title, Type.Small, color = Palette.Gold, maxLines = 1)
-                    else PlainText("${save.victories} wins", Type.Small)
+                    PlainText("${save.victories} wins", Type.Small)
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.width(130.dp)) {
@@ -260,32 +259,9 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
 }
 
 /** Spark Capsules waiting to be opened, or how to earn the next one. The server earns and opens them, so offline they wait. */
-/** The way into the Spark Pass: the tier the player is on, the bar toward the next, and a badge when a reward is waiting. */
-@Composable
-private fun PassButton(pass: io.github.projectwip.data.PassState?, modifier: Modifier, onClick: () -> Unit) {
-    Box(modifier) {
-        ChunkyButton(onClick, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.GLASS, cut = 14.dp, lip = 4.dp, sound = Sound.UI_OPEN) {
-            Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                GameIcon(IconKind.STAR, Modifier.size(36.dp))
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    GameText("SPARK PASS", Type.Label, color = Palette.Gold, outline = 2.dp)
-                    if (pass == null) PlainText("Tiers of rewards, online", Type.Small, color = Color.White, maxLines = 1)
-                    else {
-                        PlainText("Tier ${pass.reached} of ${pass.tiers.size}", Type.Small, color = Color.White, maxLines = 1)
-                        ProgressBar(if (pass.reached >= pass.tiers.size) 1f else (pass.points % pass.tierPoints).toFloat() / pass.tierPoints, Modifier.fillMaxWidth(), Palette.Gold, 9.dp)
-                    }
-                }
-            }
-        }
-        val waiting = pass?.claimable ?: 0
-        if (waiting > 0) Badge(waiting.toString(), Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp))
-    }
-}
-
 /**
- * The way onto the Spark Road: the fighter the Credits are filling (still a silhouette), how far along it is, and a
- * badge when it is ready to claim. With the road finished it shows the Glory rank instead.
+ * The way onto the Spark Road: the fighter the Credits are filling (still a silhouette) and how far along it is. The
+ * moment the bar is full the fighter is unlocked. With every fighter unlocked it says the road is finished.
  */
 @Composable
 private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) {
@@ -294,7 +270,7 @@ private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) 
         ChunkyButton(onClick, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.GLASS, cut = 14.dp, lip = 4.dp, sound = Sound.UI_OPEN) {
             Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (next != null) io.github.projectwip.ui.FighterView(Balance.fighter(next.fighter), 0, Modifier.size(42.dp), pedestal = false, locked = true)
-                else GameIcon(IconKind.GLORY, Modifier.size(38.dp))
+                else GameIcon(IconKind.CHECK, Modifier.size(38.dp))
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     GameText("SPARK ROAD", Type.Label, color = Palette.Green, outline = 2.dp)
@@ -302,28 +278,26 @@ private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) 
                         PlainText("${Balance.fighter(next.fighter).name} · ${"%,d".format(minOf(save.credits, next.cost))} / ${"%,d".format(next.cost)}", Type.Small, color = Color.White, maxLines = 1)
                         ProgressBar(save.credits.toFloat() / next.cost, Modifier.fillMaxWidth(), Palette.Green, 9.dp)
                     } else {
-                        val rank = io.github.projectwip.data.Glory.rank(save.glory)
-                        PlainText("Glory · ${rank.title}", Type.Small, color = Color.White, maxLines = 1)
-                        ProgressBar(rank.into.toFloat() / rank.size, Modifier.fillMaxWidth(), Palette.Gold, 9.dp)
+                        PlainText("Every fighter unlocked", Type.Small, color = Color.White, maxLines = 1)
+                        ProgressBar(1f, Modifier.fillMaxWidth(), Palette.Gold, 9.dp)
                     }
                 }
             }
         }
-        if (next != null && save.credits >= next.cost) Badge("CLAIM", Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp), color = Palette.GreenDeep)
     }
 }
 
 @Composable
-private fun CapsuleButton(count: Int, leftToday: Int, online: Boolean, onOpen: () -> Unit) {
+private fun CapsuleButton(count: Int, leftToday: Int, online: Boolean, big: Boolean, onOpen: () -> Unit) {
     Box {
-        ChunkyButton(onOpen, Modifier.fillMaxWidth().height(62.dp), ButtonStyle.CYAN, enabled = count > 0, cut = 14.dp, lip = 4.dp) {
+        ChunkyButton(onOpen, Modifier.fillMaxWidth().height(if (big) 150.dp else 62.dp), ButtonStyle.CYAN, enabled = count > 0, cut = 14.dp, lip = 4.dp) {
             Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 // A drop waiting to be opened glitches, like the real thing does when it is.
-                if (count > 0) io.github.projectwip.ui.GlitchIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = Palette.Gold)
+                if (count > 0) io.github.projectwip.ui.GlitchIcon(IconKind.CAPSULE, Modifier.size(if (big) 84.dp else 44.dp), tint = Palette.Gold)
                 else GameIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = Palette.Grey)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    GameText(if (count > 0) "OPEN DROP" else "SPARK DROPS", Type.Heading, outline = 2.5.dp)
+                    GameText(if (count > 0) "OPEN DROP" else "GLITCH DROPS", Type.Heading, outline = 2.5.dp)
                     PlainText(
                         when {
                             !online -> if (count > 0) "Opens when you're back online" else "Earned and opened online"

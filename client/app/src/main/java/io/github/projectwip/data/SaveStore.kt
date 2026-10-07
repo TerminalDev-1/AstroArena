@@ -43,7 +43,6 @@ class SaveStore(context: Context) {
             put("bolts", s.bolts)
             put("prisms", s.prisms)
             put("credits", s.credits)
-            put("glory", s.glory)
             put("selectedFighter", s.selectedFighter.name)
             put("selectedMode", s.selectedMode.name)
             put("selectedBoss", s.selectedBoss?.name ?: "")
@@ -102,7 +101,7 @@ class SaveStore(context: Context) {
                 put("debugInfiniteCapsules", st.debugInfiniteCapsules)
                 put("debugNoLevelCap", st.debugNoLevelCap)
                 put("debugUpgradeCost", st.debugUpgradeCost.toDouble())
-                put("devMenu", st.devMenu)
+                put("glitchDropsOnly", st.glitchDropsOnly)
                 put("musicVolume", st.musicVolume.toDouble())
                 val l = st.controlLayout
                 put("controlLayout", JSONArray(listOf(l.moveX, l.moveY, l.attackX, l.attackY, l.superX, l.superY).map { it.toDouble() }))
@@ -145,7 +144,7 @@ class SaveStore(context: Context) {
                 debugLuck = so.optDouble("debugLuck", 0.0).toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, SparkCapsules.MAX_LUCK) },
                 debugInfiniteCapsules = so.optBoolean("debugInfiniteCapsules", false),
                 debugNoLevelCap = so.optBoolean("debugNoLevelCap", false),
-                devMenu = so.optBoolean("devMenu", false),
+                glitchDropsOnly = so.optBoolean("glitchDropsOnly", false),
                 debugUpgradeCost = so.optDouble("debugUpgradeCost", 1.0).toFloat().let { if (it.isNaN()) 1f else it.coerceIn(0f, Progression.MAX_COST_FACTOR) },
                 musicVolume = so.optDouble("musicVolume", sd.musicVolume.toDouble()).toFloat().let { if (it.isNaN()) sd.musicVolume else it.coerceIn(0f, 1f) },
                 controlLayout = so.optJSONArray("controlLayout")?.takeIf { it.length() == 6 }?.let { a ->
@@ -160,7 +159,6 @@ class SaveStore(context: Context) {
                 bolts = o.optInt("bolts", d.bolts).coerceAtLeast(0),
                 prisms = o.optInt("prisms", d.prisms).coerceAtLeast(0),
                 credits = o.optInt("credits", d.credits).coerceAtLeast(0),
-                glory = o.optInt("glory", d.glory).coerceAtLeast(0),
                 fighters = fighters,
                 selectedFighter = if (fighters[selected]?.unlocked == true) selected else FighterId.BYTE,
                 selectedMode = enumOr(o.optString("selectedMode"), d.selectedMode),

@@ -600,4 +600,102 @@ class SimulationTest {
         println("Elite $eliteWins – Easy $easyWins")
         assertTrue("Elite should dominate Easy ($eliteWins vs $easyWins)", eliteWins >= 7)
     }
+
+    /** Buddy and one or two Brakks on open ground, two tiles apart in a row, past the countdown and the spawn shield. */
+    private fun buddyAndTargets(count: Int = 1, level: Int = 1): Triple<World, Fighter, List<Fighter>> {
+        val a = Arenas.staticCanyon()
+        val buddy = Fighter(0, Balance.fighter(FighterId.BUDDY), level, 0, 0, "B", true)
+        val others = (1..count).map { Fighter(it, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "T$it", true) }
+        val w = World(a, listOf(buddy) + others, io.github.projectwip.sim.MatchRules.lastSpark())
+        repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
+        var placed = false
+        search@ for (y in 3 until a.height - 3) for (x in 3 until a.width - 9) {
+            val x0 = x + 0.5f; val y0 = y + 0.5f
+            if ((0..7).any { a.circleBlocked(x0 + it, y0, 0.9f) || a.inThicket(x0 + it, y0) }) continue
+            buddy.x = x0; buddy.y = y0
+            others.forEachIndexed { i, o -> o.x = x0 + 2f + i * 4f; o.y = y0 }
+            placed = true
+            break@search
+        }
+        assertTrue(placed)
+        for (f in listOf(buddy) + others) f.shield = 0f
+        w.events.clear()
+        return Triple(w, buddy, others)
+    }
+
+    @Test fun buddySmashesAComputerIntoWhoeverIsClose() {
+        val (w, buddy, others) = buddyAndTargets(2)
+        val (near, far) = others
+        buddy.control.aimX = 1f; buddy.control.aimY = 0f; buddy.control.attack = true
+        val hits = ArrayList<io.github.projectwip.sim.GameEvent.Hit>()
+        repeat(40) { w.step(Match.STEP); hits += w.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>(); w.events.clear() }
+        assertEquals("one heavy hit, on the one in reach", listOf(near.id to buddy.attackDamage), hits.map { it.targetId to it.damage })
+        assertTrue("it is the hardest single hit in the game", buddy.def.attackDamage.base >= Balance.fighters.maxOf { it.attackDamage.base })
+        assertEquals("but it doesn't reach far", far.maxHp, far.hp)
+        assertTrue(buddy.def.attack.range < 3f)
+    }
+
+    @Test fun buddysMalformedCodePoisonsTheNearestEnemyUntilTheyAreKnockedOut() {
+        val (w, buddy, others) = buddyAndTargets(2)
+        val (near, far) = others
+        buddy.superCharge = 1f
+        // No aiming: it points the other way and still finds the nearest one.
+        buddy.control.aimX = -1f; buddy.control.aimY = 0f; buddy.control.superAttack = true
+        w.step(Match.STEP)
+        assertTrue("the nearest enemy is the one poisoned", near.poisoned && !far.poisoned)
+        assertEquals(0f, buddy.superCharge, 0f)
+        var t = 0f
+        var healedWhilePoisoned = false
+        var last = near.hp
+        while (near.alive && t < 30f) {
+            w.step(Match.STEP); t += Match.STEP
+            if (near.hp > last) healedWhilePoisoned = true
+            last = near.hp
+        }
+        assertFalse("it never lets up: they are knocked out", near.alive)
+        assertFalse("and they could not heal through it", healedWhilePoisoned)
+        assertFalse("the knockout clears it", near.poisoned)
+        assertEquals("Buddy gets the knockout", 1, buddy.kos)
+        assertEquals(far.maxHp, far.hp)
+        println("malformed code took ${"%.1f".format(t)}s to knock out ${near.maxHp} health")
+    }
+
+    @Test fun buddyKeepsHisSuperWhenThereIsNobodyToPoison() {
+        val (w, buddy, others) = buddyAndTargets(1)
+        buddy.superCharge = 1f
+        // Out of reach: move the target right away.
+        others[0].x = (buddy.x + 30f).coerceAtMost(w.arena.width - 2f); others[0].y = (buddy.y + 30f).coerceAtMost(w.arena.height - 2f)
+        if (kotlin.math.hypot(others[0].x - buddy.x, others[0].y - buddy.y) > buddy.def.superSpec.range) {
+            buddy.control.superAttack = true
+            w.step(Match.STEP)
+            assertEquals("the charge is kept", 1f, buddy.superCharge, 0f)
+            assertFalse(others[0].poisoned)
+        }
+    }
+
+    @Test fun aBossShrugsThePoisonOffAfterAWhile() {
+        val a = Arenas.provingGround()
+        val buddy = Fighter(0, Balance.fighter(FighterId.BUDDY), 1, 0, 0, "B", false)
+        val boss = Fighter(1, Balance.bosses[0], 1, 0, 1, "Boss", true)
+        val w = World(a, listOf(buddy, boss), io.github.projectwip.sim.MatchRules.bossMode())
+        repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
+        boss.shield = 0f
+        buddy.superCharge = 1f
+        if (w.corruptTarget(buddy) != null) {
+            buddy.control.superAttack = true
+            w.step(Match.STEP)
+            assertTrue(boss.poisoned)
+            repeat(((Balance.POISON_GIANT_SECONDS + 1f) / Match.STEP).toInt()) { w.step(Match.STEP) }
+            assertFalse("a boss is not doomed by one super", boss.poisoned)
+            assertTrue(boss.alive && boss.hp < boss.maxHp)
+        }
+    }
+
+    @Test fun botsCanPlayBuddyThroughAWholeMatch() {
+        val m = Match(MatchConfig(FighterId.BUDDY, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 33L))
+        var t = 0f
+        while (m.world.phase != Phase.ENDED && t < 200f) { m.step(Match.STEP); t += Match.STEP; m.world.events.clear() }
+        println("Buddy bot: ${m.player.kos} KOs, ${m.player.deaths} deaths, ${m.player.damageDealt} damage")
+        assertTrue("a bot playing Buddy gets close enough to hit things", m.player.damageDealt > 0)
+    }
 }

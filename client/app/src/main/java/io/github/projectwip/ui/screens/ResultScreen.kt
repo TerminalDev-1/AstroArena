@@ -250,21 +250,20 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
                             if (row++ < rowsShown) RewardChip(IconKind.BOLT, "+${rewards.bolts}")
                             if (rewards.credits > 0 && row++ < rowsShown) RewardChip(IconKind.CREDIT, "+${rewards.credits}")
-                            if (rewards.glory > 0 && row++ < rowsShown) RewardChip(IconKind.GLORY, "+${rewards.glory}")
-                            if (rewards.passPoints > 0 && row++ < rowsShown) RewardChip(IconKind.STAR, "+${rewards.passPoints}")
                             if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardChip(IconKind.PRISM, "+${rewards.firstWinPrisms}")
                             if (rewards.capsuleEarned && row++ < rowsShown) RewardChip(IconKind.CAPSULE, "+1")
                         }
+                        for (f in rewards.unlocked) PlainText("${Balance.fighter(f).name.substringBefore(' ')} unlocked on the Spark Road!", Type.Label, color = Palette.Gold)
                         if (rewards.mvpCups > 0) PlainText("MVP: +${rewards.mvpCups} Cups", Type.Small, color = Palette.Gold)
                         val dropsHere = r.mode != io.github.projectwip.data.GameMode.BOSS && r.mode != io.github.projectwip.data.GameMode.DUEL && rewards.online
                         // Everything a match is worth is awarded by the server; without it a match is practice.
                         if (r.mode == io.github.projectwip.data.GameMode.DUEL && !rewards.online) PlainText("This 1v1 wasn't settled by the server · nothing is earned", Type.Small, color = Palette.Gold)
                         else if (!rewards.online) PlainText("Offline match · rewards are only earned online", Type.Small, color = Palette.Gold)
                         if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
-                            PlainText("All of today's Spark Drops are earned · more tomorrow", Type.Small, color = Palette.Text)
+                            PlainText("All of today's Glitch Drops are earned · more tomorrow", Type.Small, color = Palette.Text)
                         }
                         if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday > 0) {
-                            PlainText("${if (ffa) "Finish top 4" else "Win"} to earn a Spark Drop · ${rewards.capsulesLeftToday} left today", Type.Small, color = Palette.Text)
+                            PlainText("${if (ffa) "Finish top 4" else "Win"} to earn a Glitch Drop · ${rewards.capsulesLeftToday} left today", Type.Small, color = Palette.Text)
                         }
                     }
                 }
@@ -311,7 +310,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
 
 /** How many rows the rewards panel will show, so each one gets its own pop. */
 private fun rewardRowCount(rewards: MatchRewards, mvpBonus: Boolean) =
-    2 + (if (rewards.credits > 0 || rewards.glory > 0) 1 else 0) + (if (rewards.passPoints > 0) 1 else 0) + (if (rewards.firstWinPrisms > 0) 1 else 0) + (if (rewards.capsuleEarned) 1 else 0) + (if (mvpBonus) 1 else 0)
+    2 + (if (rewards.credits > 0) 1 else 0) + (if (rewards.unlocked.isNotEmpty()) 1 else 0) + (if (rewards.firstWinPrisms > 0) 1 else 0) + (if (rewards.capsuleEarned) 1 else 0) + (if (mvpBonus) 1 else 0)
 
 /** A fighter's rank: a gold medallion with the rank on it. */
 @Composable

@@ -645,6 +645,11 @@ class MatchRenderer(
                         SuperKind.VOLLEY -> fan(s.range, s.spreadDegrees + 8f)
                         SuperKind.PIERCE -> beam(clip(a, px, pz, dx, dz, s.range), s.radius * 3.2f)
                         SuperKind.RAM -> beam(s.range, p.radius * 2.2f)
+                        // No aiming to do: a ring shows how far the code reaches.
+                        SuperKind.CORRUPT -> {
+                            tint(1); setModel(px, 0.05f, pz, s.range, 1f, s.range); ring.draw()
+                            tint(2); setModel(px, 0.056f, pz, s.range * (0.3f + 0.7f * pulse), 1f, s.range * (0.3f + 0.7f * pulse)); ring.draw()
+                        }
                         SuperKind.SWARM -> {
                             // The rockets go up and come down: an arc from the fighter, up and over, to one big
                             // circle where they will land. How far the stick is pushed is how far away that is.
@@ -675,7 +680,7 @@ class MatchRenderer(
                     val at = p.def.attack
                     if (at.shape == AttackShape.SPREAD) fan(at.range, at.spreadDegrees + 8f)
                     else if (at.shape == AttackShape.ROCKETS) beam(clip(a, px, pz, dx, dz, at.range), io.github.projectwip.data.Balance.ROCKET_LANE * (at.projectiles - 1) + 0.4f)
-                    else beam(clip(a, px, pz, dx, dz, at.range), if (at.shape == AttackShape.BURST) 0.55f else 0.34f)
+                    else beam(clip(a, px, pz, dx, dz, at.range), if (at.shape == AttackShape.SMASH) 0.95f else if (at.shape == AttackShape.BURST) 0.55f else 0.34f)
                 }
             }
         }
@@ -722,6 +727,14 @@ class MatchRenderer(
                     tint(skin.accent)
                     val size = pr.radius * (if (pr.isSuper) 1.5f else 1.25f)
                     setModel(x, 0.7f, z, size, size, size, yaw + pr.age * 900f); bit.draw()
+                }
+                ShotStyle.COMPUTER -> {
+                    // A whole computer, end over end: the case, and its lit screen on top.
+                    val size = pr.radius * 0.8f
+                    tint(0xFF6A7390)
+                    setModel(x, 0.8f, z, size, size * 0.85f, size, yaw + pr.age * 700f); bit.draw()
+                    tint(skin.secondary)
+                    setModel(x, 0.8f + size * 0.9f, z, size * 0.7f, size * 0.12f, size * 0.7f, yaw + pr.age * 700f); bit.draw()
                 }
                 ShotStyle.PELLET -> {
                     tint(skin.secondary)
@@ -1053,6 +1066,7 @@ class MatchRenderer(
         FighterId.MIRA -> 2.0f
         FighterId.KITO -> 1.9f
         FighterId.VARUN -> 1.95f
+        FighterId.BUDDY -> 2.05f
     }
 
     override fun onDestroyed() {}

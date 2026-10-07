@@ -716,7 +716,7 @@ object SfxSynth {
         osc(Wave.TRI, 0f, 0.05f, { 784f }, { perc(it, 0.001f, 0.01f) * 0.3f })
     }
 
-    /** A Power Up landing in the wallet: a quick charge. A blip that jumps up a fifth over a rising whine, a fizz of static, a soft thump. */
+    /** A Upgrade Credit landing in the wallet: a quick charge. A blip that jumps up a fifth over a rising whine, a fizz of static, a soft thump. */
     private fun boltLand() = Clip(0.36f).apply {
         osc(Wave.SQUARE, 0f, 0.07f, { 660f }, { hold(it, 0.002f, 0.05f, 0.01f) * 0.3f })
         osc(Wave.SQUARE, 0.06f, 0.14f, { 990f }, { perc(it, 0.002f, 0.045f) * 0.35f })
@@ -728,8 +728,8 @@ object SfxSynth {
     }
 
     /**
-     * A Crystal landing in the wallet: four glass notes tumbling upward, each doubled a hair sharp so the tail
-     * shimmers, behind a tiny digital stutter (Crystals glitch).
+     * A CPU Chip landing in the wallet: four glass notes tumbling upward, each doubled a hair sharp so the tail
+     * shimmers, behind a tiny digital stutter (CPU Chips glitch).
      */
     private fun prismLand() = Clip(0.75f).apply {
         for ((i, n) in intArrayOf(96, 103, 108, 115).withIndex()) {
@@ -751,7 +751,7 @@ object SfxSynth {
         reverb(0.14f, 0.45f)
     }
 
-    /** A Spark Drop tearing: a stutter of square-wave blips that jump about in pitch, over chopped static. */
+    /** A Glitch Drop tearing: a stutter of square-wave blips that jump about in pitch, over chopped static. */
     private fun glitch() = Clip(0.34f).apply {
         for ((i, f) in floatArrayOf(220f, 1760f, 440f, 3520f, 880f, 110f, 2640f).withIndex()) {
             osc(Wave.SQUARE, i * 0.036f, 0.034f, { f }, { hold(it, 0.001f, 0.022f, 0.004f) * 0.4f })

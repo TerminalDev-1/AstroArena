@@ -50,8 +50,8 @@ data class Settings(
     val debugNoLevelCap: Boolean = false,
     /** Debug menu: multiplies what every upgrade costs (1 = normal, 0 = free). */
     val debugUpgradeCost: Float = 1f,
-    /** Developers: show the "D" button that opens the debug menu. Off unless they switch it on in Settings. */
-    val devMenu: Boolean = false,
+    /** Glitch Drops only: the home screen is just the Glitch Drop button, with no fights. */
+    val glitchDropsOnly: Boolean = false,
 )
 
 data class FighterProgress(
@@ -70,8 +70,6 @@ data class SaveData(
     val prisms: Int = Balance.STARTING_PRISMS,
     /** Credits on the Spark Road, toward the next fighter along it; a copy of what the server holds. Not a wallet: they can only become that fighter. */
     val credits: Int = 0,
-    /** What Credits are earned as once every fighter is unlocked. */
-    val glory: Int = 0,
     val fighters: Map<FighterId, FighterProgress> = defaultFighters(),
     val selectedFighter: FighterId = FighterId.BYTE,
     val selectedMode: GameMode = GameMode.LAST_SPARK,

@@ -35,7 +35,7 @@ data class Account(
     /** Place on the server's leaderboard (1 = top), out of [players] accounts. */
     val rank: Int,
     val players: Int,
-    /** Unopened Spark Drops. */
+    /** Unopened Glitch Drops. */
     val drops: Int,
     val dropsLeftToday: Int,
     /** The bot difficulty the server gives ordinary players. */
@@ -53,8 +53,6 @@ data class Account(
     /** When the server's day ends and the shop changes, on this device's clock (ms). */
     val dayEndsAt: Long = 0,
     val giftAvailable: Boolean = true,
-    /** This season's Spark Pass; null from a server that has none. */
-    val pass: io.github.projectwip.data.PassState? = null,
 )
 
 /** What the game knows about the server right now. */
@@ -89,12 +87,12 @@ data class MatchPlan(
 data class NewsItem(val title: String, val date: String, val tag: String, val text: String)
 
 /** A real player on the server's leaderboard. */
-data class RemotePlayer(val id: String, val name: String, val cups: Int, val fighter: FighterId, val glory: Int = 0)
+data class RemotePlayer(val id: String, val name: String, val cups: Int, val fighter: FighterId)
 
 /**
  * The game's connection to the AstroArena server (see the `server/` directory of the repository).
  *
- * The server is in charge of Cups, Spark Drops, Bolts, Prisms, fighters, the shop and its deals, the bot
+ * The server is in charge of Cups, Glitch Drops, Bolts, Prisms, fighters, the shop and its deals, the bot
  * difficulty and who gets the debug menu. Without it the game still plays, in offline mode: matches are set up
  * on the device, but nothing is earned and nothing can be bought, upgraded, claimed or opened.
  *
@@ -192,14 +190,6 @@ class GameServer(context: Context) {
             dailyOffers = offers("dailyOffers"),
             day = time?.optLong("day", -1) ?: -1, dayEndsAt = local(time?.optLong("dayEndsAt") ?: 0L),
             giftAvailable = o.optBoolean("giftAvailable", true),
-            pass = o.optJSONObject("pass")?.let { p ->
-                val tiers = p.optJSONArray("tiers")
-                io.github.projectwip.data.PassState(
-                    season = p.optLong("season"), endsAt = local(p.optLong("endsAt")), points = p.optInt("points"), tierPoints = p.optInt("tierPoints", 100),
-                    claimed = ints(p, "claimed"),
-                    tiers = if (tiers == null) emptyList() else (0 until tiers.length()).mapNotNull { i -> tiers.optJSONObject(i)?.let { reward(it) } },
-                )
-            },
         )
         _status.value = _status.value.copy(account = account)
     }
@@ -214,7 +204,6 @@ class GameServer(context: Context) {
         val fighters = o.optJSONObject("fighters")
         return ServerProfile(
             bolts = o.optInt("bolts"), prisms = o.optInt("prisms"), bestCups = o.optInt("bestCups"), credits = o.optInt("credits"),
-            glory = o.optInt("glory"),
             fighters = FighterId.entries.associateWith { id ->
                 val f = fighters?.optJSONObject(id.name)
                 FighterProgress(
@@ -262,12 +251,6 @@ class GameServer(context: Context) {
 
     /** Claims the Cup Track reward at [cups]. What comes back is what was actually given (owned things are paid out instead). */
     fun claimMilestone(cups: Int): Reward? = act("/v1/track/claim", JSONObject().put("cups", cups))?.optJSONObject("reward")?.let { reward(it) }
-
-    /** Claims the Spark Road fighter the Credits have covered. Null if they haven't yet (see [lastError]). */
-    fun roadUnlock(): Reward? = act("/v1/road/unlock")?.optJSONObject("reward")?.let { reward(it) }
-
-    /** Claims the reward at Spark Pass tier [tier] (1-based). */
-    fun claimPass(tier: Int): Reward? = act("/v1/pass/claim", JSONObject().put("tier", tier))?.optJSONObject("reward")?.let { reward(it) }
 
     fun buyDeal(id: Long): Reward? = act("/v1/shop/deals/$id/buy")?.optJSONObject("reward")?.let { reward(it) }
 
@@ -432,13 +415,14 @@ class GameServer(context: Context) {
         }
         return ServerVerdict(
             o.optInt("cupDelta"), o.optInt("cups"), o.optBoolean("drop"), account?.optInt("drops") ?: 0, account?.optInt("dropsLeftToday") ?: 0,
-            bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"), credits = o.optInt("credits"), passPoints = o.optInt("passPoints"), glory = o.optInt("glory"), judged = judged,
+            bolts = o.optInt("bolts"), firstWinPrisms = o.optInt("firstWinPrisms"), credits = o.optInt("credits"),
+            unlocked = o.optJSONArray("unlocked")?.let { a -> (0 until a.length()).mapNotNull { fighterNamed(a.optString(it)) } } ?: emptyList(), judged = judged,
             fighterCupsBefore = o.optInt("fighterCupsBefore"), fighterCups = o.optInt("fighterCups"), mvpCups = o.optInt("mvpCups"),
         )
     }
 
     /**
-     * Opens one Spark Drop. The server rolls it; this only carries the answer back. [luck] and [free] are
+     * Opens one Glitch Drop. The server rolls it; this only carries the answer back. [luck] and [free] are
      * honoured for developers only. Null if the server couldn't be reached or the player has none to open.
      */
     fun openDrop(luck: Float = 0f, free: Boolean = false): CapsuleResult? {
@@ -453,7 +437,7 @@ class GameServer(context: Context) {
     }
 
     /**
-     * Opens every Spark Drop the player holds, in one go; pieces that split off on the way are left to open
+     * Opens every Glitch Drop the player holds, in one go; pieces that split off on the way are left to open
      * next. The server rolls them all; the answer is what came out of each, in the order they were opened. Null
      * if it couldn't be reached or there were none.
      */
@@ -475,7 +459,6 @@ class GameServer(context: Context) {
             "bolts" -> Reward.Bolts(o.optInt("amount").coerceAtLeast(0))
             "prisms" -> Reward.Prisms(o.optInt("amount").coerceAtLeast(0))
             "credits" -> Reward.Credits(o.optInt("amount").coerceAtLeast(0))
-            "glory" -> Reward.Glory(o.optInt("amount").coerceAtLeast(0))
             "fighter" -> fighter()?.let { Reward.UnlockFighter(it) }
             "skin" -> fighter()?.let { Reward.SkinReward(it, o.optInt("skin")) }
             "bundle" -> o.optJSONArray("items")?.let { a -> Reward.Bundle((0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { reward(it) } }) }
@@ -539,7 +522,6 @@ class GameServer(context: Context) {
             RemotePlayer(
                 p.optString("id"), p.optString("name", "Player"), p.optInt("cups"),
                 FighterId.entries.firstOrNull { it.name == p.optString("fighter") } ?: FighterId.BYTE,
-                p.optInt("glory"),
             )
         }
     }

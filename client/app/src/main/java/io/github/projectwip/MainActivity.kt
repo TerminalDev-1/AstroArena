@@ -30,8 +30,6 @@ class MainActivity : ComponentActivity() {
         if (BuildConfig.DEBUG) intent?.getStringExtra("server")?.let { url -> repo.updateSettings { it.copy(serverUrl = if (url == "default") "" else url) } }
         sfx = Sfx(this).also { it.load(); it.loadVoice() }
         music = io.github.projectwip.audio.Music(this).also { it.load() }
-        // The no-level-cap cheat is for dev builds: a release build switches it back off.
-        if (!BuildConfig.DEBUG && repo.save.value.settings.debugNoLevelCap) repo.updateSettings { it.copy(debugNoLevelCap = false) }
         io.github.projectwip.render3d.Portraits.start()
         applyRefreshRate(repo.save.value.settings.highFrameRate)
 

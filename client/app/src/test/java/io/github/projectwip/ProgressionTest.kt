@@ -75,6 +75,13 @@ class ProgressionTest {
         assertEquals(1, Progression.capsulesLeftToday(after, 7))
     }
 
+    @Test fun aMatchThatFillsTheRoadSaysWhoItUnlocked() {
+        val verdict = ServerVerdict(8, 8, false, 1, 3, bolts = 28, credits = 6, unlocked = listOf(FighterId.BRAKK))
+        val (_, rewards) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = verdict)
+        assertEquals(6 to listOf(FighterId.BRAKK), rewards.credits to rewards.unlocked)
+        assertEquals("the road's prices, as the server charges them", listOf(2500, 4200, 6500, 9000, 13000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
+    }
+
     @Test fun offlineMatchesEarnNothing() {
         val save = SaveData(cups = 120, bestCups = 120, capsules = 2)
         val (after, rewards) = Progression.applyMatch(save, report(MatchOutcome.VICTORY), today = 3, verdict = null)
@@ -164,7 +171,7 @@ class ProgressionTest {
     }
 
     @Test fun cheatsCanBeSwitchedOff() {
-        val cheating = io.github.projectwip.data.Settings(debugLuck = 9f, debugInfiniteCapsules = true, debugNoLevelCap = true, debugUpgradeCost = 0f, devMenu = true, playerName = "Ace")
+        val cheating = io.github.projectwip.data.Settings(debugLuck = 9f, debugInfiniteCapsules = true, debugNoLevelCap = true, debugUpgradeCost = 0f, playerName = "Ace")
         assertEquals(io.github.projectwip.data.Settings(playerName = "Ace"), Progression.withoutCheats(cheating))
     }
 
@@ -300,7 +307,7 @@ class ProgressionTest {
         assertTrue(io.github.projectwip.data.SparkRoad.steps.any { it.fighter == FighterId.KITO })
         val varun = Balance.fighter(FighterId.VARUN)
         assertEquals("six rockets a shot, eight in the super", 6 to 8, varun.attack.projectiles to varun.superSpec.projectiles)
-        assertEquals("the rarest fighter is the last one on the road", FighterId.VARUN, io.github.projectwip.data.SparkRoad.steps.last().fighter)
+        assertEquals("the rarest fighter is the last one on the road", FighterId.BUDDY, io.github.projectwip.data.SparkRoad.steps.last().fighter)
         assertTrue(CupTrack.milestones.none { it.reward is Reward.UnlockFighter })
         assertEquals(io.github.projectwip.data.SparkRoad.steps.first(), io.github.projectwip.data.SparkRoad.next(SaveData()))
         // The floor every fighter stands on: enough health, and enough damage from one ammo when it all lands.

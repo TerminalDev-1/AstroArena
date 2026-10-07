@@ -39,35 +39,12 @@ import io.github.projectwip.ui.Panel
 import io.github.projectwip.ui.PlainText
 import io.github.projectwip.ui.Type
 
-/** The small "D" in the bottom-left corner of the menus that opens the debug menu. */
+/**
+ * The Chaos Command Center: every tweak the game has (drop luck, free drops, upgrade cost, level cap, hand-outs). It
+ * is a tab in Settings, for developers only: the server honours none of it from anyone else. They change the real account.
+ */
 @Composable
-fun DebugButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    ChunkyButton(onClick, modifier.padding(start = 6.dp, bottom = 6.dp).size(34.dp, 34.dp).graphicsLayer { alpha = 0.75f },
-        ButtonStyle.GLASS, cut = 8.dp, lip = 3.dp, sound = Sound.UI_OPEN) {
-        GameText("D", Type.Label, outline = 2.dp)
-    }
-}
-
-/** The debug menu as a pop-up (from the corner "D"). The same controls are also a tab in Settings. */
-@Composable
-fun DebugMenu(save: SaveData, repo: GameRepository, onClose: () -> Unit) {
-    BackHandler(onBack = onClose)
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).clickable(remember { MutableInteractionSource() }, null, onClick = onClose),
-        contentAlignment = Alignment.Center,
-    ) {
-        Panel(Modifier.widthIn(max = 760.dp).padding(18.dp).clickable(remember { MutableInteractionSource() }, null) { }, cut = 20.dp) {
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                DebugControls(save, repo)
-                ChunkyButton(onClose, Modifier.width(170.dp).height(52.dp).align(Alignment.End), ButtonStyle.ORANGE, lip = 4.dp, sound = Sound.UI_BACK) { GameText("CLOSE", Type.Heading) }
-            }
-        }
-    }
-}
-
-/** Cheats for trying things out. They change the real save. */
-@Composable
-fun DebugControls(save: SaveData, repo: GameRepository) {
+fun ChaosCommandCenter(save: SaveData, repo: GameRepository) {
     val s = save.settings
     val ask = io.github.projectwip.ui.LocalServerCall.current
     // The slider's own position while it is being dragged, so the number and the odds follow the thumb;
@@ -79,7 +56,7 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
     val status = server?.status?.collectAsState()?.value
     // Everything these cheats touch is the server's, so they only work if it lists this player as a developer.
     val trusted = status?.online == true && status.account?.developer == true
-    SectionTitle("DEBUG MENU", "Cheats for trying things out. They change your real save.")
+    SectionTitle("CHAOS COMMAND CENTER", "Every tweak in the game. They change your real account, so use them however you like.")
     if (!trusted) PlainText(
         if (status?.online != true) "Offline: everything in this menu needs the server."
         else "The server doesn't list you as a developer, so it ignores everything in this menu. " +
@@ -89,11 +66,8 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
     ToggleRow("INFINITE DROPS", "The drop button always works and opening one never uses it up.", s.debugInfiniteCapsules) { v ->
         repo.updateSettings { it.copy(debugInfiniteCapsules = v) }
     }
-    // Dev builds only: it makes fighters as strong as you like.
-    if (io.github.projectwip.BuildConfig.DEBUG) {
-        ToggleRow("NO LEVEL CAP", "Fighters can be upgraded past level ${io.github.projectwip.data.Balance.MAX_LEVEL}. Only in dev builds.", s.debugNoLevelCap) { v ->
-            repo.updateSettings { it.copy(debugNoLevelCap = v) }
-        }
+    ToggleRow("NO LEVEL CAP", "Fighters can be upgraded past level ${io.github.projectwip.data.Balance.MAX_LEVEL}.", s.debugNoLevelCap) { v ->
+        repo.updateSettings { it.copy(debugNoLevelCap = v) }
     }
     SliderRow("DROP LUCK", "×${"%.1f".format(1f + luck)}", s.debugLuck, 0f, SparkCapsules.MAX_LUCK, onDrag = { luck = snap(it) }) { v ->
         luck = snap(v)
@@ -108,17 +82,17 @@ fun DebugControls(save: SaveData, repo: GameRepository) {
         costFactor = snap(v)
         repo.updateSettings { it.copy(debugUpgradeCost = snap(v)) }
     }
-    PlainText("Multiplies the price of every fighter upgrade. A level 1 upgrade now costs ${Math.round(io.github.projectwip.data.Balance.upgradeCostFrom(1) * costFactor)} Power Ups, level 9 costs ${Math.round(io.github.projectwip.data.Balance.upgradeCostFrom(9) * costFactor)}.",
+    PlainText("Multiplies the price of every fighter upgrade. A level 1 upgrade now costs ${Math.round(io.github.projectwip.data.Balance.upgradeCostFrom(1) * costFactor)} Upgrade Credits, level 9 costs ${Math.round(io.github.projectwip.data.Balance.upgradeCostFrom(9) * costFactor)}.",
         Type.Body, color = Color.White)
-    SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.cups)} Cups, ${"%,d".format(save.bolts)} Power Ups, ${"%,d".format(save.prisms)} Crystals and ${save.capsules} drops.")
+    SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.cups)} Cups, ${"%,d".format(save.bolts)} Upgrade Credits, ${"%,d".format(save.prisms)} CPU Chips and ${save.capsules} drops.")
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ChunkyButton({ ask({ devGrant(cups = 50) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+50 CUPS", Type.Label, outline = 2.dp) }
         ChunkyButton({ ask({ devGrant(cups = 500) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+500 CUPS", Type.Label, outline = 2.dp) }
         ChunkyButton({ ask({ devGrant(cups = -50) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.RED, lip = 4.dp) { GameText("−50 CUPS", Type.Label, outline = 2.dp) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        ChunkyButton({ ask({ devGrant(bolts = 1000) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("+1,000 POWER UPS", Type.Label, outline = 2.dp) }
-        ChunkyButton({ ask({ devGrant(prisms = 100) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("+100 CRYSTALS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(bolts = 1000) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("+1,000 UPGRADE CREDITS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(prisms = 100) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("+100 CPU CHIPS", Type.Label, outline = 2.dp) }
         ChunkyButton({ ask({ devGrant(drops = 5) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 DROPS", Type.Label, outline = 2.dp) }
         ChunkyButton({ ask({ devGrant(credits = 100) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+100 CREDITS", Type.Label, outline = 2.dp) }
     }

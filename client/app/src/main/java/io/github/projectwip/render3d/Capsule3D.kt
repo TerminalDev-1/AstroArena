@@ -46,7 +46,7 @@ class Capsule3D {
     private val TWIN = floatArrayOf(0.31f, 0.53f, 1f)
 
     init {
-// A Spark Drop: a puffy five-pointed star. The front half lifts off the back half when it opens.
+// A Glitch Drop: a puffy five-pointed star. The front half lifts off the back half when it opens.
         fun MeshBuilder.starHalf(front: Boolean) {
             val s = if (front) 1f else -1f
             val pos = ArrayList<FloatArray>()

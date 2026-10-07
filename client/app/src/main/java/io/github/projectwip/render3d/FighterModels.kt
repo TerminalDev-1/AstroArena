@@ -56,6 +56,7 @@ class FighterModels {
         models[FighterId.MIRA] = buildMira()
         models[FighterId.KITO] = buildKito()
         models[FighterId.VARUN] = buildVarun()
+        models[FighterId.BUDDY] = buildBuddy()
         bossModels[io.github.projectwip.data.BossKind.BARRAGE] = buildHailstorm()
         bossModels[io.github.projectwip.data.BossKind.SWEEPER] = buildLighthouse()
         bossModels[io.github.projectwip.data.BossKind.STAMPEDE] = buildRamrod()
@@ -182,7 +183,7 @@ class FighterModels {
         }
         // Floating prism
         a.add(Bone.FLOAT, Slot.SECONDARY, emissive = true) { octa(0.13f, 0.21f, 0.13f) }
-        // Crystal rifle
+        // Prism rifle
         a.add(Bone.WEAPON, Slot.DARK) { at(0.42f, 0f, 0f) { alongX { cylinder(0.05f, 1.0f, 10) } } }
         a.add(Bone.WEAPON, Slot.SECONDARY) { at(-0.04f, -0.02f, 0f) { roundedBox(0.26f, 0.13f, 0.09f, 0.04f) } }
         a.add(Bone.WEAPON, Slot.METAL) { at(0.3f, 0.09f, 0f) { alongX { cylinder(0.045f, 0.22f, 8) } } }
@@ -257,6 +258,58 @@ class FighterModels {
         a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { for (z in listOf(-0.14f, 0f, 0.14f)) at(0.63f, 0.04f, z) { sphere(0.065f, 6, 8) } }
         a.add(Bone.WEAPON, Slot.DARK) { at(0.04f, -0.08f, 0f) { sphere(0.1f, 8, 10) } }
         a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.12f, 0f) { capsule(0.1f, 0.14f) } }
+        a.add(Bone.ARM, Slot.DARK) { at(0f, -0.31f, 0f) { sphere(0.1f, 8, 10) } }
+        return a.build(rig)
+    }
+
+    // ------------------------------------------------------------------ Buddy — a rogue AI with a hologram for a face
+
+    private fun buildBuddy(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 1.1f, hipY = 0.4f, hipZ = 0.17f, shoulder = floatArrayOf(0.14f, 0.78f, 0.4f), shoulderL = floatArrayOf(0.02f, 0.84f, -0.34f), floatY = 1.5f)
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.DARK) { at(0f, -0.15f, 0f) { roundedBox(0.17f, 0.32f, 0.17f, 0.05f) } }
+            a.add(bone, Slot.METAL) { at(0.05f, -0.36f, 0f) { roundedBox(0.32f, 0.12f, 0.2f, 0.05f) } }
+        }
+        // The body is a server tower: a dark case, lit vents down the front, a row of status lights, a cable loop behind.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.68f, 0f) { roundedBox(0.46f, 0.62f, 0.56f, 0.1f) } }
+        a.add(Bone.BODY, Slot.METAL) { at(0f, 0.4f, 0f) { roundedBox(0.5f, 0.08f, 0.6f, 0.03f) } }
+        a.add(Bone.BODY, Slot.SECONDARY, outline = false, emissive = true) {
+            for (y in listOf(0.56f, 0.66f, 0.76f)) at(0.235f, y, 0f) { roundedBox(0.02f, 0.04f, 0.36f, 0.01f) }
+        }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) {
+            for (z in listOf(-0.14f, 0f, 0.14f)) at(0.235f, 0.9f, z) { sphere(0.035f, 6, 8) }
+        }
+        a.add(Bone.BODY, Slot.DARK) { at(-0.28f, 0.66f, 0f) { alongZ { torus(0.16f, 0.04f, 14, 6) } } }
+        // No head. A projector ring sits on the shoulders and throws a face into the air above it: a flat screen of
+        // light with nothing behind it, two eyes and a mouth drawn on, and a bright bar along its top and bottom.
+        a.add(Bone.HEAD, Slot.METAL) { at(0f, -0.06f, 0f) { cylinder(0.17f, 0.07f, 12) } }
+        a.add(Bone.HEAD, Slot.SECONDARY, outline = false, emissive = true) { at(0f, -0.01f, 0f) { torus(0.13f, 0.025f, 14, 5) } }
+        // (The screen leans back, so that it can be read from above as well as from in front.)
+        fun MeshBuilder.screen(block: MeshBuilder.() -> Unit) = at(0f, 0.36f, 0f) { rotate(34f, 0f, 0f, 1f); block() }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { screen { roundedBox(0.012f, 0.46f, 0.66f, 0.005f) } }
+        a.add(Bone.HEAD, Slot.SECONDARY, outline = false, emissive = true) {
+            screen {
+                for (y in listOf(-0.24f, 0.24f)) at(0f, y, 0f) { roundedBox(0.03f, 0.025f, 0.72f, 0.008f) }
+                for (z in listOf(-0.36f, 0.36f)) at(0f, 0f, z) { roundedBox(0.03f, 0.5f, 0.02f, 0.008f) }
+            }
+        }
+        a.add(Bone.HEAD, Slot.INK, outline = false) {
+            screen {
+                for (z in listOf(-0.16f, 0.16f)) at(0.015f, 0.07f, z) { roundedBox(0.012f, 0.15f, 0.1f, 0.004f) }
+                at(0.015f, -0.12f, 0f) { roundedBox(0.012f, 0.04f, 0.3f, 0.004f) }
+            }
+        }
+        // Loose bits of code turning round the screen.
+        a.add(Bone.FLOAT, Slot.SECONDARY, outline = false, emissive = true) {
+            for (k in 0 until 3) { val t = k * 2.094f; at(kotlin.math.cos(t) * 0.5f, (k - 1) * 0.1f, sin(t) * 0.5f) { roundedBox(0.07f, 0.07f, 0.07f, 0.01f) } }
+        }
+        // What it hits people with: a whole computer, monitor and all, held out in front.
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.36f, 0f, 0f) { roundedBox(0.36f, 0.36f, 0.44f, 0.05f) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.545f, 0.02f, 0f) { roundedBox(0.02f, 0.26f, 0.34f, 0.01f) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.36f, -0.22f, 0f) { roundedBox(0.4f, 0.06f, 0.5f, 0.02f) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.06f, 0f, 0f) { sphere(0.11f, 8, 10) } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.12f, 0f) { roundedBox(0.15f, 0.3f, 0.15f, 0.05f) } }
         a.add(Bone.ARM, Slot.DARK) { at(0f, -0.31f, 0f) { sphere(0.1f, 8, 10) } }
         return a.build(rig)
     }

@@ -441,7 +441,7 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
 private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, go: (Screen) -> Unit, onUpgrade: () -> Unit) {
     val p = save.progress(id)
     if (!p.unlocked) {
-        // Fighters are unlocked on the Spark Road with Credits; the shop sells them for Crystals as a shortcut.
+        // Fighters are unlocked on the Spark Road with Credits; the shop sells them for CPU Chips as a shortcut.
         val step = io.github.projectwip.data.SparkRoad.steps.firstOrNull { it.fighter == id }
         ChunkyButton({ go(Screen.Road) }, Modifier.fillMaxWidth().height(60.dp), ButtonStyle.GREEN) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -480,7 +480,7 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
             }
         }
     }
-    if (!Progression.levelCapped(save, id) && save.bolts < cost) PlainText("Need ${cost - save.bolts} more Power Ups — win matches or visit the Shop.", Type.Small, color = Palette.Red)
+    if (!Progression.levelCapped(save, id) && save.bolts < cost) PlainText("Need ${cost - save.bolts} more Upgrade Credits — win matches or visit the Shop.", Type.Small, color = Palette.Red)
 }
 
 @Composable

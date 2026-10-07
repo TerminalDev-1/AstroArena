@@ -40,7 +40,7 @@ class GameRepository(private val store: SaveStore) {
         return rewards
     }
 
-    /** Counts a Spark Drop the server opened. */
+    /** Counts a Glitch Drop the server opened. */
     fun dropOpened(count: Int = 1) = commit(Progression.dropOpened(_save.value, count))
 
     /** Takes on what the server holds for this player (Cups, drops, and when given the profile and shop deals). */

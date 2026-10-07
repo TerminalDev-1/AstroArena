@@ -25,7 +25,7 @@ from .store import Store
 NAME = "accounts.cfg"
 DELETED = "deleted_accounts.log"
 # The whole numbers of an account, as the file calls them.
-NUMBERS = ("cups", "best_cups", "drops", "bolts", "prisms", "credits", "glory")
+NUMBERS = ("cups", "best_cups", "drops", "bolts", "prisms", "credits")
 _KEPT_REVISIONS = 500
 _YES, _NO = ("yes", "true", "on", "1"), ("no", "false", "off", "0")
 _DATE = "%Y-%m-%d %H:%M"
@@ -49,11 +49,10 @@ HEADER = """\
 #               turns it into the date. Both only count while disabled = yes.
 #   cups        the player's Cups: their place on the leaderboard
 #   best_cups   the most Cups they have had: how far along the Cup Track they are
-#   drops       unopened Spark Drops
-#   bolts       Power Ups
-#   prisms      Crystals
-#   credits     Credits on the Spark Road, toward the next fighter
-#   glory       Glory, once every fighter is unlocked
+#   drops       unopened Glitch Drops
+#   bolts       Upgrade Credits
+#   prisms      CPU Chips
+#   credits     Credits on the Spark Road, toward the next fighter (enough of them unlocks it)
 #   <fighter>   unlocked or locked, its level (1 to %d) and its own Cups (its rank follows them):
 #                   mira = unlocked, level 4, cups 120
 #               %s can't be locked: everyone starts with it.

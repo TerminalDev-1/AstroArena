@@ -97,6 +97,14 @@ class Fighter(
     var dashDirY = 0f
     val dashHits = HashSet<Int>()
 
+    // Malformed code (Buddy's super): the id of whoever compiled it into this fighter (-1 = clean), what it does each
+    // second, the time to its next bite, and how long it has left.
+    var poisonBy = -1
+    var poisonDamage = 0
+    var poisonTick = 0f
+    var poisonLeft = 0f
+    val poisoned get() = poisonBy >= 0
+
     var lastAttackerId = -1
     var spawnIndex = 0
     /** Free-for-all: out for good. */
@@ -120,7 +128,7 @@ class Fighter(
     val isDashing get() = dashTime > 0f
 }
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER }
 
 class Projectile(
     val ownerId: Int,

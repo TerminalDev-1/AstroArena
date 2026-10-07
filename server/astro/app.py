@@ -12,15 +12,13 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/matches        {...}       plan a match -> {matchId, seed, botNames, difficulty} (token)
     POST /v1/matches/<id>/result {inputs}  hand in the match's inputs; the server replays it and
                                         answers with the result and what it earned            (token)
-    POST /v1/drops/open     {...}       open a Spark Drop -> {tier, pieces, reward, account}  (token)
-    POST /v1/drops/open-all {...}       open every Spark Drop held -> {results: [{tier, pieces, reward}], account}  (token)
+    POST /v1/drops/open     {...}       open a Glitch Drop -> {tier, pieces, reward, account}  (token)
+    POST /v1/drops/open-all {...}       open every Glitch Drop held -> {results: [{tier, pieces, reward}], account}  (token)
     POST /v1/fighters/upgrade {fighter} level a fighter up with Bolts                         (token)
     POST /v1/shop/buy       {item}      buy a standing shop item with Prisms -> {reward}      (token)
     POST /v1/shop/gift                  claim the daily gift -> {reward}                      (token)
     POST /v1/shop/deals/<id>/buy        buy a deal -> {reward}                                (token)
     POST /v1/track/claim    {cups}      claim a Cup Track reward -> {reward}                  (token)
-    POST /v1/road/unlock                claim the Spark Road fighter the Credits have covered -> {reward}  (token)
-    POST /v1/pass/claim     {tier}      claim a Spark Pass tier -> {reward}                   (token)
     POST /v1/shop/daily/<n>/buy {day}   buy one of today's offers -> {reward}                 (token)
     POST /v1/settings/difficulty {difficulty}  choose the bot difficulty; the server says yes or no  (token)
     POST /v1/reset                      start this account's progress over                    (token, developer)
@@ -33,7 +31,7 @@ Only the Python standard library is used, so there is nothing to install.
 A token goes in the `Authorization: Bearer <token>` header, and every request with a token must also say which
 version of the game is asking (`X-Client-Version`); versions listed in versions_not_supported.cfg are refused.
 
-The server owns each player's Cups, Spark Drops, Bolts, Prisms, fighters and claimed rewards: it works out what a
+The server owns each player's Cups, Glitch Drops, Bolts, Prisms, fighters and claimed rewards: it works out what a
 match is worth, rolls what comes out of a drop, and is the only place anything is bought, upgraded or claimed.
 Matches are played on the device and then replayed here from the player's inputs (referee.py): the result is
 the server's own. Every reply to a signed-in request carries the `account`, which is what the game shows.
@@ -55,7 +53,7 @@ from .accounts import Accounts
 from .config import Config, parse_version
 from .economy import Refused
 from .referee import Referee, TICKS_PER_SECOND, count_ticks, decode_inputs
-from .store import Store, clock, season_ends_ms, today
+from .store import Store, clock, today
 
 API = 2
 MAX_BODY = 2 * 1024 * 1024  # a match's input log rides along with its result
@@ -125,15 +123,10 @@ class Game:
             "difficulty": self.difficulty(player),
             "difficulties": list(rules.DIFFICULTIES) if developer else self.config.allowed_difficulties(),
             "profile": profile,
-            # The Spark Road (fighters in order, and the Credits each takes) and this season's Spark Pass.
+            # The Spark Road: fighters in order, and the Credits each takes.
             "road": {
                 "steps": [{"fighter": name, "cost": cost, "rarity": economy.FIGHTER_RARITY[name]} for name, cost in economy.SPARK_ROAD],
                 "target": (economy.road_next(profile) or ("", 0))[0],
-            },
-            "pass": {
-                **economy.pass_view(profile, time_now["day"]), "endsAt": season_ends_ms(time_now["day"]),
-                "tierPoints": economy.PASS_TIER_POINTS,
-                "tiers": [economy.pass_reward(t) for t in range(1, economy.PASS_TIERS + 1)],
             },
             "deals": self.store.deals(player_id),
             # The day's offers and the clock they run on. Times are the server's: the game counts down from these.
@@ -284,10 +277,6 @@ def make_handler(game: Game, quiet: bool = False):
                 return self._act(lambda p, d: {"reward": game.store.claim_gift(p["id"])})
             if url.path == "/v1/track/claim":
                 return self._act(lambda p, d: {"reward": game.store.claim_milestone(p["id"], int(d.get("cups") or 0))})
-            if url.path == "/v1/road/unlock":
-                return self._act(lambda p, d: {"reward": game.store.road_unlock(p["id"])})
-            if url.path == "/v1/pass/claim":
-                return self._act(lambda p, d: {"reward": game.store.claim_pass(p["id"], int(d.get("tier") or 0))})
             if url.path == "/v1/reset":
                 return self._act(lambda p, d: game.store.reset(p["id"]), developer=True)
             if url.path == "/v1/settings/difficulty":
@@ -341,7 +330,7 @@ def make_handler(game: Game, quiet: bool = False):
             luck = float(data.get("luck") or 0) if game.config.is_developer(player["id"]) else 0.0
             results = game.store.open_all_drops(player["id"], luck)
             if not results:
-                raise Refused(409, "no Spark Drops to open")
+                raise Refused(409, "no Glitch Drops to open")
             return {"results": results}
 
         def _upgrade(self, player, data):
@@ -438,7 +427,7 @@ def make_handler(game: Game, quiet: bool = False):
                 free = data.get("free") is True
             result = game.store.open_drop(player["id"], luck, free)
             if result is None:
-                return self._error(409, "no Spark Drops to open")
+                return self._error(409, "no Glitch Drops to open")
             return self._send(200, {**result, "account": game.account(player["id"])})
 
         def do_PUT(self):  # noqa: N802

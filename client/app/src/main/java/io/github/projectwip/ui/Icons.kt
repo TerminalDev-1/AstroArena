@@ -19,12 +19,12 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE, CREDIT, HEART, GLORY }
+enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE, CREDIT, HEART }
 
 /** Original vector icon set. Each icon is drawn in a 0..1 unit square with an ink outline. */
 @Composable
 fun GameIcon(kind: IconKind, modifier: Modifier = Modifier, tint: Color? = null) {
-    // Crystals are unstable: their icon glitches wherever it is shown, however small.
+    // CPU Chips are unstable: their icon glitches wherever it is shown, however small.
     if (kind == IconKind.PRISM) { GlitchIcon(kind, modifier, tint); return }
     Canvas(modifier) {
         withTransform({ scale(size.width, size.height, Offset.Zero) }) {
@@ -120,15 +120,18 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             drawPath(bolt, Color(0xFF2EE6D6)); outline(bolt, 0.03f)
         }
         IconKind.BOLT -> {
-            // A Power Up, the soft currency (the code still calls it a bolt): a charged cell with two chevrons climbing it.
-            val cell = poly(0.3f, 0.06f, 0.7f, 0.06f, 0.92f, 0.28f, 0.92f, 0.74f, 0.7f, 0.96f, 0.3f, 0.96f, 0.08f, 0.74f, 0.08f, 0.28f)
-            drawPath(cell, Brush.verticalGradient(listOf(Color(0xFFDDF7FF), Palette.Bolt, Palette.BoltDeep), 0.05f, 0.98f))
-            drawPath(poly(0.3f, 0.06f, 0.7f, 0.06f, 0.92f, 0.28f, 0.08f, 0.28f), Color.White.copy(alpha = 0.3f))
-            outline(cell)
-            for (y in floatArrayOf(0.2f, 0.47f)) {
-                val chevron = poly(0.5f, y, 0.76f, y + 0.23f, 0.76f, y + 0.38f, 0.5f, y + 0.15f, 0.24f, y + 0.38f, 0.24f, y + 0.23f)
-                drawPath(chevron, Color.White)
-                outline(chevron, 0.045f)
+            // An Upgrade Credit: the Credit's card in amber, with an arrow pointing up in its window.
+            val round = androidx.compose.ui.geometry.CornerRadius(0.09f)
+            drawRoundRect(INK, Offset(0.03f, 0.17f), Size(0.94f, 0.68f), round)
+            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFFFF1B8), Palette.Gold, Palette.GoldDeep), 0.2f, 0.84f),
+                Offset(0.085f, 0.225f), Size(0.83f, 0.57f), androidx.compose.ui.geometry.CornerRadius(0.055f))
+            drawRect(Color.White.copy(alpha = 0.35f), Offset(0.085f, 0.225f), Size(0.83f, 0.1f))
+            drawRoundRect(INK, Offset(0.13f, 0.28f), Size(0.44f, 0.46f), androidx.compose.ui.geometry.CornerRadius(0.07f))
+            drawRoundRect(Color(0xFF7A4A00), Offset(0.165f, 0.315f), Size(0.37f, 0.39f), androidx.compose.ui.geometry.CornerRadius(0.045f))
+            drawPath(poly(0.35f, 0.34f, 0.5f, 0.52f, 0.41f, 0.52f, 0.41f, 0.68f, 0.29f, 0.68f, 0.29f, 0.52f, 0.2f, 0.52f), tint ?: Color.White)
+            for (y in floatArrayOf(0.34f, 0.56f)) {
+                drawRoundRect(INK, Offset(0.62f, y - 0.035f), Size(0.26f, 0.17f), androidx.compose.ui.geometry.CornerRadius(0.04f))
+                drawRoundRect(Color(0xFFFFF7DC), Offset(0.65f, y - 0.005f), Size(0.2f, 0.11f), androidx.compose.ui.geometry.CornerRadius(0.025f))
             }
         }
         IconKind.HEART -> {
@@ -162,32 +165,21 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
                 drawRoundRect(Color(0xFFE9FFF3), Offset(0.65f, y - 0.005f), Size(0.2f, 0.11f), androidx.compose.ui.geometry.CornerRadius(0.025f))
             }
         }
-        IconKind.GLORY -> {
-            // Glory: a gold pennant-shield with a white star.
-            val shield = poly(0.5f, 0.04f, 0.9f, 0.2f, 0.9f, 0.56f, 0.5f, 0.96f, 0.1f, 0.56f, 0.1f, 0.2f)
-            drawPath(shield, Brush.verticalGradient(listOf(Color(0xFFFFF3A0), Palette.Gold, Palette.GoldDeep), 0.05f, 0.95f))
-            drawPath(poly(0.5f, 0.04f, 0.9f, 0.2f, 0.9f, 0.36f, 0.1f, 0.36f, 0.1f, 0.2f), Color.White.copy(alpha = 0.3f))
-            outline(shield)
-            val star = Path()
-            for (i in 0 until 10) {
-                val a = -PI / 2 + i * PI / 5
-                val r = if (i % 2 == 0) 0.25f else 0.11f
-                val x = 0.5f + (cos(a) * r).toFloat(); val y = 0.47f + (sin(a) * r).toFloat()
-                if (i == 0) star.moveTo(x, y) else star.lineTo(x, y)
-            }
-            star.close()
-            drawPath(star, Color.White)
-            outline(star, 0.04f)
-        }
         IconKind.PRISM -> {
-            val outer = poly(0.5f, 0.06f, 0.88f, 0.4f, 0.5f, 0.95f, 0.12f, 0.4f)
-            drawPath(outer, Brush.linearGradient(listOf(Color(0xFFFFB8FF), Palette.Prism, Palette.PrismDeep), Offset(0.2f, 0.1f), Offset(0.8f, 0.9f)))
-            val facetL = poly(0.5f, 0.06f, 0.36f, 0.4f, 0.5f, 0.95f, 0.12f, 0.4f)
-            drawPath(facetL, Color.White.copy(alpha = 0.25f))
-            val facetTop = poly(0.36f, 0.4f, 0.5f, 0.06f, 0.64f, 0.4f)
-            drawPath(facetTop, Color.White.copy(alpha = 0.35f))
-            drawLine(INK.copy(alpha = 0.5f), Offset(0.12f, 0.4f), Offset(0.88f, 0.4f), 0.03f)
-            outline(outer)
+            // A CPU Chip: a square package with pins down every side and a bright die in the middle.
+            for (i in 0 until 4) {
+                val p = 0.26f + i * 0.16f
+                drawRoundRect(INK, Offset(p - 0.045f, 0.02f), Size(0.09f, 0.96f), androidx.compose.ui.geometry.CornerRadius(0.03f))
+                drawRoundRect(INK, Offset(0.02f, p - 0.045f), Size(0.96f, 0.09f), androidx.compose.ui.geometry.CornerRadius(0.03f))
+                drawRect(Palette.Gold, Offset(p - 0.02f, 0.05f), Size(0.04f, 0.9f))
+                drawRect(Palette.Gold, Offset(0.05f, p - 0.02f), Size(0.9f, 0.04f))
+            }
+            drawRoundRect(INK, Offset(0.13f, 0.13f), Size(0.74f, 0.74f), androidx.compose.ui.geometry.CornerRadius(0.09f))
+            drawRoundRect(Brush.linearGradient(listOf(Color(0xFFFFB8FF), Palette.Prism, Palette.PrismDeep), Offset(0.2f, 0.15f), Offset(0.8f, 0.85f)),
+                Offset(0.18f, 0.18f), Size(0.64f, 0.64f), androidx.compose.ui.geometry.CornerRadius(0.06f))
+            drawRect(Color.White.copy(alpha = 0.3f), Offset(0.18f, 0.18f), Size(0.64f, 0.12f))
+            drawRoundRect(INK, Offset(0.33f, 0.33f), Size(0.34f, 0.34f), androidx.compose.ui.geometry.CornerRadius(0.05f))
+            drawRoundRect(tint ?: Color.White, Offset(0.375f, 0.375f), Size(0.25f, 0.25f), androidx.compose.ui.geometry.CornerRadius(0.03f))
         }
         IconKind.GEAR -> {
             val c = Offset(0.5f, 0.5f)
@@ -332,7 +324,7 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
 }
 
 /**
- * A Spark Drop in a unit square: a plump star in [color] with a glowing core. [glow] (0..1) adds light around it.
+ * A Glitch Drop in a unit square: a plump star in [color] with a glowing core. [glow] (0..1) adds light around it.
  */
 fun DrawScope.drawCapsuleUnit(color: Color, @Suppress("UNUSED_PARAMETER") split: Float = 0f, glow: Float = 0f) {
     val c = Offset(0.5f, 0.54f)
