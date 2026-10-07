@@ -70,7 +70,7 @@ import androidx.compose.runtime.collectAsState
 
 const val REPO_URL = "https://github.com/TerminalDev-1/AstroArena"
 
-private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), CHAOS("Chaos Command Center") }
+private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), MODES("Modes"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), CHAOS("Chaos Command Center") }
 
 @Composable
 fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
@@ -87,11 +87,13 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("SETTINGS", { go(Screen.Home) }, null, null)
             Row(Modifier.weight(1f).padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
-                Column(Modifier.width(if (ui.roomy) 200.dp else 170.dp), verticalArrangement = Arrangement.spacedBy(if (ui.roomy) 10.dp else 7.dp)) {
+                // (Seven tabs: sized to fit a tablet without scrolling, and scrolling on anything shorter.)
+                Column(Modifier.width(if (ui.roomy) 200.dp else 170.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(if (ui.roomy) 8.dp else 5.dp)) {
                     for (t in Tab.entries.filter { it != Tab.CHAOS || dev }) {
-                        ChunkyButton({ tab = t }, Modifier.fillMaxWidth().height(if (ui.roomy) 58.dp else 42.dp),
+                        ChunkyButton({ tab = t }, Modifier.fillMaxWidth().height(if (ui.roomy) 50.dp else 38.dp),
                             if (t == tab) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
-                            GameText(t.label.uppercase(), Type.Label, outline = 2.dp)
+                            // Offline the tweaks are everyone's, and the tab says so.
+                            GameText((if (t == Tab.CHAOS && io.github.projectwip.ui.LocalOfflineMode.current) "Chaos Mode" else t.label).uppercase(), Type.Label, outline = 2.dp)
                         }
                     }
                 }
@@ -100,6 +102,7 @@ fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         when (tab) {
                             Tab.GAMEPLAY -> GameplayTab(s, set)
+                            Tab.MODES -> ModesTab(s, set)
                             Tab.CONTROLS -> ControlsTab(s, set) { editingLayout = true }
                             Tab.AUDIO -> AudioTab(s, set)
                             Tab.DISPLAY -> DisplayTab(s, set)
@@ -135,9 +138,6 @@ private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
                 }
             }
         }
-    }
-    ToggleRow("GLITCH DROPS ONLY", "The home screen becomes just the Glitch Drop button. No fights. Turn it off to get the fights back.", s.glitchDropsOnly) { v ->
-        set { it.copy(glitchDropsOnly = v) }
     }
     SectionTitle("PLAYER NAME", "Shown above your fighter in matches.")
     NameField(s.playerName) { n -> set { it.copy(playerName = n, nameChosen = true) } }
@@ -282,6 +282,19 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     PlainText(REPO_URL, Type.Small, color = Palette.Cyan)
     if (confirm) {
         ConfirmDialog("RESET EVERYTHING?", "All progress will be lost.", "RESET", { confirm = false; ask({ reset() }) { repo.resetProgress() } }, { confirm = false }, ButtonStyle.RED)
+    }
+}
+
+/** The ways of playing the player can switch on for themselves. */
+@Composable
+private fun ModesTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
+    val offline = io.github.projectwip.ui.LocalOfflineMode.current
+    SectionTitle("MODES", if (offline) "You are offline, on your offline profile, in Chaos Mode." else "You are online, on your server account.")
+    ToggleRow("OFFLINE MODE", "Play on your offline profile even while the server is there: a separate account on this device, with Chaos Mode (every tweak in the game). Your server account is untouched. Turn it off to go back online.", s.forceOffline) { v ->
+        set { it.copy(forceOffline = v) }
+    }
+    ToggleRow("GLITCH DROPS ONLY", "The home screen becomes just the Glitch Drop button. No fights. Turn it off to get the fights back.", s.glitchDropsOnly) { v ->
+        set { it.copy(glitchDropsOnly = v) }
     }
 }
 

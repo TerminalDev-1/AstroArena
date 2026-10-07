@@ -41,7 +41,8 @@ import io.github.projectwip.ui.Type
 
 /**
  * The Chaos Command Center: every tweak the game has (drop luck, free drops, upgrade cost, level cap, hand-outs). It
- * is a tab in Settings, for developers only: the server honours none of it from anyone else. They change the real account.
+ * is a tab in Settings. Online it is for developers only (the server honours none of it from anyone else) and changes
+ * the real account. Offline it is Chaos Mode: everyone has it, and it changes the offline profile only.
  */
 @Composable
 fun ChaosCommandCenter(save: SaveData, repo: GameRepository) {
@@ -54,12 +55,14 @@ fun ChaosCommandCenter(save: SaveData, repo: GameRepository) {
     fun snap(v: Float) = (v * 10).toInt() / 10f
     val server = io.github.projectwip.ui.LocalServer.current
     val status = server?.status?.collectAsState()?.value
-    // Everything these cheats touch is the server's, so they only work if it lists this player as a developer.
-    val trusted = status?.online == true && status.account?.developer == true
-    SectionTitle("CHAOS COMMAND CENTER", "Every tweak in the game. They change your real account, so use them however you like.")
+    val offline = io.github.projectwip.ui.LocalOfflineMode.current
+    // Online, everything these tweaks touch is the server's, so they only work if it lists this player as a developer.
+    // Offline is Chaos Mode: they are everyone's, and only touch the offline profile.
+    val trusted = offline || (status?.online == true && status.account?.developer == true)
+    if (offline) SectionTitle("CHAOS MODE", "You are offline, so every tweak in the game is yours. They only change your offline profile, and they switch off when you are back online.")
+    else SectionTitle("CHAOS COMMAND CENTER", "Every tweak in the game. They change your real account, so use them however you like.")
     if (!trusted) PlainText(
-        if (status?.online != true) "Offline: everything in this menu needs the server."
-        else "The server doesn't list you as a developer, so it ignores everything in this menu. " +
+        "The server doesn't list you as a developer, so it ignores everything in this menu. " +
             "Add your player ID (${server?.playerId ?: "see Settings > Data"}) to game.cfg on the server.",
         Type.Body, color = io.github.projectwip.ui.Palette.Gold,
     )

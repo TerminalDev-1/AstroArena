@@ -148,7 +148,7 @@ fun HomeScreen(
                 ) {
                     val dropsOnly = save.settings.glitchDropsOnly
                     // Boss Mode or 3v3 with one or two real players, by team code.
-                    if (!dropsOnly) ChunkyButton({ go(Screen.Team) }, Modifier.fillMaxWidth().height(50.dp), ButtonStyle.GLASS, lip = 4.dp) {
+                    if (!dropsOnly && !io.github.projectwip.ui.LocalOfflineMode.current) ChunkyButton({ go(Screen.Team) }, Modifier.fillMaxWidth().height(50.dp), ButtonStyle.GLASS, lip = 4.dp) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             GameIcon(IconKind.FIGHTERS, Modifier.size(24.dp))
                             Spacer(Modifier.width(8.dp))

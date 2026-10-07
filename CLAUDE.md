@@ -77,9 +77,14 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (`save.json`, a copy of the server's account) is untouched while offline. The switch is automatic and only ever
   made by the connection: offline when the server doesn't answer (at start-up after `CONNECT_PATIENCE_MS`, or when
   it stops answering later), back online by itself when it does, and never in the middle of a match (a match belongs
-  to the profile it started on; one started online that can't be handed in pays nothing). There is no button for
-  it. A disabled account or an unsupported version gets no offline play. Offline nobody is a developer, and there
-  is no leaderboard, News, 1v1 against a real player or team play.
+  to the profile it started on; one started online that can't be handed in pays nothing). The player can also
+  ask for it while the server is there: Settings > Modes > Offline mode (`Settings.forceOffline`); then the server
+  isn't asked to plan or judge matches. A disabled account or an unsupported version gets no offline play. Offline
+  there is no real leaderboard place, 1v1 against a real player or team play.
+- Offline is *Chaos Mode*, by the user's decision: everyone has every tweak there (the Chaos Command Center tab is
+  shown as "Chaos Mode"; luck, free drops, upgrade cost, no level cap, hand-outs, deals, starting over), because
+  they only touch the offline profile. Don't call anyone a developer for it. Back online the game switches the
+  tweaks off for everyone the server doesn't list as a developer.
 - `Economy.kt` must say what `server/astro/economy.py` and `rules.py` say: change a price, a cost, a drop table or
   what a match pays in both, and `EconomyTest` and `test_server.py` both check the numbers.
 - Menus ask through `LocalServerCall` whichever profile is showing: the request is written against `GameActions`
@@ -91,7 +96,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (drop luck, free drops, upgrade cost, no level cap, hand-outs) and is always on for them: there is no "D" button
   and no switch any more. Only they can make shop deals (the in-game Offer Creator) or reset an account. The server
   ignores luck, free drops, free upgrades and hand-outs from anyone else.
-- Settings > Gameplay has "Glitch Drops only", for everyone: the home screen becomes just the Glitch Drop button, with
+- Settings > Modes has "Glitch Drops only", for everyone: the home screen becomes just the Glitch Drop button, with
   no fights. It is a layout choice kept on the device; the drops are still the server's.
 - `server/accounts.cfg` is the owner's hand on every account (`astro/accounts.py`): the server writes it from the
   database, leaderboard first, and forces whatever value the owner changes in it (`Store.force`). It holds player

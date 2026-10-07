@@ -15,6 +15,9 @@ import java.util.concurrent.Executors
  * while the server can't be reached ([offlineMode]): everything in it is earned and spent on this device, by the
  * rules in [Economy], and none of it is ever sent to the server. [save] is whichever is being played on right now.
  * Settings belong to the device, not to a profile: they are carried across when the profile changes.
+ *
+ * Offline is also *Chaos Mode*: everyone has every tweak there (the Chaos Command Center), since the offline profile
+ * is nobody's business but the player's. Back online the tweaks are a developer's again.
  */
 class GameRepository(private val store: SaveStore, private val offlineStore: SaveStore? = null) {
     private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "save-io").apply { isDaemon = true } }
@@ -63,7 +66,8 @@ class GameRepository(private val store: SaveStore, private val offlineStore: Sav
 
     /**
      * Changes which profile is being played on: the offline one when the server can't be reached, the server's when
-     * it can. Settings come along; the debug cheats don't go offline (offline nobody is a developer).
+     * it can. Settings come along, tweaks included: offline they are everyone's (Chaos Mode), and back online the
+     * game switches them off for anyone the server doesn't list as a developer.
      */
     @Synchronized
     fun setOffline(on: Boolean) {
@@ -72,7 +76,7 @@ class GameRepository(private val store: SaveStore, private val offlineStore: Sav
         _offline.value = on
         if (on) {
             val profile = offlineSave ?: offlineStore?.load() ?: SaveData(capsuleSeed = System.nanoTime())
-            commit(profile.copy(settings = Progression.withoutCheats(settings)))
+            commit(profile.copy(settings = settings))
         } else commit(onlineSave.copy(settings = settings))
     }
 

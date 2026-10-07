@@ -50,6 +50,8 @@ data class Settings(
     val debugNoLevelCap: Boolean = false,
     /** Debug menu: multiplies what every upgrade costs (1 = normal, 0 = free). */
     val debugUpgradeCost: Float = 1f,
+    /** Offline mode by choice: play on the offline profile (and so in Chaos Mode) even while the server is there. */
+    val forceOffline: Boolean = false,
     /** Glitch Drops only: the home screen is just the Glitch Drop button, with no fights. */
     val glitchDropsOnly: Boolean = false,
 )

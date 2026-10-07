@@ -137,9 +137,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // While the server can't be reached the game is on its offline profile, answered on the device.
     val local = remember { io.github.projectwip.net.LocalGame(repo) }
     val offline by repo.offline.collectAsState()
-    // The debug menu and its cheats belong to developers, and the server says who those are. A dev build is not enough,
-    // and offline nobody is one.
-    val dev = account?.developer == true && serverStatus.online
+    // Online, the tweaks (the Chaos Command Center) belong to developers, and the server says who those are: a dev
+    // build is not enough. Offline is Chaos Mode: the offline profile is the player's own, so everyone has them.
+    val developer = account?.developer == true && serverStatus.online
+    val dev = offline || developer
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var unsupportedSkipped by remember { mutableStateOf(false) }
     // A disabled account gets nothing: no menus, no offline play. The notice stays up until the server lets it back in.
@@ -210,13 +211,16 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // Cups, Glitch Drops, currencies, fighters and shop deals are the server's: whatever it says this player has is what the game shows.
     LaunchedEffect(account) { account?.let { repo.sync(it) } }
     // Anyone who isn't a developer plays without the debug menu's cheats, even if their save has some switched on.
-    LaunchedEffect(dev, booting, serverStatus.online, account) { if (!booting && serverStatus.online && account != null && !dev) repo.clearCheats() }
+    // Back online, anyone who isn't a developer loses the tweaks they had in Chaos Mode.
+    LaunchedEffect(developer, offline, booting, serverStatus.online, account) { if (!booting && !offline && serverStatus.online && account != null && !developer) repo.clearCheats() }
     val inMatch = screen is Screen.Match
     // Which profile is being played on: the server's account while it answers, the offline profile kept on this
     // device while it doesn't. It is never swapped in the middle of a match (the match belongs to the profile it
-    // started on), and a disabled account or an unsupported version gets no offline play.
-    LaunchedEffect(serverStatus.online, serverStatus.disabled, serverStatus.supported, booting, inMatch) {
-        if (!booting && !inMatch) repo.setOffline(!serverStatus.online && !serverStatus.disabled && serverStatus.supported)
+    // started on), and a disabled account or an unsupported version gets no offline play. The player can also ask
+    // for it, in Settings > Modes, while the server is there.
+    val forceOffline = save.settings.forceOffline
+    LaunchedEffect(serverStatus.online, serverStatus.disabled, serverStatus.supported, booting, inMatch, forceOffline) {
+        if (!booting && !inMatch) repo.setOffline((forceOffline || !serverStatus.online) && !serverStatus.disabled && serverStatus.supported)
     }
     // Offline in the menus: quietly keep trying to get back online.
     LaunchedEffect(serverStatus.online, serverStatus.supported, booting, inMatch) {
@@ -248,7 +252,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     val teamUp = team?.takeIf { !it.ended && it.error == null }
     // In a team, matches are started by its leader, from the team screen: Play goes there.
     val go: (Screen) -> Unit = {
-        val to = if (it is Screen.Match && it.config.team == null && teamUp != null) Screen.Team else it
+        // (Offline there is nobody to team up with, and a match is the offline profile's alone.)
+        val to = if (repo.offlineMode) (if (it is Screen.Team) Screen.Home else it) else if (it is Screen.Match && it.config.team == null && teamUp != null) Screen.Team else it
         if (to !is Screen.Match) sfx.play(Sound.WHOOSH, 0.7f)
         screen = to
     }
@@ -274,7 +279,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // offline profile's, and are rolled on the device.)
     val openCapsule: () -> Unit = {
         if (!opening) {
-            if (repo.offlineMode) local.openDrop().let { if (it != null) capsule = it else toast = "No Glitch Drops to open." }
+            if (repo.offlineMode) repo.save.value.settings.let { local.openDrop(it.debugLuck, it.debugInfiniteCapsules) }.let { if (it != null) capsule = it else toast = "No Glitch Drops to open." }
             else if (!serverStatus.online) toast = "Couldn't reach the server. Try again in a moment."
             else {
                 opening = true
@@ -299,7 +304,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // Opens every drop that is left. [first] is the one on screen, when its own reveal is being skipped.
     val openAll: (CapsuleResult?) -> Unit = { first ->
         if (!opening) {
-            if (repo.offlineMode) local.openAllDrops().let { if (it != null) { capsule = null; haul = listOfNotNull(first) + it } else toast = "No Glitch Drops to open." }
+            if (repo.offlineMode) repo.save.value.settings.let { local.openAllDrops(it.debugLuck, it.debugInfiniteCapsules) }.let { if (it != null) { capsule = null; haul = listOfNotNull(first) + it } else toast = "No Glitch Drops to open." }
             else if (!serverStatus.online) toast = "Couldn't reach the server. Try again in a moment."
             else {
                 opening = true
@@ -368,9 +373,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                         // The difficulty is the one the server last approved (it is kept in the settings), and the
                         // server's match plan has the final word.
                         s.config,
-                        save.settings, sfx, save.matchesPlayed, server,
+                        // (Offline the server isn't asked, even if it is there: the match is the offline profile's.)
+                        save.settings, sfx, save.matchesPlayed, server.takeIf { !offline },
                         onCancel = { screen = Screen.Home },
-                        team = team,
+                        team = team.takeIf { !offline },
                         onFinish = { summary ->
                             scope.launch {
                                 // The server replays the match from the player's inputs: the result and what it is worth are
@@ -378,8 +384,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                                 // (A 1v1 is settled by the lobby, from both players' inputs, and the answer comes down its line.)
                                 val duel = summary.duel
                                 val squad = summary.team
-                                judging = (summary.serverMatchId > 0 || duel != null || squad != null) && serverStatus.online
-                                val verdict = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                judging = (summary.serverMatchId > 0 || duel != null || squad != null) && serverStatus.online && !repo.offlineMode
+                                val verdict = if (repo.offlineMode) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                     if (duel != null) duel.result()?.let { server.duelVerdict(it) }
                                     else if (squad != null) squad.result()?.let { server.duelVerdict(it) }
                                     else server.reportMatch(summary.serverMatchId, summary.report, summary.inputs)
@@ -401,9 +407,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             }
             // On top of everything: the loading screen, then (if a newer release exists) the update screen.
             // Server status in the corner. (Its notice is part of the home screen.)
-            if (screen !is Screen.Match && capsule == null && haul == null && reveal == null) {
+            // (Not over Settings: its tabs run down that corner, and Settings > Modes says the same.)
+            if (screen !is Screen.Match && screen !is Screen.Settings && capsule == null && haul == null && reveal == null) {
                 PlainText(
-                    if (serverStatus.online && !offline) "● ONLINE" else "● OFFLINE MODE · your offline profile, kept on this device", Type.Small,
+                    if (serverStatus.online && !offline) "● ONLINE" else "● OFFLINE · CHAOS MODE · your offline profile, kept on this device", Type.Small,
                     if (screen is Screen.Home) Modifier.align(Alignment.TopStart).padding(start = 22.dp, top = 68.dp)
                     else Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 12.dp),
                     color = if (serverStatus.online) Palette.Positive else Palette.TextDim,
