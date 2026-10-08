@@ -302,7 +302,7 @@ private fun CapsuleButton(count: Int, leftToday: Int, canOpen: Boolean, big: Boo
                     PlainText(
                         when {
                             !canOpen -> if (count > 0) "Opens when you're back online" else "Earned and opened online"
-                            count > 0 -> "Tap it to charge it up"
+                            count > 0 -> "Tap to see what is inside"
                             leftToday > 0 -> "Win or top 4 earns one · $leftToday left today"
                             else -> "Today's are all earned · more tomorrow"
                         },
