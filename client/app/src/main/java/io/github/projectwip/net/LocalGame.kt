@@ -88,11 +88,11 @@ class LocalGame(private val repo: GameRepository) : GameActions {
         act { Done(Economy.devGrant(it, cups, drops, bolts, prisms, credits), true) }
     override fun refreshAccount(): Boolean = true
 
-    /** Opens one Glitch Drop from the offline profile. [luck] and [free] are Chaos Mode's. Null if there is none to open. */
+    /** Opens one Arena Box from the offline profile. [luck] and [free] are Chaos Mode's. Null if there is none to open. */
     fun openDrop(luck: Float = 0f, free: Boolean = false): CapsuleResult? = act { Economy.openDrops(it, luck, free, 1, Random.Default) }?.firstOrNull()
 
     /**
-     * Opens every Glitch Drop the offline profile holds; pieces that split off are left to open next. With [free]
+     * Opens every Arena Box the offline profile holds. With [free]
      * there is no count to go by, so [FREE_BATCH] are opened. Null if there were none.
      */
     fun openAllDrops(luck: Float = 0f, free: Boolean = false): List<CapsuleResult>? =

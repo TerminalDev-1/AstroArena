@@ -138,7 +138,7 @@ CUP_TRACK = {
 # it. The moment that fighter's cost is covered it is unlocked, and what is left over carries on toward the next.
 # Fighters have a rarity; a rarer one takes more Credits. (Fighters are also sold in the shop for Prisms.)
 RARITIES = ["RARE", "EPIC", "MYTHIC", "LEGENDARY", "ULTRA"]
-ROAD_COST = {"RARE": 2500, "EPIC": 4200, "MYTHIC": 6500, "LEGENDARY": 9000, "ULTRA": 13000}
+ROAD_COST = {"RARE": 2500, "EPIC": 4200, "MYTHIC": 6500, "LEGENDARY": 9000, "ULTRA": 9000}
 # The road: every fighter in the order it is unlocked (the cheapest rarity first) with what it costs.
 SPARK_ROAD = sorted(((name, ROAD_COST[rarity]) for name, rarity in FIGHTER_RARITY.items()), key=lambda step: step[1])  # stable: the order above within a rarity
 

@@ -11,7 +11,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * The Spark Capsule being opened, drawn in 3D in front of the lobby with its own fixed camera: the lobby is
+ * The Arena Box being opened, drawn in 3D in front of the lobby with its own fixed camera: the lobby is
  * dimmed, rays turn behind it, and the capsule is unstable: it glitches (tears sideways, leaves cyan and magenta
  * ghosts, throws off scan bars) on its own and with every knock. A knock jolts it, a charge spins it right round,
  * and to open it winds up, collapses, and blows apart behind a shockwave. The menu only sets timestamps, a colour
@@ -46,44 +46,23 @@ class Capsule3D {
     private val TWIN = floatArrayOf(0.31f, 0.53f, 1f)
 
     init {
-// A Glitch Drop: a puffy five-pointed star. The front half lifts off the back half when it opens.
-        fun MeshBuilder.starHalf(front: Boolean) {
-            val s = if (front) 1f else -1f
-            val pos = ArrayList<FloatArray>()
-            fun v(x: Float, y: Float, z: Float, nx: Float, ny: Float, nz: Float): Int { pos += floatArrayOf(x, y, z); return vertex(x, y, z, nx, ny, nz) }
-            val first = v(0f, 0f, 0.4f * s, 0f, 0f, s)
-            // Every triangle is wound to face away from the middle of the star: the ink outline is an inverted
-            // hull drawn with front faces culled, so a wrong winding paints the whole thing black.
-            fun face(i0: Int, i1: Int, i2: Int) {
-                val p0 = pos[i0 - first]; val p1 = pos[i1 - first]; val p2 = pos[i2 - first]
-                val ux = p1[0] - p0[0]; val uy = p1[1] - p0[1]; val uz = p1[2] - p0[2]
-                val wx = p2[0] - p0[0]; val wy = p2[1] - p0[1]; val wz = p2[2] - p0[2]
-                val nx = uy * wz - uz * wy; val ny = uz * wx - ux * wz; val nz = ux * wy - uy * wx
-                val cx = (p0[0] + p1[0] + p2[0]) / 3f; val cy = (p0[1] + p1[1] + p2[1]) / 3f; val cz = (p0[2] + p1[2] + p2[2]) / 3f
-                if (nx * cx + ny * cy + nz * (cz + 0.2f * s) >= 0f) tri(i0, i1, i2) else tri(i0, i2, i1)
-            }
-            val rim = IntArray(10)
-            val edge = IntArray(10)
-            for (i in 0 until 10) {
-                val a = -Math.PI / 2 + i * Math.PI / 5
-                val r = if (i % 2 == 0) 0.9f else 0.46f
-                val x = (cos(a) * r).toFloat(); val y = -(sin(a) * r).toFloat()
-                val len = kotlin.math.sqrt(x * x + y * y + 0.2f)
-                rim[i] = v(x, y, 0.1f * s, x / len, y / len, 0.45f * s / len)
-                edge[i] = v(x, y, 0f, x / r, y / r, 0f)
-            }
-            for (i in 0 until 10) {
-                val j = (i + 1) % 10
-                face(first, rim[i], rim[j])
-                face(rim[i], rim[j], edge[j]); face(rim[i], edge[j], edge[i])
-            }
-        }
-        shell = MeshBuilder().apply { color(1f, 1f, 1f); starHalf(front = true) }.build()
-        base = MeshBuilder().apply { color(1f, 1f, 1f); starHalf(front = false) }.build()
-        // A thin glowing halo that circles the star. (The face of the star is plain: nothing sits on it.)
+        // An Arena Box: a rounded crate with corner posts, under a lid that overhangs it. The lid is thrown off
+        // one way and the crate the other when it opens.
+        shell = MeshBuilder().apply {
+            color(1f, 1f, 1f)
+            with { translate(0f, 0.5f, 0f); roundedBox(1.42f, 0.36f, 1.42f, 0.1f) }
+            // The clasp, on the front of the lid.
+            with { translate(0f, 0.4f, 0.72f); roundedBox(0.34f, 0.3f, 0.1f, 0.04f) }
+        }.build()
+        base = MeshBuilder().apply {
+            color(1f, 1f, 1f)
+            with { translate(0f, -0.14f, 0f); roundedBox(1.24f, 0.96f, 1.24f, 0.1f) }
+            for (sx in intArrayOf(-1, 1)) for (sz in intArrayOf(-1, 1)) with { translate(sx * 0.6f, -0.14f, sz * 0.6f); roundedBox(0.2f, 1.02f, 0.2f, 0.05f) }
+        }.build()
+        // The glowing seam where the lid meets the crate.
         core = MeshBuilder().apply {
             color(1f, 1f, 1f)
-            with { rotate(72f, 1f, 0f, 0.2f); torus(1.08f, 0.022f, 44, 6) }
+            with { translate(0f, 0.32f, 0f); box(1.3f, 0.05f, 1.3f) }
         }.build()
         light = MeshBuilder().apply { color(1f, 1f, 1f); sphere(0.4f, 10, 14) }.build()
         rays = MeshBuilder().apply {
@@ -335,15 +314,15 @@ class Capsule3D {
     }
 
     private fun drawHalves(lit: Program, gap: Float, tint: FloatArray, outline: Boolean) {
-        // The halves are thrown apart, front and back, each turning as it goes.
+        // The lid is thrown up and the crate drops away, each turning as it goes.
         System.arraycopy(root, 0, model, 0, 16)
-        Matrix.translateM(model, 0, -gap * 0.35f, gap * 0.15f, gap * 0.6f)
+        Matrix.translateM(model, 0, -gap * 0.25f, gap * 0.7f, gap * 0.3f)
         Matrix.rotateM(model, 0, halfSpin, 0.3f, 1f, 0.5f)
         lit.mat4("uModel", model)
         if (outline) lit.v4("uTint", Toon.INK[0], Toon.INK[1], Toon.INK[2], 1f) else lit.v4("uTint", tint[0], tint[1], tint[2], 1f)
         shell.draw()
         System.arraycopy(root, 0, model, 0, 16)
-        Matrix.translateM(model, 0, gap * 0.35f, -gap * 0.15f, -gap * 0.6f)
+        Matrix.translateM(model, 0, gap * 0.25f, -gap * 0.5f, -gap * 0.3f)
         Matrix.rotateM(model, 0, -halfSpin, 0.3f, 1f, 0.5f)
         lit.mat4("uModel", model)
         // The bottom half is the same colour, a shade deeper.

@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
-import io.github.projectwip.data.CapsuleResult
+import io.github.projectwip.data.BoxItem
 import io.github.projectwip.data.CapsuleTier
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.Reward
@@ -117,9 +117,9 @@ fun GlitchBars(time: Float, color: Color, strength: Float) {
     }
 }
 
-private fun boltsIn(r: Reward): Int = when (r) { is Reward.Bolts -> r.amount; is Reward.Bundle -> r.items.sumOf { boltsIn(it) }; else -> 0 }
-private fun prismsIn(r: Reward): Int = when (r) { is Reward.Prisms -> r.amount; is Reward.Bundle -> r.items.sumOf { prismsIn(it) }; else -> 0 }
-private fun creditsIn(r: Reward): Int = when (r) { is Reward.Credits -> r.amount; is Reward.Bundle -> r.items.sumOf { creditsIn(it) }; else -> 0 }
+internal fun boltsIn(r: Reward): Int = when (r) { is Reward.Bolts -> r.amount; is Reward.Bundle -> r.items.sumOf { boltsIn(it) }; else -> 0 }
+internal fun prismsIn(r: Reward): Int = when (r) { is Reward.Prisms -> r.amount; is Reward.Bundle -> r.items.sumOf { prismsIn(it) }; else -> 0 }
+internal fun creditsIn(r: Reward): Int = when (r) { is Reward.Credits -> r.amount; is Reward.Bundle -> r.items.sumOf { creditsIn(it) }; else -> 0 }
 private fun unlocksIn(r: Reward): Int = when (r) { is Reward.UnlockFighter, is Reward.SkinReward -> 1; is Reward.Bundle -> r.items.sumOf { unlocksIn(it) }; else -> 0 }
 
 /** One icon on its way from a card to the wallet (to counter number [purse]: 0 Upgrade Credits, 1 CPU Chips, 2 Credits). The first of each handful carries the amount, paid in when it lands. */
@@ -151,7 +151,7 @@ private fun shortLabel(r: Reward): String = when (r) {
  * arrive; and the totals slam in underneath. It is all saved already: this only shows it.
  */
 @Composable
-fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int, roadNow: Int, roadGoal: Int, onDone: () -> Unit) = key(results) {
+fun DropHaulOverlay(results: List<BoxItem>, boltsNow: Int, prismsNow: Int, roadNow: Int, roadGoal: Int, onDone: () -> Unit) = key(results) {
     val sfx = LocalSfx.current
     val lobby = LocalLobby.current
     val time by rememberAnimTime()
@@ -289,7 +289,7 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
     ) {
         if (stage == 0) {
             Column(Modifier.fillMaxSize().padding(top = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                GameText("OPENING ${"%,d".format(results.size)} GLITCH DROPS", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
+                GameText("OPENING EVERY ARENA BOX", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
                 GlitchText(CapsuleTier.entries[charge].label.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), tint, 5.dp, time, 1f)
             }
             GlitchBars(time, tint, 1f)
@@ -297,7 +297,7 @@ fun DropHaulOverlay(results: List<CapsuleResult>, boltsNow: Int, prismsNow: Int,
             Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        GlitchText("OPENED ${"%,d".format(results.size)} DROPS", Type.Title, Palette.Gold, 3.5.dp, time, 0.5f)
+                        GlitchText("${"%,d".format(results.size)} ITEMS", Type.Title, Palette.Gold, 3.5.dp, time, 0.5f)
                         if (results.size > cards.size) PlainText("Showing the best ${cards.size}. The totals count them all.", Type.Small)
                     }
                     val totals = listOf(
@@ -366,7 +366,7 @@ private fun Total(icon: IconKind, text: String) {
 
 /** One opened drop: what came out, on a plate in its tier's colour. It springs into place when it first appears. */
 @Composable
-private fun HaulCard(result: CapsuleResult, onLanded: (Offset) -> Unit) {
+private fun HaulCard(result: BoxItem, onLanded: (Offset) -> Unit) {
     val pop = remember { Animatable(0f) }
     LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium)) }
     val c = Color(result.tier.color)
@@ -388,7 +388,7 @@ private fun HaulCard(result: CapsuleResult, onLanded: (Offset) -> Unit) {
 }
 
 /** Made-up drops for `--es screen haul`: plenty of each tier, a fighter, a colourway and a jackpot. */
-fun previewHaul(): List<CapsuleResult> = List(46) { i ->
+fun previewHaul(): List<BoxItem> = List(46) { i ->
     val tier = CapsuleTier.entries[when { i % 23 == 22 -> 5; i % 15 == 14 -> 4; i % 8 == 7 -> 3; i % 4 == 3 -> 2; i % 2 == 1 -> 1; else -> 0 }]
     val reward = when (tier) {
         CapsuleTier.ULTRA -> Reward.Bundle(listOf(Reward.SkinReward(FighterId.BRAKK, 1), Reward.Prisms(1350), Reward.Bolts(6600)))
@@ -396,5 +396,5 @@ fun previewHaul(): List<CapsuleResult> = List(46) { i ->
         CapsuleTier.OVERCLOCKED -> if (i % 16 == 7) Reward.Credits(55) else Reward.Prisms(270 + i)
         else -> if (i % 3 == 0) Reward.Prisms(45 * (tier.ordinal + 1)) else Reward.Bolts(270 * (tier.ordinal + 1) + i * 15)
     }
-    CapsuleResult(tier, reward)
+    BoxItem(tier, reward)
 }

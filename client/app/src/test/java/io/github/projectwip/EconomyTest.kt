@@ -81,7 +81,7 @@ class EconomyTest {
 
     @Test fun creditsFillTheRoadAndTheFighterUnlocksTheMomentItIsFull() {
         val first = SparkRoad.steps.first()
-        assertEquals("the road's prices", listOf(2500, 4200, 6500, 9000, 13000), SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices", listOf(2500, 4200, 6500, 9000, 9000), SparkRoad.steps.map { it.cost })
         // Not enough yet: the Credits just sit on the road.
         val some = Economy.grant(SaveData(), Reward.Credits(first.cost - 1))
         assertEquals(Reward.Credits(first.cost - 1), some.value)
@@ -290,36 +290,37 @@ class EconomyTest {
         assertEquals("a lost fighter's Cups follow the player's", 0, veteran.save.progress(FighterId.BYTE).cups)
     }
 
-    // ---------------------------------------------------------------- Glitch Drops
+    // ---------------------------------------------------------------- Arena Boxes
 
-    @Test fun dropsAreOpenedOneByOneAndAddTheirRewardToTheSave() {
+    @Test fun boxesAreOpenedOneByOneAndAddTheirItemsToTheSave() {
         val s = SaveData(capsules = 3)
         val done = Economy.openDrops(s, 0f, false, 1, Random(1))
-        val result = done.value.single()
-        assertEquals(2 + (result.pieces - 1), done.save.capsules)
+        val box = done.value.single()
+        assertTrue("a box holds three items or more", box.items.size in SparkCapsules.BOX_ITEMS..SparkCapsules.MAX_ITEMS)
+        assertEquals(2, done.save.capsules)
         assertEquals(1, done.save.capsulesOpened)
-        assertEquals("split pieces are the boosted ones", result.pieces - 1, done.save.boostedCapsules)
+        assertEquals("every Upgrade Credit in the box is in the save", box.items.sumOf { (it.reward as? Reward.Bolts)?.amount ?: 0 }, done.save.bolts - s.bolts)
         assertTrue(Economy.openDrops(SaveData(capsules = 0), 0f, false, 1, Random(1)).value.isEmpty())
-        // Debug: a free drop isn't used up, even with none held.
+        // Debug: a free box isn't used up, even with none held.
         val free = Economy.openDrops(SaveData(capsules = 0), 0f, true, 1, Random(1))
         assertEquals(1, free.value.size)
-        assertEquals(free.value.single().pieces - 1, free.save.capsules)
+        assertEquals(0, free.save.capsules)
     }
 
-    @Test fun openingEveryDropLeavesTheSplitsForNext() {
+    @Test fun openingEveryBoxOpensExactlyTheOnesHeld() {
         val done = Economy.openDrops(SaveData(capsules = 40), 0f, false, null, Random(7))
-        assertEquals("exactly the drops held at the start are opened", 40, done.value.size)
-        val extra = done.value.sumOf { it.pieces - 1 }
-        assertEquals(extra, done.save.capsules)
-        assertTrue("pieces are opened as soon as they split off, so only some are left", done.save.boostedCapsules in 0..extra)
+        assertEquals(40, done.value.size)
+        assertEquals(0, done.save.capsules)
         assertEquals(40, done.save.capsulesOpened)
-        assertTrue("every roll gave something", done.value.all { it.reward != Reward.Bundle(emptyList()) })
-        // Luck pushes the tiers up: with max luck most drops are Ultra, and no tier is ever missing from the table.
-        val lucky = Economy.openDrops(SaveData(capsules = 200), SparkCapsules.MAX_LUCK, false, null, Random(3)).value
-        assertTrue(lucky.count { it.tier == CapsuleTier.ULTRA } > 100)
-        // (A plain drop, one at a time: pieces that split off roll better and are never Scrap.)
-        val rng = Random(4)
-        val plain = (0 until 2000).map { Economy.openDrops(SaveData(capsules = 1), 0f, false, 1, rng).value.single() }
+        val sizes = done.value.map { it.items.size }
+        assertTrue("three items at least, eight at most, and not always the same", sizes.min() == SparkCapsules.BOX_ITEMS && sizes.max() <= SparkCapsules.MAX_ITEMS && sizes.toSet().size > 1)
+        assertTrue("every roll gave something", done.value.all { box -> box.items.all { it.reward != Reward.Bundle(emptyList()) } })
+        // Luck fills the boxes and pushes the tiers up: with max luck most items are Ultra.
+        val lucky = Economy.openDrops(SaveData(capsules = 50), SparkCapsules.MAX_LUCK, false, null, Random(3)).value
+        assertTrue(lucky.all { it.items.size == SparkCapsules.MAX_ITEMS })
+        assertTrue(lucky.flatMap { it.items }.count { it.tier == CapsuleTier.ULTRA } > 200)
+        // No tier is ever missing from the table, and Scrap is the common one.
+        val plain = Economy.openDrops(SaveData(capsules = 700), 0f, false, null, Random(4)).value.flatMap { it.items }
         assertEquals(CapsuleTier.entries.toSet(), plain.map { it.tier }.toSet())
         assertTrue("scrap is the common one", plain.count { it.tier == CapsuleTier.SCRAP } > plain.count { it.tier == CapsuleTier.TUNED })
     }
@@ -333,9 +334,9 @@ class EconomyTest {
             val before = s
             val done = Economy.openDrops(before, SparkCapsules.MAX_LUCK, false, 1, rng)
             s = done.save
-            for (sk in done.value.flatMap { skins(it.reward) }) {
+            for (sk in done.value.flatMap { box -> box.items.flatMap { skins(it.reward) } }) {
                 skinsSeen++
-                assertTrue("only an unlocked fighter's colourways come out", before.progress(sk.fighter).unlocked)
+                assertTrue("only an unlocked fighter's colourways come out", done.save.progress(sk.fighter).unlocked)
                 assertFalse("never one that is already owned", sk.skinIndex in before.progress(sk.fighter).ownedSkins)
                 assertTrue(sk.skinIndex in Balance.fighter(sk.fighter).skins.indices)
             }
@@ -357,10 +358,10 @@ class EconomyTest {
     }
 
     @Test fun freeDropsNeverRunOut() {
-        // Glitch Drops only mode and the Chaos Command Center: none is used up, and there are always more.
+        // Arena Boxes only mode and the Chaos Command Center: none is used up, and there are always more.
         val done = Economy.openDrops(SaveData(capsules = 0), 0f, true, 5, Random(2))
         assertEquals(5, done.value.size)
-        assertEquals("only what split off is left over", done.value.sumOf { it.pieces - 1 }, done.save.capsules)
+        assertEquals(0, done.save.capsules)
         val held = Economy.openDrops(SaveData(capsules = 3), 0f, true, 4, Random(2))
         assertEquals(4, held.value.size)
         assertTrue("the three held are still there", held.save.capsules >= 3)

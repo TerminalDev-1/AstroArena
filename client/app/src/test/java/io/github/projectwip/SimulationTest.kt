@@ -623,16 +623,16 @@ class SimulationTest {
         return Triple(w, buddy, others)
     }
 
-    @Test fun buddySmashesAComputerIntoWhoeverIsClose() {
+    @Test fun buddyHurlsAComputerThatSmashesIntoTheFirstInItsWay() {
         val (w, buddy, others) = buddyAndTargets(2)
         val (near, far) = others
         buddy.control.aimX = 1f; buddy.control.aimY = 0f; buddy.control.attack = true
         val hits = ArrayList<io.github.projectwip.sim.GameEvent.Hit>()
         repeat(40) { w.step(Match.STEP); hits += w.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>(); w.events.clear() }
-        assertEquals("one heavy hit, on the one in reach", listOf(near.id to buddy.attackDamage), hits.map { it.targetId to it.damage })
+        assertEquals("one heavy hit, on the first in its way", listOf(near.id to buddy.attackDamage), hits.map { it.targetId to it.damage })
         assertTrue("it is the hardest single hit in the game", buddy.def.attackDamage.base >= Balance.fighters.maxOf { it.attackDamage.base })
-        assertEquals("but it doesn't reach far", far.maxHp, far.hp)
-        assertTrue(buddy.def.attack.range < 3f)
+        assertEquals("it stops at whoever it smashes into", far.maxHp, far.hp)
+        assertTrue("and it is thrown a long way", buddy.def.attack.range >= 8f)
     }
 
     @Test fun buddysMalformedCodePoisonsTheNearestEnemyUntilTheyAreKnockedOut() {

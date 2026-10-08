@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -37,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.CapsuleResult
 import io.github.projectwip.data.CapsuleTier
+import io.github.projectwip.data.Economy
 import io.github.projectwip.ui.ButtonStyle
 import io.github.projectwip.ui.ChunkyButton
 import io.github.projectwip.ui.GameText
@@ -44,6 +44,7 @@ import io.github.projectwip.ui.LocalLobby
 import io.github.projectwip.ui.LocalSfx
 import io.github.projectwip.ui.LocalUi
 import io.github.projectwip.ui.Palette
+import io.github.projectwip.ui.Panel
 import io.github.projectwip.ui.PlainText
 import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.rememberAnimTime
@@ -52,14 +53,12 @@ import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
 
-/** Knocks it takes to open a capsule. Some of them charge it up a tier, the rest just rattle it. */
-private val TAPS = CapsuleTier.entries.size - 1
-
 /**
- * Opening a Spark Capsule. The result is already decided (and saved) before this is shown; the taps only
- * reveal it: each knock either rattles the capsule or charges it up a tier, and the last one overloads it.
- * The capsule is unstable, more so with every tier, and the screen glitches along with it.
- * [onOpenAll] opens everything that is left in one go; it is handed this capsule's result when this one has not
+ * Opening an Arena Box. What is inside is already decided (and saved) before this is shown; this only reveals it.
+ * One tap and the box takes the colour of the rarest thing in it, winds up and blows open. Then its items come
+ * out one at a time, each with its own rarity, while a counter in the corner says how many are still to come.
+ * The box is unstable, and the screen glitches along with it.
+ * [onOpenAll] opens everything that is left in one go; it is handed this box's result when this one has not
  * been shown yet, so that it can be shown with the rest.
  */
 @Composable
@@ -68,26 +67,18 @@ fun CapsuleOpenOverlay(
     onNext: () -> Unit, onOpenAll: (CapsuleResult?) -> Unit, onDone: () -> Unit,
 ) = key(result) {
     val sfx = LocalSfx.current
-    val ui = LocalUi.current
     val scope = rememberCoroutineScope()
     val time by rememberAnimTime()
-    // Which knocks charge the capsule: as many as the tier is above Scrap, spread at random over the taps.
-    val plan = remember { List(TAPS) { it < result.tier.ordinal }.shuffled(Random(result.hashCode())) }
-    var taps by remember { mutableIntStateOf(0) }
-    var tier by remember { mutableIntStateOf(0) }
+    var opening by remember { mutableStateOf(false) }
     var opened by remember { mutableStateOf(false) }
-    // A capsule that splits doubles (2, 4, 8) on separate knocks before the last one.
-    val splitTaps = remember {
-        val doublings = Integer.numberOfTrailingZeros(result.pieces.coerceAtLeast(1))
-        (1 until TAPS).shuffled(Random(result.hashCode() + 7)).take(doublings).toSet()
-    }
-    var pieces by remember { mutableIntStateOf(1) }
-    val splitPop = remember { Animatable(0f) }
-    val shake = remember { Animatable(0f) }
+    /** Which of the box's items is on show. */
+    var index by remember { mutableIntStateOf(0) }
     val pop = remember { Animatable(1f) }
     val flash = remember { Animatable(0f) }
+    val countPop = remember { Animatable(1f) }
     val lobby = LocalLobby.current
-    // The capsule itself is 3D, drawn by the lobby renderer; this overlay only tells it what is happening.
+    val best = result.best
+    // The box itself is 3D, drawn by the lobby renderer; this overlay only tells it what is happening.
     DisposableEffect(Unit) {
         lobby.capsuleOpenAt = 0L
         lobby.capsuleSplitAt = 0L
@@ -97,7 +88,7 @@ fun CapsuleOpenOverlay(
         lobby.capsuleShown = true
         onDispose { lobby.capsuleShown = false }
     }
-    // The drop never sits quietly: it stutters for as long as it is closed.
+    // The box never sits quietly: it stutters for as long as it is closed.
     LaunchedEffect(opened) {
         val pace = Random(result.hashCode() + 3)
         while (!opened) {
@@ -105,43 +96,25 @@ fun CapsuleOpenOverlay(
             delay(360L + pace.nextInt(380))
         }
     }
-    // "Open all" makes sense when there is a known number of others waiting (the debug menu's endless drops are not).
+    // "Open all" makes sense when there is a known number of others waiting (the debug menu's endless boxes are not).
     val others = remaining in 1..1_000_000
-    val shown = CapsuleTier.entries[tier]
-    val color = Color(shown.color)
+    val color = Color((if (opening) best else CapsuleTier.SCRAP).color)
 
-    fun knock() {
-        if (opened || taps >= TAPS) return
-        val charged = plan[taps]
-        taps++
+    fun open() {
+        if (opening) return
+        opening = true
+        // It charges up to the rarest thing inside: the better that is, the less stable the box gets.
         lobby.capsuleKnockAt = System.currentTimeMillis()
-        if (charged) {
-            tier++
-            lobby.capsuleColor = CapsuleTier.entries[tier].color.toInt()
-            lobby.capsuleChargeAt = System.currentTimeMillis()
-            // The higher it charges, the less stable it gets.
-            lobby.capsuleGlitch = 0.2f + 0.16f * tier
-            sfx?.play(Sound.GLITCH, 0.5f, 0.9f + 0.08f * tier)
-            sfx?.play(Sound.DROP_UPGRADE, pitch = 0.85f + 0.12f * tier)
-            sfx?.buzz(45, 210)
-            scope.launch { pop.snapTo(1.4f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
-            scope.launch { flash.snapTo(0.7f); flash.animateTo(0f, tween(380)) }
-        } else {
-            sfx?.play(Sound.DROP_TAP, pitch = 0.92f + 0.06f * taps)
-            sfx?.buzz(16, 120)
-        }
-        scope.launch { shake.snapTo(1f); shake.animateTo(0f, tween(420)) }
-        if (taps in splitTaps) {
-            pieces *= 2
-            lobby.capsulePieces = pieces
-            lobby.capsuleSplitAt = System.currentTimeMillis()
-            sfx?.play(Sound.POP, pitch = 0.7f + 0.1f * pieces / 2)
-            sfx?.play(Sound.DROP_UPGRADE, 0.7f, 1.3f + 0.08f * pieces / 2)
-            sfx?.buzz(60, 230)
-            scope.launch { splitPop.snapTo(1.6f); splitPop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
-        }
-        if (taps == TAPS) scope.launch {
-            delay(if (charged) 750 else 450)
+        lobby.capsuleChargeAt = System.currentTimeMillis()
+        lobby.capsuleColor = best.color.toInt()
+        lobby.capsuleGlitch = 0.2f + 0.16f * best.ordinal
+        sfx?.play(Sound.GLITCH, 0.5f, 0.9f + 0.08f * best.ordinal)
+        sfx?.play(Sound.DROP_UPGRADE, pitch = 0.85f + 0.12f * best.ordinal)
+        sfx?.buzz(45, 210)
+        scope.launch { pop.snapTo(1.4f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
+        scope.launch { flash.snapTo(0.7f); flash.animateTo(0f, tween(380)) }
+        scope.launch {
+            delay(750)
             // It winds up and collapses, tearing all the way, then blows apart.
             lobby.capsuleOpenAt = System.currentTimeMillis()
             sfx?.play(Sound.GLITCH, 0.9f, 0.8f)
@@ -157,53 +130,68 @@ fun CapsuleOpenOverlay(
         }
     }
 
+    fun nextItem() {
+        if (index >= result.items.lastIndex) return
+        index++
+        sfx?.play(Sound.POP, pitch = 0.9f + 0.06f * index)
+        sfx?.buzz(16, 120)
+        scope.launch { countPop.snapTo(1.5f); countPop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
+        scope.launch { flash.snapTo(0.35f); flash.animateTo(0f, tween(300)) }
+    }
+
     BoxWithConstraints(
-        // While the capsule is closed the lobby renderer does the dimming, so the 3D capsule stays bright.
+        // While the box is closed the lobby renderer does the dimming, so the 3D box stays bright.
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (opened) 0.8f else 0f))
-            .clickable(remember { MutableInteractionSource() }, null) { knock() },
+            .clickable(remember { MutableInteractionSource() }, null) { open() },
         contentAlignment = Alignment.Center,
     ) {
-        val capsuleRoom = maxHeight * 0.46f
+        val boxRoom = maxHeight * 0.5f
         if (!opened) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                GameText("GLITCH DROP", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
-                GlitchText(shown.label.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), color, 5.dp, time, 0.5f + 0.2f * tier,
+                GlitchText("ARENA BOX", Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), color, 5.dp, time, if (opening) 0.5f + 0.2f * best.ordinal else 0.5f,
                     Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value })
-                // Room for the 3D capsule, which sits in the middle of the screen.
-                Spacer(Modifier.height(capsuleRoom))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    for (t in CapsuleTier.entries) Canvas(Modifier.size(if (t.ordinal == tier) 20.dp else 14.dp)) {
-                        drawCircle(Palette.Ink)
-                        drawCircle(if (t.ordinal <= tier) Color(t.color) else Palette.PanelInset, size.minDimension / 2 - 2.5.dp.toPx())
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
+                // Room for the 3D box, which sits in the middle of the screen.
+                Spacer(Modifier.height(boxRoom))
                 val pulse = 1f + 0.08f * sin(time * 7f)
-                GameText(if (taps < TAPS) "TAP TO CHARGE  ·  ${TAPS - taps}" else "HERE IT COMES…", Type.Title, color = Palette.Gold, outline = 3.5.dp,
+                GameText(if (opening) "HERE IT COMES…" else "TAP TO OPEN", Type.Title, color = Palette.Gold, outline = 3.5.dp,
                     modifier = Modifier.graphicsLayer { scaleX = pulse; scaleY = pulse })
-                if (pieces > 1) GameText("SPLIT INTO $pieces!  +${pieces - 1} DROP${if (pieces > 2) "S" else ""}", Type.Heading, color = Palette.Green, outline = 3.dp,
-                    modifier = Modifier.graphicsLayer { scaleX = splitPop.value; scaleY = splitPop.value })
             }
         } else {
-            io.github.projectwip.ui.RewardShowcase(
-                "${result.tier.label} drop", Color(result.tier.color), result.reward, boltsNow, prismsNow,
-                note = if (result.split) "SPLIT INTO ${result.pieces} · +${result.pieces - 1} DROP${if (result.pieces > 2) "S" else ""}" else null,
-                roadNow = roadNow, roadGoal = roadGoal,
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
-                    if (remaining > 0) ChunkyButton(onNext, Modifier.size(220.dp, 60.dp), ButtonStyle.GREEN) { GameText(if (remaining > 999) "OPEN NEXT" else "OPEN NEXT ($remaining)", Type.Heading) }
-                    if (others && remaining > 1) ChunkyButton({ onOpenAll(null) }, Modifier.size(220.dp, 60.dp), ButtonStyle.GOLD) { GameText("OPEN ALL (${"%,d".format(remaining)})", Type.Heading) }
+            val item = result.items[index]
+            val last = index == result.items.lastIndex
+            // The counters run up to what the wallet held once this item was in it: everything, less what is still to come.
+            val later = result.items.drop(index + 1).map { it.reward }
+            key(index) {
+                io.github.projectwip.ui.RewardShowcase(
+                    "${item.tier.label} item", Color(item.tier.color), item.reward,
+                    boltsNow - later.sumOf { boltsIn(it) }, prismsNow - later.sumOf { prismsIn(it) },
+                    roadNow = (roadNow - later.sumOf { Economy.creditsIn(it) }).coerceAtLeast(Economy.creditsIn(item.reward)), roadGoal = roadGoal,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        if (!last) ChunkyButton({ nextItem() }, Modifier.size(220.dp, 60.dp), ButtonStyle.GREEN) { GameText("NEXT ITEM", Type.Heading) }
+                        else {
+                            ChunkyButton(onDone, Modifier.size(180.dp, 60.dp), if (remaining > 0) ButtonStyle.PURPLE else ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
+                            if (remaining > 0) ChunkyButton(onNext, Modifier.size(220.dp, 60.dp), ButtonStyle.GREEN) { GameText(if (remaining > 999) "OPEN NEXT" else "OPEN NEXT ($remaining)", Type.Heading) }
+                            if (others && remaining > 1) ChunkyButton({ onOpenAll(null) }, Modifier.size(220.dp, 60.dp), ButtonStyle.GOLD) { GameText("OPEN ALL (${"%,d".format(remaining)})", Type.Heading) }
+                        }
+                    }
+                }
+            }
+            // How many items are still in the box.
+            Panel(Modifier.align(Alignment.BottomEnd).padding(18.dp).graphicsLayer { scaleX = countPop.value; scaleY = countPop.value }, cut = 10.dp) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    GameText("${result.items.lastIndex - index}", Type.Title, color = if (last) Palette.TextDim else Palette.Gold, outline = 3.dp)
+                    GameText(if (result.items.lastIndex - index == 1) "ITEM REMAINING" else "ITEMS REMAINING", Type.Label, color = Palette.TextDim, outline = 2.dp)
                 }
             }
         }
-        if (!opened) GlitchBars(time, color, 0.4f + 0.15f * tier)
+        if (!opened) GlitchBars(time, color, if (opening) 0.4f + 0.15f * best.ordinal else 0.4f)
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value * 0.85f)))
-        // Skips the knocking: this drop and every other one are opened and shown together.
-        if (!opened && others && taps < TAPS) ChunkyButton({ onOpenAll(result) }, Modifier.align(Alignment.TopEnd).padding(18.dp).size(230.dp, 58.dp), ButtonStyle.GOLD) {
+        // Skips the reveal: this box and every other one are opened and shown together.
+        if (!opened && others && !opening) ChunkyButton({ onOpenAll(result) }, Modifier.align(Alignment.TopEnd).padding(18.dp).size(230.dp, 58.dp), ButtonStyle.GOLD) {
             GameText("OPEN ALL (${"%,d".format(remaining + 1)})", Type.Heading)
         }
-        if (!opened) PlainText("Drops charge up at random, and now and then one splits — into two, four or even eight — and the pieces roll better. The result is locked in when you open one.", Type.Small,
+        if (!opened) PlainText("An Arena Box holds three items or more, each with a rarity of its own. What is inside is locked in when you open it.", Type.Small,
             Modifier.align(Alignment.BottomCenter).graphicsLayer { translationY = -14.dp.toPx() }, align = TextAlign.Center)
     }
 }

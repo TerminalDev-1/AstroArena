@@ -127,7 +127,7 @@ private fun RoadSummary(save: SaveData, next: RoadStep?, modifier: Modifier) {
                 Column(Modifier.weight(1f)) {
                     GameText("NEXT: ${Balance.fighter(next.fighter).name.substringBefore(' ').uppercase()}", Type.Label, color = Palette.Gold, outline = 2.dp)
                     ProgressBar(save.credits.toFloat() / next.cost, Modifier.fillMaxWidth(), height = 18.dp)
-                    PlainText("Every Credit you earn goes straight onto the road. Glitch Drops give the most. A full bar unlocks the fighter.", Type.Small, color = Color.White, maxLines = 1)
+                    PlainText("Every Credit you earn goes straight onto the road. Arena Boxes give the most. A full bar unlocks the fighter.", Type.Small, color = Color.White, maxLines = 1)
                 }
                 Spacer(Modifier.width(14.dp))
                 GameText("${"%,d".format(minOf(save.credits, next.cost))} / ${"%,d".format(next.cost)}", Type.Title, outline = 3.dp)

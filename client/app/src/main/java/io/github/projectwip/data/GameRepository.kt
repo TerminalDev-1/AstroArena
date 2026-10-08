@@ -107,7 +107,7 @@ class GameRepository(private val store: SaveStore, private val offlineStore: Sav
         return done.value
     }
 
-    /** Counts a Glitch Drop the server opened. */
+    /** Counts an Arena Box the server opened. */
     fun dropOpened(count: Int = 1) = commit(Progression.dropOpened(_save.value, count))
 
     /** Takes on what the server holds for this player (Cups, drops, and when given the profile and shop deals). It goes into the online save, whichever profile is showing. */

@@ -2,7 +2,7 @@
 
 AstroArena (the package id is still `io.github.projectwip`, so saves carry over): original mobile 3D arena brawler for Android (landscape, touch, bots), with an optional Python game server. Kotlin + Compose
 menus + custom OpenGL ES 3.0 renderer, no engine. All art and sound is generated in code and must stay
-original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Glitch Drops", "Upgrade Credits" and "CPU Chips"; the code (and the server's files and API) still call them capsules, bolts and prisms. (They were Spark Drops, Power Ups and Crystals: the user renamed them. Upgrade Credits pay for every fighter upgrade; their icon is the Credit card in amber. CPU Chips are the shop currency; their icon is a chip.)
+original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Arena Boxes", "Upgrade Credits" and "CPU Chips"; the code (and the server's files and API) still call them capsules (or drops), bolts and prisms. (They were Spark Drops then Glitch Drops, Power Ups and Crystals: the user renamed them. Upgrade Credits pay for every fighter upgrade; their icon is the Credit card in amber. CPU Chips are the shop currency; their icon is a chip.)
 
 ## How to work here
 
@@ -25,7 +25,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|duel|fighters|roster|kito|varun|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `tryvarun` / `trybuddy` the Training Area as Varun / Buddy, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` splits into eight, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
+  (`match|boss|train|duel|fighters|roster|kito|varun|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `tryvarun` / `trybuddy` the Training Area as Varun / Buddy, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - UI changes must be checked with a screenshot (`adb exec-out screencap -p`) and `adb logcat -b crash -d`.
 - The tablet is the user's everyday device. Before every `input tap` or `am start`, confirm
   `dumpsys window | grep mCurrentFocus` shows `io.github.projectwip` or the home screen (`com.miui.home`): on
@@ -42,10 +42,12 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Boss Mode bosses are their own things (`BossKind`, `Balance.bosses`), not giant fighters: each fights through
   moves of its own in `sim/Boss.kt` (telegraphed ground hazards, sweeps, rings, charges) and has its own model.
   Keep their names, looks and moves original.
-- Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack smashes a
-  computer into whoever is close (`AttackShape.SMASH`: one short, heavy shot drawn as a computer, `ShotStyle.COMPUTER`).
+- Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls a
+  whole computer a long way, and it smashes into the first enemy in its path (`AttackShape.SMASH`: one long, heavy shot drawn
+  as a desktop computer, `ShotStyle.COMPUTER`). The long range is the user's decision: don't shorten it.
   His super (`SuperKind.CORRUPT`) needs no aiming: it picks the nearest enemy in sight and poisons them (`Fighter.poisonBy`,
   `World.stepPoison`): no healing, and it only ends with a knockout (a boss shakes it off after `POISON_GIANT_SECONDS`).
+  While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
   With nobody in sight the super isn't spent. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
 - Every fighter has a hyper (`Control.hyper`, the `HYPER_*` numbers in `Balance.kt`): a third button that charges from
@@ -63,7 +65,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - `client/` is the whole Android game. `server/` is the game server: Python, standard library only, SQLite.
   `python run.py` (or `run.bat`) starts it on port 8765; `python -m unittest` in `server/` runs its tests.
-- The server is in charge, by the user's decision. It owns each player's Cups, Glitch Drops, Bolts, Prisms,
+- The server is in charge, by the user's decision. It owns each player's Cups, Arena Boxes, Bolts, Prisms,
   fighters (unlocked, level, colourways), Cup Track claims, the daily gift and the shop deals. It works out what
   a match is worth, refuses results that can't be real, rolls drops, and is the only place anything is bought,
   upgraded or claimed (`server/astro/rules.py`, `economy.py`). The client's online save is a copy of what the server
@@ -96,7 +98,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (drop luck, free drops, upgrade cost, no level cap, hand-outs) and is always on for them: there is no "D" button
   and no switch any more. Only they can make shop deals (the in-game Offer Creator) or reset an account. The server
   ignores luck, free drops, free upgrades and hand-outs from anyone else.
-- Settings > Modes has "Glitch Drops only", for everyone: the home screen becomes just the Glitch Drop button, with
+- Settings > Modes has "Arena Boxes only", for everyone: the home screen becomes just the Arena Box button, with
   no fights. It is a layout choice kept on the device; the drops are still the server's.
 - `server/accounts.cfg` is the owner's hand on every account (`astro/accounts.py`): the server writes it from the
   database, leaderboard first, and forces whatever value the owner changes in it (`Store.force`). It holds player
@@ -143,11 +145,17 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Fighters are unlocked on the Spark Road with Credits (or bought with CPU Chips): drops and the Cup Track pay
   Credits, never a fighter. Credits are not a wallet and must never be shown as one: they go straight onto the
   road toward the next fighter along it (a fixed order; rarity decides the cost: Rare 2,500, Epic 4,200, Mythic
-  6,500, Legendary 9,000, Ultra 13,000), and the moment they cover it the server unlocks that fighter
+  6,500, Legendary 9,000, Ultra 9,000: the user lowered Ultra from 13,000), and the moment they cover it the server unlocks that fighter
   (`economy.fill_road`), with the leftover carried on: there is nothing to claim. A reward that unlocked someone
   comes back as a bundle (the Credits and the fighter), and a match's verdict lists them in `unlocked`. Once every
-  fighter is unlocked Credits are paid as Upgrade Credits. Glitch Drops are the main source of Credits: every
+  fighter is unlocked Credits are paid as Upgrade Credits. Arena Boxes are the main source of Credits: every
   Credit amount a drop gives is multiplied by `CREDIT_BUFF` in `rules.py`.
+- Arena Boxes replaced Glitch Drops, by the user's decision; a drop a player still held became a box, one for one
+  (it is the same counter: `drops` on the server, `capsules` in the save). A box holds several items
+  (`BOX_ITEMS`, sometimes more, up to `MAX_ITEMS`, in `rules.py` and `SparkCapsules`), each rolled on the tier table
+  for a rarity and a reward of its own; the opening screen shows them one at a time with an "items remaining"
+  counter (`CapsuleOpen.kt`). Boxes don't split: that was the drops' mechanic and it is gone. The idea of a box of
+  several random items is a familiar one; the name, the crate, the tiers and the screen are ours and must stay so.
 - There is no Glory and no Spark Pass: both were removed on purpose (stored Glory was paid out as Upgrade Credits,
   `economy.complete`). Don't bring them back.
 - The Spark Road screen is 3D: `LobbyShot.ROAD` draws a road in the lobby scene (`render3d/Lobby.kt`, off at

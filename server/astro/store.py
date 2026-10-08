@@ -2,7 +2,7 @@
 
 Tables
   players         one row per installed game: an id, a secret token, its name, and what the server keeps for it:
-                  Cups, unopened Glitch Drops, how many drops it has earned today, and its profile (Bolts, Prisms,
+                  Cups, unopened Arena Boxes, how many drops it has earned today, and its profile (Bolts, Prisms,
                   fighters, claimed rewards: see economy.py) as JSON
   saves           the latest copy of each player's save file (the JSON the client writes), with a revision counter
   matches         every match the server planned: who, which mode, the seed it handed out, and the reported result
@@ -75,7 +75,7 @@ CREATE INDEX IF NOT EXISTS matches_by_player ON matches(player_id);
 # Columns added since the first release, as (name, definition). Existing databases get them on start-up.
 PLAYER_COLUMNS = [
     ("drops", "INTEGER NOT NULL DEFAULT %d" % rules.STARTING_DROPS),
-    ("boosted", "INTEGER NOT NULL DEFAULT 0"),     # how many of the unopened drops came from a split
+    ("boosted", "INTEGER NOT NULL DEFAULT 0"),     # unused since Arena Boxes (drops used to split)
     ("drops_day", "INTEGER NOT NULL DEFAULT -1"),  # the day drops_today counts for
     ("drops_today", "INTEGER NOT NULL DEFAULT 0"),
     ("imported", "INTEGER NOT NULL DEFAULT 0"),    # 1 once the starting Cups and drops have been settled
@@ -215,7 +215,7 @@ class Store:
             return min(max(int(value), 0), high)
 
         with self._lock, self._db:
-            row = self._db.execute("SELECT cups, drops, boosted, disabled, disabled_reason, disabled_until FROM players WHERE id = ?", (player_id,)).fetchone()
+            row = self._db.execute("SELECT cups, drops, disabled, disabled_reason, disabled_until FROM players WHERE id = ?", (player_id,)).fetchone()
             if row is None:
                 return False
             cups = number(change.get("cups", row["cups"]))
@@ -225,8 +225,8 @@ class Store:
             reason = " ".join(str(change.get("disabled_reason", row["disabled_reason"])).split())[:200] if disabled else ""
             until = max(0.0, float(change.get("disabled_until", row["disabled_until"]))) if disabled else 0.0
             self._db.execute(
-                "UPDATE players SET cups = ?, drops = ?, boosted = ?, disabled = ?, disabled_reason = ?, disabled_until = ? WHERE id = ?",
-                (cups, drops, min(row["boosted"], drops), 1 if disabled else 0, reason, until, player_id),
+                "UPDATE players SET cups = ?, drops = ?, disabled = ?, disabled_reason = ?, disabled_until = ? WHERE id = ?",
+                (cups, drops, 1 if disabled else 0, reason, until, player_id),
             )
             profile = self._profile(player_id)
             for key, field in (("best_cups", "bestCups"), ("bolts", "bolts"), ("prisms", "prisms"), ("credits", "credits")):
@@ -392,7 +392,7 @@ class Store:
     def put_save(self, player_id: str, save: dict, import_progress: bool = True) -> int:
         """Stores the player's save and returns its new revision.
 
-        The name and fighter are copied out for the leaderboard. Cups, Glitch Drops, Bolts, Prisms and everything
+        The name and fighter are copied out for the leaderboard. Cups, Arena Boxes, Bolts, Prisms and everything
         else in the profile are the server's own: they are read from a save only once, the first time an account
         uploads one (and only if `import_progress` allows it), so that earlier progress carries over.
         """
@@ -400,7 +400,6 @@ class Store:
         name = clean_name((save.get("settings") or {}).get("playerName"))
         cups = max(0, int(save.get("cups") or 0))
         drops = min(max(0, int(save.get("capsules") or 0)), rules.MAX_IMPORTED_DROPS)
-        boosted = min(max(0, int(save.get("boostedCapsules") or 0)), drops)
         fighter = str(save.get("selectedFighter") or "BYTE")[:16]
         with self._lock, self._db:
             row = self._db.execute("SELECT revision FROM saves WHERE player_id = ?", (player_id,)).fetchone()
@@ -416,7 +415,7 @@ class Store:
                 self._keep(player_id, economy.profile_from_save(save) if import_progress else economy.new_profile())
             if not player["imported"]:
                 if import_progress:
-                    self._db.execute("UPDATE players SET cups = ?, drops = ?, boosted = ? WHERE id = ?", (cups, drops, boosted, player_id))
+                    self._db.execute("UPDATE players SET cups = ?, drops = ? WHERE id = ?", (cups, drops, player_id))
                 self._db.execute("UPDATE players SET imported = 1 WHERE id = ?", (player_id,))
         return revision
 
@@ -540,10 +539,10 @@ class Store:
                 "fighterRank": rules.fighter_rank(fighter_cups),
             }
 
-    # ------------------------------------------------------------------ Glitch Drops
+    # ------------------------------------------------------------------ Arena Boxes ("drops")
 
     def open_drop(self, player_id: str, luck: float = 0.0, free: bool = False) -> dict | None:
-        """Opens one of the player's Glitch Drops: the server rolls it and adds the reward to their profile.
+        """Opens one of the player's Arena Boxes: the server rolls its items and adds them to their profile.
 
         None if they have none to open. `luck` and `free` (the drop isn't used up) are for developers; the
         caller decides whether this player may use them.
@@ -552,35 +551,28 @@ class Store:
         return results[0] if results else None
 
     def open_all_drops(self, player_id: str, luck: float = 0.0) -> list[dict]:
-        """Opens every Glitch Drop the player holds right now, one after another (up to `rules.MAX_OPEN_ALL`). The
-        pieces that split off on the way are left for them to open next. The results come back in the order they
-        were opened; empty if there were none."""
+        """Opens every Arena Box the player holds right now, one after another (up to `rules.MAX_OPEN_ALL`). The
+        boxes come back in the order they were opened; empty if there were none."""
         return self._open_drops(player_id, luck, False, None)
 
     def _open_drops(self, player_id: str, luck: float, free: bool, most: int | None) -> list[dict]:
         """`most`: how many to open, or None for as many as the player holds."""
         results = []
         with self._lock, self._db:
-            player = self._db.execute("SELECT drops, boosted FROM players WHERE id = ?", (player_id,)).fetchone()
+            player = self._db.execute("SELECT drops FROM players WHERE id = ?", (player_id,)).fetchone()
             if player is None:
                 return results
-            drops, boosted_left = player["drops"], player["boosted"]
+            drops = player["drops"]
             if most is None:
                 most = min(drops, rules.MAX_OPEN_ALL)
             profile = self._profile(player_id)
             rng = secrets.SystemRandom()
             while len(results) < most and (drops > 0 or (free and not results)):
-                # Pieces from an earlier split are opened first, and roll better than a plain one.
-                boosted = boosted_left > 0
-                result = rules.open_drop(profile, boosted, luck, rng)
-                result["reward"] = economy.grant(profile, result["reward"])
-                extra = result["pieces"] - 1
-                drops = drops - (0 if free else 1) + extra
-                boosted_left = max(0, boosted_left - (1 if boosted else 0)) + extra
-                results.append(result)
+                results.append(rules.open_box(profile, luck, rng, economy.grant))
+                drops -= 0 if free else 1
             if results:
                 self._keep(player_id, profile)
-                self._db.execute("UPDATE players SET drops = ?, boosted = ? WHERE id = ?", (drops, boosted_left, player_id))
+                self._db.execute("UPDATE players SET drops = ?, boosted = 0 WHERE id = ?", (drops, player_id))
         return results
 
     # ------------------------------------------------------------------ leaderboard & stats

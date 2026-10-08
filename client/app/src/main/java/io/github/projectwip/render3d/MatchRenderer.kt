@@ -729,12 +729,20 @@ class MatchRenderer(
                     setModel(x, 0.7f, z, size, size, size, yaw + pr.age * 900f); bit.draw()
                 }
                 ShotStyle.COMPUTER -> {
-                    // A whole computer, end over end: the case, and its lit screen on top.
-                    val size = pr.radius * 0.8f
+                    // A whole desktop computer, spinning as it flies: the monitor with its lit screen showing through
+                    // both sides, the stand and foot under it, and the keyboard trailing along below.
+                    val size = pr.radius * 2.1f
+                    val spin = yaw + pr.age * 540f
+                    val y = 0.95f + 0.08f * sin(pr.age * 14f)
                     tint(0xFF6A7390)
-                    setModel(x, 0.8f, z, size, size * 0.85f, size, yaw + pr.age * 700f); bit.draw()
+                    setModel(x, y, z, size * 1.25f, size * 0.9f, size * 0.4f, spin); bit.draw()
                     tint(skin.secondary)
-                    setModel(x, 0.8f + size * 0.9f, z, size * 0.7f, size * 0.12f, size * 0.7f, yaw + pr.age * 700f); bit.draw()
+                    setModel(x, y, z, size * 1.05f, size * 0.7f, size * 0.46f, spin); bit.draw()
+                    tint(0xFF474E66)
+                    setModel(x, y - size * 0.57f, z, size * 0.2f, size * 0.26f, size * 0.16f, spin); bit.draw()
+                    setModel(x, y - size * 0.73f, z, size * 0.7f, size * 0.08f, size * 0.45f, spin); bit.draw()
+                    tint(0xFF8C95B4)
+                    setModel(x, y - size * 0.95f, z, size * 1.05f, size * 0.07f, size * 0.36f, spin + 35f); bit.draw()
                 }
                 ShotStyle.PELLET -> {
                     tint(skin.secondary)
@@ -800,7 +808,7 @@ class MatchRenderer(
                 // A rocket leaves fire behind it, and a puff of smoke that hangs in the air.
                 particles.spawn(x, 0.72f, z, 0f, 0.2f, 0f, 0.2f, 0.3f, c, 0.6f)
                 if (rng.nextFloat() < 0.5f) particles.spawn(x, 0.72f, z, 0f, 0.5f, 0f, 0.7f, 0.42f, 0xFFD8D2E6.toInt(), 0.35f)
-            } else if (rng.nextFloat() < 0.9f) particles.spawn(x, 0.72f, z, 0f, 0.1f, 0f, 0.18f, pr.radius * 2.2f, c, 0.6f)
+            } else if (rng.nextFloat() < 0.9f) particles.spawn(x, 0.72f, z, 0f, 0.1f, 0f, 0.18f, if (pr.style == ShotStyle.COMPUTER) 0.3f else pr.radius * 2.2f, c, 0.6f)
         }
         sprite.use()
         sprite.mat4("uViewProj", viewProj)
@@ -814,7 +822,8 @@ class MatchRenderer(
             val c = colorOf(pr.style, owner)
             val x = lerp(pr.prevX, pr.x, alpha); val z = lerp(pr.prevY, pr.y, alpha)
             val s = if (pr.style == ShotStyle.LANCE) 1.3f else if (pr.style == ShotStyle.ROCKET) 0.8f else pr.radius * 4.5f
-            sprites.add(x, 0.72f, z, s, r(c), g(c), b(c), 0.85f)
+            // (A thrown computer only gets a faint glow, so the thing itself can be seen.)
+            sprites.add(x, 0.72f, z, if (pr.style == ShotStyle.COMPUTER) 1.1f else s, r(c), g(c), b(c), if (pr.style == ShotStyle.COMPUTER) 0.22f else 0.85f)
         }
         for (pk in world.pickups) sprites.add(pk.x, 0.6f + sin(time * 3f + pk.x) * 0.12f, pk.y, 0.9f, 1f, 0.85f, 0.3f, 0.6f)
         for (l in arena.lamps) sprites.add(l[0], l[1], l[2], 1.1f + 0.05f * sin(time * 3f + l[0]), 1f, 0.9f, 0.55f, 0.55f)
@@ -1055,6 +1064,7 @@ class MatchRenderer(
             s.names[i] = f.name
             s.superReady[i] = f.superReady
             s.hyper[i] = f.hyperActive
+            s.poisoned[i] = f.poisoned
             s.cells[i] = f.cells
         }
         hud.publish()

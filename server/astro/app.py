@@ -12,8 +12,8 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/matches        {...}       plan a match -> {matchId, seed, botNames, difficulty} (token)
     POST /v1/matches/<id>/result {inputs}  hand in the match's inputs; the server replays it and
                                         answers with the result and what it earned            (token)
-    POST /v1/drops/open     {...}       open a Glitch Drop -> {tier, pieces, reward, account}  (token)
-    POST /v1/drops/open-all {...}       open every Glitch Drop held -> {results: [{tier, pieces, reward}], account}  (token)
+    POST /v1/drops/open     {...}       open an Arena Box -> {items: [{tier, reward}], account}  (token)
+    POST /v1/drops/open-all {...}       open every Arena Box held -> {results: [{items: [{tier, reward}]}], account}  (token)
     POST /v1/fighters/upgrade {fighter} level a fighter up with Bolts                         (token)
     POST /v1/shop/buy       {item}      buy a standing shop item with Prisms -> {reward}      (token)
     POST /v1/shop/gift                  claim the daily gift -> {reward}                      (token)
@@ -31,7 +31,7 @@ Only the Python standard library is used, so there is nothing to install.
 A token goes in the `Authorization: Bearer <token>` header, and every request with a token must also say which
 version of the game is asking (`X-Client-Version`); versions listed in versions_not_supported.cfg are refused.
 
-The server owns each player's Cups, Glitch Drops, Bolts, Prisms, fighters and claimed rewards: it works out what a
+The server owns each player's Cups, Arena Boxes, Bolts, Prisms, fighters and claimed rewards: it works out what a
 match is worth, rolls what comes out of a drop, and is the only place anything is bought, upgraded or claimed.
 Matches are played on the device and then replayed here from the player's inputs (referee.py): the result is
 the server's own. Every reply to a signed-in request carries the `account`, which is what the game shows.
@@ -330,7 +330,7 @@ def make_handler(game: Game, quiet: bool = False):
             luck = float(data.get("luck") or 0) if game.config.is_developer(player["id"]) else 0.0
             results = game.store.open_all_drops(player["id"], luck)
             if not results:
-                raise Refused(409, "no Glitch Drops to open")
+                raise Refused(409, "no Arena Boxes to open")
             return {"results": results}
 
         def _upgrade(self, player, data):
@@ -427,7 +427,7 @@ def make_handler(game: Game, quiet: bool = False):
                 free = data.get("free") is True
             result = game.store.open_drop(player["id"], luck, free)
             if result is None:
-                return self._error(409, "no Glitch Drops to open")
+                return self._error(409, "no Arena Boxes to open")
             return self._send(200, {**result, "account": game.account(player["id"])})
 
         def do_PUT(self):  # noqa: N802

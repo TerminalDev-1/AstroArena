@@ -259,7 +259,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
         status == null -> "No server connection in this build."
         !status.supported -> "The server at ${status.url} doesn't support this version."
         status.disabled -> "Your account on ${status.url} has been disabled by the server's owner."
-        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Glitch Drops, Upgrade Credits, CPU Chips and fighters, sets matches up and decides their results."
+        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Arena Boxes, Upgrade Credits, CPU Chips and fighters, sets matches up and decides their results."
         else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You are on your offline profile, which is kept on this device: what you earn and spend here stays here, and your server account is untouched. The game keeps trying, and goes back online by itself."
     })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -293,7 +293,7 @@ private fun ModesTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
     ToggleRow("OFFLINE MODE", "Play on your offline profile even while the server is there: a separate account on this device, with Chaos Mode (every tweak in the game). Your server account is untouched. Turn it off to go back online.", s.forceOffline) { v ->
         set { it.copy(forceOffline = v) }
     }
-    ToggleRow("GLITCH DROPS ONLY", "The home screen becomes just the Glitch Drop button. No fights. Turn it off to get the fights back.", s.glitchDropsOnly) { v ->
+    ToggleRow("ARENA BOXES ONLY", "The home screen becomes just the Arena Box button. No fights. Turn it off to get the fights back.", s.glitchDropsOnly) { v ->
         set { it.copy(glitchDropsOnly = v) }
     }
 }

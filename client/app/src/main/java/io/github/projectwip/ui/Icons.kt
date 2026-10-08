@@ -324,7 +324,7 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
 }
 
 /**
- * A Glitch Drop in a unit square: a plump star in [color] with a glowing core. [glow] (0..1) adds light around it.
+ * An Arena Box in a unit square: a crate in [color] with a light in its clasp. [glow] (0..1) adds light around it.
  */
 fun DrawScope.drawCapsuleUnit(color: Color, @Suppress("UNUSED_PARAMETER") split: Float = 0f, glow: Float = 0f) {
     val c = Offset(0.5f, 0.54f)
@@ -332,22 +332,18 @@ fun DrawScope.drawCapsuleUnit(color: Color, @Suppress("UNUSED_PARAMETER") split:
         val g = glow.coerceAtMost(1f)
         drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.85f * g), color.copy(alpha = 0.55f * g), Color.Transparent), c, 0.62f), 0.62f, c)
     }
-    val star = Path()
-    for (i in 0 until 10) {
-        val a = -PI / 2 + i * PI / 5
-        val r = if (i % 2 == 0) 0.44f else 0.24f
-        val x = c.x + (cos(a) * r).toFloat(); val y = c.y + (sin(a) * r).toFloat()
-        if (i == 0) star.moveTo(x, y) else star.lineTo(x, y)
-    }
-    star.close()
-    // A fat round-joined stroke under the fill plumps the points up.
-    drawPath(star, INK, style = Stroke(0.2f, join = StrokeJoin.Round))
-    drawPath(star, lerp(color, INK, 0.25f), style = Stroke(0.1f, join = StrokeJoin.Round))
-    drawPath(star, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.6f), color, lerp(color, INK, 0.25f)), 0.1f, 0.95f))
-    drawLine(Color.White.copy(alpha = 0.7f), Offset(0.36f, 0.42f), Offset(0.45f, 0.3f), 0.05f, cap = StrokeCap.Round)
-    drawCircle(INK, 0.115f, c)
-    drawCircle(Brush.radialGradient(listOf(Color.White, lerp(color, Color.White, 0.3f), color), c, 0.09f), 0.09f, c)
-    fun at(u: Float, o: Float) = o + (u - 0.5f) * 0.19f
-    val bolt = poly(at(0.58f, c.x), at(0.12f, c.y), at(0.3f, c.x), at(0.55f, c.y), at(0.48f, c.x), at(0.55f, c.y), at(0.4f, c.x), at(0.9f, c.y), at(0.72f, c.x), at(0.42f, c.y), at(0.53f, c.x), at(0.42f, c.y))
-    drawPath(bolt, INK)
+    // The crate, seen a little from above: its top face, and its front under a lid that overhangs it.
+    val body = poly(0.2f, 0.5f, 0.8f, 0.5f, 0.8f, 0.9f, 0.2f, 0.9f)
+    val lid = poly(0.13f, 0.36f, 0.87f, 0.36f, 0.87f, 0.52f, 0.13f, 0.52f)
+    val top = poly(0.25f, 0.2f, 0.75f, 0.2f, 0.87f, 0.36f, 0.13f, 0.36f)
+    for (part in listOf(body, lid, top)) drawPath(part, INK, style = Stroke(0.13f, join = StrokeJoin.Round))
+    drawPath(body, Brush.verticalGradient(listOf(color, lerp(color, INK, 0.4f)), 0.5f, 0.9f))
+    drawPath(top, lerp(color, Color.White, 0.55f))
+    drawPath(lid, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.3f), color), 0.36f, 0.52f))
+    // Corner posts, and the clasp with a light in it.
+    drawRect(lerp(color, INK, 0.5f), Offset(0.2f, 0.52f), androidx.compose.ui.geometry.Size(0.08f, 0.38f))
+    drawRect(lerp(color, INK, 0.5f), Offset(0.72f, 0.52f), androidx.compose.ui.geometry.Size(0.08f, 0.38f))
+    drawLine(Color.White.copy(alpha = 0.7f), Offset(0.32f, 0.27f), Offset(0.5f, 0.27f), 0.04f, cap = StrokeCap.Round)
+    drawCircle(INK, 0.115f, Offset(0.5f, 0.56f))
+    drawCircle(Brush.radialGradient(listOf(Color.White, lerp(color, Color.White, 0.3f), color), Offset(0.5f, 0.56f), 0.08f), 0.08f, Offset(0.5f, 0.56f))
 }

@@ -79,7 +79,7 @@ class ProgressionTest {
         val verdict = ServerVerdict(8, 8, false, 1, 3, bolts = 28, credits = 6, unlocked = listOf(FighterId.BRAKK))
         val (_, rewards) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = verdict)
         assertEquals(6 to listOf(FighterId.BRAKK), rewards.credits to rewards.unlocked)
-        assertEquals("the road's prices, as the server charges them", listOf(2500, 4200, 6500, 9000, 13000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices, as the server charges them", listOf(2500, 4200, 6500, 9000, 9000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
     }
 
     @Test fun offlineMatchesEarnNothing() {
@@ -165,8 +165,8 @@ class ProgressionTest {
         assertEquals("Ultra is the rarest tier", 0.02f, normal.last(), 1e-4f)
         assertEquals(normal.min(), normal.last(), 0f)
         assertTrue("max luck makes Ultra the most likely tier", lucky.last() > 0.5f && lucky.last() == lucky.max())
-        assertTrue(SparkCapsules.splitChance(SparkCapsules.MAX_LUCK) > SparkCapsules.splitChance(0f))
-        assertTrue("chances never exceed 100%", SparkCapsules.splitChance(SparkCapsules.MAX_LUCK) <= 1f && SparkCapsules.resplitChance(SparkCapsules.MAX_LUCK) <= 1f)
+        assertTrue(SparkCapsules.moreItemsChance(SparkCapsules.MAX_LUCK) > SparkCapsules.moreItemsChance(0f))
+        assertTrue("chances never exceed 100%", SparkCapsules.moreItemsChance(SparkCapsules.MAX_LUCK) <= 1f)
         assertEquals("the luck slider tops out at x15", 14f, SparkCapsules.MAX_LUCK, 0f)
     }
 

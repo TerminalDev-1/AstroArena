@@ -1,9 +1,9 @@
 """The rules the server enforces itself rather than taking the client's word for them.
 
   * how many Cups a match is worth (by trophies.cfg; the client has no copy and shows what it is told)
-  * which finishes earn a Glitch Drop, and how many a day
+  * which finishes earn an Arena Box, and how many a day
   * whether a reported result is believable at all
-  * what comes out of a Glitch Drop
+  * what comes out of an Arena Box
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, tab
     return max(delta, -cups)
 
 
-# ---------------------------------------------------------------------------- Glitch Drops: earning
+# ---------------------------------------------------------------------------- Arena Boxes ("drops" in the code and the API): earning
 
 DROPS_PER_DAY = 3
 STARTING_DROPS = 1
@@ -125,20 +125,22 @@ def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: i
     return None
 
 
-# ---------------------------------------------------------------------------- Glitch Drops: opening
+# ---------------------------------------------------------------------------- Arena Boxes: opening
 
 TIERS = [("SCRAP", 40), ("TUNED", 28), ("CHARGED", 18), ("OVERCLOCKED", 8), ("PRISMATIC", 4), ("ULTRA", 2)]
 MAX_LUCK = 14.0
-MAX_PIECES = 8
-# The pieces a drop splits into roll with this much extra luck and are never Scrap.
-SPLIT_LUCK = 0.6
+# An Arena Box holds this many items, and now and then more: after these, each further item comes with
+# `MORE_ITEMS_CHANCE` (plus `MORE_ITEMS_LUCK` for each point of luck), up to `MAX_ITEMS`.
+BOX_ITEMS = 3
+MAX_ITEMS = 8
+MORE_ITEMS_CHANCE = 0.4
+MORE_ITEMS_LUCK = 0.05
 # Every Bolt and Prism amount a drop gives is multiplied by this (3 = the amounts below, plus 200%).
 DROP_BUFF = 3
 # Every Credit amount a drop gives is multiplied by this: the Spark Road asks for thousands, and drops are the
 # way to get them in any number.
 CREDIT_BUFF = 12
-# "Open all" opens the drops the player holds at that moment; the pieces that split off wait for the next one.
-# (Chasing the splits has no end when luck makes every drop split.) This is the most one request goes through.
+# "Open all" opens the boxes the player holds at that moment. This is the most one request goes through.
 MAX_OPEN_ALL = 10000
 
 # Every fighter and how many colourways it has (index 0 is the one it comes with). Keep in step with Balance.kt.
@@ -162,14 +164,12 @@ def roll_tier(rng, luck: float = 0.0) -> int:
     return 0
 
 
-def roll_pieces(rng, luck: float = 0.0) -> int:
-    """1 for a plain drop; 2, 4 or 8 when it splits."""
-    if rng.random() >= min(1.0, 0.25 + 0.05 * luck):
-        return 1
-    pieces = 2
-    while pieces < MAX_PIECES and rng.random() < min(1.0, 0.5 + 0.08 * luck):
-        pieces *= 2
-    return pieces
+def roll_items(rng, luck: float = 0.0) -> int:
+    """How many items an Arena Box holds: `BOX_ITEMS`, and with some luck a few more."""
+    items = BOX_ITEMS
+    while items < MAX_ITEMS and rng.random() < min(1.0, MORE_ITEMS_CHANCE + MORE_ITEMS_LUCK * luck):
+        items += 1
+    return items
 
 
 def _fighters(save: dict) -> dict:
@@ -260,11 +260,16 @@ def apply_reward(save: dict, reward: dict) -> None:
             entry["ownedSkins"] = sorted(_owned_skins(save, name) | {int(reward["skin"])})
 
 
-def open_drop(save: dict, boosted: bool, luck: float, rng) -> dict:
-    """Rolls one drop: its tier, how many it split into, and its reward."""
+def open_box(save: dict, luck: float, rng, grant=apply_reward) -> dict:
+    """Opens one Arena Box: rolls how many items it holds, then each item's tier and reward.
+
+    Every item is handed to `grant(save, reward)` before the next is rolled, so a box never holds the same
+    colourway twice; what `grant` returns (if anything) is the reward as it is reported.
+    """
     luck = min(max(float(luck), 0.0), MAX_LUCK)
-    tier = roll_tier(rng, luck + (SPLIT_LUCK if boosted else 0.0))
-    if boosted and tier == 0:
-        tier = 1
-    reward = roll_reward(tier, save, rng)
-    return {"tier": TIERS[tier][0], "pieces": roll_pieces(rng, luck), "reward": reward}
+    items = []
+    for _ in range(roll_items(rng, luck)):
+        tier = roll_tier(rng, luck)
+        reward = roll_reward(tier, save, rng)
+        items.append({"tier": TIERS[tier][0], "reward": grant(save, reward) or reward})
+    return {"items": items}

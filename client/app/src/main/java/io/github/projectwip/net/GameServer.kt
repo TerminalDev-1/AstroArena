@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import io.github.projectwip.ai.BotProfile
 import io.github.projectwip.data.BotDifficulty
+import io.github.projectwip.data.BoxItem
 import io.github.projectwip.data.CapsuleResult
 import io.github.projectwip.data.CapsuleTier
 import io.github.projectwip.data.Currency
@@ -35,7 +36,7 @@ data class Account(
     /** Place on the server's leaderboard (1 = top), out of [players] accounts. */
     val rank: Int,
     val players: Int,
-    /** Unopened Glitch Drops. */
+    /** Unopened Arena Boxes. */
     val drops: Int,
     val dropsLeftToday: Int,
     /** The bot difficulty the server gives ordinary players. */
@@ -92,7 +93,7 @@ data class RemotePlayer(val id: String, val name: String, val cups: Int, val fig
 /**
  * The game's connection to the AstroArena server (see the `server/` directory of the repository).
  *
- * The server is in charge of Cups, Glitch Drops, Bolts, Prisms, fighters, the shop and its deals, the bot
+ * The server is in charge of Cups, Arena Boxes, Bolts, Prisms, fighters, the shop and its deals, the bot
  * difficulty and who gets the debug menu. Without it the game still plays, in offline mode: on a separate
  * offline profile kept on the device ([LocalGame]), which the server never sees.
  *
@@ -422,7 +423,7 @@ class GameServer(context: Context) : GameActions {
     }
 
     /**
-     * Opens one Glitch Drop. The server rolls it; this only carries the answer back. [luck] and [free] are
+     * Opens one Arena Box. The server rolls it; this only carries the answer back. [luck] and [free] are
      * honoured for developers only. Null if the server couldn't be reached or the player has none to open.
      */
     fun openDrop(luck: Float = 0f, free: Boolean = false): CapsuleResult? {
@@ -437,8 +438,8 @@ class GameServer(context: Context) : GameActions {
     }
 
     /**
-     * Opens every Glitch Drop the player holds, in one go; pieces that split off on the way are left to open
-     * next. The server rolls them all; the answer is what came out of each, in the order they were opened. Null
+     * Opens every Arena Box the player holds, in one go. The server rolls them all; the answer is what came out
+     * of each, in the order they were opened. Null
      * if it couldn't be reached or there were none.
      */
     fun openAllDrops(luck: Float = 0f): List<CapsuleResult>? {
@@ -448,9 +449,12 @@ class GameServer(context: Context) : GameActions {
     }
 
     private fun capsuleResult(o: JSONObject): CapsuleResult? {
-        val tier = CapsuleTier.entries.firstOrNull { it.name == o.optString("tier") } ?: return null
-        val reward = o.optJSONObject("reward")?.let { reward(it) } ?: return null
-        return CapsuleResult(tier, reward, o.optInt("pieces", 1).coerceIn(1, 8))
+        val items = o.optJSONArray("items") ?: return null
+        return CapsuleResult((0 until items.length()).mapNotNull { i ->
+            val item = items.optJSONObject(i) ?: return@mapNotNull null
+            val tier = CapsuleTier.entries.firstOrNull { it.name == item.optString("tier") } ?: return@mapNotNull null
+            item.optJSONObject("reward")?.let { reward(it) }?.let { BoxItem(tier, it) }
+        }).takeIf { it.items.isNotEmpty() }
     }
 
     private fun reward(o: JSONObject): Reward? {

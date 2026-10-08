@@ -97,6 +97,23 @@ class HudView(
             val col = when (s.relation[i]) { 0 -> PLAYER; 1 -> ALLY; else -> ENEMY }
             text.textSize = dp(13f)
             outlined(c, s.names[i] ?: "", x, y - bh - dp(5f), if (s.relation[i] == 0) Color.rgb(255, 245, 160) else Color.WHITE, dp(3f))
+            if (s.poisoned[i]) {
+                // Malformed code: zeros and ones streaming up off their head for as long as the poison runs.
+                text.textSize = dp(15f)
+                for (k in 0 until 7) {
+                    val run = time * 0.85f + k * 0.37f + i * 0.21f
+                    val step = run.toInt()
+                    val up = run - step
+                    val alpha = (sin(up * 3.1416f) * 255f).toInt().coerceIn(0, 255)
+                    val digit = if ((step * 31 + k * 17 + i * 7) % 3 == 0) "0" else "1"
+                    val dx = (k - 3) * dp(12f) + sin(run * 2.3f + k) * dp(3f)
+                    val dy = y - bh - dp(22f) - up * dp(40f)
+                    textStroke.alpha = alpha
+                    outlined(c, digit, x + dx, dy, Color.argb(alpha, 96, 255, 130), dp(2.5f))
+                }
+                textStroke.alpha = 255
+                text.textSize = dp(13f)
+            }
             if (s.cells[i] > 0) {
                 // Power Cell count badge to the left of the bar
                 val bx = x - bw / 2 - dp(15f)

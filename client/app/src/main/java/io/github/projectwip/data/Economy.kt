@@ -238,7 +238,7 @@ object Economy {
         else -> if (good(mode, outcome, placement)) 6 else 2
     }
 
-    /** A win in Knockout Rush, or a top-4 finish in Last Spark, earns a Glitch Drop. */
+    /** A win in Knockout Rush, or a top-4 finish in Last Spark, earns an Arena Box. */
     fun earnsDrop(mode: GameMode, outcome: MatchOutcome, placement: Int): Boolean = when (mode) {
         GameMode.LAST_SPARK -> placement in 1..4
         GameMode.KNOCKOUT_RUSH -> outcome == MatchOutcome.VICTORY
@@ -247,7 +247,7 @@ object Economy {
 
     /**
      * Settles a finished match: what it pays in Bolts, CPU Chips, Credits and Spark Pass points goes into the save,
-     * and the verdict says the rest (Cups and Glitch Drops are applied by [Progression.applyMatch] from it).
+     * and the verdict says the rest (Cups and Arena Boxes are applied by [Progression.applyMatch] from it).
      */
     fun settleMatch(save: SaveData, report: MatchReport, day: Long): Done<ServerVerdict> {
         val mode = report.mode
@@ -275,15 +275,13 @@ object Economy {
         ))
     }
 
-    // ---------------------------------------------------------------------------- Glitch Drops
+    // ---------------------------------------------------------------------------- Arena Boxes
 
     private const val DROP_BUFF = 3
     /** Every Credit amount a drop gives is multiplied by this: the Spark Road asks for thousands. */
     const val CREDIT_BUFF = 12
-    /** "Open all" opens the drops held at that moment; the pieces that split off wait for the next one. */
+    /** "Open all" opens the boxes held at that moment; this is the most it goes through. */
     const val MAX_OPEN_ALL = 10_000
-    /** Pieces a drop splits into roll with this much extra luck and are never Scrap. */
-    const val SPLIT_LUCK = 0.6f
 
     private fun rollTier(rng: Random, luck: Float): Int {
         var roll = rng.nextDouble()
@@ -294,12 +292,11 @@ object Economy {
         return 0
     }
 
-    /** 1 for a plain drop; 2, 4 or 8 when it splits. */
-    private fun rollPieces(rng: Random, luck: Float): Int {
-        if (rng.nextFloat() >= SparkCapsules.splitChance(luck)) return 1
-        var pieces = 2
-        while (pieces < SparkCapsules.MAX_PIECES && rng.nextFloat() < SparkCapsules.resplitChance(luck)) pieces *= 2
-        return pieces
+    /** How many items an Arena Box holds: [SparkCapsules.BOX_ITEMS], and with some luck a few more. */
+    private fun rollItems(rng: Random, luck: Float): Int {
+        var items = SparkCapsules.BOX_ITEMS
+        while (items < SparkCapsules.MAX_ITEMS && rng.nextFloat() < SparkCapsules.moreItemsChance(luck)) items++
+        return items
     }
 
     /** What a drop of [tier] gives this player. Never a colourway they already own. */
@@ -331,32 +328,26 @@ object Economy {
     }
 
     /**
-     * Opens up to [most] of the Glitch Drops the player holds (null = all of them, up to [MAX_OPEN_ALL]) and adds what
+     * Opens up to [most] of the Arena Boxes the player holds (null = all of them, up to [MAX_OPEN_ALL]) and adds what
      * came out to the save. [free]: none is used up, and there are always more (the Chaos Command Center, and the
-     * Glitch Drops only mode); [most] must then say how many, since there is no count to go by. Pieces from an earlier split are
-     * opened first and roll better than a plain drop. Empty if there was nothing to open.
+     * Arena Boxes only mode); [most] must then say how many, since there is no count to go by. Each item is added
+     * before the next is rolled, so a box never holds the same colourway twice. Empty if there was nothing to open.
      */
     fun openDrops(save: SaveData, luck: Float, free: Boolean, most: Int?, rng: Random): Done<List<CapsuleResult>> {
         var s = save
         var drops = save.capsules
-        var boostedLeft = save.boostedCapsules
         val limit = most ?: minOf(drops, MAX_OPEN_ALL)
         val luck = luck.coerceIn(0f, SparkCapsules.MAX_LUCK)
         val results = ArrayList<CapsuleResult>()
         while (results.size < limit && (drops > 0 || free)) {
-            val boosted = boostedLeft > 0
-            var tier = rollTier(rng, luck + if (boosted) SPLIT_LUCK else 0f)
-            if (boosted && tier == 0) tier = 1
-            val capsuleTier = CapsuleTier.entries[tier]
-            val given = grant(s, rollReward(capsuleTier, s, rng)).also { s = it.save }.value
-            val pieces = rollPieces(rng, luck)
-            val extra = pieces - 1
-            drops = drops - (if (free) 0 else 1) + extra
-            boostedLeft = maxOf(0, boostedLeft - (if (boosted) 1 else 0)) + extra
-            results += CapsuleResult(capsuleTier, given, pieces)
+            results += CapsuleResult(List(rollItems(rng, luck)) {
+                val tier = CapsuleTier.entries[rollTier(rng, luck)]
+                BoxItem(tier, grant(s, rollReward(tier, s, rng)).also { s = it.save }.value)
+            })
+            if (!free) drops--
         }
         if (results.isEmpty()) return Done(save, results)
-        return Done(s.copy(capsules = drops, boostedCapsules = boostedLeft, capsulesOpened = s.capsulesOpened + results.size), results)
+        return Done(s.copy(capsules = drops, capsulesOpened = s.capsulesOpened + results.size), results)
     }
 
     // ---------------------------------------------------------------------------- developers

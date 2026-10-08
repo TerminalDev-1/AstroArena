@@ -85,9 +85,10 @@ class Rules(unittest.TestCase):
         self.assertAlmostEqual(rules.odds()[0], 0.4)
         self.assertGreater(rules.odds(5.0)[5], rules.odds()[5] * 20)
         rng = random.Random(7)
-        self.assertTrue(all(rules.roll_pieces(rng) in (1, 2, 4, 8) for _ in range(500)))
-        # At full luck a drop nearly always splits, and one that splits always goes all the way to eight.
-        self.assertEqual({rules.roll_pieces(rng, rules.MAX_LUCK) for _ in range(200)}, {1, 8})
+        # An Arena Box holds three items, and sometimes more; at full luck it is always full.
+        counts = {rules.roll_items(rng) for _ in range(500)}
+        self.assertEqual((min(counts), max(counts)), (rules.BOX_ITEMS, rules.MAX_ITEMS))
+        self.assertEqual({rules.roll_items(rng, rules.MAX_LUCK) for _ in range(200)}, {rules.MAX_ITEMS})
 
     def test_drops_never_give_what_is_owned(self):
         rng = random.Random(11)
@@ -95,14 +96,14 @@ class Rules(unittest.TestCase):
         save = {"bolts": 0, "prisms": 0, "fighters": {f: {"unlocked": True, "level": 1, "skin": 0, "ownedSkins": [0]} for f in rules.FIGHTER_SKINS}}
         seen = set()
         for _ in range(400):
-            result = rules.open_drop(save, boosted=False, luck=4.0, rng=rng)
-            reward = result["reward"]
-            for item in reward.get("items", [reward]):
-                key = (item["type"], item.get("fighter"), item.get("skin"))
-                if item["type"] in ("fighter", "skin"):
-                    self.assertNotIn(key, seen)
-                    seen.add(key)
-            rules.apply_reward(save, reward)
+            box = rules.open_box(save, luck=4.0, rng=rng)
+            self.assertTrue(rules.BOX_ITEMS <= len(box["items"]) <= rules.MAX_ITEMS)
+            for reward in (i["reward"] for i in box["items"]):
+                for item in reward.get("items", [reward]):
+                    key = (item["type"], item.get("fighter"), item.get("skin"))
+                    if item["type"] in ("fighter", "skin"):
+                        self.assertNotIn(key, seen)
+                        seen.add(key)
         # Everything there is to own was handed out exactly once, and only currency after that.
         self.assertEqual(len([k for k in seen if k[0] == "fighter"]), 0)
         self.assertGreater(save["credits"], 0)
@@ -110,10 +111,10 @@ class Rules(unittest.TestCase):
         self.assertTrue(all(f["unlocked"] for f in save["fighters"].values()))
         self.assertGreater(save["bolts"], 0)
 
-    def test_split_pieces_are_never_scrap(self):
+    def test_every_item_in_a_box_has_a_tier(self):
         rng = random.Random(3)
-        tiers = {rules.open_drop({}, boosted=True, luck=0, rng=rng)["tier"] for _ in range(300)}
-        self.assertNotIn("SCRAP", tiers)
+        tiers = {i["tier"] for _ in range(300) for i in rules.open_box({}, 0, rng)["items"]}
+        self.assertEqual(tiers, {name for name, _ in rules.TIERS})
 
 
 class Economy(unittest.TestCase):
@@ -125,7 +126,7 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.shop_item("fighter_KITO"), ({"type": "fighter", "fighter": "KITO"}, 90))
         self.assertEqual(economy.shop_item("fighter_VARUN"), ({"type": "fighter", "fighter": "VARUN"}, 160))
         self.assertEqual(economy.shop_item("fighter_BUDDY"), ({"type": "fighter", "fighter": "BUDDY"}, 250))
-        self.assertEqual(economy.SPARK_ROAD[-1], ("BUDDY", 13000))
+        self.assertEqual(economy.SPARK_ROAD[-1], ("BUDDY", 9000))
         self.assertEqual(economy.shop_item("skin_VARUN_2"), ({"type": "skin", "fighter": "VARUN", "skin": 2}, 20))
         self.assertEqual(economy.shop_item("skin_MIRA_2"), ({"type": "skin", "fighter": "MIRA", "skin": 2}, 20))
         for missing in ("fighter_BYTE", "skin_MIRA_0", "skin_MIRA_3", "skin_NOBODY_1", "crate_xl", ""):
@@ -877,13 +878,16 @@ class Api(unittest.TestCase):
         me = self.player(save=save)
         status, first = self.call("POST", "/v1/drops/open", {"luck": 14, "free": True}, me["token"])
         self.assertEqual(status, 200)
-        self.assertIn(first["tier"], [name for name, _ in rules.TIERS])
-        self.assertIn(first["pieces"], (1, 2, 4, 8))
-        # `free` was ignored: this player is no developer, so the drop was used up.
-        self.assertEqual(first["account"]["drops"], 2 - 1 + first["pieces"] - 1)
+        self.assertTrue(rules.BOX_ITEMS <= len(first["items"]) <= rules.MAX_ITEMS)
+        self.assertTrue(all(i["tier"] in [name for name, _ in rules.TIERS] for i in first["items"]))
+        # `free` was ignored: this player is no developer, so the box was used up.
+        self.assertEqual(first["account"]["drops"], 1)
         # The reward went into the profile the server keeps; the uploaded save is left as it was.
         expected = economy.profile_from_save(save)
-        economy.grant(expected, first["reward"])
+        for reward in (i["reward"] for i in first["items"]):
+            for item in reward.get("items", [reward]):
+                if item["type"] != "fighter":
+                    economy.grant(expected, item)
         self.assertEqual(first["account"]["profile"], expected)
         self.assertEqual(self.call("GET", "/v1/save", token=me["token"])[1]["save"], save)
         # Open until there are none left; then the server says no.
@@ -900,7 +904,7 @@ class Api(unittest.TestCase):
         cost = dict(economy.SPARK_ROAD)
         self.assertEqual([s["fighter"] for s in road["steps"]], order)
         self.assertEqual(order, ["BRAKK", "MIRA", "KITO", "VARUN", "BUDDY"])
-        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 4200, 6500, 9000, 13000])
+        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 4200, 6500, 9000, 9000])
         self.assertEqual(road["steps"][0], {"fighter": "BRAKK", "cost": 2500, "rarity": "RARE"})
         self.assertEqual(len(road["steps"]), len(rules.FIGHTER_SKINS) - 1)
         # The road has a fixed order: the Credits go toward the first fighter along it that is still locked.
@@ -1027,22 +1031,20 @@ class Api(unittest.TestCase):
         status, body = self.call("POST", "/v1/drops/open-all", {"luck": 14}, me["token"])
         self.assertEqual(status, 200)
         results = body["results"]
-        # `luck` was ignored (no developer). The five drops they held were opened; the pieces that split off on
-        # the way are theirs to open next.
+        # `luck` was ignored (no developer): the five boxes they held were opened, and at full luck every one
+        # would have been full.
         self.assertEqual(len(results), 5)
-        left = sum(r["pieces"] - 1 for r in results)
-        self.assertEqual(body["account"]["drops"], left)
+        self.assertTrue(any(len(r["items"]) < rules.MAX_ITEMS for r in results))
+        self.assertEqual(body["account"]["drops"], 0)
         # Everything that came out is in the profile the server keeps.
         # (A drop never holds a fighter: one in a result is the fighter its Credits unlocked on the Spark Road, and
         # putting the Credits back on the road unlocks it again.)
         expected = economy.profile_from_save(save)
-        for r in results:
-            for item in r["reward"].get("items", [r["reward"]]):
+        for reward in (i["reward"] for r in results for i in r["items"]):
+            for item in reward.get("items", [reward]):
                 if item["type"] != "fighter":
                     economy.grant(expected, item)
         self.assertEqual(body["account"]["profile"], expected)
-        while left > 0:
-            left = self.call("POST", "/v1/drops/open-all", {}, me["token"])[1]["account"]["drops"]
         self.assertEqual(self.call("POST", "/v1/drops/open-all", {}, me["token"])[0], 409)
 
     def test_drops_pay_three_times_over(self):
@@ -1064,7 +1066,8 @@ class Api(unittest.TestCase):
         self.assertEqual((body["account"]["cups"], body["account"]["drops"]), (500, 6))
         # A developer can open drops for free with luck.
         _, drop = self.call("POST", "/v1/drops/open", {"luck": 14, "free": True}, me["token"])
-        self.assertEqual(drop["account"]["drops"], 6 + drop["pieces"] - 1)  # free: none used up
+        self.assertEqual(drop["account"]["drops"], 6)  # free: none used up
+        self.assertEqual(len(drop["items"]), rules.MAX_ITEMS)  # and full luck fills the box
         # Someone else is still an ordinary player.
         other = self.player("Other")
         self.assertFalse(self.call("GET", "/v1/me", token=other["token"])[1]["account"]["developer"])

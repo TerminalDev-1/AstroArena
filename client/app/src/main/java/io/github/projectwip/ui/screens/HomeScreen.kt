@@ -158,7 +158,7 @@ fun HomeScreen(
                     }
                     if (!dropsOnly) Spacer(Modifier.height(10.dp))
                     CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online || io.github.projectwip.ui.LocalOfflineMode.current, dropsOnly, openCapsule)
-                    // Glitch Drops only: no fights, just drops.
+                    // Arena Boxes only: no fights, just drops.
                     if (!dropsOnly) {
                         Spacer(Modifier.height(10.dp))
                         ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
@@ -298,7 +298,7 @@ private fun CapsuleButton(count: Int, leftToday: Int, canOpen: Boolean, big: Boo
                 else GameIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = Palette.Grey)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    GameText(if (count > 0) "OPEN DROP" else "GLITCH DROPS", Type.Heading, outline = 2.5.dp)
+                    GameText(if (count > 0) "OPEN BOX" else "ARENA BOXES", Type.Heading, outline = 2.5.dp)
                     PlainText(
                         when {
                             !canOpen -> if (count > 0) "Opens when you're back online" else "Earned and opened online"

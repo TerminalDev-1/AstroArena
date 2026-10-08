@@ -57,7 +57,6 @@ class SaveStore(context: Context, name: String = "save.json") {
             put("capsuleDay", s.capsuleDay)
             put("capsulesEarnedToday", s.capsulesEarnedToday)
             put("capsulesOpened", s.capsulesOpened)
-            put("boostedCapsules", s.boostedCapsules)
             put("capsuleSeed", s.capsuleSeed)
             put("dailyDay", s.dailyDay)
             put("dailyBought", JSONArray(s.dailyBought.sorted()))
@@ -178,7 +177,6 @@ class SaveStore(context: Context, name: String = "save.json") {
                 capsuleDay = o.optLong("capsuleDay", -1),
                 capsulesEarnedToday = o.optInt("capsulesEarnedToday", 0).coerceAtLeast(0),
                 capsulesOpened = o.optInt("capsulesOpened", 0).coerceAtLeast(0),
-                boostedCapsules = o.optInt("boostedCapsules", 0).coerceAtLeast(0),
                 capsuleSeed = if (o.has("capsuleSeed")) o.optLong("capsuleSeed") else System.nanoTime(),
                 dailyDay = o.optLong("dailyDay", -1),
                 dailyBought = o.optJSONArray("dailyBought")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet(),

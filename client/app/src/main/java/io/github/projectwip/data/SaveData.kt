@@ -52,7 +52,7 @@ data class Settings(
     val debugUpgradeCost: Float = 1f,
     /** Offline mode by choice: play on the offline profile (and so in Chaos Mode) even while the server is there. */
     val forceOffline: Boolean = false,
-    /** Glitch Drops only: the home screen is just the Glitch Drop button, with no fights. */
+    /** Arena Boxes only: the home screen is just the Arena Box button, with no fights. */
     val glitchDropsOnly: Boolean = false,
 )
 
@@ -93,8 +93,6 @@ data class SaveData(
     val capsuleDay: Long = -1,
     val capsulesEarnedToday: Int = 0,
     val capsulesOpened: Int = 0,
-    /** How many of the unopened ones came from a split (they roll with [SparkCapsules.SPLIT_LUCK] and are opened first). */
-    val boostedCapsules: Int = 0,
     /** Seeds the next capsule roll; stored so reloading the game can't re-roll a capsule. */
     val capsuleSeed: Long = 0,
     /** Offline profile: the day [dailyBought] counts for, and the titles of that day's offers already bought. (Online the server keeps these.) */

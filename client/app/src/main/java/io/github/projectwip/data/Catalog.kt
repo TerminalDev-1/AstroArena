@@ -51,7 +51,7 @@ data class CustomOffer(
     val discountPercent get() = if (wasPrice > price && wasPrice > 0) ((wasPrice - price) * 100 / wasPrice) else 0
 }
 
-/** How good a Spark Capsule turned out. Each tier up is rarer and pays better. */
+/** How good an item in an Arena Box turned out. Each tier up is rarer and pays better. */
 enum class CapsuleTier(val label: String, val color: Long, val weight: Int) {
     SCRAP("Scrap", 0xFF4F86FF, 40),
     TUNED("Tuned", 0xFF4ED36A, 28),
@@ -61,18 +61,17 @@ enum class CapsuleTier(val label: String, val color: Long, val weight: Int) {
     ULTRA("Ultra", 0xFFFFE14D, 2),
 }
 
-/** What came out of an opened capsule. */
-data class CapsuleResult(
-    val tier: CapsuleTier,
-    val reward: Reward,
-    /** How many capsules this one became while it was being opened (1, 2, 4 or 8); the player keeps the extras. */
-    val pieces: Int = 1,
-) {
-    val split get() = pieces > 1
+/** One thing that came out of an Arena Box, and how rare it turned out to be. */
+data class BoxItem(val tier: CapsuleTier, val reward: Reward)
+
+/** What came out of an opened Arena Box: every item in it, in the order they are shown. */
+data class CapsuleResult(val items: List<BoxItem>) {
+    /** The rarest item's tier: the box takes its colour as it opens. */
+    val best: CapsuleTier get() = items.maxOfOrNull { it.tier } ?: CapsuleTier.SCRAP
 }
 
 /**
- * Spark Capsules ("Glitch Drops" to players): earned from your first few good finishes each day, opened from the
+ * Spark Capsules ("Arena Boxes" to players; they were Spark Drops, then Arena Boxes): earned from your first few good finishes each day, opened from the
  * home screen. The game server decides all of it: whether a match earned one, and what comes out when one is
  * opened (`server/astro/rules.py`). What is left here is only what the game needs to show them.
  */
@@ -92,15 +91,12 @@ object SparkCapsules {
         return w.map { it / sum }
     }
 
-    /** The most capsules one can turn into. */
-    const val MAX_PIECES = 8
+    /** A box holds this many items, and now and then more, up to [MAX_ITEMS]. */
+    const val BOX_ITEMS = 3
+    const val MAX_ITEMS = 8
 
-    /** Chance that a capsule splits in two as it is opened, leaving a second one to open. Luck helps. */
-    fun splitChance(luck: Float = 0f) = (0.25f + 0.05f * luck).coerceAtMost(1f)
-
-    /** Once it has split, the chance that every piece splits again (2 -> 4 -> 8). */
-    fun resplitChance(luck: Float = 0f) = (0.5f + 0.08f * luck).coerceAtMost(1f)
-
+    /** After the first [BOX_ITEMS], the chance of each further item. Luck helps. */
+    fun moreItemsChance(luck: Float = 0f) = (0.4f + 0.05f * luck).coerceAtMost(1f)
 }
 
 data class Milestone(val cups: Int, val reward: Reward)

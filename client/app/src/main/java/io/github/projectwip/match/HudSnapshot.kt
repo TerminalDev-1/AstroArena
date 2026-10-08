@@ -67,6 +67,8 @@ class HudSnapshot {
     val superReady = BooleanArray(MAX)
     /** A hyper is running. */
     val hyper = BooleanArray(MAX)
+    /** Malformed code is running in them (Buddy's super). */
+    val poisoned = BooleanArray(MAX)
     val cells = IntArray(MAX)
 
     fun copyFrom(o: HudSnapshot) {
@@ -83,7 +85,7 @@ class HudSnapshot {
         n = o.n
         for (i in 0 until n) {
             ids[i] = o.ids[i]; sx[i] = o.sx[i]; sy[i] = o.sy[i]; visible[i] = o.visible[i]
-            hp[i] = o.hp[i]; maxHp[i] = o.maxHp[i]; shield[i] = o.shield[i]; relation[i] = o.relation[i]; names[i] = o.names[i]; superReady[i] = o.superReady[i]; hyper[i] = o.hyper[i]; cells[i] = o.cells[i]
+            hp[i] = o.hp[i]; maxHp[i] = o.maxHp[i]; shield[i] = o.shield[i]; relation[i] = o.relation[i]; names[i] = o.names[i]; superReady[i] = o.superReady[i]; hyper[i] = o.hyper[i]; poisoned[i] = o.poisoned[i]; cells[i] = o.cells[i]
         }
     }
 

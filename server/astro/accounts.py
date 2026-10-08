@@ -49,7 +49,7 @@ HEADER = """\
 #               turns it into the date. Both only count while disabled = yes.
 #   cups        the player's Cups: their place on the leaderboard
 #   best_cups   the most Cups they have had: how far along the Cup Track they are
-#   drops       unopened Glitch Drops
+#   drops       unopened Arena Boxes
 #   bolts       Upgrade Credits
 #   prisms      CPU Chips
 #   credits     Credits on the Spark Road, toward the next fighter (enough of them unlocks it)

@@ -40,7 +40,7 @@ server never locks anyone out.
 | **Bolts and Prisms** | kept by the server: match pay, upgrades, shop purchases, the daily gift and Cup Track rewards all happen there |
 | **Deals** | shop offers made by developers in the game's Offer Creator, stored here and shown to every player |
 | **Leaderboard** | the real accounts on this server, ranked by Cups; there are no made-up names |
-| **Glitch Drops** | the server decides when one is earned (three a day) and rolls what comes out when it is opened |
+| **Arena Boxes** | the server decides when one is earned (three a day) and rolls what comes out when it is opened |
 | **Matches** | the server plans each match (seed, bots, difficulty, fighter level). The game hands in what the player did, and the server replays the whole match to get the result |
 | **Saves** | the game uploads its save (settings and local statistics) after every change; a fresh install restores it |
 
@@ -72,7 +72,7 @@ result from its replay. So:
 - A match that is handed in unfinished counts as walking out: a defeat, in last place.
 - A match can't be handed in faster than it could have been played.
 
-- A save file can't set Cups, Glitch Drops, Bolts, Prisms, levels or what is owned. They are read from a save
+- A save file can't set Cups, Arena Boxes, Bolts, Prisms, levels or what is owned. They are read from a save
   once, when an account first uploads one (so earlier progress carries over); set `import_saves = no` in
   `game.cfg` to stop even that.
 - Buying, upgrading and claiming are checked on the server: the price is the server's, the player has to be

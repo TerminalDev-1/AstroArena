@@ -66,19 +66,19 @@ fun ChaosCommandCenter(save: SaveData, repo: GameRepository) {
             "Add your player ID (${server?.playerId ?: "see Settings > Data"}) to game.cfg on the server.",
         Type.Body, color = io.github.projectwip.ui.Palette.Gold,
     )
-    ToggleRow("INFINITE DROPS", "The drop button always works and opening one never uses it up.", s.debugInfiniteCapsules) { v ->
+    ToggleRow("INFINITE BOXES", "The Arena Box button always works and opening one never uses it up.", s.debugInfiniteCapsules) { v ->
         repo.updateSettings { it.copy(debugInfiniteCapsules = v) }
     }
     ToggleRow("NO LEVEL CAP", "Fighters can be upgraded past level ${io.github.projectwip.data.Balance.MAX_LEVEL}.", s.debugNoLevelCap) { v ->
         repo.updateSettings { it.copy(debugNoLevelCap = v) }
     }
-    SliderRow("DROP LUCK", "×${"%.1f".format(1f + luck)}", s.debugLuck, 0f, SparkCapsules.MAX_LUCK, onDrag = { luck = snap(it) }) { v ->
+    SliderRow("BOX LUCK", "×${"%.1f".format(1f + luck)}", s.debugLuck, 0f, SparkCapsules.MAX_LUCK, onDrag = { luck = snap(it) }) { v ->
         luck = snap(v)
         repo.updateSettings { it.copy(debugLuck = snap(v)) }
     }
     val odds = SparkCapsules.odds(luck)
     PlainText(CapsuleTier.entries.joinToString("  ·  ") { "${it.label} ${"%.1f".format(odds[it.ordinal] * 100)}%" }, Type.Body, color = Color.White)
-    PlainText("Chance a drop splits: ${"%.0f".format(SparkCapsules.splitChance(luck) * 100)}%, then ${"%.0f".format(SparkCapsules.resplitChance(luck) * 100)}% to split again (up to ${SparkCapsules.MAX_PIECES})",
+    PlainText("A box holds ${SparkCapsules.BOX_ITEMS} items; each further one comes ${"%.0f".format(SparkCapsules.moreItemsChance(luck) * 100)}% of the time (up to ${SparkCapsules.MAX_ITEMS})",
         Type.Body, color = Color.White)
     SliderRow("UPGRADE COST", if (costFactor <= 0f) "FREE" else "×${"%.1f".format(costFactor)}", s.debugUpgradeCost, 0f, io.github.projectwip.data.Progression.MAX_COST_FACTOR,
         onDrag = { costFactor = snap(it) }) { v ->
@@ -87,7 +87,7 @@ fun ChaosCommandCenter(save: SaveData, repo: GameRepository) {
     }
     PlainText("Multiplies the price of every fighter upgrade. A level 1 upgrade now costs ${Math.round(io.github.projectwip.data.Balance.upgradeCostFrom(1) * costFactor)} Upgrade Credits, level 9 costs ${Math.round(io.github.projectwip.data.Balance.upgradeCostFrom(9) * costFactor)}.",
         Type.Body, color = Color.White)
-    SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.cups)} Cups, ${"%,d".format(save.bolts)} Upgrade Credits, ${"%,d".format(save.prisms)} CPU Chips and ${save.capsules} drops.")
+    SectionTitle("HAND-OUTS", "You have ${"%,d".format(save.cups)} Cups, ${"%,d".format(save.bolts)} Upgrade Credits, ${"%,d".format(save.prisms)} CPU Chips and ${save.capsules} Arena Boxes.")
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ChunkyButton({ ask({ devGrant(cups = 50) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+50 CUPS", Type.Label, outline = 2.dp) }
         ChunkyButton({ ask({ devGrant(cups = 500) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GOLD, lip = 4.dp) { GameText("+500 CUPS", Type.Label, outline = 2.dp) }
@@ -96,7 +96,7 @@ fun ChaosCommandCenter(save: SaveData, repo: GameRepository) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         ChunkyButton({ ask({ devGrant(bolts = 1000) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.CYAN, lip = 4.dp) { GameText("+1,000 UPGRADE CREDITS", Type.Label, outline = 2.dp) }
         ChunkyButton({ ask({ devGrant(prisms = 100) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.PURPLE, lip = 4.dp) { GameText("+100 CPU CHIPS", Type.Label, outline = 2.dp) }
-        ChunkyButton({ ask({ devGrant(drops = 5) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 DROPS", Type.Label, outline = 2.dp) }
+        ChunkyButton({ ask({ devGrant(drops = 5) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+5 BOXES", Type.Label, outline = 2.dp) }
         ChunkyButton({ ask({ devGrant(credits = 100) }) }, Modifier.width(150.dp).height(52.dp), ButtonStyle.GREEN, lip = 4.dp) { GameText("+100 CREDITS", Type.Label, outline = 2.dp) }
     }
 }

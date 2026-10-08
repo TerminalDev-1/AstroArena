@@ -118,16 +118,17 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     var reveal by remember { mutableStateOf<RewardReveal?>(null) }
     /** The Spark Capsule being opened, if any. Its reward is already saved by the time this is set. */
     var capsule by remember {
-        // Debug: `--es screen capsule3` previews opening a capsule of tier 3 (`capsule3s`: one that splits into eight) without touching the save.
+        // Debug: `--es screen capsule3` previews opening a box whose best item is tier 3 (`capsule3s`: a full box of eight) without touching the save.
         mutableStateOf(startScreen?.takeIf { it.startsWith("capsule") }?.let {
             val tier = CapsuleTier.entries[(it.removePrefix("capsule").trimEnd('s', 'f', 'b').toIntOrNull() ?: 0).coerceIn(0, CapsuleTier.entries.lastIndex)]
-            // Suffixes: s = splits into eight, f = a fighter comes out, b = a bundle comes out.
+            // Suffixes: s = a full box, f = a fighter comes out, b = a bundle comes out.
             val reward = when {
                 it.endsWith("f") -> Reward.UnlockFighter(FighterId.MIRA)
                 it.endsWith("b") -> Reward.Bundle(listOf(Reward.SkinReward(FighterId.BRAKK, 1), Reward.Prisms(150), Reward.Bolts(800)))
                 else -> Reward.Bolts(100 * (tier.ordinal + 1))
             }
-            CapsuleResult(tier, reward, pieces = if (it.endsWith("s")) 8 else 1)
+            val count = if (it.endsWith("s")) io.github.projectwip.data.SparkCapsules.MAX_ITEMS else io.github.projectwip.data.SparkCapsules.BOX_ITEMS
+            CapsuleResult(List(count - 1) { i -> io.github.projectwip.data.BoxItem(CapsuleTier.entries[i % (tier.ordinal + 1)], if (i % 2 == 0) Reward.Bolts(180 + 60 * i) else Reward.Credits(120 + 40 * i)) } + io.github.projectwip.data.BoxItem(tier, reward))
         })
     }
 
@@ -208,7 +209,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         booting = false
     }
 
-    // Cups, Glitch Drops, currencies, fighters and shop deals are the server's: whatever it says this player has is what the game shows.
+    // Cups, Arena Boxes, currencies, fighters and shop deals are the server's: whatever it says this player has is what the game shows.
     LaunchedEffect(account) { account?.let { repo.sync(it) } }
     // Anyone who isn't a developer plays without the debug menu's cheats, even if their save has some switched on.
     // Back online, anyone who isn't a developer loses the tweaks they had in Chaos Mode.
@@ -275,11 +276,11 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     /** A match has just ended and the server is replaying it to decide the result. */
     var judging by remember { mutableStateOf(false) }
     val ask = remember { ServerCall(scope, server, local, repo, sfx) { toast = it } }
-    // Glitch Drops are opened by the server: it rolls the drop, the game shows what came out. (Offline they are the
+    // Arena Boxes are opened by the server: it rolls the drop, the game shows what came out. (Offline they are the
     // offline profile's, and are rolled on the device.)
     val openCapsule: () -> Unit = {
         if (!opening) {
-            if (repo.offlineMode) repo.save.value.settings.let { local.openDrop(it.debugLuck, it.debugInfiniteCapsules) }.let { if (it != null) capsule = it else toast = "No Glitch Drops to open." }
+            if (repo.offlineMode) repo.save.value.settings.let { local.openDrop(it.debugLuck, it.debugInfiniteCapsules) }.let { if (it != null) capsule = it else toast = "No Arena Boxes to open." }
             else if (!serverStatus.online) toast = "Couldn't reach the server. Try again in a moment."
             else {
                 opening = true
@@ -291,7 +292,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     opening = false
                     server.status.value.account?.let { repo.sync(it) }
                     if (result != null) { repo.dropOpened(); capsule = result }
-                    else toast = if (server.status.value.online) "No Glitch Drops to open." else "Couldn't reach the server. Try again in a moment."
+                    else toast = if (server.status.value.online) "No Arena Boxes to open." else "Couldn't reach the server. Try again in a moment."
                 }
             }
         }
@@ -304,7 +305,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // Opens every drop that is left. [first] is the one on screen, when its own reveal is being skipped.
     val openAll: (CapsuleResult?) -> Unit = { first ->
         if (!opening) {
-            if (repo.offlineMode) repo.save.value.settings.let { local.openAllDrops(it.debugLuck, it.debugInfiniteCapsules) }.let { if (it != null) { capsule = null; haul = listOfNotNull(first) + it } else toast = "No Glitch Drops to open." }
+            if (repo.offlineMode) repo.save.value.settings.let { local.openAllDrops(it.debugLuck, it.debugInfiniteCapsules) }.let { if (it != null) { capsule = null; haul = (listOfNotNull(first) + it).flatMap { box -> box.items } } else toast = "No Arena Boxes to open." }
             else if (!serverStatus.online) toast = "Couldn't reach the server. Try again in a moment."
             else {
                 opening = true
@@ -313,8 +314,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     val rest = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server.openAllDrops(luck) }
                     opening = false
                     server.status.value.account?.let { repo.sync(it) }
-                    if (rest != null) { repo.dropOpened(rest.size); capsule = null; haul = listOfNotNull(first) + rest }
-                    else toast = if (server.status.value.online) "No Glitch Drops to open." else "Couldn't reach the server. Try again in a moment."
+                    if (rest != null) { repo.dropOpened(rest.size); capsule = null; haul = (listOfNotNull(first) + rest).flatMap { box -> box.items } }
+                    else toast = if (server.status.value.online) "No Arena Boxes to open." else "Couldn't reach the server. Try again in a moment."
                 }
             }
         }
@@ -470,7 +471,7 @@ private enum class Connection { CONNECTING, SETTLED }
 /**
  * Says hello to the game server and syncs the save with it. Blocking: call it off the main thread.
  * A save nobody has played on is replaced by the copy the server holds; otherwise this device's save wins
- * and is uploaded. Either way the server then says who this player is (its Cups, its Glitch Drops, developer
+ * and is uploaded. Either way the server then says who this player is (its Cups, its Arena Boxes, developer
  * or not), which the game takes on.
  */
 fun connectToServer(server: io.github.projectwip.net.GameServer, repo: GameRepository) {

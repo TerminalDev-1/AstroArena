@@ -751,7 +751,7 @@ object SfxSynth {
         reverb(0.14f, 0.45f)
     }
 
-    /** A Glitch Drop tearing: a stutter of square-wave blips that jump about in pitch, over chopped static. */
+    /** An Arena Box tearing: a stutter of square-wave blips that jump about in pitch, over chopped static. */
     private fun glitch() = Clip(0.34f).apply {
         for ((i, f) in floatArrayOf(220f, 1760f, 440f, 3520f, 880f, 110f, 2640f).withIndex()) {
             osc(Wave.SQUARE, i * 0.036f, 0.034f, { f }, { hold(it, 0.001f, 0.022f, 0.004f) * 0.4f })

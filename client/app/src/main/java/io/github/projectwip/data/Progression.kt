@@ -27,7 +27,7 @@ data class MatchRewards(
     val capsuleEarned: Boolean = false,
     /** Spark Capsules that can still be earned today, after this match. */
     val capsulesLeftToday: Int = 0,
-    /** False for an offline match: the server wasn't there to award Cups or a Glitch Drop. */
+    /** False for an offline match: the server wasn't there to award Cups or an Arena Box. */
     val online: Boolean = true,
     /** Credits for the Spark Road, and the fighters they unlocked. */
     val credits: Int = 0,
@@ -40,16 +40,16 @@ data class MatchRewards(
 )
 
 /**
- * What the game server decided a match was worth. Cups and Glitch Drops are the server's to give, so these are
+ * What the game server decided a match was worth. Cups and Arena Boxes are the server's to give, so these are
  * totals to adopt, not amounts to add up on the device.
  */
 data class ServerVerdict(
     val cupDelta: Int,
     /** The player's Cups after this match. */
     val cups: Int,
-    /** This match earned a Glitch Drop. */
+    /** This match earned an Arena Box. */
     val drop: Boolean,
-    /** Unopened Glitch Drops after this match. */
+    /** Unopened Arena Boxes after this match. */
     val drops: Int,
     val dropsLeftToday: Int,
     /** Bolts this match paid. */
@@ -127,7 +127,7 @@ object Progression {
     }
 
     /**
-     * Takes on what the server holds for this player: Cups and Glitch Drops, and (when given) the [profile] and
+     * Takes on what the server holds for this player: Cups and Arena Boxes, and (when given) the [profile] and
      * the shop [deals]. These are totals to show, so applying the same ones twice changes nothing.
      */
     fun syncAccount(
@@ -167,7 +167,7 @@ object Progression {
     fun capsulesLeftToday(save: SaveData, today: Long): Int =
         SparkCapsules.PER_DAY - if (save.capsuleDay == today) save.capsulesEarnedToday else 0
 
-    /** Counts a Glitch Drop as opened. (Its reward arrives with the profile the server sends.) */
+    /** Counts an Arena Box as opened. (Its reward arrives with the profile the server sends.) */
     fun dropOpened(save: SaveData, count: Int = 1): SaveData = save.copy(capsulesOpened = save.capsulesOpened + count)
 
     /** Puts the debug menu's cheats back to normal (for players the server doesn't list as developers). */
