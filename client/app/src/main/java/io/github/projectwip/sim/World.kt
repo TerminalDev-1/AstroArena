@@ -187,7 +187,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy)
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits())
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -223,7 +223,9 @@ class World(
         f.attackCooldown = (f.attackCooldown - dt).coerceAtLeast(0f)
 
         // --- movement
-        if (f.isDashing) {
+        if (f.isLeaping) {
+            stepLeap(f, dt)
+        } else if (f.isDashing) {
             stepDash(f, dt)
         } else {
             var mx = if (f.rooted) 0f else c.moveX
@@ -244,7 +246,7 @@ class World(
         else if (hypot(c.moveX, c.moveY) > 0.1f && !f.isDashing) f.facing = atan2(c.moveY, c.moveX)
 
         // --- main attack
-        if (c.attack && f.ammo >= 1f && f.attackCooldown <= 0f && f.pending.isEmpty() && !f.isDashing) {
+        if (c.attack && f.ammo >= 1f && f.attackCooldown <= 0f && f.pending.isEmpty() && !f.isDashing && !f.isLeaping) {
             val (dx, dy) = aimDirection(f)
             f.facing = atan2(dy, dx)
             f.ammo -= 1f
@@ -286,7 +288,7 @@ class World(
 
         // --- super
         // (Malformed code needs someone to compile it into: with nobody in sight the charge is kept.)
-        if (c.superAttack && f.superReady && !f.isDashing && (f.def.superSpec.kind != SuperKind.CORRUPT || corruptTarget(f) != null)) {
+        if (c.superAttack && f.superReady && !f.isDashing && !f.isLeaping && (f.def.superSpec.kind != SuperKind.CORRUPT || corruptTarget(f) != null)) {
             val (dx, dy) = aimDirection(f)
             f.facing = atan2(dy, dx)
             fireSuper(f, dx, dy)
@@ -451,13 +453,16 @@ class World(
                 f.pending.clear()
                 events += GameEvent.Dash(f.id)
             }
+            // Up and over, whatever is in the way: the code goes in when the leaper lands (see [stepLeap]).
             SuperKind.CORRUPT -> corruptTarget(f)?.let { t ->
                 f.facing = atan2(t.y - f.y, t.x - f.x)
-                t.poisonBy = f.id
-                t.poisonDamage = f.superDamage
-                t.poisonTick = Balance.POISON_TICK_SECONDS
-                t.poisonLeft = if (t.scale > 1f) Balance.POISON_GIANT_SECONDS else Balance.POISON_SECONDS
-                t.revealTimer = maxOf(t.revealTimer, 1.5f)
+                f.leapTotal = Balance.LEAP_SECONDS
+                f.leapTime = Balance.LEAP_SECONDS
+                f.leapFromX = f.x; f.leapFromY = f.y
+                f.leapTarget = t.id
+                f.pending.clear()
+                aimLeap(f, t)
+                events += GameEvent.Leap(f.id)
             }
         }
     }
@@ -489,6 +494,34 @@ class World(
             if (f.team == p.team || !f.alive) continue
             if (hypot(f.x - x, f.y - y) < p.blast + f.radius) damage(f, owner, p.damage, p.isSuper, f.x, f.y)
         }
+    }
+
+    /** Where a leaper comes down: open ground right behind its target. */
+    private fun aimLeap(f: Fighter, t: Fighter) {
+        val reach = t.radius + f.radius
+        val spot = arena.nearestOpen(t.x - cos(t.facing) * reach, t.y - sin(t.facing) * reach, f.radius)
+        f.leapToX = spot.x; f.leapToY = spot.y
+    }
+
+    /** A leaper in the air: it follows its target, so it always lands on their back, and then the code goes in. */
+    private fun stepLeap(f: Fighter, dt: Float) {
+        val t = fighter(f.leapTarget)
+        if (t != null && t.alive) aimLeap(f, t)
+        f.leapTime -= dt
+        val u = (1f - f.leapTime / f.leapTotal).coerceIn(0f, 1f)
+        f.x = f.leapFromX + (f.leapToX - f.leapFromX) * u
+        f.y = f.leapFromY + (f.leapToY - f.leapFromY) * u
+        if (f.leapTime > 0f) return
+        f.leapTime = 0f
+        f.leapTarget = -1
+        if (t == null || !t.alive) return
+        f.facing = atan2(t.y - f.y, t.x - f.x)
+        t.poisonBy = f.id
+        t.poisonDamage = f.superDamage
+        t.poisonTick = Balance.POISON_TICK_SECONDS
+        t.poisonLeft = if (t.scale > 1f) Balance.POISON_GIANT_SECONDS else Balance.POISON_SECONDS
+        t.revealTimer = maxOf(t.revealTimer, 1.5f)
+        events += GameEvent.Corrupt(f.id, t.id)
     }
 
     private fun stepDash(f: Fighter, dt: Float) {
@@ -610,7 +643,8 @@ class World(
     /** [lethal] false: the hit can take the target down to its last point of health, but never knocks it out. */
     private fun damage(target: Fighter, source: Fighter?, wanted: Int, isSuper: Boolean, x: Float, y: Float, lethal: Boolean = true) {
         val amount = if (lethal) wanted else minOf(wanted, target.hp - 1)
-        if (target.shield > 0f || amount <= 0) {
+        // (Nothing reaches a fighter in the middle of a leap.)
+        if (target.shield > 0f || target.isLeaping || amount <= 0) {
             events += GameEvent.Blocked(x, y)
             return
         }
@@ -645,6 +679,7 @@ class World(
         victim.respawnTimer = Balance.RESPAWN_SECONDS
         victim.pending.clear()
         victim.dashTime = 0f
+        victim.leapTime = 0f
         cure(victim)
         if (victim.hyperActive) endHyper(victim)
         // The super and hyper charges are kept: whatever was charged is still there after the respawn.

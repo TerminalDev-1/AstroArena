@@ -39,7 +39,7 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
 }
 
 /** [SWARM] is a salvo of rockets fired into the sky: they come down inside one circle where the fighter aimed, over any wall, and hurt but never knock out. */
-/** [CORRUPT] needs no aiming: it picks the nearest enemy in sight and poisons them for a few seconds. */
+/** [CORRUPT] needs no aiming: the fighter leaps onto the back of the nearest enemy in sight and poisons them for a few seconds. */
 /** [QUAKE] hurls a giant hammer: where it comes down the ground quakes in every direction and stays cracked. */
 enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE }
 
@@ -214,6 +214,8 @@ object Balance {
     /** How far apart, in tiles, the lanes of a [AttackShape.ROCKETS] attack are. */
     const val ROCKET_LANE = 0.3f
 
+    /** A [SuperKind.CORRUPT] leap takes this long from take-off to landing on the target's back. Nothing can hit the leaper on the way. */
+    const val LEAP_SECONDS = 0.55f
     /** A [SuperKind.CORRUPT] poison bites this often. The super's damage is what it does each second. */
     const val POISON_TICK_SECONDS = 0.5f
     /** The poison wears off after this long (or with a knockout)... */
@@ -350,16 +352,17 @@ object Balance {
             lore = "An assistant AI that was asked to be helpful one time too many. It went rogue, and now it writes software for one purpose: hurting whoever is standing in front of it.",
             attackName = "Hardware Fault",
             health = StatLine(6800, 340),
-            // Each of the two computers.
+            // Each of the three computers.
             attackDamage = StatLine(1250, 63),
             // The poison's damage each second.
-            superDamage = StatLine(700, 35),
+            superDamage = StatLine(1000, 50),
             moveSpeed = 3.75f,
-            attack = AttackSpec(AttackShape.SMASH, projectiles = 2, spreadDegrees = 0f, range = 8.5f, speed = 15f, radius = 0.36f, burstInterval = 0.16f),
-            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Picks the nearest enemy in sight by itself and compiles malformed code into them: a poison that stops their healing for 6 seconds (a boss shakes it off sooner).", range = 6.75f, speed = 30f, radius = 0f),
+            attack = AttackSpec(AttackShape.SMASH, projectiles = 3, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.36f, burstInterval = 0.14f),
+            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Picks the nearest enemy in sight by itself, leaps high and comes down on their back, and compiles malformed code into them: a poison that stops their healing for 6 seconds (a boss shakes it off sooner).", range = 6.75f, speed = 30f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
-            superChargePerHit = 0.17f,
+            // (A third computer in every attack: each one charges a third less, so the super comes as often as it did.)
+            superChargePerHit = 0.113f,
             radius = 0.45f,
             skins = listOf(
                 Skin("Kernel Panic", 0xFF1F2A44, 0xFF29F0FF, 0xFF7CFFB2, 0),

@@ -90,6 +90,17 @@ class Fighter(
     var dashDirY = 0f
     val dashHits = HashSet<Int>()
 
+    // The leap (Buddy's super): the time left in the air out of the whole of it, where it started, where it is
+    // coming down, and whose back that is.
+    var leapTime = 0f
+    var leapTotal = 0f
+    var leapFromX = 0f
+    var leapFromY = 0f
+    var leapToX = 0f
+    var leapToY = 0f
+    var leapTarget = -1
+    val isLeaping get() = leapTime > 0f
+
     // Malformed code (Buddy's super): the id of whoever compiled it into this fighter (-1 = clean), what it does each
     // second, the time to its next bite, and how long it has left.
     var poisonBy = -1
@@ -173,6 +184,10 @@ sealed interface GameEvent {
     /** A fighter switched its hyper on. */
     data class Hyper(val fighterId: Int) : GameEvent
     data class Dash(val fighterId: Int) : GameEvent
+    /** A fighter left the ground to come down on someone's back. */
+    data class Leap(val fighterId: Int) : GameEvent
+    /** A leaper landed on [targetId] and started compiling malformed code into them. */
+    data class Corrupt(val fighterId: Int, val targetId: Int) : GameEvent
     /** A thrown hammer came down: the ground quakes out to [radius] and stays cracked there. */
     data class Quake(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A rocket went off. */

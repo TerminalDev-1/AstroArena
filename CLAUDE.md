@@ -64,11 +64,13 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Running out of ammo has a sound of its own (`Sound.EMPTY`); `Sound.DENIED` is only for things that went wrong.
   Buddy's computers break like glass on whoever they hit (`Sound.GLASS`).
 - In the Training Area the player's super starts charged (`Match`), so it can be tried at once.
-- Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls two
+- Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls three
   whole computers a long way, one after the other, and each smashes into the first enemy in its path
-  (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Two computers and the long range are the
+  (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Three computers and the long range are the
   user's decisions: don't change them.
-  His super (`SuperKind.CORRUPT`) needs no aiming: it picks the nearest enemy in sight and poisons them (`Fighter.poisonBy`,
+  His super (`SuperKind.CORRUPT`) needs no aiming: he leaps high (`Fighter.leapTime`, `World.stepLeap`; nothing can hit
+  him in the air, and walls don't stop him) and comes down on the back of the nearest enemy in sight, a terminal opens
+  over them (`GameEvent.Corrupt`, drawn in `MatchRenderer`), and they are poisoned (`Fighter.poisonBy`,
   `World.stepPoison`): no healing while it lasts. It wears off after `POISON_SECONDS` (a boss after
   `POISON_GIANT_SECONDS`): the user took away the poison that never ended and cut the super's range by a quarter.
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).

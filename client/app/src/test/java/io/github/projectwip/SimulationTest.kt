@@ -619,13 +619,13 @@ class SimulationTest {
         return Triple(w, buddy, others)
     }
 
-    @Test fun buddyHurlsTwoComputersThatSmashIntoTheFirstInTheirWay() {
+    @Test fun buddyHurlsThreeComputersThatSmashIntoTheFirstInTheirWay() {
         val (w, buddy, others) = buddyAndTargets(2)
         val (near, far) = others
         buddy.control.aimX = 1f; buddy.control.aimY = 0f; buddy.control.attack = true
         val hits = ArrayList<io.github.projectwip.sim.GameEvent.Hit>()
         repeat(50) { w.step(Match.STEP); hits += w.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>(); w.events.clear() }
-        assertEquals("two heavy hits, both on the first in their way", listOf(near.id to buddy.attackDamage, near.id to buddy.attackDamage), hits.map { it.targetId to it.damage })
+        assertEquals("three heavy hits, all on the first in their way", List(3) { near.id to buddy.attackDamage }, hits.map { it.targetId to it.damage })
         assertEquals("they stop at whoever they smash into", far.maxHp, far.hp)
         assertTrue("and they are thrown a long way", buddy.def.attack.range >= 8f)
     }
@@ -637,8 +637,20 @@ class SimulationTest {
         // No aiming: it points the other way and still finds the nearest one.
         buddy.control.aimX = -1f; buddy.control.aimY = 0f; buddy.control.superAttack = true
         w.step(Match.STEP)
-        assertTrue("the nearest enemy is the one poisoned", near.poisoned && !far.poisoned)
+        assertTrue("he leaves the ground", buddy.isLeaping)
         assertEquals(0f, buddy.superCharge, 0f)
+        assertFalse("the code doesn't go in until he lands", near.poisoned)
+        // Nothing reaches him in the air, and he can't attack from up there.
+        val hpInTheAir = buddy.hp
+        buddy.control.attack = true
+        var air = 0f
+        while (buddy.isLeaping && air < 2f) { w.step(Match.STEP); air += Match.STEP }
+        assertEquals(Balance.LEAP_SECONDS, air, 0.1f)
+        assertEquals(hpInTheAir, buddy.hp)
+        assertTrue(w.projectiles.none { it.ownerId == buddy.id })
+        assertTrue("he comes down on the nearest enemy's back", kotlin.math.hypot(buddy.x - near.x, buddy.y - near.y) < buddy.radius + near.radius + 0.6f)
+        assertTrue("and they are the one poisoned", near.poisoned && !far.poisoned)
+        assertEquals("a thousand a second", 1000, near.poisonDamage)
         var t = 0f
         var healedWhilePoisoned = false
         var last = near.hp
@@ -729,8 +741,8 @@ class SimulationTest {
         buddy.superCharge = 1f
         if (w.corruptTarget(buddy) != null) {
             buddy.control.superAttack = true
-            w.step(Match.STEP)
-            assertTrue(boss.poisoned)
+            repeat(((Balance.LEAP_SECONDS + 0.1f) / Match.STEP).toInt()) { w.step(Match.STEP) }
+            assertTrue("he lands on the boss's back too", boss.poisoned && !buddy.isLeaping)
             repeat(((Balance.POISON_GIANT_SECONDS + 1f) / Match.STEP).toInt()) { w.step(Match.STEP) }
             assertFalse("a boss is not doomed by one super", boss.poisoned)
             assertTrue(boss.alive && boss.hp < boss.maxHp)

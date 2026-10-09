@@ -338,6 +338,16 @@ class MatchRunner(
             is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }
             is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop; say(VoiceCue.START) }
             is GameEvent.Spawned -> if (e.fighterId == pid) say(VoiceCue.BACK)
+            is GameEvent.Leap -> {
+                val f = world.fighter(e.fighterId) ?: return
+                sfx.play(Sound.WHOOSH, (if (e.fighterId == pid) 1f else 0.6f) / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f), 0.8f)
+            }
+            is GameEvent.Corrupt -> {
+                val f = world.fighter(e.targetId) ?: return
+                val near = (if (e.fighterId == pid || e.targetId == pid) 1f else 0.6f) / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
+                sfx.play(Sound.GLITCH, near, 0.8f); sfx.play(Sound.UI_TOGGLE, near * 0.8f, 1.3f)
+                if (e.fighterId == pid || e.targetId == pid) sfx.buzz(70, 220)
+            }
             is GameEvent.Quake -> {
                 val p = match.player
                 val near = 1f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)
