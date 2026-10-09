@@ -361,18 +361,19 @@ object Balance {
             lore = "An assistant AI that was asked to be helpful one time too many. It went rogue, and now it writes software for one purpose: hurting whoever is standing in front of it.",
             attackName = "Hardware Fault",
             health = StatLine(8500, 425),
-            // Each of the three computers.
-            attackDamage = StatLine(1250, 63),
+            // Each of the four computers. (The user asked for 1,400 each, down from the 1,817 a max-level Buddy did:
+            // that is what this comes to at level 10.)
+            attackDamage = StatLine(968, 48),
             // The code does no damage of its own any more (the user took it away: it was finishing bosses too soon).
             // It pins its victim, stops them healing, and leaves them corrupted.
             superDamage = StatLine(0, 0),
             moveSpeed = 3.75f,
-            attack = AttackSpec(AttackShape.SMASH, projectiles = 3, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.36f, burstInterval = 0.14f),
+            attack = AttackSpec(AttackShape.SMASH, projectiles = 4, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.36f, burstInterval = 0.13f),
             superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Aim it at an enemy (or tap, and it picks the nearest): he leaps high along the line, latches onto the back of the first one on it and compiles malformed code into them for 6 seconds. It does no damage, but they cannot heal, and afterwards they are corrupted: for 21 seconds they follow him around and stand in front of him, out of their mind. Bosses too.", range = 6.75f, speed = 30f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
-            // (A third computer in every attack: each one charges a third less, so the super comes as often as it did.)
-            superChargePerHit = 0.113f,
+            // (More computers in every attack, each charging less: the super comes as often as it did with two.)
+            superChargePerHit = 0.085f,
             radius = 0.45f,
             skins = listOf(
                 Skin("Kernel Panic", 0xFF1F2A44, 0xFF29F0FF, 0xFF7CFFB2, 0),

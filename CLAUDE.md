@@ -64,9 +64,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Running out of ammo has a sound of its own (`Sound.EMPTY`); `Sound.DENIED` is only for things that went wrong.
   Buddy's computers break like glass on whoever they hit (`Sound.GLASS`).
 - In the Training Area the player's super starts charged (`Match`), so it can be tried at once.
-- Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls three
+- Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls four
   whole computers a long way, one after the other, and each smashes into the first enemy in its path
-  (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Three computers and the long range are the
+  (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Four computers (1,400 each at level 10) and the long range are the
   user's decisions: don't change them.
   His super (`SuperKind.CORRUPT`) is aimed along a line (a tap auto-aims at the nearest enemy): he leaps high
   (`Fighter.leapTime`, `World.stepLeap`; nothing can hit him in the air, and walls don't stop him) and comes down on

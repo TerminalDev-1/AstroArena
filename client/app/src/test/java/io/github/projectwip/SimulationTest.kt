@@ -619,13 +619,14 @@ class SimulationTest {
         return Triple(w, buddy, others)
     }
 
-    @Test fun buddyHurlsThreeComputersThatSmashIntoTheFirstInTheirWay() {
+    @Test fun buddyHurlsFourComputersThatSmashIntoTheFirstInTheirWay() {
         val (w, buddy, others) = buddyAndTargets(2)
         val (near, far) = others
         buddy.control.aimX = 1f; buddy.control.aimY = 0f; buddy.control.attack = true
         val hits = ArrayList<io.github.projectwip.sim.GameEvent.Hit>()
-        repeat(50) { w.step(Match.STEP); hits += w.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>(); w.events.clear() }
-        assertEquals("three heavy hits, all on the first in their way", List(3) { near.id to buddy.attackDamage }, hits.map { it.targetId to it.damage })
+        repeat(60) { w.step(Match.STEP); hits += w.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>(); w.events.clear() }
+        assertEquals("four heavy hits, all on the first in their way", List(4) { near.id to buddy.attackDamage }, hits.map { it.targetId to it.damage })
+        assertEquals("fourteen hundred each at the top level", 1400, Fighter(9, buddy.def, 10, 0, 0, "X", true).attackDamage)
         assertEquals("they stop at whoever they smash into", far.maxHp, far.hp)
         assertTrue("and they are thrown a long way", buddy.def.attack.range >= 8f)
     }
