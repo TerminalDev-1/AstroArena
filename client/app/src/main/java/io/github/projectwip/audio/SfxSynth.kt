@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -34,6 +34,7 @@ object SfxSynth {
         Sound.BARK -> bark().finish(0.8f)
         Sound.GLASS -> glass().finish(0.75f)
         Sound.EMPTY -> empty().finish(0.5f)
+        Sound.HEX -> hex().finish(0.7f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -474,6 +475,20 @@ object SfxSynth {
             fm(at, 0.3f, { shards[k] }, 2.76f, { 1.2f * perc(it, 0.0005f, 0.05f) }, { perc(it, 0.0005f, 0.09f) * (0.3f - k * 0.025f) })
         }
         echo(0.06f, 0.2f, 0.12f)
+    }
+
+    /** Kira throwing a hex: something thick comes to the boil, three fat bubbles and a hiss, over a low sour note. */
+    private fun hex() = Clip(0.5f).apply {
+        osc(Wave.TRI, 0f, 0.3f, { glide(it, 0.28f, 150f, 92f) }, { perc(it, 0.01f, 0.12f) * 0.45f })
+        for (k in 0 until 3) {
+            val at = 0.02f + k * 0.07f
+            val top = 520f + k * 170f
+            osc(Wave.SINE, at, 0.09f, { glide(it, 0.06f, top * 0.45f, top) }, { perc(it, 0.004f, 0.03f) * (0.6f - k * 0.08f) })
+        }
+        noise(51, 0.03f, 0.32f, Band.HIGH, { 5200f }, 0.9f, { perc(it, 0.02f, 0.1f) * 0.22f })
+        fm(0.01f, 0.35f, { 311f }, 1.41f, { 2.2f * perc(it, 0.001f, 0.09f) }, { perc(it, 0.002f, 0.12f) * 0.2f })
+        filter(Band.LOW, 0.8f) { 4200f }
+        echo(0.09f, 0.22f, 0.14f)
     }
 
     /** Out of ammo: two soft, hollow clicks, like an empty chamber. Nothing has gone wrong, so it doesn't scold. */

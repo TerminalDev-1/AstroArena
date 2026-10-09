@@ -835,9 +835,10 @@ class MatchRenderer(
         }
         // Poison bubbles up off anyone who is hexed.
         for (f in world.fighters) {
-            if (!f.hexed || !f.alive || !shown(f) || rng.nextFloat() > 0.5f) continue
+            // (The more hexes are on them, the harder it boils.)
+            if (!f.hexed || !f.alive || !shown(f) || rng.nextFloat() > 0.3f + 0.2f * f.hexes.size) continue
             val a = rng.nextFloat() * 6.28f
-            val c = world.fighter(f.hexBy)?.let { it.def.skins[it.skin].secondary.toInt() } ?: 0xFF7CFF4F.toInt()
+            val c = world.fighter(f.hexes.last().by)?.let { it.def.skins[it.skin].secondary.toInt() } ?: 0xFF7CFF4F.toInt()
             particles.spawn(f.x + cos(a) * 0.35f, 0.3f + rng.nextFloat() * 0.9f, f.y + sin(a) * 0.35f, 0f, 1.6f + rng.nextFloat() * 1.4f, 0f, 0.55f, 0.16f, c, 0.9f)
         }
         // Sparks of stray code come off anyone who is corrupted and standing there.
@@ -882,14 +883,28 @@ class MatchRenderer(
                     setModel(x, y - size * 0.95f, z, size * 1.05f, size * 0.07f, size * 0.36f, spin + 35f); bit.draw()
                 }
                 ShotStyle.HEX -> {
-                    // A hex bolt: a boiling ball of poison with bubbles circling it.
-                    val k = pr.radius * (if (pr.isSuper) 1.3f else 1.15f) * (1f + 0.12f * sin(pr.age * 26f))
-                    tint(skin.secondary)
-                    setModel(x, 0.75f, z, k, k, k); sphere.draw()
+                    // A hex: a rune thrown flat, a triangle of light wheeling round a lidless eye, with a tail of
+                    // dwindling drops strung out behind it.
+                    val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
+                    val dx = pr.vx / len; val dz = pr.vy / len
+                    val k = pr.radius * (if (pr.isSuper) 1.15f else 1.4f)
+                    val y = 0.78f + 0.05f * sin(pr.age * 17f)
+                    val side = k * 3.1f
+                    val inner = side / 3.4641f
                     tint(skin.accent)
-                    for (i in 0 until 3) {
-                        val a = pr.age * 11f + i * 2.094f
-                        setModel(x + cos(a) * k * 1.5f, 0.75f + sin(a * 1.3f) * k * 0.8f, z + sin(a) * k * 1.5f, k * 0.32f, k * 0.32f, k * 0.32f); sphere.draw()
+                    for (j in 0 until 3) {
+                        val a = pr.age * 9f + j * 2.0944f
+                        setModel(x + cos(a) * inner, y, z + sin(a) * inner, side, k * 0.22f, k * 0.22f, -Math.toDegrees(a.toDouble()).toFloat() - 90f); bit.draw()
+                    }
+                    tint(skin.secondary)
+                    setModel(x, y, z, k * 0.75f, k * 0.45f, k * 0.75f); sphere.draw()
+                    tint(0xFF0A1420)
+                    setModel(x + dx * k * 0.4f, y + k * 0.1f, z + dz * k * 0.4f, k * 0.3f, k * 0.3f, k * 0.3f); sphere.draw()
+                    tint(skin.secondary)
+                    for (j in 1..4) {
+                        val drop = k * (0.5f - j * 0.09f)
+                        val sway = sin(pr.age * 22f - j * 1.1f) * k * 0.35f
+                        setModel(x - dx * k * (0.9f + j * 0.75f) - dz * sway, y - j * 0.03f, z - dz * k * (0.9f + j * 0.75f) + dx * sway, drop, drop, drop); sphere.draw()
                     }
                 }
                 ShotStyle.PAW -> {

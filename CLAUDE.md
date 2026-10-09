@@ -45,10 +45,11 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Mira was removed, by the user's decision (`REMOVED_FIGHTERS` in `economy.py` pays her road Credits back). The
   Training Area's sentry keeps her old lance shot as a def of its own (`Balance.sentry`).
 - Kira (`FighterId.KIRA`, Epic) is the user's idea: a witch whose attack poisons. Her Hex Bolt (`AttackShape.HEX`,
-  `AttackSpec.hexSeconds`) hits for 750 and then bites for 750 again every `HEX_TICK_SECONDS` (half a second) for six
-  seconds (`Fighter.hexBy`, `World.stepHex`): 9,000 in all, which is more than any fighter's health, and that is what
-  the user asked for ("insanely fast poison", 750 a tick, six seconds). Her super, Witching Hour, is a fan of the same
-  bolts. Her name, look and words are ours.
+  `AttackSpec.hexSeconds`) hits for 200 and then bites for 200 again every `HEX_TICK_SECONDS` (half a second) for six
+  seconds: 2,400 a bolt (the user had it brought down from 750 a bite, which was 9,000). Hexes stack, by the user's
+  decision: every bolt that lands is a poison of its own (`Fighter.hexes`, `World.stepHex`). Her super, Witching Hour,
+  is a fan of the same bolts at half strength. She has a sound of her own (`Sound.HEX`): don't give her another
+  fighter's. Her name, look and words are ours.
 - Bark is the dog (the user renamed him from Brakk; the code and the server still say `BRAKK`, so saves carry over).
   He is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, and a front
   leg is flung forward for each paw print: `FighterAnim.throwL/R`). His attack sound is a bark of his own (`Sound.BARK`). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its

@@ -793,7 +793,7 @@ class SimulationTest {
         assertTrue("a bot playing Buddy gets close enough to hit things", m.player.damageDealt > 0)
     }
 
-    @Test fun kirasHexBoltPoisonsFastForSixSeconds() {
+    @Test fun kirasHexBoltPoisonsFastForSixSecondsAndStacks() {
         val (w, _, others) = buddyAndTargets(2)
         val (hit, other) = others
         val x = hit.x; val y = hit.y
@@ -804,20 +804,39 @@ class SimulationTest {
         for (f in w2.fighters) f.shield = 0f
         // (A target with health to spare, so the whole of it can be counted.)
         hit.maxHp = 40000; hit.hp = 40000
-        kira.control.aimX = 1f; kira.control.aimY = 0f; kira.control.attack = true
-        val bites = ArrayList<Int>()
-        var first = -1f; var last = 0f; var t = 0f
-        while (t < 9f) {
-            w2.step(Match.STEP); t += Match.STEP
-            for (e in w2.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>()) { bites += e.damage; if (first < 0f) first = t; last = t }
-            w2.events.clear()
+        fun count(seconds: Float, shots: Int): List<Int> {
+            val bites = ArrayList<Int>()
+            var t = 0f; var fired = 0
+            while (t < seconds) {
+                if (fired < shots && kira.attackCooldown <= 0f) { kira.control.aimX = 1f; kira.control.aimY = 0f; kira.control.attack = true; fired++ }
+                w2.step(Match.STEP); t += Match.STEP
+                bites += w2.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>().map { it.damage }
+                w2.events.clear()
+            }
+            return bites
         }
-        assertEquals("seven hundred and fifty a bite", setOf(750), bites.toSet())
-        assertEquals("a bite every half second for six seconds, the hit being the first", 12, bites.size)
-        assertEquals(6f - Balance.HEX_TICK_SECONDS, last - first, 0.1f)
+        val one = count(9f, 1)
+        assertEquals("two hundred a bite", setOf(200), one.toSet())
+        assertEquals("a bite every half second for six seconds, the hit being the first: 2,400 from one bolt", 12, one.size)
         assertFalse("and then it is over", hit.hexed)
         assertEquals("only the one it hit is poisoned", other.maxHp, other.hp)
         assertEquals("only the bolt itself charges her super, not the bites after it", kira.def.superChargePerHit, kira.superCharge, 1e-4f)
+        // Hexes stack: two bolts are two poisons, each running its full course, both biting together.
+        var most = 0
+        kira.ammo = 3f
+        // (Topped up first, so nothing is healing while this is counted.)
+        hit.hp = hit.maxHp
+        val hpBefore = hit.hp
+        var t = 0f; var fired = 0
+        // (Stopped before the target has gone long enough without a bite to start healing.)
+        while (t < 7.5f) {
+            if (fired < 2 && kira.attackCooldown <= 0f) { kira.control.aimX = 1f; kira.control.aimY = 0f; kira.control.attack = true; fired++ }
+            w2.step(Match.STEP); t += Match.STEP
+            most = maxOf(most, hit.hexes.size)
+            w2.events.clear()
+        }
+        assertEquals("two on them at once", 2, most)
+        assertEquals("and the whole of both is done", 2 * 12 * 200, hpBefore - hit.hp)
         assertEquals("she is Epic", io.github.projectwip.data.Rarity.EPIC, kira.def.rarity)
     }
 }

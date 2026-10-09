@@ -104,12 +104,9 @@ class Fighter(
     var latchedTo = -1
     val latched get() = latchedTo >= 0
 
-    // Hexed (Kira's poison): who did it (-1 = nobody), what each bite does, the time to the next, and how long is left.
-    var hexBy = -1
-    var hexDamage = 0
-    var hexTick = 0f
-    var hexLeft = 0f
-    val hexed get() = hexBy >= 0
+    /** Hexed (Kira's poison): every bolt that landed is a poison of its own, and they all bite at once. */
+    val hexes = ArrayList<Hex>(4)
+    val hexed get() = hexes.isNotEmpty()
 
     // Corrupted (what Buddy's super leaves behind): whose it is (-1 = nobody's), how long it has left, and whether it
     // is on its way over to them right now (rather than standing in front of them).
@@ -148,6 +145,9 @@ class Fighter(
     val hyperReady get() = hyperCharge >= 1f && !hyperActive
     val isDashing get() = dashTime > 0f
 }
+
+/** One hex on a fighter: who did it, what each bite does, the time to the next bite, and how long it has left. */
+class Hex(val by: Int, val damage: Int, var tick: Float, var left: Float)
 
 enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX }
 

@@ -187,7 +187,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexBy)
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size)
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -413,22 +413,23 @@ class World(
         f.x = spot.x; f.y = spot.y
     }
 
-    /** A hex bites: the same damage again, every [Balance.HEX_TICK_SECONDS], until its time is up. */
+    /** Every hex on [f] bites on its own clock: its damage again, every [Balance.HEX_TICK_SECONDS], until its time is up. */
     private fun stepHex(f: Fighter, dt: Float) {
         if (phase != Phase.PLAYING) return
-        f.hexLeft -= dt
-        f.hexTick -= dt
-        if (f.hexTick <= 0f) {
-            f.hexTick += Balance.HEX_TICK_SECONDS
-            // (Only the bolt itself charges the super: the bites that follow don't.)
-            damage(f, fighter(f.hexBy), f.hexDamage, false, f.x, f.y, charge = false)
+        var i = 0
+        while (i < f.hexes.size) {
+            val h = f.hexes[i]
+            h.left -= dt
+            h.tick -= dt
+            if (h.tick <= 0f) {
+                h.tick += Balance.HEX_TICK_SECONDS
+                // (Only the bolt itself charges the super: the bites that follow don't.)
+                damage(f, fighter(h.by), h.damage, false, f.x, f.y, charge = false)
+                // (A knockout lifts every hex at once.)
+                if (!f.alive) return
+            }
+            if (h.left <= 0f) f.hexes.removeAt(i) else i++
         }
-        if (f.alive && f.hexLeft <= 0f) unhex(f)
-    }
-
-    private fun unhex(f: Fighter) {
-        f.hexBy = -1
-        f.hexDamage = 0
     }
 
     private fun cure(f: Fighter) {
@@ -725,10 +726,7 @@ class World(
                         damage(f, owner, shotDamage(p, f), p.isSuper, p.x, p.y)
                         // The hit was the first bite of a hex; the rest follow.
                         if (p.hex > 0f && f.alive && f.shield <= 0f && !f.isLeaping) {
-                            f.hexBy = p.ownerId
-                            f.hexDamage = p.damage
-                            f.hexTick = Balance.HEX_TICK_SECONDS
-                            f.hexLeft = p.hex - Balance.HEX_TICK_SECONDS / 2f
+                            f.hexes += Hex(p.ownerId, p.damage, Balance.HEX_TICK_SECONDS, p.hex - Balance.HEX_TICK_SECONDS / 2f)
                         }
                         if (p.knock > 0f && f.alive && !f.rooted && speed > 0f) {
                             arena.moveCircle(f.x, f.y, f.radius, p.vx / speed * p.knock, p.vy / speed * p.knock, tmp)
@@ -795,7 +793,7 @@ class World(
         victim.pending.clear()
         victim.dashTime = 0f
         victim.leapTime = 0f
-        unhex(victim)
+        victim.hexes.clear()
         victim.latchedTo = -1
         release(victim)
         cure(victim)

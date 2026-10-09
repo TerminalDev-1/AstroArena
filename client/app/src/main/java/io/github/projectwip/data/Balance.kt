@@ -70,7 +70,8 @@ data class AttackSpec(
     val healthShare: Float = 0f,
     /**
      * Each shot that lands poisons its target for this long: the hit is the first bite, and the attack's damage is
-     * done again every [Balance.HEX_TICK_SECONDS] until the time is up. Another hit starts the time again. 0 = no poison.
+     * done again every [Balance.HEX_TICK_SECONDS] until the time is up. Hexes stack: every shot that lands is a poison
+     * of its own, biting on its own clock. 0 = no poison.
      */
     val hexSeconds: Float = 0f,
 )
@@ -343,11 +344,14 @@ object Balance {
             attackName = "Hex Bolt",
             health = StatLine(6600, 330),
             // One bite of the poison: the hit is the first, and it bites again every half second for six seconds.
-            attackDamage = StatLine(750, 38),
-            superDamage = StatLine(750, 38),
+            // Twelve bites is 2,400 from a bolt, in line with what one ammo is worth to anyone else; three bolts
+            // stacked on one target do three times that.
+            attackDamage = StatLine(200, 10),
+            // (A bolt of the super is worth half as much: seven of them can land.)
+            superDamage = StatLine(100, 5),
             moveSpeed = 3.7f,
             attack = AttackSpec(AttackShape.HEX, projectiles = 1, spreadDegrees = 0f, range = 7.5f, speed = 15f, radius = 0.2f, burstInterval = 0f, hexSeconds = 6f),
-            superSpec = SuperSpec(SuperKind.VOLLEY, "Witching Hour", "A wide fan of 7 hex bolts. Every one that lands poisons whoever it hits, just as her attack does.", projectiles = 7, spreadDegrees = 60f, range = 7f, speed = 15f, radius = 0.2f),
+            superSpec = SuperSpec(SuperKind.VOLLEY, "Witching Hour", "A wide fan of 7 hex bolts. Every one that lands is a poison of its own on whoever it hits, and they all stack.", projectiles = 7, spreadDegrees = 60f, range = 7f, speed = 15f, radius = 0.2f),
             ammoMax = 3,
             reloadSeconds = 1.7f,
             superChargePerHit = 0.2f,

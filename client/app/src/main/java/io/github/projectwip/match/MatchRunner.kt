@@ -290,7 +290,7 @@ class MatchRunner(
                     // A computer leaves quietly; the noise is when it lands on someone.
                     AttackShape.SMASH -> Sound.WHOOSH
                     AttackShape.PAWS -> Sound.BARK
-                    AttackShape.HEX -> Sound.SHOOT_PRISM
+                    AttackShape.HEX -> Sound.HEX
                 }, gain, 0.95f + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }
