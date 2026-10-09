@@ -288,7 +288,7 @@ class MatchRunner(
                     AttackShape.ROCKETS -> Sound.ROCKET
                     AttackShape.LANCE -> Sound.SHOOT_PRISM
                     AttackShape.SMASH -> Sound.SHOOT_HEAVY
-                    AttackShape.PAWS -> Sound.SHOOT_SPARK
+                    AttackShape.PAWS -> Sound.BARK
                 }, gain, 0.95f + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }
@@ -361,7 +361,7 @@ class MatchRunner(
     /** The player's fighter says one of its lines for [cue], if it has a voice. */
     private fun say(cue: VoiceCue) {
         val lines = match.player.def.voice[cue] ?: return
-        if (lines.isNotEmpty()) sfx.say(lines[voiceTurn++ % lines.size])
+        if (lines.isNotEmpty()) sfx.say(lines[voiceTurn++ % lines.size], match.player.def.voiceStyle)
     }
 
     companion object {

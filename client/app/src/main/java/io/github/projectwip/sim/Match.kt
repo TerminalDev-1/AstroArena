@@ -126,6 +126,8 @@ class Match(val config: MatchConfig) {
         val profile = BotProfile.of(config.difficulty)
         brains = roster.filter { it.isBot && it !in passive }.map { BotBrain(it, profile, world, pathfinder, Random(rng.nextLong())) }
         for (b in brains) b.others = brains
+        // In the Training Area the super is there to be tried straight away.
+        if (practice) player.superCharge = 1f
     }
 
     private fun botFighter(id: Int, team: Int, name: String): Fighter {

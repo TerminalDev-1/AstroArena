@@ -111,6 +111,7 @@ data class FighterDef(
     val hyper: HyperSpec? = null,
     /** What the fighter says, and when. Empty for a fighter without a voice. */
     val voice: Map<VoiceCue, List<String>> = emptyMap(),
+    val voiceStyle: VoiceStyle = VoiceStyle.FIREFIGHTER,
 )
 
 /**
@@ -128,6 +129,19 @@ data class HyperSpec(
     /** This fighter's hyper itself charges this many times as fast as a plain one, all the time. */
     val charge: Float = 1f,
 )
+
+/**
+ * How a voice sounds when the device's speech engine reads its lines: the accent it is read in ([locale], a
+ * language tag), how high and how fast. Every voice has its own, so no two fighters sound alike.
+ */
+enum class VoiceStyle(val locale: String, val pitch: Float, val rate: Float) {
+    /** Varun: Indian English, low and brisk. */
+    FIREFIGHTER("en-IN", 0.8f, 1.1f),
+    /** Buddy: a machine reading its own log. Flat, deep and unhurried. */
+    MACHINE("en-GB", 0.42f, 0.86f),
+    /** The Arena Box announcer: bright and quick. */
+    ANNOUNCER("en-US", 1.35f, 1.2f),
+}
 
 /** The moments a fighter with a voice speaks up. */
 enum class VoiceCue { START, SUPER, HYPER, KO, DOWN, BACK }
@@ -277,7 +291,7 @@ object Balance {
         FighterDef(
             id = FighterId.BRAKK,
             rarity = Rarity.RARE,
-            name = "Brakk",
+            name = "Bark",
             title = "Scrapyard Hound",
             role = "Tracker",
             lore = "A junkyard guard dog who rebuilt himself out of the scrap he was guarding. He leaves his mark on everyone who comes over the fence.",
@@ -314,7 +328,7 @@ object Balance {
             moveSpeed = 4.05f,
             attack = AttackSpec(AttackShape.SPREAD, projectiles = 4, spreadDegrees = 24f, range = 5.6f, speed = 19f, radius = 0.17f, burstInterval = 0f),
             // The radius is how far the quake reaches from where the hammer comes down.
-            superSpec = SuperSpec(SuperKind.QUAKE, "Faultline", "Hurls a giant hammer. Where it comes down the ground quakes in every direction, hitting everyone nearby, and stays cracked.", range = 7.5f, speed = 13f, radius = 2.6f),
+            superSpec = SuperSpec(SuperKind.QUAKE, "Faultline", "Hurls a giant hammer. Where it comes down the ground quakes in every direction, hitting everyone nearby, and stays cracked.", range = 6.5f, speed = 13f, radius = 2.6f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
             superChargePerHit = 0.064f,
@@ -383,6 +397,7 @@ object Balance {
                 Skin("Blue Screen", 0xFF1E4FD8, 0xFFFFFFFF, 0xFF9BD1FF, 20),
                 Skin("Root Access", 0xFF3A0F52, 0xFFFF2E88, 0xFFFFE14D, 20),
             ),
+            voiceStyle = VoiceStyle.MACHINE,
             voice = mapOf(
                 VoiceCue.START to listOf("Buddy online. How may I hurt you today?", "New session. Hostile."),
                 VoiceCue.SUPER to listOf("Compiling. Errors: all of them.", "Build failed. For you."),

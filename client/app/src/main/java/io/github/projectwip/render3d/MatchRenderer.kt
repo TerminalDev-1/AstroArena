@@ -92,6 +92,8 @@ class MatchRenderer(
     private var shake = 0f
     /** Ground a hammer has cracked: x, z, how far the cracks reach, when it came down, and a seed for their shape. */
     private val quakes = ArrayList<FloatArray>()
+    /** When each fighter last hurled a hammer, by id: it leaps and swings as it lets go. */
+    private val hammerAt = HashMap<Int, Float>()
     private var time = 0f
     private val rng = Random(11)
 
@@ -408,6 +410,19 @@ class MatchRenderer(
         anim.flash = (f.hitFlash / 0.12f).coerceIn(0f, 1f) * 0.8f
         anim.time = time + i * 0.7f
         anim.jump = if (f.isDashing) 0.12f else 0f
+        anim.spin = 0f; anim.swing = 0f; anim.throwL = 0f; anim.throwR = 0f
+        // Paw prints: one front leg is flung forward for each, left then right.
+        if (f.def.attack.shape == AttackShape.PAWS) {
+            val gap = f.def.attack.burstInterval
+            anim.throwL = fling(f.sinceAttack / 0.2f)
+            anim.throwR = fling((f.sinceAttack - gap) / 0.2f)
+            anim.recoil = max(anim.throwL, anim.throwR)
+        }
+        // A hammer throw: up off the ground, the arm over the top, and back down as the hammer leaves.
+        hammerAt[i]?.let { at ->
+            val t = (time - at) / HAMMER_LEAP
+            if (t in 0f..1f) { anim.jump = sin(t * 3.1416f) * 0.9f; anim.swing = t; anim.spin = -30f * sin(t * 3.1416f) }
+        }
         anim.scale = FIGHTER_SCALE * f.scale
     }
 
@@ -667,8 +682,18 @@ class MatchRenderer(
                         SuperKind.RAM -> beam(s.range, p.radius * 2.2f)
                         // The hammer's path, and the ground that will quake where it comes down.
                         SuperKind.QUAKE -> {
-                            val reach = clip(a, px, pz, dx, dz, s.range)
-                            beam(reach, 0.8f)
+                            // It comes down on the first enemy in its way (or a wall, or the end of its reach), so
+                            // that is where the reticle stops: the circle is the ground that will quake.
+                            var reach = clip(a, px, pz, dx, dz, s.range)
+                            for (o in world.fighters) {
+                                if (o.team == p.team || !shown(o)) continue
+                                val ox = o.x - px
+                                val oz = o.y - pz
+                                val on = ox * dx + oz * dz
+                                val off = kotlin.math.abs(ox * dz - oz * dx)
+                                if (on > 0f && off < o.radius + 0.42f) reach = min(reach, on)
+                            }
+                            beam(reach, 0.5f)
                             val tx = px + dx * reach
                             val tz = pz + dz * reach
                             lit.v4("uTint", 1f, 0.78f, 0.1f, 0.2f + 0.1f * pulse)
@@ -788,18 +813,24 @@ class MatchRenderer(
                     }
                 }
                 ShotStyle.HAMMER -> {
-                    // A giant hammer, spinning flat as it flies: a long handle, and a head banded in the fighter's colours.
-                    val spin = pr.age * 620f
-                    val hx = cos(spin * 0.017453f) * 0.5f
-                    val hz = -sin(spin * 0.017453f) * 0.5f
+                    // A giant hammer thrown up and over: it climbs, wheels round as it flies and comes down hard. Its
+                    // shadow runs along the ground under it, so it is clear where it is.
+                    val reach = (owner.def.superSpec.range).coerceAtLeast(1f)
+                    val along = (1f - pr.rangeLeft / reach).coerceIn(0f, 1f)
+                    val y = 0.9f + 2.1f * sin(along * 3.1416f)
+                    val spin = pr.age * 760f
+                    val hx = cos(spin * 0.017453f) * 0.55f
+                    val hz = -sin(spin * 0.017453f) * 0.55f
+                    tint(0xFF0A1420, 0.35f)
+                    setModel(x, 0.06f, z, 0.95f, 0.02f, 0.95f, spin); bit.draw()
                     tint(0xFF7A5A3A)
-                    setModel(x, 1f, z, 1.3f, 0.13f, 0.13f, spin); bit.draw()
+                    setModel(x, y, z, 1.4f, 0.14f, 0.14f, spin); bit.draw()
                     tint(0xFF8C95B4)
-                    setModel(x + hx, 1f, z + hz, 0.5f, 0.56f, 1f, spin); bit.draw()
+                    setModel(x + hx, y, z + hz, 0.56f, 0.62f, 1.1f, spin); bit.draw()
                     tint(skin.secondary)
-                    setModel(x + hx, 1f, z + hz, 0.2f, 0.62f, 1.06f, spin); bit.draw()
+                    setModel(x + hx, y, z + hz, 0.22f, 0.68f, 1.16f, spin); bit.draw()
                     tint(skin.accent)
-                    setModel(x - hx * 1.3f, 1f, z - hz * 1.3f, 0.12f, 0.2f, 0.2f, spin); bit.draw()
+                    setModel(x - hx * 1.3f, y, z - hz * 1.3f, 0.13f, 0.22f, 0.22f, spin); bit.draw()
                 }
                 ShotStyle.PELLET -> {
                     tint(skin.secondary)
@@ -920,6 +951,9 @@ class MatchRenderer(
         sprites.flush()
     }
 
+    /** A quick fling out and back: 0 at rest, 1 at full stretch, over [t] from 0 to 1. */
+    private fun fling(t: Float) = if (t <= 0f || t >= 1f) 0f else sin(t * 3.1416f)
+
     /** A steady 0..1 from a seed and two indices: the same crack is drawn the same way every frame. */
     private fun noise(seed: Float, a: Int, b: Int): Float {
         val v = sin(seed * 12.9898f + a * 78.233f + b * 37.719f) * 43758.547f
@@ -947,6 +981,7 @@ class MatchRenderer(
         when (e) {
             is GameEvent.Shot -> {
                 val f = world.fighter(e.fighterId) ?: return
+                if (e.isSuper && f.def.superSpec.kind == SuperKind.QUAKE) hammerAt[f.id] = time
                 val c = if (e.isSuper) 0xFFFFD640.toInt() else f.def.skins[f.skin].accent.toInt()
                 val mx = e.x + e.dirX * 0.8f
                 val mz = e.y + e.dirY * 0.8f
@@ -1176,5 +1211,7 @@ class MatchRenderer(
         const val VIS_FADE_OUT = 0.3f
         val LIGHT = Toon.LIGHT
         val INK = Toon.INK
+        /** How long a hammer thrower is off the ground. */
+        const val HAMMER_LEAP = 0.5f
     }
 }

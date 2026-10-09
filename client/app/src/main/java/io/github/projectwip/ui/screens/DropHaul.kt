@@ -290,7 +290,7 @@ fun DropHaulOverlay(results: List<BoxItem>, boltsNow: Int, prismsNow: Int, roadN
         if (stage == 0) {
             Column(Modifier.fillMaxSize().padding(top = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 GameText("OPENING EVERY ARENA BOX", Type.Heading, color = Palette.TextDim, outline = 2.5.dp)
-                GlitchText(CapsuleTier.entries[charge].label.uppercase(), Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), tint, 5.dp, time, 1f)
+                GlitchText("HERE THEY COME", Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), tint, 5.dp, time, 1f)
             }
             GlitchBars(time, tint, 1f)
         } else {
@@ -364,12 +364,12 @@ private fun Total(icon: IconKind, text: String) {
     }
 }
 
-/** One opened drop: what came out, on a plate in its tier's colour. It springs into place when it first appears. */
+/** One item that came out, on a plain plate (a fighter or a bundle gets a gold one). It springs into place when it first appears. */
 @Composable
 private fun HaulCard(result: BoxItem, onLanded: (Offset) -> Unit) {
     val pop = remember { Animatable(0f) }
     LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium)) }
-    val c = Color(result.tier.color)
+    val c = if (result.reward is Reward.UnlockFighter || result.reward is Reward.Bundle) Palette.Gold else Palette.CyanDeep
     Panel(
         Modifier.padding(4.dp).aspectRatio(0.8f)
             // Says where it is (its middle, on the whole screen) so its currency can fly out of it.
@@ -382,7 +382,6 @@ private fun HaulCard(result: BoxItem, onLanded: (Offset) -> Unit) {
                 RewardVisual(result.reward, Modifier.fillMaxHeight().aspectRatio(1f))
             }
             GameText(shortLabel(result.reward), Type.Label, outline = 2.dp, align = TextAlign.Center)
-            PlainText(result.tier.label.uppercase(), Type.Small, color = lerp(c, Color.White, 0.5f), align = TextAlign.Center, maxLines = 1)
         }
     }
 }

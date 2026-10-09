@@ -94,7 +94,8 @@ fun HomeScreen(
         Column(Modifier.fillMaxSize()) {
             // ---------------- top bar
             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                ProfileAndCups(save, claimable) { go(Screen.CupTrack) }
+                // The profile plate takes whatever room the fixed buttons leave, so none of them is ever squeezed.
+                Box(Modifier.weight(1f)) { ProfileAndCups(save, claimable) { go(Screen.CupTrack) } }
                 Spacer(Modifier.width(10.dp))
                 // The player's place among the real accounts on the server; unknown while offline.
                 val status = io.github.projectwip.ui.LocalServer.current?.status?.collectAsState()?.value
@@ -109,7 +110,7 @@ fun HomeScreen(
                 ChunkyButton({ go(Screen.News) }, Modifier.size(58.dp, 58.dp), ButtonStyle.GLASS, lip = 4.dp) {
                     GameText("NEWS", Type.Label, color = Palette.Cyan, outline = 2.dp)
                 }
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(10.dp))
                 CurrencyPill(IconKind.BOLT, save.bolts)
                 Spacer(Modifier.width(10.dp))
                 CurrencyPill(IconKind.PRISM, save.prisms, onClick = { go(Screen.Shop) })
@@ -190,14 +191,14 @@ private fun ProfileAndCups(save: SaveData, claimable: Int, onCups: () -> Unit) {
     val prev = CupTrack.previousMilestoneCups(save.bestCups)
     val frac = if (next == null) 1f else (save.bestCups - prev).toFloat() / (next.cups - prev)
     Box {
-        ChunkyButton(onCups, Modifier.height(58.dp).widthIn(min = 300.dp), ButtonStyle.GLASS, lip = 4.dp) {
+        ChunkyButton(onCups, Modifier.height(58.dp).widthIn(max = 340.dp).fillMaxWidth(), ButtonStyle.GLASS, lip = 4.dp) {
             Row(Modifier.padding(start = 66.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.width(110.dp)) {
                     GameText(save.settings.playerName, Type.Label, outline = 2.dp)
                     PlainText("${save.victories} wins", Type.Small)
                 }
                 Spacer(Modifier.width(10.dp))
-                Column(Modifier.width(130.dp)) {
+                Column(Modifier.weight(1f)) {
                     GameText("%,d".format(save.cups), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
                     ProgressBar(frac, Modifier.fillMaxWidth().height(9.dp))
                     PlainText(next?.let { "Next reward: ${it.cups}" } ?: "Track complete!", Type.Small)

@@ -88,25 +88,26 @@ class Sfx(private val context: Context) {
         tts = android.speech.tts.TextToSpeech(context.applicationContext) { status ->
             val t = tts
             if (status != android.speech.tts.TextToSpeech.SUCCESS || t == null) return@TextToSpeech
-            try {
-                val indian = java.util.Locale("en", "IN")
-                t.language = if (t.isLanguageAvailable(indian) >= android.speech.tts.TextToSpeech.LANG_AVAILABLE) indian else java.util.Locale.US
-                t.setPitch(0.8f)
-                t.setSpeechRate(1.1f)
-                ttsReady = true
-            } catch (_: Exception) {
-            }
+            ttsReady = true
         }
     }
 
-    /** Says a line out loud, unless one was said a moment ago. */
-    fun say(line: String) {
+    /** Says a line out loud in [style]'s voice, unless one was said a moment ago. */
+    fun say(line: String, style: io.github.projectwip.data.VoiceStyle = io.github.projectwip.data.VoiceStyle.FIREFIGHTER) {
         val t = tts ?: return
         val now = android.os.SystemClock.uptimeMillis()
         if (!ttsReady || volume <= 0f || now - lastSaid < 2200) return
         lastSaid = now
         val params = android.os.Bundle().apply { putFloat(android.speech.tts.TextToSpeech.Engine.KEY_PARAM_VOLUME, volume.coerceIn(0f, 1f)) }
-        try { t.speak(line, android.speech.tts.TextToSpeech.QUEUE_FLUSH, params, "line") } catch (_: Exception) {}
+        try {
+            // Each voice has an accent, a pitch and a pace of its own. An accent the device doesn't have falls back to plain English.
+            val locale = java.util.Locale.forLanguageTag(style.locale)
+            t.language = if (t.isLanguageAvailable(locale) >= android.speech.tts.TextToSpeech.LANG_AVAILABLE) locale else java.util.Locale.US
+            t.setPitch(style.pitch)
+            t.setSpeechRate(style.rate)
+            t.speak(line, android.speech.tts.TextToSpeech.QUEUE_FLUSH, params, "line")
+        } catch (_: Exception) {
+        }
     }
 
     fun release() { worker.shutdown(); pool.release(); tts?.shutdown(); tts = null }
@@ -123,6 +124,6 @@ class Sfx(private val context: Context) {
     }
 
     private companion object {
-        const val CACHE = "sfx-v13"
+        const val CACHE = "sfx-v14"
     }
 }

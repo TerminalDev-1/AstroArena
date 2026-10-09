@@ -464,7 +464,7 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
     val cost = Progression.upgradeCost(save, id)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (save.selectedFighter != id) {
-            ChunkyButton({ repo.selectFighter(id) }, Modifier.width(110.dp).height(72.dp), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }
+            ChunkyButton({ repo.selectFighter(id); go(Screen.Home) }, Modifier.width(110.dp).height(72.dp), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }
         }
         if (Progression.levelCapped(save, id)) {
             ChunkyButton({}, Modifier.weight(1f).height(72.dp), ButtonStyle.GOLD, enabled = true) { GameText("MAX LEVEL", Type.Heading) }

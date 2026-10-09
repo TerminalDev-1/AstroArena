@@ -77,13 +77,12 @@ fun CapsuleOpenOverlay(
     val flash = remember { Animatable(0f) }
     val countPop = remember { Animatable(1f) }
     val lobby = LocalLobby.current
-    val best = result.best
     // The box itself is 3D, drawn by the lobby renderer; this overlay only tells it what is happening.
     DisposableEffect(Unit) {
         lobby.capsuleOpenAt = 0L
         lobby.capsuleSplitAt = 0L
         lobby.capsulePieces = 1
-        lobby.capsuleColor = CapsuleTier.SCRAP.color.toInt()
+        lobby.capsuleColor = BOX_COLOR.toInt()
         lobby.capsuleGlitch = 0.2f
         lobby.capsuleShown = true
         onDispose { lobby.capsuleShown = false }
@@ -98,18 +97,19 @@ fun CapsuleOpenOverlay(
     }
     // "Open all" makes sense when there is a known number of others waiting (the debug menu's endless boxes are not).
     val others = remaining in 1..1_000_000
-    val color = Color((if (opening) best else CapsuleTier.SCRAP).color)
+    // A box is a box: it has no rarity of its own, and doesn't give away what is inside.
+    val color = Color(BOX_COLOR)
+    val bonus = result.items.size - io.github.projectwip.data.SparkCapsules.BOX_ITEMS
 
     fun open() {
         if (opening) return
         opening = true
-        // It charges up to the rarest thing inside: the better that is, the less stable the box gets.
         lobby.capsuleKnockAt = System.currentTimeMillis()
         lobby.capsuleChargeAt = System.currentTimeMillis()
-        lobby.capsuleColor = best.color.toInt()
-        lobby.capsuleGlitch = 0.2f + 0.16f * best.ordinal
-        sfx?.play(Sound.GLITCH, 0.5f, 0.9f + 0.08f * best.ordinal)
-        sfx?.play(Sound.DROP_UPGRADE, pitch = 0.85f + 0.12f * best.ordinal)
+        lobby.capsuleGlitch = 0.4f
+        sfx?.play(Sound.GLITCH, 0.5f, 0.95f)
+        sfx?.play(Sound.DROP_UPGRADE, pitch = 0.95f)
+        sfx?.say(OPEN_LINES[(result.hashCode() and 0x7fffffff) % OPEN_LINES.size], io.github.projectwip.data.VoiceStyle.ANNOUNCER)
         sfx?.buzz(45, 210)
         scope.launch { pop.snapTo(1.4f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
         scope.launch { flash.snapTo(0.7f); flash.animateTo(0f, tween(380)) }
@@ -125,8 +125,14 @@ fun CapsuleOpenOverlay(
             delay(((io.github.projectwip.render3d.Capsule3D.GONE - io.github.projectwip.render3d.Capsule3D.WIND) * 1000).toLong() - 120)
             lobby.capsuleShown = false
             opened = true
-            flash.snapTo(1f)
-            flash.animateTo(0f, tween(650))
+            scope.launch { flash.snapTo(1f); flash.animateTo(0f, tween(650)) }
+            // The announcer has a word for what came out: a fighter, more items than usual, or an ordinary box.
+            delay(1500)
+            sfx?.say(when {
+                result.items.any { hasFighter(it.reward) } -> FIGHTER_LINES
+                bonus > 0 -> BONUS_LINES
+                else -> PLAIN_LINES
+            }.let { it[(result.hashCode() and 0x7fffffff) % it.size] }, io.github.projectwip.data.VoiceStyle.ANNOUNCER)
         }
     }
 
@@ -148,7 +154,7 @@ fun CapsuleOpenOverlay(
         val boxRoom = maxHeight * 0.5f
         if (!opened) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                GlitchText("ARENA BOX", Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), color, 5.dp, time, if (opening) 0.5f + 0.2f * best.ordinal else 0.5f,
+                GlitchText("ARENA BOX", Type.Display.copy(fontSize = Type.Display.fontSize * 1.25f), color, 5.dp, time, if (opening) 0.9f else 0.5f,
                     Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value })
                 // Room for the 3D box, which sits in the middle of the screen.
                 Spacer(Modifier.height(boxRoom))
@@ -163,7 +169,8 @@ fun CapsuleOpenOverlay(
             val later = result.items.drop(index + 1).map { it.reward }
             key(index) {
                 io.github.projectwip.ui.RewardShowcase(
-                    "${item.tier.label} item", Color(item.tier.color), item.reward,
+                    // Anything past the usual three is a bonus: that is the luck of the box.
+                    if (index >= io.github.projectwip.data.SparkCapsules.BOX_ITEMS) "Bonus item!" else "Item ${index + 1}", if (index >= io.github.projectwip.data.SparkCapsules.BOX_ITEMS) Palette.Gold else Palette.Cyan, item.reward,
                     boltsNow - later.sumOf { boltsIn(it) }, prismsNow - later.sumOf { prismsIn(it) },
                     roadNow = (roadNow - later.sumOf { Economy.creditsIn(it) }).coerceAtLeast(Economy.creditsIn(item.reward)), roadGoal = roadGoal,
                 ) {
@@ -185,13 +192,27 @@ fun CapsuleOpenOverlay(
                 }
             }
         }
-        if (!opened) GlitchBars(time, color, if (opening) 0.4f + 0.15f * best.ordinal else 0.4f)
+        if (!opened) GlitchBars(time, color, if (opening) 0.7f else 0.4f)
         if (flash.value > 0f) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = flash.value * 0.85f)))
         // Skips the reveal: this box and every other one are opened and shown together.
         if (!opened && others && !opening) ChunkyButton({ onOpenAll(result) }, Modifier.align(Alignment.TopEnd).padding(18.dp).size(230.dp, 58.dp), ButtonStyle.GOLD) {
             GameText("OPEN ALL (${"%,d".format(remaining + 1)})", Type.Heading)
         }
-        if (!opened) PlainText("An Arena Box holds three items or more, each with a rarity of its own. What is inside is locked in when you open it.", Type.Small,
+        if (!opened) PlainText("An Arena Box holds three items, and with luck a few more. What is inside is locked in when you open it.", Type.Small,
             Modifier.align(Alignment.BottomCenter).graphicsLayer { translationY = -14.dp.toPx() }, align = TextAlign.Center)
     }
+}
+
+/** Every Arena Box is the same plain crate. */
+private const val BOX_COLOR = 0xFFFFB03A
+
+private val OPEN_LINES = listOf("Let's see what's inside!", "Here we go!", "Open it up!", "Fingers crossed!")
+private val PLAIN_LINES = listOf("Three items. Not bad!", "Every little helps!", "A tidy box!", "Straight into the bank!")
+private val BONUS_LINES = listOf("Extra items! Lucky you!", "Ooh, there's more in here!", "A bonus! Nice box!", "That one was stuffed!")
+private val FIGHTER_LINES = listOf("A new fighter! What a box!", "Somebody new joins the team!")
+
+private fun hasFighter(r: io.github.projectwip.data.Reward): Boolean = when (r) {
+    is io.github.projectwip.data.Reward.UnlockFighter -> true
+    is io.github.projectwip.data.Reward.Bundle -> r.items.any { hasFighter(it) }
+    else -> false
 }

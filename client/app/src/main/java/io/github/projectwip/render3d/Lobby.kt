@@ -345,7 +345,7 @@ class LobbyScene {
             }
         }
         shownYaw += (p.dragYaw - shownYaw) * (1f - exp(-dt * 10f))
-        anim.time = time; anim.walk = 0f; anim.moving = 0f; anim.recoil = 0f; anim.flash = 0f; anim.scale = 1f; anim.jump = 0f; anim.spin = 0f
+        anim.time = time; anim.walk = 0f; anim.moving = 0f; anim.recoil = 0f; anim.flash = 0f; anim.scale = 1f; anim.jump = 0f; anim.spin = 0f; anim.throwL = 0f; anim.throwR = 0f; anim.swing = 0f
         if (ct in 0f..0.9f) {
             anim.jump = sin(ct / 0.9f * PI.toFloat()) * 0.7f
             anim.spin = 360f * smooth(ct / 0.9f)

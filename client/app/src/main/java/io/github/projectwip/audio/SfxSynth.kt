@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -31,6 +31,7 @@ object SfxSynth {
     fun render(s: Sound): FloatArray = when (s) {
         Sound.SHOOT_SPARK -> sparkShot().finish(0.7f)
         Sound.SHOOT_HEAVY -> heavyShot().finish(0.8f)
+        Sound.BARK -> bark().finish(0.8f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -460,7 +461,22 @@ object SfxSynth {
         echo(0.05f, 0.2f, 0.12f)
     }
 
-    /** Brakk's scrap cannon: a chesty boom, a blast of grit and a clank of loose metal. */
+    /** Bark throwing his paw prints: two sharp woofs, throat and all, the second a little higher. */
+    private fun bark() = Clip(0.42f).apply {
+        for (k in 0 until 2) {
+            val at = k * 0.15f
+            val up = 1f + k * 0.12f
+            // The voice: it jumps up and falls away, like a dog's.
+            osc(Wave.SAW, at, 0.13f, { glide(it, 0.03f, 300f * up, 560f * up) * (if (it > 0.03f) (1f - (it - 0.03f) * 3.6f).coerceAtLeast(0.4f) else 1f) }, { perc(it, 0.006f, 0.05f) * 0.7f })
+            osc(Wave.SQUARE, at, 0.12f, { glide(it, 0.1f, 230f * up, 120f) }, { perc(it, 0.004f, 0.045f) * 0.35f })
+            // The breath behind it.
+            noise(31 + k, at, 0.08f, Band.BAND, { 1300f * up }, 1.4f, { perc(it, 0.003f, 0.03f) * 0.55f })
+        }
+        filter(Band.LOW, 0.9f) { 3200f }
+        echo(0.07f, 0.15f, 0.1f)
+    }
+
+    /** The heavy shot: a chesty boom, a blast of grit and a clank of loose metal. */
     private fun heavyShot() = Clip(0.6f).apply {
         osc(Wave.SINE, 0f, 0.35f, { glide(it, 0.12f, 170f, 42f) }, { perc(it, 0.002f, 0.09f) })
         noise(21, 0f, 0.3f, Band.LOW, { glide(it, 0.18f, 7000f, 500f) }, 0.9f, { perc(it, 0.001f, 0.06f) * 0.9f })

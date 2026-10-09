@@ -43,6 +43,11 @@ class FighterAnim {
     var jump = 0f        // extra height (menu celebrations)
     var spin = 0f        // extra yaw degrees (menu celebrations)
     var scale = 1f
+    /** 0..1: a front leg flung forward (a fighter on four legs throwing something). */
+    var throwL = 0f
+    var throwR = 0f
+    /** 0..1: the weapon arm swung up and over, for an overhead throw. */
+    var swing = 0f
 }
 
 enum class Pass { SHADOW, COLOR, OUTLINE, SILHOUETTE }
@@ -413,7 +418,7 @@ class FighterModels {
         val breathe = 1f + sin(t * 2.4f) * 0.018f * (1 - mv)
         System.arraycopy(root, 0, body, 0, 16)
         Matrix.translateM(body, 0, 0f, bob, 0f)
-        Matrix.rotateM(body, 0, -8f * mv, 0f, 0f, 1f) // lean forward when running
+        Matrix.rotateM(body, 0, -8f * mv + maxOf(anim.throwL, anim.throwR) * 9f, 0f, 0f, 1f) // lean forward when running; rear up to throw
         Matrix.scaleM(body, 0, 1f, breathe, 1f)
 
         for (p in model.parts) {
@@ -430,7 +435,7 @@ class FighterModels {
                 Bone.WEAPON -> {
                     System.arraycopy(body, 0, bone, 0, 16)
                     Matrix.translateM(bone, 0, rig.shoulder[0] - anim.recoil * 0.16f, rig.shoulder[1] + sin(anim.walk) * 0.025f * mv, rig.shoulder[2])
-                    Matrix.rotateM(bone, 0, anim.recoil * 14f, 0f, 0f, 1f)
+                    Matrix.rotateM(bone, 0, anim.recoil * 14f + sin(anim.swing * 3.1416f) * 110f, 0f, 0f, 1f)
                 }
                 Bone.ARM -> {
                     System.arraycopy(body, 0, bone, 0, 16)
@@ -448,7 +453,7 @@ class FighterModels {
                     val side = if (p.bone == Bone.FORE_L) -1f else 1f
                     System.arraycopy(root, 0, bone, 0, 16)
                     Matrix.translateM(bone, 0, rig.foreX, rig.hipY, rig.hipZ * side)
-                    Matrix.rotateM(bone, 0, -sin(anim.walk) * 32f * mv * side, 0f, 0f, 1f)
+                    Matrix.rotateM(bone, 0, -sin(anim.walk) * 32f * mv * side + (if (side < 0f) anim.throwL else anim.throwR) * 85f, 0f, 0f, 1f)
                 }
                 Bone.FLOAT -> {
                     System.arraycopy(root, 0, bone, 0, 16)

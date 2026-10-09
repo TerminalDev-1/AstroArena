@@ -44,12 +44,18 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   Keep their names, looks and moves original.
 - Mira was removed, by the user's decision (`REMOVED_FIGHTERS` in `economy.py` pays her road Credits back). The
   Training Area's sentry keeps her old lance shot as a def of its own (`Balance.sentry`).
-- Brakk is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, so he
-  barks when he fires). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its
+- Bark is the dog (the user renamed him from Brakk; the code and the server still say `BRAKK`, so saves carry over).
+  He is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, and a front
+  leg is flung forward for each paw print: `FighterAnim.throwL/R`). His attack sound is a bark of his own (`Sound.BARK`). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its
   target has left (`AttackSpec.healthShare`), never less than the attack's own damage, and a fixed amount on a giant.
 - Kito's numbers are the user's: 8,000 health and 2,200 damage an attack (four blades of 550). His super
   (`SuperKind.QUAKE`) hurls a giant hammer; where it comes down the ground quakes in every direction
-  (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match.
+  (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match. He leaps as he throws and the
+  hammer is drawn flying up and over (renderer only: in the sim it is a straight shot). The aiming reticle stops at the
+  first enemy in the way, because that is where it comes down.
+- Every voice sounds different (`VoiceStyle`: accent, pitch, pace): Varun's, Buddy's machine voice, and the Arena Box
+  announcer's. Don't give two speakers the same one.
+- In the Training Area the player's super starts charged (`Match`), so it can be tried at once.
 - Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls two
   whole computers a long way, one after the other, and each smashes into the first enemy in its path
   (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Two computers and the long range are the
@@ -165,7 +171,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Arena Boxes replaced Glitch Drops, by the user's decision; a drop a player still held became a box, one for one
   (it is the same counter: `drops` on the server, `capsules` in the save). A box holds several items
   (`BOX_ITEMS`, sometimes more, up to `MAX_ITEMS`, in `rules.py` and `SparkCapsules`), each rolled on the tier table
-  for a rarity and a reward of its own; the opening screen shows them one at a time with an "items remaining"
+  for a reward of its own. The tiers are only the luck behind the roll: by the user's decision a box has no rarity and
+  the game never shows one (items are "Item 1", "Item 2"... and anything past the third is a "Bonus item"); the opening screen shows them one at a time with an "items remaining"
   counter (`CapsuleOpen.kt`). Boxes don't split: that was the drops' mechanic and it is gone. The idea of a box of
   several random items is a familiar one; the name, the crate, the tiers and the screen are ours and must stay so.
 - There is no Glory and no Spark Pass: both were removed on purpose (stored Glory was paid out as Upgrade Credits,
