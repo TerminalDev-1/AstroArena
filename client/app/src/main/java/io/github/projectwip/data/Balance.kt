@@ -429,12 +429,12 @@ object Balance {
     // Everything here is created at level 1 with flat stat lines, like the boss: it is a fixed yardstick.
 
     /** A target dummy: never attacks, soaks up damage and regenerates like anyone else. */
-    val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(24000, 0)) }
+    val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(8000, 0)) }
 
     /** One of the swarm: a little over half size and fragile. In the Training Area it is a target and never attacks. */
     val mini: FighterDef = fighter(FighterId.BYTE).let {
         it.copy(
-            name = "Mini", title = "Swarm", health = StatLine(9000, 0),
+            name = "Mini", title = "Swarm", health = StatLine(3000, 0),
             attackDamage = StatLine(Math.round(it.attackDamage.base * 0.3f), 0), superDamage = StatLine(Math.round(it.superDamage.base * 0.3f), 0),
             radius = it.radius * 0.62f, reloadSeconds = it.reloadSeconds * 1.6f, superChargePerHit = 0f,
             attack = it.attack.copy(range = it.attack.range * 0.8f),
@@ -443,7 +443,7 @@ object Balance {
 
     /** The sentry: a long-range gun on an island of coolant. Slow to reload, so its shots can be dodged. */
     val sentry: FighterDef = fighter(FighterId.BYTE).let {
-        it.copy(name = "Sentry", title = "Turret", health = StatLine(24000, 0), attackDamage = StatLine(1500, 0),
+        it.copy(name = "Sentry", title = "Turret", health = StatLine(8000, 0), attackDamage = StatLine(1500, 0),
             superDamage = StatLine(1920, 0), reloadSeconds = 2.4f, superChargePerHit = 0f, hyper = null,
             attack = AttackSpec(AttackShape.LANCE, projectiles = 1, spreadDegrees = 0f, range = 10f, speed = 22f, radius = 0.18f, burstInterval = 0f))
     }
