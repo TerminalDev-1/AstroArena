@@ -322,8 +322,8 @@ object Economy {
                 skin ?: when (pick) { 0 -> prisms(80, 110); 1 -> credits(45, 60); else -> bolts(1000, 1300) }
             }
             CapsuleTier.PRISMATIC -> if (rng.nextInt(2) == 0) credits(120, 160) else (newSkin() ?: prisms(250, 300))
-            // Ultra, the jackpot: a colourway (while any is left) plus a pile of every currency.
-            CapsuleTier.ULTRA -> Reward.Bundle(listOfNotNull(newSkin(), credits(250, 300), prisms(400, 500), bolts(2000, 2500)))
+            // Ultra, the jackpot. One item is one thing, so it is a single, very big pile.
+            CapsuleTier.ULTRA -> when (rng.nextInt(3)) { 0 -> credits(500, 600); 1 -> prisms(800, 1000); else -> bolts(4000, 5000) }
         }
     }
 

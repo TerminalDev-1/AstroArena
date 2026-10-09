@@ -124,7 +124,7 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.upgrade_cost(3, 99), 105)  # the factor is capped at x3
         self.assertEqual(economy.shop_item("crate_l"), ({"type": "bolts", "amount": 3000}, 50))
         self.assertEqual(economy.shop_item("fighter_KITO"), ({"type": "fighter", "fighter": "KITO"}, 90))
-        self.assertEqual(economy.shop_item("fighter_VARUN"), ({"type": "fighter", "fighter": "VARUN"}, 160))
+        self.assertEqual(economy.shop_item("fighter_VARUN"), ({"type": "fighter", "fighter": "VARUN"}, 40))
         self.assertEqual(economy.shop_item("fighter_BUDDY"), ({"type": "fighter", "fighter": "BUDDY"}, 250))
         self.assertEqual(economy.SPARK_ROAD[-1], ("BUDDY", 9000))
         self.assertEqual(economy.shop_item("skin_VARUN_2"), ({"type": "skin", "fighter": "VARUN", "skin": 2}, 20))
@@ -903,8 +903,8 @@ class Api(unittest.TestCase):
         order = [f for f, _ in economy.SPARK_ROAD]
         cost = dict(economy.SPARK_ROAD)
         self.assertEqual([s["fighter"] for s in road["steps"]], order)
-        self.assertEqual(order, ["BRAKK", "KITO", "VARUN", "BUDDY"])
-        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 6500, 9000, 9000])
+        self.assertEqual(order, ["BRAKK", "VARUN", "KITO", "BUDDY"])
+        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 2500, 6500, 9000])
         self.assertEqual(road["steps"][0], {"fighter": "BRAKK", "cost": 2500, "rarity": "RARE"})
         self.assertEqual(len(road["steps"]), len(rules.FIGHTER_SKINS) - 1)
         # The road has a fixed order: the Credits go toward the first fighter along it that is still locked.
@@ -1008,12 +1008,12 @@ class Api(unittest.TestCase):
     def test_a_jackpot_whose_credits_unlock_a_fighter_comes_back_as_one_flat_list(self):
         profile = economy.new_profile()
         profile["credits"] = dict(economy.SPARK_ROAD)["BRAKK"] - 10
-        jackpot = {"type": "bundle", "items": [{"type": "credits", "amount": 3000}, {"type": "prisms", "amount": 1200}, {"type": "bolts", "amount": 6000}]}
+        jackpot = {"type": "bundle", "items": [{"type": "credits", "amount": 1000}, {"type": "prisms", "amount": 1200}, {"type": "bolts", "amount": 6000}]}
         given = economy.grant(profile, jackpot)
         self.assertEqual(given, {"type": "bundle", "items": [
-            {"type": "credits", "amount": 3000}, {"type": "fighter", "fighter": "BRAKK"}, {"type": "prisms", "amount": 1200}, {"type": "bolts", "amount": 6000}]})
+            {"type": "credits", "amount": 1000}, {"type": "fighter", "fighter": "BRAKK"}, {"type": "prisms", "amount": 1200}, {"type": "bolts", "amount": 6000}]})
         self.assertTrue(profile["fighters"]["BRAKK"]["unlocked"])
-        self.assertEqual(profile["credits"], 2990)
+        self.assertEqual(profile["credits"], 990)
 
     def test_drops_give_twelve_times_the_credits(self):
         rng = random.Random(8)

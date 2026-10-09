@@ -813,24 +813,21 @@ class MatchRenderer(
                     }
                 }
                 ShotStyle.HAMMER -> {
-                    // A giant hammer thrown up and over: it climbs, wheels round as it flies and comes down hard. Its
-                    // shadow runs along the ground under it, so it is clear where it is.
-                    val reach = (owner.def.superSpec.range).coerceAtLeast(1f)
-                    val along = (1f - pr.rangeLeft / reach).coerceIn(0f, 1f)
-                    val y = 0.9f + 2.1f * sin(along * 3.1416f)
-                    val spin = pr.age * 760f
-                    val hx = cos(spin * 0.017453f) * 0.55f
-                    val hz = -sin(spin * 0.017453f) * 0.55f
+                    // A giant hammer flying straight at whoever it was thrown at, head first, with its shadow under it.
+                    val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
+                    val hx = pr.vx / len * 0.5f
+                    val hz = pr.vy / len * 0.5f
+                    val y = 1f
                     tint(0xFF0A1420, 0.35f)
-                    setModel(x, 0.06f, z, 0.95f, 0.02f, 0.95f, spin); bit.draw()
+                    setModel(x, 0.06f, z, 1.5f, 0.02f, 0.9f, yaw); bit.draw()
                     tint(0xFF7A5A3A)
-                    setModel(x, y, z, 1.4f, 0.14f, 0.14f, spin); bit.draw()
+                    setModel(x - hx * 0.4f, y, z - hz * 0.4f, 1.4f, 0.14f, 0.14f, yaw); bit.draw()
                     tint(0xFF8C95B4)
-                    setModel(x + hx, y, z + hz, 0.56f, 0.62f, 1.1f, spin); bit.draw()
+                    setModel(x + hx, y, z + hz, 0.56f, 0.62f, 1.1f, yaw); bit.draw()
                     tint(skin.secondary)
-                    setModel(x + hx, y, z + hz, 0.22f, 0.68f, 1.16f, spin); bit.draw()
+                    setModel(x + hx, y, z + hz, 0.22f, 0.68f, 1.16f, yaw); bit.draw()
                     tint(skin.accent)
-                    setModel(x - hx * 1.3f, y, z - hz * 1.3f, 0.13f, 0.22f, 0.22f, spin); bit.draw()
+                    setModel(x - hx * 2.2f, y, z - hz * 2.2f, 0.13f, 0.22f, 0.22f, yaw); bit.draw()
                 }
                 ShotStyle.PELLET -> {
                     tint(skin.secondary)

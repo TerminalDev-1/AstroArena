@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -32,6 +32,8 @@ object SfxSynth {
         Sound.SHOOT_SPARK -> sparkShot().finish(0.7f)
         Sound.SHOOT_HEAVY -> heavyShot().finish(0.8f)
         Sound.BARK -> bark().finish(0.8f)
+        Sound.GLASS -> glass().finish(0.75f)
+        Sound.EMPTY -> empty().finish(0.5f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -459,6 +461,27 @@ object SfxSynth {
         }
         filter(Band.LOW, 0.7f) { 7500f }
         echo(0.05f, 0.2f, 0.12f)
+    }
+
+    /** A computer coming apart on somebody: the thud of the case, the screen bursting, and shards ringing as they scatter. */
+    private fun glass() = Clip(0.7f).apply {
+        osc(Wave.SINE, 0f, 0.12f, { glide(it, 0.09f, 190f, 70f) }, { perc(it, 0.001f, 0.05f) * 0.7f })
+        noise(41, 0f, 0.09f, Band.HIGH, { 3800f }, 0.8f, { perc(it, 0.0005f, 0.03f) * 0.9f })
+        noise(42, 0.02f, 0.4f, Band.HIGH, { 6500f }, 1.2f, { perc(it, 0.002f, 0.12f) * 0.35f })
+        val shards = floatArrayOf(2637f, 3520f, 4186f, 3136f, 5274f, 2349f, 4699f)
+        for (k in shards.indices) {
+            val at = 0.015f + k * 0.045f + (k % 3) * 0.012f
+            fm(at, 0.3f, { shards[k] }, 2.76f, { 1.2f * perc(it, 0.0005f, 0.05f) }, { perc(it, 0.0005f, 0.09f) * (0.3f - k * 0.025f) })
+        }
+        echo(0.06f, 0.2f, 0.12f)
+    }
+
+    /** Out of ammo: two soft, hollow clicks, like an empty chamber. Nothing has gone wrong, so it doesn't scold. */
+    private fun empty() = Clip(0.2f).apply {
+        osc(Wave.SINE, 0f, 0.05f, { glide(it, 0.04f, 620f, 480f) }, { perc(it, 0.002f, 0.018f) * 0.5f })
+        osc(Wave.SINE, 0.07f, 0.05f, { glide(it, 0.04f, 520f, 400f) }, { perc(it, 0.002f, 0.018f) * 0.4f })
+        noise(43, 0f, 0.02f, Band.BAND, { 1800f }, 1.5f, { perc(it, 0.0005f, 0.006f) * 0.25f })
+        filter(Band.LOW, 0.7f) { 2600f }
     }
 
     /** Bark throwing his paw prints: two sharp woofs, throat and all, the second a little higher. */

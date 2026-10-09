@@ -229,9 +229,9 @@ def roll_reward(tier: int, save: dict, rng) -> dict:
         return skin or (prisms(80, 110) if pick == 0 else credits(45, 60) if pick == 1 else bolts(1000, 1300))
     if name == "PRISMATIC":
         return credits(120, 160) if rng.randrange(2) == 0 else (new_skin() or prisms(250, 300))
-    # Ultra, the jackpot: a colourway (while any is left) plus a pile of every currency.
-    items = [new_skin(), credits(250, 300), prisms(400, 500), bolts(2000, 2500)]
-    return {"type": "bundle", "items": [i for i in items if i]}
+    # Ultra, the jackpot. One item is one thing, so it is a single, very big pile.
+    pick = rng.randrange(3)
+    return credits(500, 600) if pick == 0 else prisms(800, 1000) if pick == 1 else bolts(4000, 5000)
 
 
 def apply_reward(save: dict, reward: dict) -> None:

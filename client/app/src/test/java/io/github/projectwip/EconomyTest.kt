@@ -81,7 +81,7 @@ class EconomyTest {
 
     @Test fun creditsFillTheRoadAndTheFighterUnlocksTheMomentItIsFull() {
         val first = SparkRoad.steps.first()
-        assertEquals("the road's prices", listOf(2500, 6500, 9000, 9000), SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices", listOf(2500, 2500, 6500, 9000), SparkRoad.steps.map { it.cost })
         // Not enough yet: the Credits just sit on the road.
         val some = Economy.grant(SaveData(), Reward.Credits(first.cost - 1))
         assertEquals(Reward.Credits(first.cost - 1), some.value)
@@ -109,8 +109,8 @@ class EconomyTest {
         assertEquals(all.bolts + 40, after.save.bolts)
         assertEquals(0, after.save.credits)
         // A jackpot whose Credits unlock someone comes back as one flat list, the fighter beside the Credits.
-        val jackpot = Economy.grant(SaveData(credits = first.cost - 10), Reward.Bundle(listOf(Reward.Credits(3000), Reward.Prisms(1200))))
-        assertEquals(Reward.Bundle(listOf(Reward.Credits(3000), Reward.UnlockFighter(first.fighter), Reward.Prisms(1200))), jackpot.value)
+        val jackpot = Economy.grant(SaveData(credits = first.cost - 10), Reward.Bundle(listOf(Reward.Credits(1000), Reward.Prisms(1200))))
+        assertEquals(Reward.Bundle(listOf(Reward.Credits(1000), Reward.UnlockFighter(first.fighter), Reward.Prisms(1200))), jackpot.value)
         // A gift of Credits (the Cup Track, a drop, the debug menu) fills the road in the same way.
         assertTrue(Economy.devGrant(SaveData(), credits = first.cost).progress(first.fighter).unlocked)
     }

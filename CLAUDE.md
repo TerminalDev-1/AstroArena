@@ -50,11 +50,14 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   target has left (`AttackSpec.healthShare`), never less than the attack's own damage, and a fixed amount on a giant.
 - Kito's numbers are the user's: 8,000 health and 2,200 damage an attack (four blades of 550). His super
   (`SuperKind.QUAKE`) hurls a giant hammer; where it comes down the ground quakes in every direction
-  (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match. He leaps as he throws and the
-  hammer is drawn flying up and over (renderer only: in the sim it is a straight shot). The aiming reticle stops at the
+  (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match. He leaps as he throws, and the
+  hammer flies straight at the enemy, head first (the user asked for that instead of a tumbling arc). The aiming reticle stops at the
   first enemy in the way, because that is where it comes down.
-- Every voice sounds different (`VoiceStyle`: accent, pitch, pace): Varun's, Buddy's machine voice, and the Arena Box
-  announcer's. Don't give two speakers the same one.
+- Every voice sounds different (`VoiceStyle`: accent, pitch, pace): Varun's, and Buddy's machine voice.
+  Don't give two speakers the same one. Arena Boxes have no voice: the user had an announcer added and then removed.
+- Varun is Rare, by the user's decision (he was Legendary): 4,800 health, 1,300 an attack, a 4-second hyper.
+- Running out of ammo has a sound of its own (`Sound.EMPTY`); `Sound.DENIED` is only for things that went wrong.
+  Buddy's computers break like glass on whoever they hit (`Sound.GLASS`).
 - In the Training Area the player's super starts charged (`Match`), so it can be tried at once.
 - Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls two
   whole computers a long way, one after the other, and each smashes into the first enemy in its path
@@ -172,7 +175,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (it is the same counter: `drops` on the server, `capsules` in the save). A box holds several items
   (`BOX_ITEMS`, sometimes more, up to `MAX_ITEMS`, in `rules.py` and `SparkCapsules`), each rolled on the tier table
   for a reward of its own. The tiers are only the luck behind the roll: by the user's decision a box has no rarity and
-  the game never shows one (items are "Item 1", "Item 2"... and anything past the third is a "Bonus item"); the opening screen shows them one at a time with an "items remaining"
+  the game never shows one (items are "Item 1", "Item 2"... and anything past the third is a "Bonus item"). One item is one thing: no roll
+  gives a bundle, the jackpot included (a bundle only appears when Credits unlock a fighter); the opening screen shows them one at a time with an "items remaining"
   counter (`CapsuleOpen.kt`). Boxes don't split: that was the drops' mechanic and it is gone. The idea of a box of
   several random items is a familiar one; the name, the crate, the tiers and the screen are ours and must stay so.
 - There is no Glory and no Spark Pass: both were removed on purpose (stored Glory was paid out as Upgrade Credits,

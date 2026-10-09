@@ -139,8 +139,6 @@ enum class VoiceStyle(val locale: String, val pitch: Float, val rate: Float) {
     FIREFIGHTER("en-IN", 0.8f, 1.1f),
     /** Buddy: a machine reading its own log. Flat, deep and unhurried. */
     MACHINE("en-GB", 0.42f, 0.86f),
-    /** The Arena Box announcer: bright and quick. */
-    ANNOUNCER("en-US", 1.35f, 1.2f),
 }
 
 /** The moments a fighter with a voice speaks up. */
@@ -260,8 +258,8 @@ object Balance {
 
     // The floor every fighter stands on, so that fights are even: at least [MIN_HEALTH] health, and at least
     // [MIN_AMMO_DAMAGE] damage from one ammo when all of its projectiles land. (Level 1; each level adds a twentieth.)
-    const val MIN_HEALTH = 5600
-    const val MIN_AMMO_DAMAGE = 1500
+    const val MIN_HEALTH = 4800
+    const val MIN_AMMO_DAMAGE = 1300
 
     val fighters: List<FighterDef> = listOf(
         FighterDef(
@@ -341,15 +339,16 @@ object Balance {
         ),
         FighterDef(
             id = FighterId.VARUN,
-            rarity = Rarity.LEGENDARY,
+            rarity = Rarity.RARE,
             name = "Varun",
             title = "Rocket Firefighter",
             role = "Artillery",
             lore = "An Indian firefighter who was captured and told to work for the people of the Sparks. He has never left since. Nobody knows why.",
             attackName = "Rocket Pack",
-            health = StatLine(6500, 325),
-            attackDamage = StatLine(417, 21),
-            superDamage = StatLine(1200, 60),
+            health = StatLine(4800, 240),
+            // Six rockets: 1,300 when they all land.
+            attackDamage = StatLine(217, 11),
+            superDamage = StatLine(600, 30),
             moveSpeed = 3.65f,
             attack = AttackSpec(AttackShape.ROCKETS, projectiles = 6, spreadDegrees = 0f, range = 8.5f, speed = 14f, radius = 0.17f, burstInterval = 0.1f, blast = 1.0f, lanes = 3),
             superSpec = SuperSpec(SuperKind.SWARM, "Rocket Rain", "Fires 8 rockets into the sky. They rain down inside one big circle, wherever you aim, over any wall. They hit hard, but never land the knockout.", projectiles = 8, range = 9f, speed = 10f, radius = 2.3f),
@@ -362,7 +361,7 @@ object Balance {
                 Skin("Monsoon", 0xFF1F6FB5, 0xFF2ED8A3, 0xFFE6F7FF, 20),
                 Skin("Marigold", 0xFFFF9F1C, 0xFF7B2CBF, 0xFFFFF3B0, 20),
             ),
-            hyper = HyperSpec("Five Alarm", "Lasts 14 seconds. His rockets fly faster, and his super charges half as fast again.", seconds = 14f, shotSpeed = 1.4f, superCharge = 1.5f, charge = 1.5f),
+            hyper = HyperSpec("Five Alarm", "Lasts 4 seconds. His rockets fly faster, and his super charges half as fast again.", seconds = 4f, shotSpeed = 1.4f, superCharge = 1.5f, charge = 1.5f),
             voice = mapOf(
                 VoiceCue.START to listOf("Varun reporting. Where is the fire?", "Hoses down. Rockets up."),
                 VoiceCue.SUPER to listOf("Look up!", "No wall will save you!"),
@@ -389,7 +388,7 @@ object Balance {
             attack = AttackSpec(AttackShape.SMASH, projectiles = 2, spreadDegrees = 0f, range = 8.5f, speed = 15f, radius = 0.36f, burstInterval = 0.16f),
             superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Picks the nearest enemy in sight by itself and compiles malformed code into them: a poison that stops their healing for 6 seconds (a boss shakes it off sooner).", range = 6.75f, speed = 30f, radius = 0f),
             ammoMax = 3,
-            reloadSeconds = 1.7f,
+            reloadSeconds = 1.35f,
             superChargePerHit = 0.17f,
             radius = 0.45f,
             skins = listOf(
@@ -446,12 +445,12 @@ object Balance {
     // Everything here is created at level 1 with flat stat lines, like the boss: it is a fixed yardstick.
 
     /** A target dummy: never attacks, soaks up damage and regenerates like anyone else. */
-    val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(16000, 0)) }
+    val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(8000, 0)) }
 
     /** One of the swarm: a little over half size and fragile. In the Training Area it is a target and never attacks. */
     val mini: FighterDef = fighter(FighterId.BYTE).let {
         it.copy(
-            name = "Mini", title = "Swarm", health = StatLine(6000, 0),
+            name = "Mini", title = "Swarm", health = StatLine(3000, 0),
             attackDamage = StatLine(Math.round(it.attackDamage.base * 0.3f), 0), superDamage = StatLine(Math.round(it.superDamage.base * 0.3f), 0),
             radius = it.radius * 0.62f, reloadSeconds = it.reloadSeconds * 1.6f, superChargePerHit = 0f,
             attack = it.attack.copy(range = it.attack.range * 0.8f),
@@ -460,7 +459,7 @@ object Balance {
 
     /** The sentry: a long-range gun on an island of coolant. Slow to reload, so its shots can be dodged. */
     val sentry: FighterDef = fighter(FighterId.BYTE).let {
-        it.copy(name = "Sentry", title = "Turret", health = StatLine(16000, 0), attackDamage = StatLine(1500, 0),
+        it.copy(name = "Sentry", title = "Turret", health = StatLine(8000, 0), attackDamage = StatLine(1500, 0),
             superDamage = StatLine(1920, 0), reloadSeconds = 2.4f, superChargePerHit = 0f, hyper = null,
             attack = AttackSpec(AttackShape.LANCE, projectiles = 1, spreadDegrees = 0f, range = 10f, speed = 22f, radius = 0.18f, burstInterval = 0f))
     }

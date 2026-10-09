@@ -180,7 +180,7 @@ class MatchRunner(
         val ammoBefore = p.ammo
         val tried = c.attack
         match.step(Match.STEP)
-        if (tried && ammoBefore < 1f && p.alive && match.world.phase == Phase.PLAYING) sfx.play(Sound.DENIED, 0.4f)
+        if (tried && ammoBefore < 1f && p.alive && match.world.phase == Phase.PLAYING) sfx.play(Sound.EMPTY, 0.7f)
 
         for (e in match.world.events) {
             frameEvents += e
@@ -287,7 +287,8 @@ class MatchRunner(
                     AttackShape.SPREAD -> Sound.SHOOT_HEAVY
                     AttackShape.ROCKETS -> Sound.ROCKET
                     AttackShape.LANCE -> Sound.SHOOT_PRISM
-                    AttackShape.SMASH -> Sound.SHOOT_HEAVY
+                    // A computer leaves quietly; the noise is when it lands on someone.
+                    AttackShape.SMASH -> Sound.WHOOSH
                     AttackShape.PAWS -> Sound.BARK
                 }, gain, 0.95f + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
@@ -295,6 +296,11 @@ class MatchRunner(
             is GameEvent.Hit -> {
                 if (settings.showDamageNumbers && (e.sourceId == pid || e.targetId == pid)) {
                     hudEvents += HudEvent.Damage(e.x, e.y, e.damage, e.sourceId == pid, e.isSuper)
+                }
+                // A computer breaks on whoever it hits.
+                if (!e.isSuper && world.fighter(e.sourceId)?.def?.attack?.shape == AttackShape.SMASH) {
+                    val p = match.player
+                    sfx.play(Sound.GLASS, (if (e.sourceId == pid || e.targetId == pid) 1f else 0.6f) / (1f + hypot(e.x - p.x, e.y - p.y) * 0.15f), 0.95f + (e.x % 0.12f))
                 }
                 when {
                     e.targetId == pid -> { sfx.play(Sound.HURT, 0.9f); sfx.buzz(30, 140) }

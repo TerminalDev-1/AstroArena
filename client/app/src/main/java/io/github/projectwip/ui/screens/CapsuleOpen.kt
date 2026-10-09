@@ -99,7 +99,6 @@ fun CapsuleOpenOverlay(
     val others = remaining in 1..1_000_000
     // A box is a box: it has no rarity of its own, and doesn't give away what is inside.
     val color = Color(BOX_COLOR)
-    val bonus = result.items.size - io.github.projectwip.data.SparkCapsules.BOX_ITEMS
 
     fun open() {
         if (opening) return
@@ -109,7 +108,6 @@ fun CapsuleOpenOverlay(
         lobby.capsuleGlitch = 0.4f
         sfx?.play(Sound.GLITCH, 0.5f, 0.95f)
         sfx?.play(Sound.DROP_UPGRADE, pitch = 0.95f)
-        sfx?.say(OPEN_LINES[(result.hashCode() and 0x7fffffff) % OPEN_LINES.size], io.github.projectwip.data.VoiceStyle.ANNOUNCER)
         sfx?.buzz(45, 210)
         scope.launch { pop.snapTo(1.4f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium)) }
         scope.launch { flash.snapTo(0.7f); flash.animateTo(0f, tween(380)) }
@@ -126,13 +124,6 @@ fun CapsuleOpenOverlay(
             lobby.capsuleShown = false
             opened = true
             scope.launch { flash.snapTo(1f); flash.animateTo(0f, tween(650)) }
-            // The announcer has a word for what came out: a fighter, more items than usual, or an ordinary box.
-            delay(1500)
-            sfx?.say(when {
-                result.items.any { hasFighter(it.reward) } -> FIGHTER_LINES
-                bonus > 0 -> BONUS_LINES
-                else -> PLAIN_LINES
-            }.let { it[(result.hashCode() and 0x7fffffff) % it.size] }, io.github.projectwip.data.VoiceStyle.ANNOUNCER)
         }
     }
 
@@ -205,14 +196,3 @@ fun CapsuleOpenOverlay(
 
 /** Every Arena Box is the same plain crate. */
 private const val BOX_COLOR = 0xFFFFB03A
-
-private val OPEN_LINES = listOf("Let's see what's inside!", "Here we go!", "Open it up!", "Fingers crossed!")
-private val PLAIN_LINES = listOf("Three items. Not bad!", "Every little helps!", "A tidy box!", "Straight into the bank!")
-private val BONUS_LINES = listOf("Extra items! Lucky you!", "Ooh, there's more in here!", "A bonus! Nice box!", "That one was stuffed!")
-private val FIGHTER_LINES = listOf("A new fighter! What a box!", "Somebody new joins the team!")
-
-private fun hasFighter(r: io.github.projectwip.data.Reward): Boolean = when (r) {
-    is io.github.projectwip.data.Reward.UnlockFighter -> true
-    is io.github.projectwip.data.Reward.Bundle -> r.items.any { hasFighter(it) }
-    else -> false
-}

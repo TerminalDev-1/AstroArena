@@ -469,7 +469,7 @@ class SimulationTest {
         assertEquals("and the charge is spent", 0f, varun.hyperCharge, 0f)
         var t = 0f
         while (varun.hyperActive && t < 20f) { w.step(Match.STEP); t += Match.STEP }
-        assertEquals("Varun's own hyper runs fourteen seconds; a plain one eight", 14f to 8f, varun.hyperSeconds to Fighter(9, Balance.fighter(FighterId.BYTE), 1, 0, 0, "J", true).hyperSeconds)
+        assertEquals("Varun's own hyper runs four seconds; a plain one eight", 4f to 8f, varun.hyperSeconds to Fighter(9, Balance.fighter(FighterId.BYTE), 1, 0, 0, "J", true).hyperSeconds)
         assertEquals(varun.hyperSeconds, t, 0.1f)
         assertEquals("then everything is as it was", Triple(hp, hp, dmg), Triple(varun.maxHp, varun.hp, varun.attackDamage))
     }

@@ -79,7 +79,7 @@ class ProgressionTest {
         val verdict = ServerVerdict(8, 8, false, 1, 3, bolts = 28, credits = 6, unlocked = listOf(FighterId.BRAKK))
         val (_, rewards) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = verdict)
         assertEquals(6 to listOf(FighterId.BRAKK), rewards.credits to rewards.unlocked)
-        assertEquals("the road's prices, as the server charges them", listOf(2500, 6500, 9000, 9000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices, as the server charges them", listOf(2500, 2500, 6500, 9000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
     }
 
     @Test fun offlineMatchesEarnNothing() {
@@ -315,7 +315,7 @@ class ProgressionTest {
             assertTrue("${f.name} health ${f.health.base}", f.health.base >= Balance.MIN_HEALTH)
             assertTrue("${f.name} damage an ammo ${f.attackDamage.base * f.attack.projectiles}", f.attackDamage.base * f.attack.projectiles >= Balance.MIN_AMMO_DAMAGE)
         }
-        assertEquals("Varun stands above it", 6500 to 2502, varun.health.base to varun.attackDamage.base * varun.attack.projectiles)
+        assertEquals("Varun stands right on it", 4800 to 1302, varun.health.base to varun.attackDamage.base * varun.attack.projectiles)
     }
 
     @Test fun serverCanRetuneBotsAndFreshSavesAreRecognised() {
