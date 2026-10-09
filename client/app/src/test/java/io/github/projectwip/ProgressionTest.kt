@@ -306,7 +306,7 @@ class ProgressionTest {
         // Fighters are unlocked on the Spark Road; the Cup Track pays Credits towards it instead of handing one out.
         assertTrue(io.github.projectwip.data.SparkRoad.steps.any { it.fighter == FighterId.KITO })
         val varun = Balance.fighter(FighterId.VARUN)
-        assertEquals("six rockets a shot, eight in the super", 6 to 8, varun.attack.projectiles to varun.superSpec.projectiles)
+        assertEquals("two rockets a shot, eight in the super", 2 to 8, varun.attack.projectiles to varun.superSpec.projectiles)
         assertEquals("the rarest fighter is the last one on the road", FighterId.BUDDY, io.github.projectwip.data.SparkRoad.steps.last().fighter)
         assertTrue(CupTrack.milestones.none { it.reward is Reward.UnlockFighter })
         assertEquals(io.github.projectwip.data.SparkRoad.steps.first(), io.github.projectwip.data.SparkRoad.next(SaveData()))
@@ -315,7 +315,7 @@ class ProgressionTest {
             assertTrue("${f.name} health ${f.health.base}", f.health.base >= Balance.MIN_HEALTH)
             assertTrue("${f.name} damage an ammo ${f.attackDamage.base * f.attack.projectiles}", f.attackDamage.base * f.attack.projectiles >= Balance.MIN_AMMO_DAMAGE)
         }
-        assertEquals("Varun stands right on it", 4800 to 1302, varun.health.base to varun.attackDamage.base * varun.attack.projectiles)
+        assertEquals("Varun stands right on it", 4600 to 1300, varun.health.base to varun.attackDamage.base * varun.attack.projectiles)
     }
 
     @Test fun serverCanRetuneBotsAndFreshSavesAreRecognised() {

@@ -377,13 +377,14 @@ class SimulationTest {
         return Triple(w, varun, target)
     }
 
-    @Test fun varunFiresSixRocketsPackedTogether() {
+    @Test fun varunFiresTwoRocketsSideBySide() {
         val (w, varun, target) = varunBehindAWall()
         varun.control.aimX = -(target.x - varun.x); varun.control.aimY = 0f; varun.control.attack = true
         w.step(Match.STEP)
-        assertEquals(6, varun.def.attack.projectiles)
-        assertEquals("the first row of three has left; the second follows a moment behind, in the same three lanes", listOf(-Balance.ROCKET_LANE, 0f, Balance.ROCKET_LANE), varun.pending.map { it.side })
-        assertTrue(varun.pending.all { it.delay > 0f })
+        assertEquals(2, varun.def.attack.projectiles)
+        assertTrue("both leave at once", varun.pending.isEmpty())
+        assertEquals("one ammo, two rockets", 2, w.projectiles.size)
+        assertEquals("a lane apart", Balance.ROCKET_LANE, kotlin.math.abs(w.projectiles[0].y - w.projectiles[1].y), 0.01f)
     }
 
     @Test fun varunsRocketsBurstAndCatchEveryoneNearby() {
@@ -406,7 +407,7 @@ class SimulationTest {
         varun.control.aimX = 1f; varun.control.aimY = 0f; varun.control.attack = true
         var bursts = 0
         repeat(90) { w.step(Match.STEP); bursts += w.events.count { it is io.github.projectwip.sim.GameEvent.Burst }; w.events.clear() }
-        assertEquals("every rocket goes off", 6, bursts)
+        assertEquals("every rocket goes off", 2, bursts)
         assertTrue("the one in the way is hit", one.hp < one.maxHp)
         assertTrue("and so is the one standing beside it, out of the rockets' path", two.hp < two.maxHp)
     }

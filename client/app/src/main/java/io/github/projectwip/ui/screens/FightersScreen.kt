@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -217,6 +218,17 @@ private fun FighterPage(save: SaveData, repo: GameRepository, id: FighterId, go:
                         RankBadge(io.github.projectwip.data.FighterRanks.label(prog.cups), Modifier.size(40.dp))
                         Spacer(Modifier.width(8.dp))
                         GameText("RANK ${io.github.projectwip.data.FighterRanks.label(prog.cups)}  ·  ${"%,d".format(prog.cups)} CUPS", Type.Label, outline = 2.dp)
+                    }
+                    // A fighter with something to say about its future says it here, on every screen size.
+                    def.notice?.let { notice ->
+                        Row(Modifier.width(430.dp).background(Palette.RedDeep, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                            .border(2.5.dp, Palette.Ink, androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Badge("LEGACY", color = Palette.OrangeDeep)
+                            Spacer(Modifier.width(8.dp))
+                            PlainText(notice, Type.Label, color = Palette.Text, maxLines = 2)
+                        }
+                        Spacer(Modifier.height(6.dp))
                     }
                     if (ui.roomy) {
                         // White on a dark plate: the floor behind it is bright, and the dim body colour was lost on it.
