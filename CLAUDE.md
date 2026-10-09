@@ -48,7 +48,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   He is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, and a front
   leg is flung forward for each paw print: `FighterAnim.throwL/R`). His attack sound is a bark of his own (`Sound.BARK`). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its
   target has left (`AttackSpec.healthShare`), never less than the attack's own damage, and a fixed amount on a giant.
-- Kito's numbers are the user's: 10,000 health and 2,800 damage an attack (8,000 and 2,200 until the user had every fighter's health and damage raised) (four blades of 700). His super
+- Kito's numbers are the user's: 8,000 health and 2,800 damage an attack (the damage was 2,200 until the user had every fighter's raised; a health raise to 10,000 was taken back) (four blades of 700). His super
   (`SuperKind.QUAKE`) hurls a giant hammer; where it comes down the ground quakes in every direction
   (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match. He leaps as he throws, and the
   hammer flies straight at the enemy, head first (the user asked for that instead of a tumbling arc). The aiming reticle stops at the

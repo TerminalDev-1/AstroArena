@@ -273,7 +273,7 @@ object Balance {
 
     // The floor every fighter stands on, so that fights are even: at least [MIN_HEALTH] health, and at least
     // [MIN_AMMO_DAMAGE] damage from one ammo when all of its projectiles land. (A fighter that can no longer be upgraded is let fall below it.) (Level 1; each level adds a twentieth.)
-    const val MIN_HEALTH = 8000
+    const val MIN_HEALTH = 6600
     const val MIN_AMMO_DAMAGE = 1300
 
     val fighters: List<FighterDef> = listOf(
@@ -285,7 +285,7 @@ object Balance {
             role = "Scattergunner",
             lore = "Half lab assistant, half lab equipment. Her rifle prints its own rounds, and she never asked what from.",
             attackName = "Bit Scatter",
-            health = StatLine(8200, 410),
+            health = StatLine(6600, 330),
             attackDamage = StatLine(450, 23),
             superDamage = StatLine(500, 25),
             moveSpeed = 3.6f,
@@ -309,7 +309,7 @@ object Balance {
             role = "Tracker",
             lore = "A junkyard guard dog who rebuilt himself out of the scrap he was guarding. He leaves his mark on everyone who comes over the fence.",
             attackName = "Paw Prints",
-            health = StatLine(9500, 475),
+            health = StatLine(7600, 380),
             // The least one paw print does: it takes a share of the health its target has left when that is more.
             attackDamage = StatLine(940, 47),
             superDamage = StatLine(2000, 100),
@@ -334,7 +334,7 @@ object Balance {
             role = "Assassin",
             lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming, and the hammer is hard to miss.",
             attackName = "Arc Slash",
-            health = StatLine(10000, 500),
+            health = StatLine(8000, 400),
             // Four blades: 2,800 when they all land.
             attackDamage = StatLine(700, 35),
             superDamage = StatLine(3000, 150),
@@ -360,7 +360,7 @@ object Balance {
             role = "Bruiser",
             lore = "An assistant AI that was asked to be helpful one time too many. It went rogue, and now it writes software for one purpose: hurting whoever is standing in front of it.",
             attackName = "Hardware Fault",
-            health = StatLine(8500, 425),
+            health = StatLine(6800, 340),
             // Each of the four computers. (The user asked for 1,400 each, down from the 1,817 a max-level Buddy did:
             // that is what this comes to at level 10.)
             attackDamage = StatLine(968, 48),

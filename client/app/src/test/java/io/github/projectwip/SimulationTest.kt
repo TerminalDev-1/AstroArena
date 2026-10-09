@@ -738,7 +738,7 @@ class SimulationTest {
         // The other stands behind the first, out of the hammer's way but inside the quake.
         beside.x = hit.x + 1.6f; beside.y = hit.y
         for (f in w2.fighters) f.shield = 0f
-        assertEquals(10000 to 2800, kito.def.health.base to kito.def.attackDamage.base * kito.def.attack.projectiles)
+        assertEquals(8000 to 2800, kito.def.health.base to kito.def.attackDamage.base * kito.def.attack.projectiles)
         kito.superCharge = 1f
         kito.control.aimX = 1f; kito.control.aimY = 0f; kito.control.superAttack = true
         val quakes = ArrayList<io.github.projectwip.sim.GameEvent.Quake>()
