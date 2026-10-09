@@ -154,7 +154,7 @@ class World(
         }
 
         for (f in fighters) stepFighter(f, dt)
-        if (rules.boss) for (f in fighters) if (f.def.boss != null && f.alive) bossScripts.getOrPut(f.id) { BossScript(this, f) }.step(dt)
+        if (rules.boss) for (f in fighters) if (f.def.boss != null && f.alive && !f.enthralled) bossScripts.getOrPut(f.id) { BossScript(this, f) }.step(dt)
         stepConcealment(dt)
         stepProjectiles(dt)
         stepHazards(dt)
@@ -187,7 +187,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits())
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf)
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -223,7 +223,12 @@ class World(
         f.attackCooldown = (f.attackCooldown - dt).coerceAtLeast(0f)
 
         // --- movement
-        if (f.isLeaping) {
+        if (f.latched) stepLatch(f)
+        if (f.enthralled) {
+            stepThrall(f, dt)
+        } else if (f.latched) {
+            // (Riding: [stepLatch] has already put it where its host is.)
+        } else if (f.isLeaping) {
             stepLeap(f, dt)
         } else if (f.isDashing) {
             stepDash(f, dt)
@@ -241,12 +246,17 @@ class World(
         f.vx = (f.x - f.prevX) / dt
         f.vy = (f.y - f.prevY) / dt
 
+        // A fighter that is busy on someone's back, or is not its own any more, does nothing it is told to.
+        val idle = f.latched || f.enthralled
+        if (idle) { c.attack = false; c.superAttack = false; c.hyper = false }
+
         // --- facing
-        if (c.aiming && (c.aimX != 0f || c.aimY != 0f)) f.facing = atan2(c.aimY, c.aimX)
+        if (idle) Unit
+        else if (c.aiming && (c.aimX != 0f || c.aimY != 0f)) f.facing = atan2(c.aimY, c.aimX)
         else if (hypot(c.moveX, c.moveY) > 0.1f && !f.isDashing) f.facing = atan2(c.moveY, c.moveX)
 
         // --- main attack
-        if (c.attack && f.ammo >= 1f && f.attackCooldown <= 0f && f.pending.isEmpty() && !f.isDashing && !f.isLeaping) {
+        if (c.attack && f.ammo >= 1f && f.attackCooldown <= 0f && f.pending.isEmpty() && !f.isDashing && !f.isLeaping && !idle) {
             val (dx, dy) = aimDirection(f)
             f.facing = atan2(dy, dx)
             f.ammo -= 1f
@@ -288,7 +298,7 @@ class World(
 
         // --- super
         // (Malformed code needs someone to compile it into: with nobody in sight the charge is kept.)
-        if (c.superAttack && f.superReady && !f.isDashing && !f.isLeaping && (f.def.superSpec.kind != SuperKind.CORRUPT || corruptTarget(f) != null)) {
+        if (c.superAttack && f.superReady && !f.isDashing && !f.isLeaping && !idle && (f.def.superSpec.kind != SuperKind.CORRUPT || corruptTarget(f) != null)) {
             val (dx, dy) = aimDirection(f)
             f.facing = atan2(dy, dx)
             fireSuper(f, dx, dy)
@@ -327,7 +337,61 @@ class World(
             f.poisonTick += Balance.POISON_TICK_SECONDS
             damage(f, fighter(f.poisonBy), (f.poisonDamage * Balance.POISON_TICK_SECONDS).toInt().coerceAtLeast(1), true, f.x, f.y)
         }
-        if (f.alive && f.poisonLeft <= 0f) cure(f)
+        if (f.alive && f.poisonLeft <= 0f) {
+            // It has run its course, and whoever came through it is corrupted.
+            val by = fighter(f.poisonBy)
+            cure(f)
+            if (by != null && by.alive && by.def.superSpec.kind == SuperKind.CORRUPT) enthrall(f, by)
+        }
+    }
+
+    private fun enthrall(f: Fighter, by: Fighter) {
+        f.thrallOf = by.id
+        f.thrallLeft = if (f.scale > 1f) Balance.THRALL_GIANT_SECONDS else Balance.THRALL_SECONDS
+        f.dashTime = 0f
+        f.pending.clear()
+        f.revealTimer = maxOf(f.revealTimer, 1.5f)
+        events += GameEvent.Enthralled(by.id, f.id)
+    }
+
+    private fun release(f: Fighter) {
+        f.thrallOf = -1
+        f.thrallLeft = 0f
+        f.thrallMoving = false
+    }
+
+    /** A corrupted fighter: over to whoever did it, and stock-still in front of them, until it wears off. */
+    private fun stepThrall(f: Fighter, dt: Float) {
+        val m = fighter(f.thrallOf)
+        f.thrallLeft -= dt
+        if (m == null || !m.alive || f.thrallLeft <= 0f) { release(f); return }
+        val dx = m.x - f.x
+        val dy = m.y - f.y
+        val d = hypot(dx, dy)
+        val stop = f.radius + m.radius + 0.35f
+        if (d > 1e-3f) f.facing = atan2(dy, dx)
+        f.thrallMoving = !f.rooted && d > stop + 0.02f
+        if (!f.thrallMoving) return
+        val step = minOf(f.def.moveSpeed * dt, d - stop)
+        arena.moveCircle(f.x, f.y, f.radius, dx / d * step, dy / d * step, tmp)
+        f.x = tmp[0]; f.y = tmp[1]
+        f.walkCycle += hypot(f.x - f.prevX, f.y - f.prevY) * 3.2f
+    }
+
+    /** A fighter latched onto someone's back rides wherever they go, for as long as its code is going into them. */
+    private fun stepLatch(f: Fighter) {
+        val host = fighter(f.latchedTo)
+        if (host == null || !host.alive || host.poisonBy != f.id) { unlatch(f); return }
+        f.x = host.x - cos(host.facing) * host.radius * 0.7f
+        f.y = host.y - sin(host.facing) * host.radius * 0.7f
+        f.facing = host.facing
+    }
+
+    /** Lets go, and steps down onto open ground. */
+    private fun unlatch(f: Fighter) {
+        f.latchedTo = -1
+        val spot = arena.nearestOpen(f.x, f.y, f.radius)
+        f.x = spot.x; f.y = spot.y
     }
 
     private fun cure(f: Fighter) {
@@ -521,6 +585,9 @@ class World(
         t.poisonTick = Balance.POISON_TICK_SECONDS
         t.poisonLeft = if (t.scale > 1f) Balance.POISON_GIANT_SECONDS else Balance.POISON_SECONDS
         t.revealTimer = maxOf(t.revealTimer, 1.5f)
+        release(t)
+        f.latchedTo = t.id
+        stepLatch(f)
         events += GameEvent.Corrupt(f.id, t.id)
     }
 
@@ -680,6 +747,8 @@ class World(
         victim.pending.clear()
         victim.dashTime = 0f
         victim.leapTime = 0f
+        victim.latchedTo = -1
+        release(victim)
         cure(victim)
         if (victim.hyperActive) endHyper(victim)
         // The super and hyper charges are kept: whatever was charged is still there after the respawn.

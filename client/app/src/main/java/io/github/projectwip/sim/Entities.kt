@@ -100,6 +100,16 @@ class Fighter(
     var leapToY = 0f
     var leapTarget = -1
     val isLeaping get() = leapTime > 0f
+    /** The id of the fighter whose back this one is latched onto, compiling code into them (-1 = nobody's). */
+    var latchedTo = -1
+    val latched get() = latchedTo >= 0
+
+    // Corrupted (what Buddy's super leaves behind): whose it is (-1 = nobody's), how long it has left, and whether it
+    // is on its way over to them right now (rather than standing in front of them).
+    var thrallOf = -1
+    var thrallLeft = 0f
+    var thrallMoving = false
+    val enthralled get() = thrallOf >= 0
 
     // Malformed code (Buddy's super): the id of whoever compiled it into this fighter (-1 = clean), what it does each
     // second, the time to its next bite, and how long it has left.
@@ -188,6 +198,8 @@ sealed interface GameEvent {
     data class Leap(val fighterId: Int) : GameEvent
     /** A leaper landed on [targetId] and started compiling malformed code into them. */
     data class Corrupt(val fighterId: Int, val targetId: Int) : GameEvent
+    /** The code has taken [targetId] over: it is [fighterId]'s for a while. */
+    data class Enthralled(val fighterId: Int, val targetId: Int) : GameEvent
     /** A thrown hammer came down: the ground quakes out to [radius] and stays cracked there. */
     data class Quake(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A rocket went off. */

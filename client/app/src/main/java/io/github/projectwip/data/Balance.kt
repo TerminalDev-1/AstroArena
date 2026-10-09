@@ -39,7 +39,10 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
 }
 
 /** [SWARM] is a salvo of rockets fired into the sky: they come down inside one circle where the fighter aimed, over any wall, and hurt but never knock out. */
-/** [CORRUPT] needs no aiming: the fighter leaps onto the back of the nearest enemy in sight and poisons them for a few seconds. */
+/**
+ * [CORRUPT] needs no aiming: the fighter leaps onto the back of the nearest enemy in sight, stays latched there while it
+ * poisons them, and whoever comes through it then walks over and stands in front of the fighter, out of their mind.
+ */
 /** [QUAKE] hurls a giant hammer: where it comes down the ground quakes in every direction and stays cracked. */
 enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE }
 
@@ -216,6 +219,13 @@ object Balance {
 
     /** A [SuperKind.CORRUPT] leap takes this long from take-off to landing on the target's back. Nothing can hit the leaper on the way. */
     const val LEAP_SECONDS = 0.55f
+    /**
+     * Once the poison has run its course its victim is corrupted for [THRALL_SECONDS]: it walks to whoever did it,
+     * stops in front of them and stands there, unable to do anything (and walks after them again if they move off).
+     * A boss comes round much sooner.
+     */
+    const val THRALL_SECONDS = 16f
+    const val THRALL_GIANT_SECONDS = 4f
     /** A [SuperKind.CORRUPT] poison bites this often. The super's damage is what it does each second. */
     const val POISON_TICK_SECONDS = 0.5f
     /** The poison wears off after this long (or with a knockout)... */
@@ -358,7 +368,7 @@ object Balance {
             superDamage = StatLine(1000, 50),
             moveSpeed = 3.75f,
             attack = AttackSpec(AttackShape.SMASH, projectiles = 3, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.36f, burstInterval = 0.14f),
-            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Picks the nearest enemy in sight by itself, leaps high and comes down on their back, and compiles malformed code into them: a poison that stops their healing for 6 seconds (a boss shakes it off sooner).", range = 6.75f, speed = 30f, radius = 0f),
+            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Picks the nearest enemy in sight by itself, leaps high, latches onto their back and compiles malformed code into them: a poison that stops their healing for 6 seconds. Whoever is left standing then walks over and stands in front of him for 16 seconds, out of their mind (a boss shakes it all off sooner).", range = 6.75f, speed = 30f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
             // (A third computer in every attack: each one charges a third less, so the super comes as often as it did.)

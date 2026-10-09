@@ -348,6 +348,12 @@ class MatchRunner(
                 sfx.play(Sound.GLITCH, near, 0.8f); sfx.play(Sound.UI_TOGGLE, near * 0.8f, 1.3f)
                 if (e.fighterId == pid || e.targetId == pid) sfx.buzz(70, 220)
             }
+            is GameEvent.Enthralled -> {
+                val f = world.fighter(e.targetId) ?: return
+                val near = (if (e.fighterId == pid || e.targetId == pid) 1f else 0.6f) / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
+                sfx.play(Sound.GLITCH, near, 0.55f); sfx.play(Sound.DROP_UPGRADE, near * 0.7f, 0.6f)
+                if (e.targetId == pid) sfx.buzz(160, 255)
+            }
             is GameEvent.Quake -> {
                 val p = match.player
                 val near = 1f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)

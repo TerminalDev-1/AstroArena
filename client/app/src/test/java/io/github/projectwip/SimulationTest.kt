@@ -651,7 +651,14 @@ class SimulationTest {
         assertTrue("he comes down on the nearest enemy's back", kotlin.math.hypot(buddy.x - near.x, buddy.y - near.y) < buddy.radius + near.radius + 0.6f)
         assertTrue("and they are the one poisoned", near.poisoned && !far.poisoned)
         assertEquals("a thousand a second", 1000, near.poisonDamage)
-        var t = 0f
+        assertEquals("he stays latched on while the code goes in", near.id, buddy.latchedTo)
+        // Wherever they go he goes too, and he does nothing else.
+        near.x += 1f
+        buddy.control.moveX = -1f; buddy.control.attack = true
+        w.step(Match.STEP)
+        assertTrue(kotlin.math.hypot(buddy.x - near.x, buddy.y - near.y) < near.radius)
+        assertTrue(w.projectiles.none { it.ownerId == buddy.id })
+        var t = Match.STEP
         var healedWhilePoisoned = false
         var last = near.hp
         while (near.poisoned && t < 30f) {
@@ -664,6 +671,26 @@ class SimulationTest {
         assertFalse("who could not heal through it", healedWhilePoisoned)
         assertEquals(far.maxHp, far.hp)
         assertTrue("a boss shakes it off sooner still", Balance.POISON_GIANT_SECONDS < Balance.POISON_SECONDS)
+        // Then he lets go, and they are corrupted: over to him, and stock-still in front of him.
+        w.step(Match.STEP)
+        assertFalse(buddy.latched)
+        assertFalse("he steps down onto open ground", w.arena.circleBlocked(buddy.x, buddy.y, buddy.radius))
+        assertEquals("they are his now", buddy.id, near.thrallOf)
+        buddy.control.clear()
+        buddy.x += 3f
+        assertFalse(w.arena.circleBlocked(buddy.x, buddy.y, buddy.radius))
+        var walk = 0f
+        do { w.step(Match.STEP); walk += Match.STEP } while (near.thrallMoving && walk < 6f)
+        assertTrue("it takes them a moment to get there", walk > 0.3f)
+        assertTrue("they walk over and stop in front of him", kotlin.math.hypot(buddy.x - near.x, buddy.y - near.y) < buddy.radius + near.radius + 0.5f)
+        val stood = near.x to near.y
+        near.control.moveX = 1f; near.control.attack = true; near.control.aimX = 1f
+        repeat((Balance.THRALL_SECONDS / 2 / Match.STEP).toInt()) { near.control.moveX = 1f; near.control.attack = true; w.step(Match.STEP) }
+        assertTrue("still his", near.enthralled)
+        assertEquals("motionless, whatever they try", stood, near.x to near.y)
+        assertTrue("and harmless", w.projectiles.none { it.ownerId == near.id })
+        repeat((Balance.THRALL_SECONDS / 2 / Match.STEP).toInt() + 5) { w.step(Match.STEP) }
+        assertFalse("for sixteen seconds, and then they are their own again", near.enthralled)
         // It only reaches three quarters as far as it used to.
         assertEquals(6.75f, buddy.def.superSpec.range, 0f)
         println("malformed code did ${near.maxHp - near.hp} of ${near.maxHp} health")

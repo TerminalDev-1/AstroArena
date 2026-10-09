@@ -94,8 +94,8 @@ class MatchRenderer(
     private val quakes = ArrayList<FloatArray>()
     /** When each fighter last hurled a hammer, by id: it leaps and swings as it lets go. */
     private val hammerAt = HashMap<Int, Float>()
-    /** Terminals open over a fighter that has just had code compiled into it: whose back, whose terminal, and since when. */
-    private val terminals = ArrayList<FloatArray>()
+    /** When each fighter latched onto the back it is on, by id: its terminal has been open since then. */
+    private val latchAt = HashMap<Int, Float>()
     private var time = 0f
     private val rng = Random(11)
 
@@ -421,6 +421,31 @@ class MatchRenderer(
             anim.recoil = max(anim.throwL, anim.throwR)
         }
         // A hammer throw: up off the ground, the arm over the top, and back down as the hammer leaves.
+        // On someone's back, hammering code into them: up off the ground, arms going.
+        if (f.latched) {
+            val host = world.fighter(f.latchedTo)
+            anim.jump = 0.5f * (host?.scale ?: 1f) + 0.04f * sin(time * 21f)
+            anim.recoil = kotlin.math.abs(sin(time * 19f))
+            anim.moving = 0f
+        }
+        // Corrupted. On the way over it lurches; once it has stopped it goes berserk on the spot: legs running nowhere,
+        // arms flailing, jerking round, jumping, flashing.
+        if (f.enthralled) {
+            if (f.thrallMoving) {
+                anim.spin = sin(time * 11f + i) * 14f
+                anim.flash = max(anim.flash, 0.25f * kotlin.math.abs(sin(time * 9f)))
+            } else {
+                anim.moving = 1f
+                anim.walk = time * 34f + i
+                anim.spin = sin(time * 23f + i) * 55f + sin(time * 7.3f) * 40f
+                anim.jump = kotlin.math.abs(sin(time * 15f + i)) * 0.32f
+                anim.swing = (time * 3.4f + i * 0.3f) % 1f
+                anim.recoil = kotlin.math.abs(sin(time * 29f))
+                anim.throwL = fling((time * 4.1f) % 1f)
+                anim.throwR = fling((time * 4.1f + 0.5f) % 1f)
+                anim.flash = max(anim.flash, 0.55f * kotlin.math.abs(sin(time * 13f + i)))
+            }
+        }
         // A leap onto someone's back: high over everything, turning right round on the way.
         if (f.isLeaping) {
             val u = (1f - f.leapTime / f.leapTotal).coerceIn(0f, 1f)
@@ -774,31 +799,37 @@ class MatchRenderer(
     private fun drawProjectileCores(alpha: Float) {
         lit.f("uEmissive", 0.85f)
         lit.f("uRim", 0.2f)
-        // A terminal hangs over whoever has just had code compiled into them: the screen folds open, lines of code
-        // type themselves onto it, and it blinks out.
-        terminals.removeAll { time - it[2] > TERMINAL_SECONDS }
-        for (tm in terminals) {
-            val victim = world.fighter(tm[0].toInt()) ?: continue
-            val coder = world.fighter(tm[1].toInt()) ?: continue
+        // A terminal hangs over whoever has someone on their back compiling code into them, for as long as it goes
+        // on: the screen folds open and lines of code type themselves onto it, page after page.
+        for (coder in world.fighters) {
+            if (!coder.latched || !coder.alive) continue
+            val victim = world.fighter(coder.latchedTo) ?: continue
             if (!shown(victim)) continue
-            val age = time - tm[2]
-            val open = (age / 0.15f).coerceIn(0f, 1f) * (if (age > TERMINAL_SECONDS - 0.12f) ((TERMINAL_SECONDS - age) / 0.12f).coerceIn(0f, 1f) else 1f)
+            val age = time - (latchAt[coder.id] ?: time)
+            val open = (age / 0.15f).coerceIn(0f, 1f)
+            val page = age % 0.9f
             val x = lerp(victim.prevX, victim.x, alpha)
             val z = lerp(victim.prevY, victim.y, alpha)
-            val y = (headHeight(victim.def.id) * victim.scale + 0.75f) + 0.05f * sin(age * 9f)
+            val y = (headHeight(victim.def.id) * victim.scale + 1.25f) + 0.05f * sin(age * 9f)
             val sk = coder.def.skins[coder.skin]
             tint(0xFF0A1420)
             setModel(x, y, z, 1.25f * open, 0.8f * open, 0.08f); bit.draw()
             tint(sk.secondary, 0.9f)
             setModel(x, y, z + 0.03f, 1.15f * open, 0.7f * open, 0.08f); bit.draw()
-            // Up to five lines, typed one after another, each a different length.
             tint(0xFF0A1420)
             for (line in 0 until 5) {
-                val typed = ((age - 0.15f - line * 0.13f) / 0.11f).coerceIn(0f, 1f) * open
+                val typed = ((page - line * 0.13f) / 0.11f).coerceIn(0f, 1f) * open
                 if (typed <= 0f) continue
-                val full = 0.9f - 0.17f * ((line * 3) % 4)
+                val full = 0.9f - 0.17f * ((line * 3 + (age / 0.9f).toInt()) % 4)
                 setModel(x - 0.5f + full * typed / 2f, y + 0.24f - line * 0.12f, z + 0.08f, full * typed, 0.05f, 0.03f); bit.draw()
             }
+        }
+        // Sparks of stray code come off anyone who is corrupted and standing there.
+        for (f in world.fighters) {
+            if (!f.enthralled || !f.alive || !shown(f) || rng.nextFloat() > 0.35f) continue
+            val a = rng.nextFloat() * 6.28f
+            val c = world.fighter(f.thrallOf)?.let { it.def.skins[it.skin].secondary.toInt() } ?: 0xFF29F0FF.toInt()
+            particles.spawn(f.x + cos(a) * 0.4f, 0.4f + rng.nextFloat() * 1.2f, f.y + sin(a) * 0.4f, cos(a) * 1.5f, 1.5f + rng.nextFloat() * 2f, sin(a) * 1.5f, 0.4f, 0.13f, c, 0.95f)
         }
 
         for (pr in world.projectiles) {
@@ -1072,7 +1103,7 @@ class MatchRenderer(
                 }
             }
             is GameEvent.Corrupt -> world.fighter(e.targetId)?.let { t ->
-                terminals += floatArrayOf(e.targetId.toFloat(), e.fighterId.toFloat(), time)
+                latchAt[e.fighterId] = time
                 val c = world.fighter(e.fighterId)?.let { it.def.skins[it.skin].secondary.toInt() } ?: 0xFF29F0FF.toInt()
                 // The landing, and the first of the code going in.
                 particles.spawn(t.x, 0.8f, t.y, 0f, 0f, 0f, 0.3f, 2.6f, c, 0.7f)
@@ -1126,6 +1157,14 @@ class MatchRenderer(
                 }
                 val away = hypot(e.x - match.player.x, e.y - match.player.y)
                 shake = max(shake, (0.4f - away * 0.035f).coerceAtLeast(0f))
+            }
+            is GameEvent.Enthralled -> world.fighter(e.targetId)?.let { t ->
+                val c = world.fighter(e.fighterId)?.let { it.def.skins[it.skin].secondary.toInt() } ?: 0xFF29F0FF.toInt()
+                particles.spawn(t.x, 0.9f, t.y, 0f, 0f, 0f, 0.35f, 3.2f, c, 0.8f)
+                repeat(30) {
+                    val a = it * 0.21f
+                    particles.spawn(t.x, 0.3f, t.y, cos(a) * 4f, 0.5f, sin(a) * 4f, 0.4f, 0.2f, c, 0.95f)
+                }
             }
             is GameEvent.Hyper -> world.fighter(e.fighterId)?.let { f ->
                 if (f === match.player) shake = max(shake, 0.12f)
@@ -1236,7 +1275,7 @@ class MatchRenderer(
             s.names[i] = f.name
             s.superReady[i] = f.superReady
             s.hyper[i] = f.hyperActive
-            s.poisoned[i] = f.poisoned
+            s.poisoned[i] = f.poisoned || f.enthralled
             s.cells[i] = f.cells
         }
         hud.publish()
@@ -1264,7 +1303,5 @@ class MatchRenderer(
         val INK = Toon.INK
         /** How long a hammer thrower is off the ground. */
         const val HAMMER_LEAP = 0.5f
-        /** How long the terminal stays open over a fighter that has just been corrupted. */
-        const val TERMINAL_SECONDS = 1.2f
     }
 }
