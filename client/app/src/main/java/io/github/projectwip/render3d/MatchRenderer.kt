@@ -733,10 +733,19 @@ class MatchRenderer(
                             setModel(tx, 0.05f, tz, s.radius, 1f, s.radius); sector(360f).draw()
                             tint(2); setModel(tx, 0.056f, tz, s.radius, 1f, s.radius); ring.draw()
                         }
-                        // No aiming to do: a ring shows how far the code reaches.
+                        // The line he will leap along (over walls), and a mark on whoever he will come down on.
                         SuperKind.CORRUPT -> {
-                            tint(1); setModel(px, 0.05f, pz, s.range, 1f, s.range); ring.draw()
-                            tint(2); setModel(px, 0.056f, pz, s.range * (0.3f + 0.7f * pulse), 1f, s.range * (0.3f + 0.7f * pulse)); ring.draw()
+                            val t = world.corruptTarget(p, dx, dz)
+                            val reach = if (t != null) (t.x - px) * dx + (t.y - pz) * dz else s.range
+                            beam(reach.coerceAtLeast(0.3f), p.radius * 2f)
+                            if (t != null) {
+                                val tx = lerp(t.prevX, t.x, alpha)
+                                val tz = lerp(t.prevY, t.y, alpha)
+                                val r = t.radius * (1.5f + 0.25f * pulse)
+                                lit.v4("uTint", 1f, 0.78f, 0.1f, 0.3f + 0.15f * pulse)
+                                setModel(tx, 0.05f, tz, r, 1f, r); sector(360f).draw()
+                                tint(2); setModel(tx, 0.056f, tz, r, 1f, r); ring.draw()
+                            }
                         }
                         SuperKind.SWARM -> {
                             // The rockets go up and come down: an arc from the fighter, up and over, to one big

@@ -506,8 +506,8 @@ class BotBrain(
             SuperKind.PIERCE -> clear && d <= s.range * 0.95f && (!smart || t.hp <= me.superDamage * 1.1f || lineHitsTwo(t))
             // The rockets come down over walls; they can't finish anyone, so a smart bot spends them on the healthy.
             SuperKind.SWARM -> d <= s.range && (!smart || t.hp > me.superDamage)
-            // Malformed code finds its own target and never misses: all it needs is someone in sight.
-            SuperKind.CORRUPT -> world.corruptTarget(me) != null
+            // The leap goes over walls and follows whoever it was aimed at: all it needs is someone in reach.
+            SuperKind.CORRUPT -> d <= s.range * 0.95f
             // The quake reaches past whatever the hammer hits, so it only has to get close.
             SuperKind.QUAKE -> clear && d <= s.range * 0.95f
             SuperKind.RAM -> d <= s.range * 0.85f && arena.walkClear(me.x, me.y, t.x, t.y, me.radius * 0.9f) &&

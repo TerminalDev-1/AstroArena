@@ -634,8 +634,12 @@ class SimulationTest {
         val (w, buddy, others) = buddyAndTargets(2)
         val (near, far) = others
         buddy.superCharge = 1f
-        // No aiming: it points the other way and still finds the nearest one.
+        // Aimed away from everyone, nothing happens and the charge is kept.
         buddy.control.aimX = -1f; buddy.control.aimY = 0f; buddy.control.superAttack = true
+        w.step(Match.STEP)
+        assertTrue(!buddy.isLeaping && buddy.superCharge == 1f)
+        // Aimed along the line they stand on, he goes for the first one on it.
+        buddy.control.aimX = 1f; buddy.control.aimY = 0f; buddy.control.superAttack = true
         w.step(Match.STEP)
         assertTrue("he leaves the ground", buddy.isLeaping)
         assertEquals(0f, buddy.superCharge, 0f)
@@ -648,7 +652,7 @@ class SimulationTest {
         assertEquals(Balance.LEAP_SECONDS, air, 0.1f)
         assertEquals(hpInTheAir, buddy.hp)
         assertTrue(w.projectiles.none { it.ownerId == buddy.id })
-        assertTrue("he comes down on the nearest enemy's back", kotlin.math.hypot(buddy.x - near.x, buddy.y - near.y) < buddy.radius + near.radius + 0.6f)
+        assertTrue("he comes down on the back of the first enemy on the line", kotlin.math.hypot(buddy.x - near.x, buddy.y - near.y) < buddy.radius + near.radius + 0.6f)
         assertTrue("and they are the one poisoned", near.poisoned && !far.poisoned)
         assertEquals("a thousand a second", 1000, near.poisonDamage)
         assertEquals("he stays latched on while the code goes in", near.id, buddy.latchedTo)
@@ -732,7 +736,7 @@ class SimulationTest {
         // The other stands behind the first, out of the hammer's way but inside the quake.
         beside.x = hit.x + 1.6f; beside.y = hit.y
         for (f in w2.fighters) f.shield = 0f
-        assertEquals(8000 to 2200, kito.def.health.base to kito.def.attackDamage.base * kito.def.attack.projectiles)
+        assertEquals(10000 to 2200, kito.def.health.base to kito.def.attackDamage.base * kito.def.attack.projectiles)
         kito.superCharge = 1f
         kito.control.aimX = 1f; kito.control.aimY = 0f; kito.control.superAttack = true
         val quakes = ArrayList<io.github.projectwip.sim.GameEvent.Quake>()
@@ -766,7 +770,9 @@ class SimulationTest {
         repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
         boss.shield = 0f
         buddy.superCharge = 1f
-        if (w.corruptTarget(buddy) != null) {
+        val toBoss = kotlin.math.hypot(boss.x - buddy.x, boss.y - buddy.y)
+        buddy.control.aimX = (boss.x - buddy.x) / toBoss; buddy.control.aimY = (boss.y - buddy.y) / toBoss
+        if (w.corruptTarget(buddy, buddy.control.aimX, buddy.control.aimY) != null) {
             buddy.control.superAttack = true
             repeat(((Balance.LEAP_SECONDS + 0.1f) / Match.STEP).toInt()) { w.step(Match.STEP) }
             assertTrue("he lands on the boss's back too", boss.poisoned && !buddy.isLeaping)

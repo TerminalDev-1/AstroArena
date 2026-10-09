@@ -48,7 +48,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   He is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, and a front
   leg is flung forward for each paw print: `FighterAnim.throwL/R`). His attack sound is a bark of his own (`Sound.BARK`). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its
   target has left (`AttackSpec.healthShare`), never less than the attack's own damage, and a fixed amount on a giant.
-- Kito's numbers are the user's: 8,000 health and 2,200 damage an attack (four blades of 550). His super
+- Kito's numbers are the user's: 10,000 health (8,000 until every fighter's health was raised) and 2,200 damage an attack (four blades of 550). His super
   (`SuperKind.QUAKE`) hurls a giant hammer; where it comes down the ground quakes in every direction
   (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match. He leaps as he throws, and the
   hammer flies straight at the enemy, head first (the user asked for that instead of a tumbling arc). The aiming reticle stops at the
@@ -68,8 +68,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   whole computers a long way, one after the other, and each smashes into the first enemy in its path
   (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Three computers and the long range are the
   user's decisions: don't change them.
-  His super (`SuperKind.CORRUPT`) needs no aiming: he leaps high (`Fighter.leapTime`, `World.stepLeap`; nothing can hit
-  him in the air, and walls don't stop him) and comes down on the back of the nearest enemy in sight. He stays latched
+  His super (`SuperKind.CORRUPT`) is aimed along a line (a tap auto-aims at the nearest enemy): he leaps high
+  (`Fighter.leapTime`, `World.stepLeap`; nothing can hit him in the air, and walls don't stop him) and comes down on
+  the back of the first enemy on that line (`World.corruptTarget`). He stays latched
   there (`Fighter.latchedTo`, `World.stepLatch`: he rides wherever they go and can do nothing else, but can be hit), a
   terminal stays open over them (drawn in `MatchRenderer`), and they are poisoned (`Fighter.poisonBy`,
   `World.stepPoison`): no healing while it lasts. Whoever comes through it is corrupted (`Fighter.thrallOf`,
@@ -78,7 +79,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   is the user's design, 16 seconds included: don't shorten it. It wears off after `POISON_SECONDS` (a boss after
   `POISON_GIANT_SECONDS`): the user took away the poison that never ended and cut the super's range by a quarter.
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
-  With nobody in sight the super isn't spent. His face is a hologram: a flat lit screen over a projector ring, no head.
+  With nobody on the line the super isn't spent. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
 - Every fighter has a hyper (`Control.hyper`, the `HYPER_*` numbers in `Balance.kt`): a third button that charges from
   main-attack hits. There are no shields: the user removed them (the two seconds of spawn protection, `Fighter.shield`,

@@ -40,7 +40,7 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
 
 /** [SWARM] is a salvo of rockets fired into the sky: they come down inside one circle where the fighter aimed, over any wall, and hurt but never knock out. */
 /**
- * [CORRUPT] needs no aiming: the fighter leaps onto the back of the nearest enemy in sight, stays latched there while it
+ * [CORRUPT] is aimed along a line: the fighter leaps onto the back of the first enemy on it, stays latched there while it
  * poisons them, and whoever comes through it then walks over and stands in front of the fighter, out of their mind.
  */
 /** [QUAKE] hurls a giant hammer: where it comes down the ground quakes in every direction and stays cracked. */
@@ -274,7 +274,7 @@ object Balance {
 
     // The floor every fighter stands on, so that fights are even: at least [MIN_HEALTH] health, and at least
     // [MIN_AMMO_DAMAGE] damage from one ammo when all of its projectiles land. (A fighter that can no longer be upgraded is let fall below it.) (Level 1; each level adds a twentieth.)
-    const val MIN_HEALTH = 4600
+    const val MIN_HEALTH = 8000
     const val MIN_AMMO_DAMAGE = 1300
 
     val fighters: List<FighterDef> = listOf(
@@ -286,7 +286,7 @@ object Balance {
             role = "Scattergunner",
             lore = "Half lab assistant, half lab equipment. Her rifle prints its own rounds, and she never asked what from.",
             attackName = "Bit Scatter",
-            health = StatLine(6600, 330),
+            health = StatLine(8200, 410),
             attackDamage = StatLine(360, 18),
             superDamage = StatLine(400, 20),
             moveSpeed = 3.6f,
@@ -310,7 +310,7 @@ object Balance {
             role = "Tracker",
             lore = "A junkyard guard dog who rebuilt himself out of the scrap he was guarding. He leaves his mark on everyone who comes over the fence.",
             attackName = "Paw Prints",
-            health = StatLine(7600, 380),
+            health = StatLine(9500, 475),
             // The least one paw print does: it takes a share of the health its target has left when that is more.
             attackDamage = StatLine(750, 38),
             superDamage = StatLine(1600, 80),
@@ -335,7 +335,7 @@ object Balance {
             role = "Assassin",
             lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming, and the hammer is hard to miss.",
             attackName = "Arc Slash",
-            health = StatLine(8000, 400),
+            health = StatLine(10000, 500),
             // Four blades: 2,200 when they all land.
             attackDamage = StatLine(550, 28),
             superDamage = StatLine(2400, 120),
@@ -361,14 +361,14 @@ object Balance {
             role = "Bruiser",
             lore = "An assistant AI that was asked to be helpful one time too many. It went rogue, and now it writes software for one purpose: hurting whoever is standing in front of it.",
             attackName = "Hardware Fault",
-            health = StatLine(6800, 340),
+            health = StatLine(8500, 425),
             // Each of the three computers.
             attackDamage = StatLine(1250, 63),
             // The poison's damage each second.
             superDamage = StatLine(1000, 50),
             moveSpeed = 3.75f,
             attack = AttackSpec(AttackShape.SMASH, projectiles = 3, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.36f, burstInterval = 0.14f),
-            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Picks the nearest enemy in sight by itself, leaps high, latches onto their back and compiles malformed code into them: a poison that stops their healing for 6 seconds. Whoever is left standing then walks over and stands in front of him for 16 seconds, out of their mind (a boss shakes it all off sooner).", range = 6.75f, speed = 30f, radius = 0f),
+            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Aim it at an enemy (or tap, and it picks the nearest): he leaps high along the line, latches onto the back of the first one on it and compiles malformed code into them: a poison that stops their healing for 6 seconds. Whoever is left standing then walks over and stands in front of him for 16 seconds, out of their mind (a boss shakes it all off sooner).", range = 6.75f, speed = 30f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
             // (A third computer in every attack: each one charges a third less, so the super comes as often as it did.)
@@ -428,12 +428,12 @@ object Balance {
     // Everything here is created at level 1 with flat stat lines, like the boss: it is a fixed yardstick.
 
     /** A target dummy: never attacks, soaks up damage and regenerates like anyone else. */
-    val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(8000, 0)) }
+    val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(24000, 0)) }
 
     /** One of the swarm: a little over half size and fragile. In the Training Area it is a target and never attacks. */
     val mini: FighterDef = fighter(FighterId.BYTE).let {
         it.copy(
-            name = "Mini", title = "Swarm", health = StatLine(3000, 0),
+            name = "Mini", title = "Swarm", health = StatLine(9000, 0),
             attackDamage = StatLine(Math.round(it.attackDamage.base * 0.3f), 0), superDamage = StatLine(Math.round(it.superDamage.base * 0.3f), 0),
             radius = it.radius * 0.62f, reloadSeconds = it.reloadSeconds * 1.6f, superChargePerHit = 0f,
             attack = it.attack.copy(range = it.attack.range * 0.8f),
@@ -442,7 +442,7 @@ object Balance {
 
     /** The sentry: a long-range gun on an island of coolant. Slow to reload, so its shots can be dodged. */
     val sentry: FighterDef = fighter(FighterId.BYTE).let {
-        it.copy(name = "Sentry", title = "Turret", health = StatLine(8000, 0), attackDamage = StatLine(1500, 0),
+        it.copy(name = "Sentry", title = "Turret", health = StatLine(24000, 0), attackDamage = StatLine(1500, 0),
             superDamage = StatLine(1920, 0), reloadSeconds = 2.4f, superChargePerHit = 0f, hyper = null,
             attack = AttackSpec(AttackShape.LANCE, projectiles = 1, spreadDegrees = 0f, range = 10f, speed = 22f, radius = 0.18f, burstInterval = 0f))
     }

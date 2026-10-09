@@ -297,8 +297,9 @@ class World(
         }
 
         // --- super
-        // (Malformed code needs someone to compile it into: with nobody in sight the charge is kept.)
-        if (c.superAttack && f.superReady && !f.isDashing && !f.isLeaping && !idle && (f.def.superSpec.kind != SuperKind.CORRUPT || corruptTarget(f) != null)) {
+        // (Malformed code needs someone to compile it into: with nobody on the line it is aimed along, the charge is kept.)
+        if (c.superAttack && f.superReady && !f.isDashing && !f.isLeaping && !idle &&
+            (f.def.superSpec.kind != SuperKind.CORRUPT || aimDirection(f).let { (ax, ay) -> corruptTarget(f, ax, ay) } != null)) {
             val (dx, dy) = aimDirection(f)
             f.facing = atan2(dy, dx)
             fireSuper(f, dx, dy)
@@ -326,8 +327,24 @@ class World(
         if (f.poisoned) stepPoison(f, dt) else regenerate(f, dt)
     }
 
-    /** Who [f]'s malformed code would go into: the nearest enemy it can see, within the super's reach. */
-    fun corruptTarget(f: Fighter): Fighter? = nearestVisibleEnemy(f, f.def.superSpec.range)
+    /**
+     * Who [f] would leap onto, aiming along ([dx], [dy]) (a unit vector): the first enemy it can see on that line,
+     * within the super's reach. The leap goes over walls, so they don't count.
+     */
+    fun corruptTarget(f: Fighter, dx: Float, dy: Float): Fighter? {
+        var best: Fighter? = null
+        var bestOn = f.def.superSpec.range
+        for (o in fighters) {
+            if (o.team == f.team || !isVisibleTo(o, f.team)) continue
+            val ox = o.x - f.x
+            val oy = o.y - f.y
+            val on = ox * dx + oy * dy
+            // (A little is forgiven either side of the line.)
+            if (on <= 0f || on > bestOn || kotlin.math.abs(ox * dy - oy * dx) > o.radius + f.radius + 0.25f) continue
+            best = o; bestOn = on
+        }
+        return best
+    }
 
     private fun stepPoison(f: Fighter, dt: Float) {
         if (phase != Phase.PLAYING) return
@@ -518,7 +535,7 @@ class World(
                 events += GameEvent.Dash(f.id)
             }
             // Up and over, whatever is in the way: the code goes in when the leaper lands (see [stepLeap]).
-            SuperKind.CORRUPT -> corruptTarget(f)?.let { t ->
+            SuperKind.CORRUPT -> corruptTarget(f, dx, dy)?.let { t ->
                 f.facing = atan2(t.y - f.y, t.x - f.x)
                 f.leapTotal = Balance.LEAP_SECONDS
                 f.leapTime = Balance.LEAP_SECONDS
