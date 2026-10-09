@@ -25,7 +25,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|duel|fighters|roster|kito|varun|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `trybyte` / `trybrakk` / `trykito` / `tryvarun` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
+  (`match|boss|train|duel|fighters|roster|kito|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `trybyte` / `trybrakk` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - UI changes must be checked with a screenshot (`adb exec-out screencap -p`) and `adb logcat -b crash -d`.
 - The tablet is the user's everyday device. Before every `input tap` or `am start`, confirm
   `dumpsys window | grep mCurrentFocus` shows `io.github.projectwip` or the home screen (`com.miui.home`): on
@@ -53,14 +53,14 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match. He leaps as he throws, and the
   hammer flies straight at the enemy, head first (the user asked for that instead of a tumbling arc). The aiming reticle stops at the
   first enemy in the way, because that is where it comes down.
-- Every voice sounds different (`VoiceStyle`: accent, pitch, pace): Varun's, and Buddy's machine voice.
+- Every voice sounds different (`VoiceStyle`: accent, pitch, pace); Buddy, the only fighter with a
+  voice now, has the machine one.
   Don't give two speakers the same one. Arena Boxes have no voice: the user had an announcer added and then removed.
-- Varun is Rare, by the user's decision (he was Legendary): 950 health, one half-size rocket worth 60 with a
-  12-second reload and a reach of 1 tile, a Rocket Rain that does 1 a rocket, a 4-second hyper, and voice lines about being nerfed (all the user's numbers).
-  He is shown as "Legacy (Varun)" (the user's name for him; the code and server still say `VARUN`).
-  He is a legacy fighter on his way out: his page says so (`FighterDef.notice`), a level adds far less to him than
-  to anyone else, and by the user's decision he can no longer be upgraded at all (`FighterDef.upgradable`,
-  `NO_UPGRADES` in `economy.py`: both must list him). Don't buff him.
+- Varun was removed, by the user's decision, after a run of nerfs as a "legacy fighter" (`REMOVED_FIGHTERS` pays
+  back the 9,000 Credits he cost). Rockets (`AttackShape.ROCKETS`), the rain of them (`SuperKind.SWARM`), a notice on
+  a fighter's page (`FighterDef.notice`) and a fighter that can't be upgraded (`FighterDef.upgradable`, `NO_UPGRADES`
+  in `economy.py`) are still in the code with nobody using them; `SimulationTest` keeps the first two tested with a
+  stand-in. Don't bring him back.
 - Running out of ammo has a sound of its own (`Sound.EMPTY`); `Sound.DENIED` is only for things that went wrong.
   Buddy's computers break like glass on whoever they hit (`Sound.GLASS`).
 - In the Training Area the player's super starts charged (`Match`), so it can be tried at once.

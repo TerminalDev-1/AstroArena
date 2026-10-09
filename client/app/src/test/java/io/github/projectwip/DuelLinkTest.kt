@@ -101,7 +101,7 @@ class DuelLinkTest {
 
     @Test fun twoLinkedDevicesPlayTheSameMatch() {
         val server = lobby()
-        val a = Device(server.localPort, FighterId.VARUN, 1L)
+        val a = Device(server.localPort, FighterId.BUDDY, 1L)
         val b = Device(server.localPort, FighterId.KITO, 2L)
         run(a, b, 60 * 30)
         assertFalse("they never fell out of step", a.link.outOfStep || b.link.outOfStep)

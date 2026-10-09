@@ -1191,7 +1191,6 @@ class MatchRenderer(
         FighterId.BYTE -> 1.85f
         FighterId.BRAKK -> 1.6f
         FighterId.KITO -> 1.9f
-        FighterId.VARUN -> 1.95f
         FighterId.BUDDY -> 2.05f
     }
 

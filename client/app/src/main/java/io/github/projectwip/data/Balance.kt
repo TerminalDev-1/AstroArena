@@ -13,7 +13,7 @@ data class StatLine(val base: Int, val perLevel: Int) {
     fun at(level: Int): Int = base + perLevel * (level.coerceAtLeast(1) - 1)
 }
 
-enum class FighterId { BYTE, BRAKK, KITO, VARUN, BUDDY }
+enum class FighterId { BYTE, BRAKK, KITO, BUDDY }
 
 /**
  * [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. [SMASH] is heavy things hurled a
@@ -111,7 +111,7 @@ data class FighterDef(
     val hyper: HyperSpec? = null,
     /** What the fighter says, and when. Empty for a fighter without a voice. */
     val voice: Map<VoiceCue, List<String>> = emptyMap(),
-    val voiceStyle: VoiceStyle = VoiceStyle.FIREFIGHTER,
+    val voiceStyle: VoiceStyle = VoiceStyle.PLAIN,
     /** Something players are told on this fighter's page, above everything else about them. Null: nothing. */
     val notice: String? = null,
     /** False for a fighter that can no longer be levelled up: it stays at whatever level it has. */
@@ -139,8 +139,8 @@ data class HyperSpec(
  * language tag), how high and how fast. Every voice has its own, so no two fighters sound alike.
  */
 enum class VoiceStyle(val locale: String, val pitch: Float, val rate: Float) {
-    /** Varun: Indian English, low and brisk. */
-    FIREFIGHTER("en-IN", 0.8f, 1.1f),
+    /** A plain speaking voice, low and brisk. (It was Varun's, in Indian English, until he was removed.) */
+    PLAIN("en-US", 0.8f, 1.1f),
     /** Buddy: a machine reading its own log. Flat, deep and unhurried. */
     MACHINE("en-GB", 0.42f, 0.86f),
 }
@@ -261,7 +261,7 @@ object Balance {
     const val FIRST_WIN_PRISMS = 10
 
     // The floor every fighter stands on, so that fights are even: at least [MIN_HEALTH] health, and at least
-    // [MIN_AMMO_DAMAGE] damage from one ammo when all of its projectiles land. (A legacy fighter is let fall below it.) (Level 1; each level adds a twentieth.)
+    // [MIN_AMMO_DAMAGE] damage from one ammo when all of its projectiles land. (A fighter that can no longer be upgraded is let fall below it.) (Level 1; each level adds a twentieth.)
     const val MIN_HEALTH = 4600
     const val MIN_AMMO_DAMAGE = 1300
 
@@ -339,45 +339,6 @@ object Balance {
                 Skin("Nightfall", 0xFF1F7A8C, 0xFFFF3D7F, 0xFF9BFFF0, 0),
                 Skin("Ember", 0xFFB83227, 0xFFFFC145, 0xFFFFE9A8, 20),
                 Skin("Frostbite", 0xFFE6F1FF, 0xFF3A86FF, 0xFFB5F2FF, 20),
-            ),
-        ),
-        FighterDef(
-            id = FighterId.VARUN,
-            rarity = Rarity.RARE,
-            // The user renamed him: he is shown as what he is, with his own name after it.
-            name = "Legacy (Varun)",
-            title = "Rocket Firefighter",
-            role = "Artillery",
-            lore = "An Indian firefighter who was captured and told to work for the people of the Sparks. He has never left since. Nobody knows why.",
-            attackName = "Rocket Pack",
-            // He is on his way out, so a level adds very little: about a quarter of what it adds to anyone else.
-            health = StatLine(950, 10),
-            // One rocket, and half a rocket at that: 60.
-            attackDamage = StatLine(60, 1),
-            // The user asked for half a point a rocket; damage is whole numbers, so it is one.
-            superDamage = StatLine(1, 0),
-            notice = "Varun is a legacy fighter and will be transitioning out of the game as soon as possible.",
-            upgradable = false,
-            moveSpeed = 3.65f,
-            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 1, spreadDegrees = 0f, range = 1f, speed = 14f, radius = 0.085f, burstInterval = 0.1f, blast = 1.0f, lanes = 1),
-            superSpec = SuperSpec(SuperKind.SWARM, "Rocket Rain", "Fires 8 rockets into the sky. They rain down inside one big circle, wherever you aim, over any wall. They hit hard, but never land the knockout.", projectiles = 8, range = 9f, speed = 10f, radius = 2.3f),
-            ammoMax = 3,
-            reloadSeconds = 12f,
-            superChargePerHit = 0.09f,
-            radius = 0.44f,
-            skins = listOf(
-                Skin("Fire Engine", 0xFFD9342B, 0xFFFFC72C, 0xFFFFF1C2, 0),
-                Skin("Monsoon", 0xFF1F6FB5, 0xFF2ED8A3, 0xFFE6F7FF, 20),
-                Skin("Marigold", 0xFFFF9F1C, 0xFF7B2CBF, 0xFFFFF3B0, 20),
-            ),
-            hyper = HyperSpec("Five Alarm", "Lasts 4 seconds. His rockets fly faster, and his super charges half as fast again.", seconds = 4f, shotSpeed = 1.4f, superCharge = 1.5f, charge = 1.5f),
-            voice = mapOf(
-                VoiceCue.START to listOf("Varun reporting. They nerfed me again.", "I am a legacy fighter now."),
-                VoiceCue.SUPER to listOf("This used to hurt.", "Look up. Or do not bother."),
-                VoiceCue.HYPER to listOf("Oh, I am being nerfed!", "Four seconds. Enjoy them."),
-                VoiceCue.KO to listOf("Even nerfed, I got one!", "Sixty damage at a time."),
-                VoiceCue.DOWN to listOf("Oh, I am legacy.", "Nerfed again."),
-                VoiceCue.BACK to listOf("Back. Still nerfed."),
             ),
         ),
         FighterDef(

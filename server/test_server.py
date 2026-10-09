@@ -124,12 +124,11 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.upgrade_cost(3, 99), 105)  # the factor is capped at x3
         self.assertEqual(economy.shop_item("crate_l"), ({"type": "bolts", "amount": 3000}, 50))
         self.assertEqual(economy.shop_item("fighter_KITO"), ({"type": "fighter", "fighter": "KITO"}, 90))
-        self.assertEqual(economy.shop_item("fighter_VARUN"), ({"type": "fighter", "fighter": "VARUN"}, 40))
         self.assertEqual(economy.shop_item("fighter_BUDDY"), ({"type": "fighter", "fighter": "BUDDY"}, 250))
         self.assertEqual(economy.SPARK_ROAD[-1], ("BUDDY", 9000))
-        self.assertEqual(economy.shop_item("skin_VARUN_2"), ({"type": "skin", "fighter": "VARUN", "skin": 2}, 20))
+        self.assertEqual(economy.shop_item("skin_BUDDY_2"), ({"type": "skin", "fighter": "BUDDY", "skin": 2}, 20))
         self.assertEqual(economy.shop_item("skin_KITO_2"), ({"type": "skin", "fighter": "KITO", "skin": 2}, 20))
-        for missing in ("fighter_BYTE", "fighter_MIRA", "skin_MIRA_1", "skin_KITO_0", "skin_KITO_3", "skin_NOBODY_1", "crate_xl", ""):
+        for missing in ("fighter_BYTE", "fighter_MIRA", "fighter_VARUN", "skin_MIRA_1", "skin_KITO_0", "skin_KITO_3", "skin_NOBODY_1", "crate_xl", ""):
             self.assertIsNone(economy.shop_item(missing))
         self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "VICTORY", 0, 2, "NORMAL"), 28)
         self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "DEFEAT", 0, 9, "ELITE"), 33)
@@ -144,12 +143,6 @@ class Economy(unittest.TestCase):
         with self.assertRaises(Refused) as caught:
             economy.upgrade(p, "BRAKK")  # locked
         self.assertEqual(caught.exception.status, 409)
-        # A legacy fighter stays at the level it has, however many Credits there are and whoever asks.
-        p["fighters"]["VARUN"]["unlocked"] = True
-        p["bolts"] = 100000
-        with self.assertRaises(Refused) as caught:
-            economy.upgrade(p, "VARUN", no_cap=True)
-        self.assertEqual((caught.exception.status, p["fighters"]["VARUN"]["level"], p["bolts"]), (409, 1, 100000))
         p["bolts"] = 5
         with self.assertRaises(Refused) as caught:
             economy.upgrade(p, "BYTE")
@@ -202,7 +195,13 @@ class Economy(unittest.TestCase):
         self.assertEqual((p["bolts"], p["prisms"], p["bestCups"], p["claimedMilestones"], p["lastDailyGiftDay"]), (900, 0, 77, [10, 25], 5))
         self.assertEqual(p["fighters"]["KITO"], {"unlocked": True, "level": 4, "ownedSkins": [0, 2], "cups": 0})
         self.assertEqual(p["fighters"]["BYTE"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
-        self.assertFalse(p["fighters"]["VARUN"]["unlocked"])
+        self.assertFalse(p["fighters"]["BUDDY"]["unlocked"])
+        # A fighter who has been removed is gone from an old save, and what he cost on the road comes back.
+        old = economy.new_profile()
+        old["fighters"]["VARUN"] = {"unlocked": True, "level": 6, "ownedSkins": [0, 1], "cups": 40}
+        economy.complete(old)
+        self.assertNotIn("VARUN", old["fighters"])
+        self.assertTrue(old["fighters"]["BRAKK"]["unlocked"] and old["fighters"]["KITO"]["unlocked"])
         self.assertEqual(economy.profile_from_save({}), economy.new_profile())
 
 
@@ -357,7 +356,7 @@ class Api(unittest.TestCase):
         self.assertIsNotNone(self.httpd.duel)
         one, two = self.player("Ada"), self.player("Bo")
         # A fighter that isn't unlocked is turned away, with the reason.
-        cheat = join(one, "VARUN")
+        cheat = join(one, "BUDDY")
         self.assertEqual(cheat.recv(1), b"E")
         self.assertIn("unlocked", text(cheat))
         cheat.close()
@@ -909,8 +908,8 @@ class Api(unittest.TestCase):
         order = [f for f, _ in economy.SPARK_ROAD]
         cost = dict(economy.SPARK_ROAD)
         self.assertEqual([s["fighter"] for s in road["steps"]], order)
-        self.assertEqual(order, ["BRAKK", "VARUN", "KITO", "BUDDY"])
-        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 2500, 6500, 9000])
+        self.assertEqual(order, ["BRAKK", "KITO", "BUDDY"])
+        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 6500, 9000])
         self.assertEqual(road["steps"][0], {"fighter": "BRAKK", "cost": 2500, "rarity": "RARE"})
         self.assertEqual(len(road["steps"]), len(rules.FIGHTER_SKINS) - 1)
         # The road has a fixed order: the Credits go toward the first fighter along it that is still locked.

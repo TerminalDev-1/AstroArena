@@ -13,7 +13,7 @@ android {
         minSdk = 26
         targetSdk = 35
         // Players see "Beta". The build number is what the updater and the server's version gate compare.
-        versionCode = 65
+        versionCode = 66
         versionName = "Beta"
         // Where the game looks for its server unless the player sets another address in Settings.
         // Override at build time with -Pastro.server=http://host:port

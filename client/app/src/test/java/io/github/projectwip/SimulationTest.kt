@@ -358,10 +358,23 @@ class SimulationTest {
         assertTrue(bossShare > 0f && bossShare < botShare / 8)
     }
 
-    /** Two fighters past the countdown: Varun, and a target standing where a wall blocks every straight shot. */
+    /**
+     * Nobody in the roster fires rockets any more (Varun was removed), but rockets, the rain of them and a hyper of
+     * a fighter's own are still in the simulation. This stand-in, with the numbers he left with, keeps them tested.
+     */
+    private val rocketeer = Balance.fighter(FighterId.BYTE).copy(
+        name = "Rocketeer", health = io.github.projectwip.data.StatLine(950, 10),
+        attackDamage = io.github.projectwip.data.StatLine(60, 1), superDamage = io.github.projectwip.data.StatLine(1, 0),
+        attack = io.github.projectwip.data.AttackSpec(io.github.projectwip.data.AttackShape.ROCKETS, projectiles = 1, spreadDegrees = 0f, range = 1f, speed = 14f, radius = 0.085f, burstInterval = 0.1f, blast = 1.0f, lanes = 1),
+        superSpec = io.github.projectwip.data.SuperSpec(io.github.projectwip.data.SuperKind.SWARM, "Rocket Rain", "", projectiles = 8, range = 9f, speed = 10f, radius = 2.3f),
+        reloadSeconds = 12f, superChargePerHit = 0.09f,
+        hyper = io.github.projectwip.data.HyperSpec("Five Alarm", "", seconds = 4f, shotSpeed = 1.4f, superCharge = 1.5f, charge = 1.5f),
+    )
+
+    /** Two fighters past the countdown: the rocketeer, and a target standing where a wall blocks every straight shot. */
     private fun varunBehindAWall(): Triple<World, Fighter, Fighter> {
         val a = Arenas.staticCanyon()
-        val varun = Fighter(0, Balance.fighter(FighterId.VARUN), 1, 0, 0, "V", true)
+        val varun = Fighter(0, rocketeer, 1, 0, 0, "V", true)
         val target = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "T", true)
         val w = World(a, listOf(varun, target), io.github.projectwip.sim.MatchRules.lastSpark())
         repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
@@ -390,7 +403,7 @@ class SimulationTest {
 
     @Test fun varunsRocketsBurstAndCatchEveryoneNearby() {
         val a = Arenas.staticCanyon()
-        val varun = Fighter(0, Balance.fighter(FighterId.VARUN), 1, 0, 0, "V", true)
+        val varun = Fighter(0, rocketeer, 1, 0, 0, "V", true)
         val one = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "A", true)
         val two = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "B", true)
         val w = World(a, listOf(varun, one, two), io.github.projectwip.sim.MatchRules.lastSpark())
@@ -496,8 +509,8 @@ class SimulationTest {
 
     @Test fun twoDevicesStayInStepInA1v1() {
         // The same match as each device builds it: one plays side 0, the other side 1.
-        val a = Match(MatchConfig(FighterId.VARUN, 5, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 9L, duel = io.github.projectwip.sim.DuelSetup(0, FighterId.KITO, 7, 1, "B")))
-        val b = Match(MatchConfig(FighterId.KITO, 7, 1, "B", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 9L, duel = io.github.projectwip.sim.DuelSetup(1, FighterId.VARUN, 5, 0, "A")))
+        val a = Match(MatchConfig(FighterId.BUDDY, 5, 0, "A", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 9L, duel = io.github.projectwip.sim.DuelSetup(0, FighterId.KITO, 7, 1, "B")))
+        val b = Match(MatchConfig(FighterId.KITO, 7, 1, "B", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 9L, duel = io.github.projectwip.sim.DuelSetup(1, FighterId.BUDDY, 5, 0, "A")))
         assertEquals("each device's player is on its own side", 0 to 1, a.player.team to b.player.team)
         assertTrue("nobody in a 1v1 is a bot", a.brains.isEmpty() && a.world.fighters.none { it.isBot } && a.world.fighters.size == 2)
         assertEquals(listOf("A", "B"), a.world.fighters.map { it.name })
@@ -544,7 +557,7 @@ class SimulationTest {
     }
 
     @Test fun theHyperChargesFromHitsAndBotsUseIt() {
-        val m = Match(MatchConfig(FighterId.VARUN, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 21L))
+        val m = Match(MatchConfig(FighterId.BUDDY, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 21L))
         var hypers = 0
         var t = 0f
         while (m.world.phase != Phase.ENDED && t < 200f) {

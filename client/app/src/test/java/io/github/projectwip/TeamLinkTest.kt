@@ -26,7 +26,7 @@ import kotlin.random.Random
  * server's replay of what they played.
  */
 class TeamLinkTest {
-    private val fighters = listOf(FighterId.KITO, FighterId.BYTE, FighterId.VARUN)
+    private val fighters = listOf(FighterId.KITO, FighterId.BYTE, FighterId.BUDDY)
 
     private fun io.github.projectwip.sim.Fighter.damageTaken() = maxHp - hp
 

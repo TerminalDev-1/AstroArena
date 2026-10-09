@@ -81,7 +81,7 @@ class EconomyTest {
 
     @Test fun creditsFillTheRoadAndTheFighterUnlocksTheMomentItIsFull() {
         val first = SparkRoad.steps.first()
-        assertEquals("the road's prices", listOf(2500, 2500, 6500, 9000), SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices", listOf(2500, 6500, 9000), SparkRoad.steps.map { it.cost })
         // Not enough yet: the Credits just sit on the road.
         val some = Economy.grant(SaveData(), Reward.Credits(first.cost - 1))
         assertEquals(Reward.Credits(first.cost - 1), some.value)
@@ -365,13 +365,5 @@ class EconomyTest {
         val held = Economy.openDrops(SaveData(capsules = 3), 0f, true, 4, Random(2))
         assertEquals(4, held.value.size)
         assertTrue("the three held are still there", held.save.capsules >= 3)
-    }
-
-    @Test fun aLegacyFighterCannotBeUpgraded() {
-        val s = SaveData(bolts = 100_000, fighters = SaveData.defaultFighters() + (FighterId.VARUN to io.github.projectwip.data.FighterProgress(true, 3)))
-        assertFalse(Balance.fighter(FighterId.VARUN).upgradable)
-        assertFalse(io.github.projectwip.data.Progression.canUpgrade(s, FighterId.VARUN))
-        refused(409) { Economy.upgrade(s, FighterId.VARUN, noCap = true) }
-        assertTrue(io.github.projectwip.data.Progression.canUpgrade(s, FighterId.BYTE))
     }
 }

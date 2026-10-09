@@ -93,7 +93,7 @@ class Sfx(private val context: Context) {
     }
 
     /** Says a line out loud in [style]'s voice, unless one was said a moment ago. */
-    fun say(line: String, style: io.github.projectwip.data.VoiceStyle = io.github.projectwip.data.VoiceStyle.FIREFIGHTER) {
+    fun say(line: String, style: io.github.projectwip.data.VoiceStyle = io.github.projectwip.data.VoiceStyle.PLAIN) {
         val t = tts ?: return
         val now = android.os.SystemClock.uptimeMillis()
         if (!ttsReady || volume <= 0f || now - lastSaid < 2200) return

@@ -79,7 +79,7 @@ class ProgressionTest {
         val verdict = ServerVerdict(8, 8, false, 1, 3, bolts = 28, credits = 6, unlocked = listOf(FighterId.BRAKK))
         val (_, rewards) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = verdict)
         assertEquals(6 to listOf(FighterId.BRAKK), rewards.credits to rewards.unlocked)
-        assertEquals("the road's prices, as the server charges them", listOf(2500, 2500, 6500, 9000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices, as the server charges them", listOf(2500, 6500, 9000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
     }
 
     @Test fun offlineMatchesEarnNothing() {
@@ -234,7 +234,7 @@ class ProgressionTest {
 
     @Test fun theRefereeReplaysAMatchExactly() {
         for ((mode, seed) in listOf(GameMode.LAST_SPARK to 11L, GameMode.KNOCKOUT_RUSH to 12L, GameMode.BOSS to 13L, GameMode.LAST_SPARK to 14L)) {
-            val config = io.github.projectwip.sim.MatchConfig(if (seed % 2 == 0L) FighterId.VARUN else FighterId.KITO, 6, 0, "Me", BotDifficulty.HARD, mode = mode, seed = seed, botNames = listOf("A", "B", "C"))
+            val config = io.github.projectwip.sim.MatchConfig(if (seed % 2 == 0L) FighterId.BUDDY else FighterId.KITO, 6, 0, "Me", BotDifficulty.HARD, mode = mode, seed = seed, botNames = listOf("A", "B", "C"))
             val live = played(config, 60 * 200, script = seed * 31)
             val verdict = io.github.projectwip.sim.Referee.judge(config, live.inputs.toBytes())
             assertEquals("$mode: same number of ticks", live.inputs.ticks, verdict.ticks)
@@ -305,8 +305,6 @@ class ProgressionTest {
         assertNotNull(Balance.unlockPrismPrice(FighterId.KITO))
         // Fighters are unlocked on the Spark Road; the Cup Track pays Credits towards it instead of handing one out.
         assertTrue(io.github.projectwip.data.SparkRoad.steps.any { it.fighter == FighterId.KITO })
-        val varun = Balance.fighter(FighterId.VARUN)
-        assertEquals("one rocket a shot, eight in the super", 1 to 8, varun.attack.projectiles to varun.superSpec.projectiles)
         assertEquals("the rarest fighter is the last one on the road", FighterId.BUDDY, io.github.projectwip.data.SparkRoad.steps.last().fighter)
         assertTrue(CupTrack.milestones.none { it.reward is Reward.UnlockFighter })
         assertEquals(io.github.projectwip.data.SparkRoad.steps.first(), io.github.projectwip.data.SparkRoad.next(SaveData()))
@@ -315,7 +313,6 @@ class ProgressionTest {
             assertTrue("${f.name} health ${f.health.base}", f.health.base >= Balance.MIN_HEALTH)
             assertTrue("${f.name} damage an ammo ${f.attackDamage.base * f.attack.projectiles}", f.attackDamage.base * f.attack.projectiles >= Balance.MIN_AMMO_DAMAGE)
         }
-        assertEquals("Varun, a legacy fighter, has been let fall below it", 950 to 60, varun.health.base to varun.attackDamage.base * varun.attack.projectiles)
     }
 
     @Test fun serverCanRetuneBotsAndFreshSavesAreRecognised() {

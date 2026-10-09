@@ -52,14 +52,15 @@ def _round(x: float) -> int:
 
 # What a fighter is: its rarity. That sets what it costs in the shop (Prisms) and on the Spark Road (Credits).
 # The starting fighter has no rarity and isn't sold. Keep in step with Balance.kt.
-FIGHTER_RARITY = {"BRAKK": "RARE", "KITO": "MYTHIC", "VARUN": "RARE", "BUDDY": "ULTRA"}
+FIGHTER_RARITY = {"BRAKK": "RARE", "KITO": "MYTHIC", "BUDDY": "ULTRA"}
 # Fighters that were in the game for a few builds and were taken out again, with the Credits each took on the
 # Spark Road. A profile that still holds one loses it and gets those Credits back.
 # (Juno was the starter until Byte took her place: she cost nothing, so nothing comes back for her. Mira was the
-# Epic stop on the road for a long while before she was taken out.)
-REMOVED_FIGHTERS = {"JUNO": 0, "MIRA": 4200, "PIP": 160, "DOZER": 160, "NOVA": 420, "FENN": 420, "VOLT": 900, "ONYX": 900, "AURA": 1600, "ZERO": 2600}
+# Epic stop on the road for a long while before she was taken out. Varun was the Legendary one: he was made a
+# legacy fighter and then removed, and what comes back is the 9,000 he cost for most of his time.)
+REMOVED_FIGHTERS = {"JUNO": 0, "MIRA": 4200, "VARUN": 9000, "PIP": 160, "DOZER": 160, "NOVA": 420, "FENN": 420, "VOLT": 900, "ONYX": 900, "AURA": 1600, "ZERO": 2600}
 # Legacy fighters: on their way out of the game, and stuck at whatever level they have. Keep in step with Balance.kt.
-NO_UPGRADES = {"VARUN"}
+NO_UPGRADES: set = set()
 RARITY_PRICE = {"RARE": 40, "EPIC": 70, "MYTHIC": 90, "LEGENDARY": 160, "ULTRA": 250}
 FIGHTER_PRICE = {name: RARITY_PRICE[rarity] for name, rarity in FIGHTER_RARITY.items()}
 SKIN_PRICE = 20  # Prisms, for every colourway but a fighter's first
