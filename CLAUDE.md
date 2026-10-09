@@ -25,7 +25,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|duel|fighters|roster|kito|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `trybyte` / `trybrakk` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
+  (`match|boss|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `trybyte` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - UI changes must be checked with a screenshot (`adb exec-out screencap -p`) and `adb logcat -b crash -d`.
 - The tablet is the user's everyday device. Before every `input tap` or `am start`, confirm
   `dumpsys window | grep mCurrentFocus` shows `io.github.projectwip` or the home screen (`com.miui.home`): on
@@ -44,6 +44,11 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   Keep their names, looks and moves original.
 - Mira was removed, by the user's decision (`REMOVED_FIGHTERS` in `economy.py` pays her road Credits back). The
   Training Area's sentry keeps her old lance shot as a def of its own (`Balance.sentry`).
+- Kira (`FighterId.KIRA`, Epic) is the user's idea: a witch whose attack poisons. Her Hex Bolt (`AttackShape.HEX`,
+  `AttackSpec.hexSeconds`) hits for 750 and then bites for 750 again every `HEX_TICK_SECONDS` (half a second) for six
+  seconds (`Fighter.hexBy`, `World.stepHex`): 9,000 in all, which is more than any fighter's health, and that is what
+  the user asked for ("insanely fast poison", 750 a tick, six seconds). Her super, Witching Hour, is a fan of the same
+  bolts. Her name, look and words are ours.
 - Bark is the dog (the user renamed him from Brakk; the code and the server still say `BRAKK`, so saves carry over).
   He is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, and a front
   leg is flung forward for each paw print: `FighterAnim.throwL/R`). His attack sound is a bark of his own (`Sound.BARK`). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its

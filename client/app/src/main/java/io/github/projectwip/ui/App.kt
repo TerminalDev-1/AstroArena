@@ -97,10 +97,11 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "train" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.TRAINING))
                 "fighters" -> Screen.Fighters()
                 "roster" -> { io.github.projectwip.ui.screens.rosterPreview = true; Screen.Fighters() }
+                "kira" -> Screen.Fighters(FighterId.KIRA)
                 "kito" -> Screen.Fighters(FighterId.KITO)
                 "buddy" -> Screen.Fighters(FighterId.BUDDY)
                 // The Training Area as any fighter, unlocked or not, for looking at them in play.
-                "trybuddy", "trykito", "trybrakk", "trybyte" -> Screen.Match(startMatchConfig(repo.save.value).copy(
+                "trybuddy", "trykito", "trykira", "trybrakk", "trybyte" -> Screen.Match(startMatchConfig(repo.save.value).copy(
                     playerFighter = FighterId.valueOf(startScreen.removePrefix("try").uppercase()), playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road

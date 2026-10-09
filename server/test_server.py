@@ -201,7 +201,8 @@ class Economy(unittest.TestCase):
         old["fighters"]["VARUN"] = {"unlocked": True, "level": 6, "ownedSkins": [0, 1], "cups": 40}
         economy.complete(old)
         self.assertNotIn("VARUN", old["fighters"])
-        self.assertTrue(old["fighters"]["BRAKK"]["unlocked"] and old["fighters"]["KITO"]["unlocked"])
+        self.assertTrue(old["fighters"]["BRAKK"]["unlocked"] and old["fighters"]["KIRA"]["unlocked"])
+        self.assertEqual(economy.shop_item("fighter_KIRA"), ({"type": "fighter", "fighter": "KIRA"}, 70))
         self.assertEqual(economy.profile_from_save({}), economy.new_profile())
 
 
@@ -908,8 +909,8 @@ class Api(unittest.TestCase):
         order = [f for f, _ in economy.SPARK_ROAD]
         cost = dict(economy.SPARK_ROAD)
         self.assertEqual([s["fighter"] for s in road["steps"]], order)
-        self.assertEqual(order, ["BRAKK", "KITO", "BUDDY"])
-        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 6500, 9000])
+        self.assertEqual(order, ["BRAKK", "KIRA", "KITO", "BUDDY"])
+        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 4200, 6500, 9000])
         self.assertEqual(road["steps"][0], {"fighter": "BRAKK", "cost": 2500, "rarity": "RARE"})
         self.assertEqual(len(road["steps"]), len(rules.FIGHTER_SKINS) - 1)
         # The road has a fixed order: the Credits go toward the first fighter along it that is still locked.

@@ -13,14 +13,15 @@ data class StatLine(val base: Int, val perLevel: Int) {
     fun at(level: Int): Int = base + perLevel * (level.coerceAtLeast(1) - 1)
 }
 
-enum class FighterId { BYTE, BRAKK, KITO, BUDDY }
+enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
 
 /**
  * [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. [SMASH] is heavy things hurled a
  * long way, one after another from alternate hands. [PAWS] are paw prints thrown one after another: each takes a share
- * of the health its target has left ([AttackSpec.healthShare]).
+ * of the health its target has left ([AttackSpec.healthShare]). [HEX] is one bolt that poisons whoever it hits
+ * ([AttackSpec.hexSeconds]).
  */
-enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS }
+enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
 enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
@@ -68,6 +69,11 @@ data class AttackSpec(
      * Against a giant it does [Balance.SHARE_GIANT_HITS] times the attack's damage instead. 0 = plain damage.
      */
     val healthShare: Float = 0f,
+    /**
+     * Each shot that lands poisons its target for this long: the hit is the first bite, and the attack's damage is
+     * done again every [Balance.HEX_TICK_SECONDS] until the time is up. Another hit starts the time again. 0 = no poison.
+     */
+    val hexSeconds: Float = 0f,
 )
 
 data class SuperSpec(
@@ -225,6 +231,8 @@ object Balance {
      * A boss gets no less: the full time, by the user's decision.
      */
     const val THRALL_SECONDS = 21f
+    /** A hex ([AttackSpec.hexSeconds]) bites this often: fast. */
+    const val HEX_TICK_SECONDS = 0.5f
     /** A [SuperKind.CORRUPT] poison bites this often. The super's damage is what it does each second. */
     const val POISON_TICK_SECONDS = 0.5f
     /** The poison wears off after this long (or with a knockout)... */
@@ -324,6 +332,31 @@ object Balance {
                 Skin("Rustbucket", 0xFF8C9A5B, 0xFFE0702A, 0xFFFFD166, 0),
                 Skin("Chrome", 0xFFB9C6D6, 0xFF3A86FF, 0xFFE9F5FF, 20),
                 Skin("Lava Core", 0xFF3B2F2F, 0xFFFF5A1F, 0xFFFFC145, 20),
+            ),
+        ),
+        FighterDef(
+            id = FighterId.KIRA,
+            rarity = Rarity.EPIC,
+            name = "Kira",
+            title = "Hedge Witch",
+            role = "Hexer",
+            lore = "Sold cough syrup from a market stall until somebody asked what was in it. She has stopped pretending it was ever cough syrup.",
+            attackName = "Hex Bolt",
+            health = StatLine(6600, 330),
+            // One bite of the poison: the hit is the first, and it bites again every half second for six seconds.
+            attackDamage = StatLine(750, 38),
+            superDamage = StatLine(750, 38),
+            moveSpeed = 3.7f,
+            attack = AttackSpec(AttackShape.HEX, projectiles = 1, spreadDegrees = 0f, range = 7.5f, speed = 15f, radius = 0.2f, burstInterval = 0f, hexSeconds = 6f),
+            superSpec = SuperSpec(SuperKind.VOLLEY, "Witching Hour", "A wide fan of 7 hex bolts. Every one that lands poisons whoever it hits, just as her attack does.", projectiles = 7, spreadDegrees = 60f, range = 7f, speed = 15f, radius = 0.2f),
+            ammoMax = 3,
+            reloadSeconds = 1.7f,
+            superChargePerHit = 0.2f,
+            radius = 0.4f,
+            skins = listOf(
+                Skin("Nightshade", 0xFF2E3A59, 0xFF7CFF4F, 0xFFFFD23F, 0),
+                Skin("Toadstool", 0xFFC8362E, 0xFFFFF1D6, 0xFF7CFF4F, 20),
+                Skin("Frostbloom", 0xFFE6F1FF, 0xFF4CC9F0, 0xFFFF7AD9, 20),
             ),
         ),
         FighterDef(

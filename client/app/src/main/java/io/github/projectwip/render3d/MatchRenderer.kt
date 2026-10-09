@@ -833,6 +833,13 @@ class MatchRenderer(
                 setModel(x - 0.5f + full * typed / 2f, y + 0.24f - line * 0.12f, z + 0.08f, full * typed, 0.05f, 0.03f); bit.draw()
             }
         }
+        // Poison bubbles up off anyone who is hexed.
+        for (f in world.fighters) {
+            if (!f.hexed || !f.alive || !shown(f) || rng.nextFloat() > 0.5f) continue
+            val a = rng.nextFloat() * 6.28f
+            val c = world.fighter(f.hexBy)?.let { it.def.skins[it.skin].secondary.toInt() } ?: 0xFF7CFF4F.toInt()
+            particles.spawn(f.x + cos(a) * 0.35f, 0.3f + rng.nextFloat() * 0.9f, f.y + sin(a) * 0.35f, 0f, 1.6f + rng.nextFloat() * 1.4f, 0f, 0.55f, 0.16f, c, 0.9f)
+        }
         // Sparks of stray code come off anyone who is corrupted and standing there.
         for (f in world.fighters) {
             if (!f.enthralled || !f.alive || !shown(f) || rng.nextFloat() > 0.35f) continue
@@ -873,6 +880,17 @@ class MatchRenderer(
                     setModel(x, y - size * 0.73f, z, size * 0.7f, size * 0.08f, size * 0.45f, spin); bit.draw()
                     tint(0xFF8C95B4)
                     setModel(x, y - size * 0.95f, z, size * 1.05f, size * 0.07f, size * 0.36f, spin + 35f); bit.draw()
+                }
+                ShotStyle.HEX -> {
+                    // A hex bolt: a boiling ball of poison with bubbles circling it.
+                    val k = pr.radius * (if (pr.isSuper) 1.3f else 1.15f) * (1f + 0.12f * sin(pr.age * 26f))
+                    tint(skin.secondary)
+                    setModel(x, 0.75f, z, k, k, k); sphere.draw()
+                    tint(skin.accent)
+                    for (i in 0 until 3) {
+                        val a = pr.age * 11f + i * 2.094f
+                        setModel(x + cos(a) * k * 1.5f, 0.75f + sin(a * 1.3f) * k * 0.8f, z + sin(a) * k * 1.5f, k * 0.32f, k * 0.32f, k * 0.32f); sphere.draw()
+                    }
                 }
                 ShotStyle.PAW -> {
                     // A paw print flying flat, toes first: the big pad, and four toes fanned out ahead of it.
@@ -1293,6 +1311,7 @@ class MatchRenderer(
     private fun headHeight(id: FighterId) = FIGHTER_SCALE * when (id) {
         FighterId.BYTE -> 1.85f
         FighterId.BRAKK -> 1.6f
+        FighterId.KIRA -> 2.25f
         FighterId.KITO -> 1.9f
         FighterId.BUDDY -> 2.05f
     }

@@ -104,6 +104,13 @@ class Fighter(
     var latchedTo = -1
     val latched get() = latchedTo >= 0
 
+    // Hexed (Kira's poison): who did it (-1 = nobody), what each bite does, the time to the next, and how long is left.
+    var hexBy = -1
+    var hexDamage = 0
+    var hexTick = 0f
+    var hexLeft = 0f
+    val hexed get() = hexBy >= 0
+
     // Corrupted (what Buddy's super leaves behind): whose it is (-1 = nobody's), how long it has left, and whether it
     // is on its way over to them right now (rather than standing in front of them).
     var thrallOf = -1
@@ -142,7 +149,7 @@ class Fighter(
     val isDashing get() = dashTime > 0f
 }
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX }
 
 class Projectile(
     val ownerId: Int,
@@ -163,6 +170,8 @@ class Projectile(
     val knock: Float = 0f,
     /** Takes this share of the health its target has left, when that is more than [damage] (0 = plain damage). */
     val share: Float = 0f,
+    /** Poisons whoever it hits for this many seconds (0 = it doesn't): see `AttackSpec.hexSeconds`. */
+    val hex: Float = 0f,
 ) {
     var prevX = x
     var prevY = y

@@ -444,6 +444,7 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
     Spacer(Modifier.height(6.dp))
     PlainText("${def.superSpec.name}: ${def.superSpec.description}", Type.Small, color = Palette.Text)
     val pct = { v: Float -> "${Math.round(v * 100)}%" }
+    if (def.attack.hexSeconds > 0f) PlainText("${def.attackName}: a hit poisons. That damage is done again every ${if (Balance.HEX_TICK_SECONDS == 0.5f) "half second" else "${Balance.HEX_TICK_SECONDS} seconds"} for ${def.attack.hexSeconds.toInt()} seconds, and another hit starts the time again.", Type.Small, color = Palette.Text)
     if (def.attack.healthShare > 0f) PlainText("${def.attackName}: each one takes ${pct(def.attack.healthShare)} of the health its target has left, and never less than its own damage.", Type.Small, color = Palette.Text)
     PlainText("Hyper: for ${(def.hyper?.seconds ?: Balance.HYPER_SECONDS).toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage and +${pct(Balance.HYPER_HEALTH_BONUS)} health.", Type.Small, color = Palette.Text)
     def.hyper?.let { PlainText("${it.name}, ${def.name}'s own hyper: ${it.description}", Type.Small, color = Palette.Gold) }

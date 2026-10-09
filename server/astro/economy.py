@@ -52,7 +52,7 @@ def _round(x: float) -> int:
 
 # What a fighter is: its rarity. That sets what it costs in the shop (Prisms) and on the Spark Road (Credits).
 # The starting fighter has no rarity and isn't sold. Keep in step with Balance.kt.
-FIGHTER_RARITY = {"BRAKK": "RARE", "KITO": "MYTHIC", "BUDDY": "ULTRA"}
+FIGHTER_RARITY = {"BRAKK": "RARE", "KIRA": "EPIC", "KITO": "MYTHIC", "BUDDY": "ULTRA"}
 # Fighters that were in the game for a few builds and were taken out again, with the Credits each took on the
 # Spark Road. A profile that still holds one loses it and gets those Credits back.
 # (Juno was the starter until Byte took her place: she cost nothing, so nothing comes back for her. Mira was the

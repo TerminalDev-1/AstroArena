@@ -187,7 +187,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf)
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexBy)
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -323,6 +323,7 @@ class World(
             f.ammo = (f.ammo + dt / f.def.reloadSeconds).coerceAtMost(f.def.ammoMax.toFloat())
         }
 
+        if (f.hexed) stepHex(f, dt)
         // Malformed code stops its victim healing while it lasts.
         if (f.poisoned) stepPoison(f, dt) else regenerate(f, dt)
     }
@@ -412,6 +413,24 @@ class World(
         f.x = spot.x; f.y = spot.y
     }
 
+    /** A hex bites: the same damage again, every [Balance.HEX_TICK_SECONDS], until its time is up. */
+    private fun stepHex(f: Fighter, dt: Float) {
+        if (phase != Phase.PLAYING) return
+        f.hexLeft -= dt
+        f.hexTick -= dt
+        if (f.hexTick <= 0f) {
+            f.hexTick += Balance.HEX_TICK_SECONDS
+            // (Only the bolt itself charges the super: the bites that follow don't.)
+            damage(f, fighter(f.hexBy), f.hexDamage, false, f.x, f.y, charge = false)
+        }
+        if (f.alive && f.hexLeft <= 0f) unhex(f)
+    }
+
+    private fun unhex(f: Fighter) {
+        f.hexBy = -1
+        f.hexDamage = 0
+    }
+
     private fun cure(f: Fighter) {
         f.poisonBy = -1
         f.poisonDamage = 0
@@ -485,13 +504,14 @@ class World(
             AttackShape.ROCKETS -> ShotStyle.ROCKET
             AttackShape.SMASH -> ShotStyle.COMPUTER
             AttackShape.PAWS -> ShotStyle.PAW
+            AttackShape.HEX -> ShotStyle.HEX
         }
         val baseAng = atan2(dy, dx)
         val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
         val spread = Math.toRadians(a.spreadDegrees.toDouble()).toFloat()
         for (i in 0 until n) {
             val ang = if (n == 1) baseAng else baseAng - spread / 2 + spread * i / (n - 1)
-            spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast, share = a.healthShare * f.damageMultiplier)
+            spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast, share = a.healthShare * f.damageMultiplier, hex = a.hexSeconds)
         }
     }
 
@@ -506,7 +526,10 @@ class World(
                 val spread = Math.toRadians(s.spreadDegrees.toDouble()).toFloat()
                 for (i in 0 until s.projectiles) {
                     val ang = baseAng - spread / 2 + spread * i / (s.projectiles - 1)
-                    spawnProjectile(f, ang, s.speed, s.radius, f.superDamage, s.range, false, true, if (f.def.attack.bits) ShotStyle.BIT else ShotStyle.VOLLEY, knock = s.knockback)
+                    // (A witch's volley is hex bolts, and poisons as her attack does.)
+                    val hexes = f.def.attack.shape == AttackShape.HEX
+                    spawnProjectile(f, ang, s.speed, s.radius, f.superDamage, s.range, false, true,
+                        if (hexes) ShotStyle.HEX else if (f.def.attack.bits) ShotStyle.BIT else ShotStyle.VOLLEY, knock = s.knockback, hex = if (hexes) f.def.attack.hexSeconds else 0f)
                 }
             }
             SuperKind.PIERCE -> spawnProjectile(f, baseAng, s.speed, s.radius, f.superDamage, s.range, true, true, ShotStyle.LANCE)
@@ -551,7 +574,7 @@ class World(
 
     private fun spawnProjectile(
         f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float,
-        pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f, knock: Float = 0f, share: Float = 0f,
+        pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f, knock: Float = 0f, share: Float = 0f, hex: Float = 0f,
     ) {
         val dx = cos(ang)
         val dy = sin(ang)
@@ -559,7 +582,7 @@ class World(
         val off = f.radius * 0.6f
         val sx = f.x + dx * off - dy * side
         val sy = f.y + dy * off + dx * side
-        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock, share)
+        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock, share, hex)
         if (arena.tileAt(sx, sy).blocksShots) {
             events += GameEvent.WallHit(sx, sy, style)
             return
@@ -700,6 +723,13 @@ class World(
                         if (p.blast > 0f) { detonate(p, p.x, p.y); p.alive = false; break@loop }
                         val owner = fighter(p.ownerId)
                         damage(f, owner, shotDamage(p, f), p.isSuper, p.x, p.y)
+                        // The hit was the first bite of a hex; the rest follow.
+                        if (p.hex > 0f && f.alive && f.shield <= 0f && !f.isLeaping) {
+                            f.hexBy = p.ownerId
+                            f.hexDamage = p.damage
+                            f.hexTick = Balance.HEX_TICK_SECONDS
+                            f.hexLeft = p.hex - Balance.HEX_TICK_SECONDS / 2f
+                        }
                         if (p.knock > 0f && f.alive && !f.rooted && speed > 0f) {
                             arena.moveCircle(f.x, f.y, f.radius, p.vx / speed * p.knock, p.vy / speed * p.knock, tmp)
                             f.x = tmp[0]; f.y = tmp[1]
@@ -726,7 +756,7 @@ class World(
     }
 
     /** [lethal] false: the hit can take the target down to its last point of health, but never knocks it out. */
-    private fun damage(target: Fighter, source: Fighter?, wanted: Int, isSuper: Boolean, x: Float, y: Float, lethal: Boolean = true) {
+    private fun damage(target: Fighter, source: Fighter?, wanted: Int, isSuper: Boolean, x: Float, y: Float, lethal: Boolean = true, charge: Boolean = true) {
         val amount = if (lethal) wanted else minOf(wanted, target.hp - 1)
         // (Nothing reaches a fighter in the middle of a leap.)
         if (target.shield > 0f || target.isLeaping || amount <= 0) {
@@ -741,7 +771,7 @@ class World(
         target.lastAttackerId = source?.id ?: -1
         if (source != null) {
             source.damageDealt += dealt
-            if (!isSuper) {
+            if (!isSuper && charge) {
                 val before = source.superReady
                 val faster = if (source.hyperActive) source.def.hyper?.superCharge ?: 1f else 1f
                 source.superCharge = (source.superCharge + source.def.superChargePerHit * faster).coerceAtMost(1f)
@@ -765,6 +795,7 @@ class World(
         victim.pending.clear()
         victim.dashTime = 0f
         victim.leapTime = 0f
+        unhex(victim)
         victim.latchedTo = -1
         release(victim)
         cure(victim)

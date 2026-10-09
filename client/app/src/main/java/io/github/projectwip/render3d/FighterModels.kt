@@ -62,6 +62,7 @@ class FighterModels {
     init {
         models[FighterId.BYTE] = buildByte()
         models[FighterId.BRAKK] = buildBrakk()
+        models[FighterId.KIRA] = buildKira()
         models[FighterId.KITO] = buildKito()
         models[FighterId.BUDDY] = buildBuddy()
         bossModels[io.github.projectwip.data.BossKind.BARRAGE] = buildHailstorm()
@@ -176,6 +177,52 @@ class FighterModels {
         // Tail: up and over, with a bright tip.
         a.add(Bone.ARM, Slot.PRIMARY) { at(-0.08f, 0.13f, 0f) { rotate(32f, 0f, 0f, 1f); capsule(0.055f, 0.24f) } }
         a.add(Bone.ARM, Slot.SECONDARY) { at(-0.19f, 0.29f, 0f) { sphere(0.075f, 8, 10) } }
+        return a.build(rig)
+    }
+
+    // ------------------------------------------------------------------ Kira — hedge witch
+
+    private fun buildKira(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 1.0f, hipY = 0.3f, hipZ = 0.12f, shoulder = floatArrayOf(0.08f, 0.78f, 0.3f), shoulderL = floatArrayOf(0f, 0.84f, -0.3f), floatY = 1.2f)
+        // Pointed shoes under a long robe that flares to the ground.
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.DARK) { at(0f, -0.12f, 0f) { capsule(0.07f, 0.12f) } }
+            a.add(bone, Slot.DARK) { at(0.07f, -0.27f, 0f) { roundedBox(0.3f, 0.09f, 0.14f, 0.04f) } }
+            a.add(bone, Slot.ACCENT) { at(0.24f, -0.22f, 0f) { sphere(0.05f, 6, 8) } }
+        }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.5f, 0f) { cylinder(0.46f, 0.8f, 18, topRadius = 0.2f) } }
+        a.add(Bone.BODY, Slot.DARK) { at(0f, 0.13f, 0f) { torus(0.45f, 0.045f, 22, 6) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0f, 0.6f, 0f) { torus(0.31f, 0.045f, 18, 6) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false) { at(0.31f, 0.6f, 0f) { roundedBox(0.06f, 0.11f, 0.11f, 0.02f) } }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.9f, 0f) { ellipsoid(0.25f, 0.14f, 0.29f) } }
+        // Three little bottles on her belt, each with something glowing in it.
+        a.add(Bone.BODY, Slot.SECONDARY, outline = false, emissive = true) {
+            for (z in listOf(0.2f, 0.3f)) at(0.18f, 0.48f, z) { capsule(0.04f, 0.07f) }
+            at(0.16f, 0.48f, -0.26f) { capsule(0.04f, 0.07f) }
+        }
+        // Head: a pale face, hair down her back, and the hat: a wide brim and a tall crooked point.
+        a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.16f, 0f) { sphere(0.28f) } }
+        a.add(Bone.HEAD, Slot.DARK) { at(-0.08f, 0.14f, 0f) { ellipsoid(0.3f, 0.34f, 0.31f, 8, 16, 0f, 0.55f) } }
+        a.add(Bone.HEAD, Slot.DARK) { at(-0.22f, -0.08f, 0f) { roundedBox(0.2f, 0.36f, 0.46f, 0.08f) } }
+        a.add(Bone.HEAD, Slot.INK, outline = false) {
+            at(0.255f, 0.17f, 0.1f) { sphere(0.045f, 6, 8) }
+            at(0.255f, 0.17f, -0.1f) { sphere(0.045f, 6, 8) }
+        }
+        a.add(Bone.HEAD, Slot.SECONDARY, outline = false, emissive = true) { at(0.27f, 0.06f, 0f) { roundedBox(0.03f, 0.03f, 0.14f, 0.01f) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(0f, 0.38f, 0f) { cylinder(0.52f, 0.05f, 22) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.04f, 0.68f, 0f) { rotate(12f, 0f, 0f, 1f); cylinder(0.29f, 0.62f, 14, topRadius = 0.02f) } }
+        a.add(Bone.HEAD, Slot.SECONDARY) { at(0f, 0.44f, 0f) { torus(0.29f, 0.05f, 18, 6) } }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false) { at(0.3f, 0.45f, 0f) { roundedBox(0.05f, 0.12f, 0.12f, 0.02f) } }
+        // A wisp of the stuff follows her about.
+        a.add(Bone.FLOAT, Slot.SECONDARY, outline = false, emissive = true) { at(-0.45f, 0f, 0.4f) { sphere(0.09f, 8, 10) } }
+        // Her staff: a crooked stick with a ball of poison held in a claw at the end.
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.38f, 0f, 0f) { alongX { cylinder(0.04f, 1.0f, 8) } } }
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.86f, 0f, 0f) { alongX { torus(0.1f, 0.03f, 10, 5) } } }
+        a.add(Bone.WEAPON, Slot.SECONDARY, emissive = true) { at(0.97f, 0f, 0f) { sphere(0.14f, 8, 12) } }
+        a.add(Bone.WEAPON, Slot.SKIN) { at(0.06f, 0f, 0f) { sphere(0.08f, 8, 10) } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.1f, 0f) { capsule(0.085f, 0.14f) } }
+        a.add(Bone.ARM, Slot.SKIN) { at(0f, -0.27f, 0f) { sphere(0.08f, 8, 10) } }
         return a.build(rig)
     }
 
