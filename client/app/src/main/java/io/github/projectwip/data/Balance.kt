@@ -224,8 +224,8 @@ object Balance {
      * stops in front of them and stands there, unable to do anything (and walks after them again if they move off).
      * A boss comes round much sooner.
      */
-    const val THRALL_SECONDS = 16f
-    const val THRALL_GIANT_SECONDS = 4f
+    const val THRALL_SECONDS = 61f
+    const val THRALL_GIANT_SECONDS = 15f
     /** A [SuperKind.CORRUPT] poison bites this often. The super's damage is what it does each second. */
     const val POISON_TICK_SECONDS = 0.5f
     /** The poison wears off after this long (or with a knockout)... */
@@ -364,11 +364,12 @@ object Balance {
             health = StatLine(8500, 425),
             // Each of the three computers.
             attackDamage = StatLine(1250, 63),
-            // The poison's damage each second.
-            superDamage = StatLine(1000, 50),
+            // The code does no damage of its own any more (the user took it away: it was finishing bosses too soon).
+            // It pins its victim, stops them healing, and leaves them corrupted.
+            superDamage = StatLine(0, 0),
             moveSpeed = 3.75f,
             attack = AttackSpec(AttackShape.SMASH, projectiles = 3, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.36f, burstInterval = 0.14f),
-            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Aim it at an enemy (or tap, and it picks the nearest): he leaps high along the line, latches onto the back of the first one on it and compiles malformed code into them: a poison that stops their healing for 6 seconds. Whoever is left standing then walks over and stands in front of him for 16 seconds, out of their mind (a boss shakes it all off sooner).", range = 6.75f, speed = 30f, radius = 0f),
+            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Aim it at an enemy (or tap, and it picks the nearest): he leaps high along the line, latches onto the back of the first one on it and compiles malformed code into them for 6 seconds. It does no damage, but they cannot heal, and afterwards they are corrupted: for about a minute they follow him around and stand in front of him, out of their mind (a boss shakes it all off sooner).", range = 6.75f, speed = 30f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
             // (A third computer in every attack: each one charges a third less, so the super comes as often as it did.)

@@ -654,7 +654,7 @@ class SimulationTest {
         assertTrue(w.projectiles.none { it.ownerId == buddy.id })
         assertTrue("he comes down on the back of the first enemy on the line", kotlin.math.hypot(buddy.x - near.x, buddy.y - near.y) < buddy.radius + near.radius + 0.6f)
         assertTrue("and they are the one poisoned", near.poisoned && !far.poisoned)
-        assertEquals("a thousand a second", 1000, near.poisonDamage)
+        assertEquals("the code itself does no damage", 0, near.poisonDamage)
         assertEquals("he stays latched on while the code goes in", near.id, buddy.latchedTo)
         // Wherever they go he goes too, and he does nothing else.
         near.x += 1f
@@ -671,7 +671,7 @@ class SimulationTest {
             last = near.hp
         }
         assertEquals("it wears off by itself", Balance.POISON_SECONDS, t, 0.2f)
-        assertTrue("having hurt, but not finished, a healthy fighter", near.alive && near.hp < near.maxHp)
+        assertEquals("and has not hurt them at all", near.maxHp, near.hp)
         assertFalse("who could not heal through it", healedWhilePoisoned)
         assertEquals(far.maxHp, far.hp)
         assertTrue("a boss shakes it off sooner still", Balance.POISON_GIANT_SECONDS < Balance.POISON_SECONDS)
@@ -694,7 +694,8 @@ class SimulationTest {
         assertEquals("motionless, whatever they try", stood, near.x to near.y)
         assertTrue("and harmless", w.projectiles.none { it.ownerId == near.id })
         repeat((Balance.THRALL_SECONDS / 2 / Match.STEP).toInt() + 5) { w.step(Match.STEP) }
-        assertFalse("for sixteen seconds, and then they are their own again", near.enthralled)
+        assertFalse("for a minute and a second, and then they are their own again", near.enthralled)
+        assertEquals(61f, Balance.THRALL_SECONDS, 0f)
         // It only reaches three quarters as far as it used to.
         assertEquals(6.75f, buddy.def.superSpec.range, 0f)
         println("malformed code did ${near.maxHp - near.hp} of ${near.maxHp} health")
@@ -778,7 +779,7 @@ class SimulationTest {
             assertTrue("he lands on the boss's back too", boss.poisoned && !buddy.isLeaping)
             repeat(((Balance.POISON_GIANT_SECONDS + 1f) / Match.STEP).toInt()) { w.step(Match.STEP) }
             assertFalse("a boss is not doomed by one super", boss.poisoned)
-            assertTrue(boss.alive && boss.hp < boss.maxHp)
+            assertEquals("and the code has not hurt it", boss.maxHp, boss.hp)
         }
     }
 

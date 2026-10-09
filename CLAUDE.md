@@ -74,9 +74,10 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   there (`Fighter.latchedTo`, `World.stepLatch`: he rides wherever they go and can do nothing else, but can be hit), a
   terminal stays open over them (drawn in `MatchRenderer`), and they are poisoned (`Fighter.poisonBy`,
   `World.stepPoison`): no healing while it lasts. Whoever comes through it is corrupted (`Fighter.thrallOf`,
-  `World.stepThrall`): for `THRALL_SECONDS` (16; a boss `THRALL_GIANT_SECONDS`) it walks over to Buddy, stops in
+  `World.stepThrall`): for `THRALL_SECONDS` (61; a boss `THRALL_GIANT_SECONDS`) it walks over to Buddy, stops in
   front of him and stands there (following if he moves off), unable to do anything, while the renderer has it going berserk on the spot. That
-  is the user's design, 16 seconds included: don't shorten it. It wears off after `POISON_SECONDS` (a boss after
+  is the user's design, the 61 seconds included: don't shorten it. The code does no damage (the user took it from
+  1,000 a second to none, because it was finishing bosses too soon): don't give it any back. It wears off after `POISON_SECONDS` (a boss after
   `POISON_GIANT_SECONDS`): the user took away the poison that never ended and cut the super's range by a quarter.
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
   With nobody on the line the super isn't spent. His face is a hologram: a flat lit screen over a projector ring, no head.

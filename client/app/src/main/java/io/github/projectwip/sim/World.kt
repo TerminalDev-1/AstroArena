@@ -352,7 +352,8 @@ class World(
         f.poisonTick -= dt
         if (f.poisonTick <= 0f) {
             f.poisonTick += Balance.POISON_TICK_SECONDS
-            damage(f, fighter(f.poisonBy), (f.poisonDamage * Balance.POISON_TICK_SECONDS).toInt().coerceAtLeast(1), true, f.x, f.y)
+            // (Code that does no damage just runs its course.)
+            if (f.poisonDamage > 0) damage(f, fighter(f.poisonBy), (f.poisonDamage * Balance.POISON_TICK_SECONDS).toInt().coerceAtLeast(1), true, f.x, f.y)
         }
         if (f.alive && f.poisonLeft <= 0f) {
             // It has run its course, and whoever came through it is corrupted.
