@@ -365,7 +365,7 @@ class World(
 
     private fun enthrall(f: Fighter, by: Fighter) {
         f.thrallOf = by.id
-        f.thrallLeft = if (f.scale > 1f) Balance.THRALL_GIANT_SECONDS else Balance.THRALL_SECONDS
+        f.thrallLeft = Balance.THRALL_SECONDS
         f.dashTime = 0f
         f.pending.clear()
         f.revealTimer = maxOf(f.revealTimer, 1.5f)

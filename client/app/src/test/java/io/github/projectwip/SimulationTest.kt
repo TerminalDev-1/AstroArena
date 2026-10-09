@@ -780,6 +780,7 @@ class SimulationTest {
             repeat(((Balance.POISON_GIANT_SECONDS + 1f) / Match.STEP).toInt()) { w.step(Match.STEP) }
             assertFalse("a boss is not doomed by one super", boss.poisoned)
             assertEquals("and the code has not hurt it", boss.maxHp, boss.hp)
+            assertTrue("then it is corrupted, for as long as anyone is", boss.enthralled && boss.thrallLeft > Balance.THRALL_SECONDS - 2f)
         }
     }
 
