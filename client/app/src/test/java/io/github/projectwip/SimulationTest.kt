@@ -694,8 +694,8 @@ class SimulationTest {
         assertEquals("motionless, whatever they try", stood, near.x to near.y)
         assertTrue("and harmless", w.projectiles.none { it.ownerId == near.id })
         repeat((Balance.THRALL_SECONDS / 2 / Match.STEP).toInt() + 5) { w.step(Match.STEP) }
-        assertFalse("for a minute and a second, and then they are their own again", near.enthralled)
-        assertEquals(61f, Balance.THRALL_SECONDS, 0f)
+        assertFalse("for twenty-one seconds, and then they are their own again", near.enthralled)
+        assertEquals(21f, Balance.THRALL_SECONDS, 0f)
         // It only reaches three quarters as far as it used to.
         assertEquals(6.75f, buddy.def.superSpec.range, 0f)
         println("malformed code did ${near.maxHp - near.hp} of ${near.maxHp} health")
