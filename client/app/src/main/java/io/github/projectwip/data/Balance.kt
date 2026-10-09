@@ -402,7 +402,7 @@ object Balance {
     private fun bossDef(kind: BossKind, name: String, title: String, lore: String, health: Int, speed: Float, standOff: Float, skin: Skin) = FighterDef(
         id = FighterId.BYTE, rarity = Rarity.STARTER, boss = kind,
         name = name, title = title, role = "Boss", lore = lore, attackName = "",
-        health = StatLine(health, 0), attackDamage = StatLine(400, 0), superDamage = StatLine(950, 0),
+        health = StatLine(health, 0), attackDamage = StatLine(500, 0), superDamage = StatLine(1190, 0),
         moveSpeed = speed,
         attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 30f, range = standOff, speed = 14f, radius = 0.24f, burstInterval = 0f),
         superSpec = SuperSpec(SuperKind.RAM, "Charge", "", range = 7f, speed = 12.5f, radius = 0.9f),
@@ -414,11 +414,11 @@ object Balance {
     val bosses: List<FighterDef> by lazy {
         listOf(
             bossDef(BossKind.BARRAGE, "Hailstorm", "Rocket Platform", "A walking launch pad. Whatever it points at is about to have a very bad few seconds.",
-                60000, 2.1f, 8f, Skin("Launch Grey", 0xFF6C7A89, 0xFFFF6A1F, 0xFFFFD23F, 0)),
+                75000, 2.1f, 8f, Skin("Launch Grey", 0xFF6C7A89, 0xFFFF6A1F, 0xFFFFD23F, 0)),
             bossDef(BossKind.SWEEPER, "Lighthouse", "Beam Sweeper", "Built to guide ships home. Nobody is sure who taught it to turn the light all the way up.",
-                52000, 2.3f, 7f, Skin("Harbour", 0xFFE8EEF5, 0xFF2EC4F1, 0xFFFF4FA3, 0)),
+                65000, 2.3f, 7f, Skin("Harbour", 0xFFE8EEF5, 0xFF2EC4F1, 0xFFFF4FA3, 0)),
             bossDef(BossKind.STAMPEDE, "Ramrod", "Wrecking Bull", "Head down, eyes shut, straight ahead. It has never once gone round anything.",
-                70000, 2.7f, 3f, Skin("Oxblood", 0xFF9B2D30, 0xFFE9D8A6, 0xFFFFC145, 0)),
+                88000, 2.7f, 3f, Skin("Oxblood", 0xFF9B2D30, 0xFFE9D8A6, 0xFFFFC145, 0)),
         )
     }
 

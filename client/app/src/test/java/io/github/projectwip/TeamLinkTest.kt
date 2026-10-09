@@ -140,7 +140,7 @@ class TeamLinkTest {
         assertTrue("and it is the one they brought", devices.all { it.match.player.def.id == it.fighter })
         assertEquals("three players and the boss", 4, devices[0].match.world.fighters.size)
         val boss = devices[0].match.world.fighters.last()
-        assertEquals("the boss is tougher for a team of three", Math.round(52000 * (1f + 2 * Match.TEAM_BOSS_HEALTH)), boss.maxHp)
+        assertEquals("the boss is tougher for a team of three", Math.round(65000 * (1f + 2 * Match.TEAM_BOSS_HEALTH)), boss.maxHp)
         assertTrue("they really fought it", boss.damageTaken() > 0)
         // The server's replay, from the frames the lobby kept, is that match.
         repeat(2000) { if (synchronized(kept) { kept.frames.minOf { it.size() } } < 17 * (ran - DuelLink.DELAY)) Thread.sleep(5) }

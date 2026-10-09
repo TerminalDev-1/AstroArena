@@ -90,16 +90,16 @@ internal class BossScript(private val w: World, private val me: Fighter) {
                 for (i in 0 until rockets) {
                     val a = w.rng.nextFloat() * 6.283f
                     val r = if (i == 0) 0f else 0.8f + w.rng.nextFloat() * 1.9f
-                    mark(leadX + cos(a) * r, leadY + sin(a) * r, 1.25f, 1.15f + i * 0.16f, 1100, HazardKind.ROCKET)
+                    mark(leadX + cos(a) * r, leadY + sin(a) * r, 1.25f, 1.15f + i * 0.16f, 1375, HazardKind.ROCKET)
                 }
                 w.announce(GameEvent.Shot(me.id, true, me.x, me.y, 0f, 0f))
             }
-            1 -> { face(aim()); fan(aim(), 11, 80f, 12f, 0.24f, 380, 9f, ShotStyle.PELLET) }
+            1 -> { face(aim()); fan(aim(), 11, 80f, 12f, 0.24f, 475, 9f, ShotStyle.PELLET) }
             else -> {
                 // A line of rockets walking out from the boss toward the target.
                 val a = aim()
                 face(a)
-                for (i in 1..(if (enraged) 9 else 7)) mark(me.x + cos(a) * (1.6f + i * 1.35f), me.y + sin(a) * (1.6f + i * 1.35f), 1.05f, 0.6f + i * 0.14f, 950, HazardKind.ROCKET)
+                for (i in 1..(if (enraged) 9 else 7)) mark(me.x + cos(a) * (1.6f + i * 1.35f), me.y + sin(a) * (1.6f + i * 1.35f), 1.05f, 0.6f + i * 0.14f, 1190, HazardKind.ROCKET)
                 w.announce(GameEvent.Shot(me.id, true, me.x, me.y, cos(a), sin(a)))
             }
         }
@@ -118,7 +118,7 @@ internal class BossScript(private val w: World, private val me: Fighter) {
                 for (i in 0 until bolts) after(0.4f + i * 0.06f) {
                     val angle = base + dir * (-0.9f + 1.8f * i / (bolts - 1))
                     face(angle)
-                    w.bossShot(me, angle, 17f, 0.2f, 520, 12f, true, ShotStyle.PRISM)
+                    w.bossShot(me, angle, 17f, 0.2f, 650, 12f, true, ShotStyle.PRISM)
                     if (i % 4 == 0) w.announce(GameEvent.Shot(me.id, false, me.x, me.y, cos(angle), sin(angle)))
                 }
                 return 3.4f
@@ -127,7 +127,7 @@ internal class BossScript(private val w: World, private val me: Fighter) {
                 // A slow ring going out in every direction, with gaps to slip through. Enraged, a second one fills them.
                 val offset = w.rng.nextFloat() * 6.283f
                 fun ring(shift: Float) {
-                    for (i in 0 until 22) w.bossShot(me, offset + shift + i * 6.283f / 22, 8.5f, 0.24f, 400, 10f, false, ShotStyle.PELLET)
+                    for (i in 0 until 22) w.bossShot(me, offset + shift + i * 6.283f / 22, 8.5f, 0.24f, 500, 10f, false, ShotStyle.PELLET)
                     w.announce(GameEvent.Shot(me.id, true, me.x, me.y, 0f, 0f))
                 }
                 ring(0f)
@@ -136,10 +136,10 @@ internal class BossScript(private val w: World, private val me: Fighter) {
             else -> {
                 // Mines laid in a circle round the target, and one underneath: there is a way out, for a moment.
                 val mines = if (enraged) 9 else 6
-                mark(seenX, seenY, 1.15f, 1.9f, 1000, HazardKind.MINE)
+                mark(seenX, seenY, 1.15f, 1.9f, 1250, HazardKind.MINE)
                 for (i in 0 until mines) {
                     val a = i * 6.283f / mines
-                    mark(seenX + cos(a) * 2.6f, seenY + sin(a) * 2.6f, 1.15f, 1.9f + (i % 3) * 0.2f, 1000, HazardKind.MINE)
+                    mark(seenX + cos(a) * 2.6f, seenY + sin(a) * 2.6f, 1.15f, 1.9f + (i % 3) * 0.2f, 1250, HazardKind.MINE)
                 }
             }
         }
@@ -153,7 +153,7 @@ internal class BossScript(private val w: World, private val me: Fighter) {
         when {
             distance < 3.6f -> {
                 // The target is close: it rears up and brings the floor down all round itself.
-                mark(me.x, me.y, 3.2f, 0.85f, 1500, HazardKind.SLAM)
+                mark(me.x, me.y, 3.2f, 0.85f, 1875, HazardKind.SLAM)
                 return 2.2f
             }
             turn % 2 == 0 -> {
@@ -164,13 +164,13 @@ internal class BossScript(private val w: World, private val me: Fighter) {
                     val a = aim()
                     face(a)
                     w.startDash(me, cos(a), sin(a))
-                    after(spec.range / spec.speed) { mark(me.x, me.y, 2.1f, 0.55f, 900, HazardKind.SLAM) }
+                    after(spec.range / spec.speed) { mark(me.x, me.y, 2.1f, 0.55f, 1125, HazardKind.SLAM) }
                 }
                 return 1.6f + charges * 1.5f
             }
             else -> {
                 // Three quick blasts of shrapnel.
-                for (k in 0 until 3) after(k * 0.22f) { face(aim()); fan(aim(), 7, 50f, 14f, 0.22f, 420, 8f, ShotStyle.PELLET) }
+                for (k in 0 until 3) after(k * 0.22f) { face(aim()); fan(aim(), 7, 50f, 14f, 0.22f, 525, 8f, ShotStyle.PELLET) }
             }
         }
         return 2.6f
