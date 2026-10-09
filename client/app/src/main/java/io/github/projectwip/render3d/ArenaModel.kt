@@ -128,7 +128,7 @@ class ArenaModel(val arena: Arena) {
             if (a[x, y] != Tile.WATER) continue
             g.color(0.08f, 0.3f, 0.5f)
             g.groundQuad(x.toFloat(), y.toFloat(), x + 1f, y + 1f, depth)
-            g.color(0.55f, 0.52f, 0.62f)
+            g.color(0.53f, 0.57f, 0.62f)
             // Pool walls where the neighbour is not water
             if (a[x, y - 1] != Tile.WATER) g.with { translate(x + 0.5f, depth / 2, y + 0.04f); box(1f, -depth, 0.08f) }
             if (a[x, y + 1] != Tile.WATER) g.with { translate(x + 0.5f, depth / 2, y + 0.96f); box(1f, -depth, 0.08f) }
@@ -153,9 +153,9 @@ class ArenaModel(val arena: Arena) {
             if (a[x, y] != Tile.WALL) continue // crates are dynamic; see MatchRenderer
             val h = hash(x, y)
             val hgt = 1.05f + (h % 3) * 0.04f
-            s.color(0.43f, 0.38f, 0.78f)
+            s.color(0.42f, 0.61f, 0.78f)
             s.with { translate(x + 0.5f, hgt / 2 - 0.02f, y + 0.5f); roundedBox(0.96f, hgt, 0.96f, 0.1f, 2) }
-            s.color(0.62f, 0.57f, 0.95f)
+            s.color(0.61f, 0.79f, 0.95f)
             s.with { translate(x + 0.5f, hgt - 0.02f, y + 0.5f); roundedBox(1.0f, 0.16f, 1.0f, 0.07f, 2) }
             if (h % 4 == 0) {
                 // Hazard band
@@ -163,7 +163,7 @@ class ArenaModel(val arena: Arena) {
                 s.with { translate(x + 0.5f, hgt * 0.42f, y + 0.5f); roundedBox(0.99f, 0.14f, 0.99f, 0.05f, 1) }
             } else {
                 // Rivet plate on the camera-facing side
-                s.color(0.33f, 0.28f, 0.62f)
+                s.color(0.31f, 0.47f, 0.62f)
                 s.with { translate(x + 0.5f, hgt * 0.45f, y + 0.985f); roundedBox(0.6f, 0.4f, 0.04f, 0.02f, 1) }
             }
         }
@@ -176,7 +176,7 @@ class ArenaModel(val arena: Arena) {
         val wd = a.width.toFloat(); val ht = a.height.toFloat()
         // Perimeter blocks with alternating hazard colours.
         fun block(cx: Float, cz: Float, sx: Float, sz: Float, i: Int) {
-            if (i % 2 == 0) s.color(1f, 0.78f, 0.2f) else s.color(0.18f, 0.14f, 0.32f)
+            if (i % 2 == 0) s.color(1f, 0.78f, 0.2f) else s.color(0.16f, 0.24f, 0.32f)
             s.with { translate(cx, 0.28f, cz); roundedBox(sx, 0.56f, sz, 0.06f, 1) }
         }
         for (i in 0 until a.width) { block(i + 0.5f, -0.35f, 1f, 0.7f, i); block(i + 0.5f, ht + 0.35f, 1f, 0.7f, i + 1) }
@@ -193,12 +193,12 @@ class ArenaModel(val arena: Arena) {
             g.groundQuad(-outer, -inset, -inset, ht + inset, y)
             g.groundQuad(wd + inset, -inset, wd + outer, ht + inset, y)
         }
-        g.color(0.27f, 0.23f, 0.43f)
+        g.color(0.25f, 0.34f, 0.43f)
         frame(3f, 40f, -0.07f)
-        g.color(0.33f, 0.29f, 0.52f)
+        g.color(0.31f, 0.42f, 0.52f)
         frame(0f, 3f, -0.065f)
         // Walkway stripes
-        g.color(0.42f, 0.38f, 0.64f)
+        g.color(0.41f, 0.53f, 0.64f)
         var x = -3f
         while (x < wd + 3f) { g.groundQuad(x, -2.9f, x + 0.6f, -2.5f, -0.06f); g.groundQuad(x, ht + 2.5f, x + 0.6f, ht + 2.9f, -0.06f); x += 1.4f }
     }
@@ -250,7 +250,7 @@ class ArenaModel(val arena: Arena) {
             val bz = z + sin(k * 2.1f) * 0.55f
             s.color(if (k == 1) 0xFF2EC4F1L else 0xFFFF5A3CL)
             s.with { translate(bx, 0.45f, bz); cylinder(0.32f, 0.9f, 14) }
-            s.color(0.2f, 0.16f, 0.3f)
+            s.color(0.17f, 0.23f, 0.3f)
             s.with { translate(bx, 0.62f, bz); torus(0.32f, 0.04f, 14, 5) }
         }
     }
@@ -264,7 +264,7 @@ class ArenaModel(val arena: Arena) {
     }
 
     private fun lamp(s: MeshBuilder, x: Float, z: Float) {
-        s.color(0.25f, 0.22f, 0.4f)
+        s.color(0.24f, 0.32f, 0.4f)
         s.with { translate(x, 1.6f, z); cylinder(0.08f, 3.2f, 8) }
         s.with { translate(x, 0.12f, z); cylinder(0.25f, 0.24f, 10) }
         s.color(1f, 0.93f, 0.6f)

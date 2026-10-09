@@ -114,7 +114,7 @@ fun MatchScreen(
         duelOnline = false
     }
     if (duelOnline == null) {
-        Box(Modifier.fillMaxSize().background(Color(0xFF1C143A)), contentAlignment = Alignment.Center) { GameText("CONNECTING…", Type.Title, outline = 3.5.dp) }
+        Box(Modifier.fillMaxSize().background(Color(0xFF18293A)), contentAlignment = Alignment.Center) { GameText("CONNECTING…", Type.Title, outline = 3.5.dp) }
         return
     }
     if (duelOnline == true && server != null) {
@@ -139,7 +139,7 @@ fun MatchScreen(
     val matchmade = config.mode == io.github.projectwip.data.GameMode.LAST_SPARK || config.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH
     if (ready != null && (started || !matchmade)) MatchBody(ready, settings, sfx, matchesPlayed, onFinish)
     else if (matchmade) Matchmaking(config, ready, onCancel) { started = true }
-    else Box(Modifier.fillMaxSize().background(Color(0xFF1C143A)), contentAlignment = Alignment.Center) {
+    else Box(Modifier.fillMaxSize().background(Color(0xFF18293A)), contentAlignment = Alignment.Center) {
         GameText("LOADING THE ARENA…", Type.Title, outline = 3.5.dp)
     }
 }
@@ -312,7 +312,7 @@ private fun MatchBody(
         if (paused) view?.paused = true else view?.resumeGame()
     }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF1C143A))) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF18293A))) {
         AndroidView(
             factory = { ctx ->
                 MatchView(ctx, match, settings, sfx, matchesPlayed,

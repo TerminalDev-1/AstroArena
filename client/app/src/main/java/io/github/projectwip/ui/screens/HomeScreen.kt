@@ -235,7 +235,7 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
     val p = save.progress(save.selectedFighter)
     val canUp = Progression.canUpgrade(save, def.id)
     Box(Modifier.clickable(remember { MutableInteractionSource() }, null, onClick = onClick)) {
-        Panel(color = Color(0xD8392A8C), colorBottom = Color(0xE01A1150), cut = 14.dp) {
+        Panel(color = Color(0xD834628C), colorBottom = Color(0xE0173550), cut = 14.dp) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
                     Canvas(Modifier.fillMaxSize()) {
@@ -476,7 +476,7 @@ fun Minimap(arena: Arena, modifier: Modifier = Modifier) {
         drawRect(Palette.Ink)
         for (y in 0 until arena.height) for (x in 0 until arena.width) {
             val c = when (arena[x, y]) {
-                Tile.WALL -> Color(0xFF7870C4)
+                Tile.WALL -> Color(0xFF78A1C4)
                 Tile.THICKET -> Color(0xFF3FAE5C)
                 Tile.WATER -> Color(0xFF2CA0DE)
                 Tile.CRATE -> Color(0xFFE08A2E)

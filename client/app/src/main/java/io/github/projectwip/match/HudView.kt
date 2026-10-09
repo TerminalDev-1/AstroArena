@@ -129,7 +129,7 @@ class HudView(
             // A running hyper turns the bar's rim violet.
             fill.color = if (s.hyper[i]) Color.rgb(190, 96, 255) else INK
             c.drawRoundRect(rect.left - dp(2.5f), rect.top - dp(2.5f), rect.right + dp(2.5f), rect.bottom + dp(2.5f), bh, bh, fill)
-            fill.color = Color.rgb(50, 30, 70)
+            fill.color = Color.rgb(22, 40, 62)
             c.drawRoundRect(rect, bh / 2, bh / 2, fill)
             val fr = (s.hp[i].toFloat() / s.maxHp[i]).coerceIn(0f, 1f)
             if (fr > 0f) {
@@ -140,21 +140,6 @@ class HudView(
             }
             text.textSize = bh * 0.95f
             outlined(c, s.hp[i].toString(), x, rect.bottom - bh * 0.15f, Color.WHITE, dp(2.5f))
-            if (s.shield[i] > 0) {
-                // The shield, to the right of the health bar: a small shield and how many points it holds.
-                val cx = rect.right + dp(13f)
-                val cy = rect.centerY()
-                for ((r, color) in listOf(dp(8.5f) to INK, dp(6f) to Color.rgb(110, 205, 255))) {
-                    path.rewind()
-                    path.moveTo(cx - r, cy - r); path.lineTo(cx + r, cy - r); path.lineTo(cx + r, cy + r * 0.15f)
-                    path.lineTo(cx, cy + r * 1.2f); path.lineTo(cx - r, cy + r * 0.15f); path.close()
-                    fill.color = color
-                    c.drawPath(path, fill)
-                }
-                // The number sits to the right of the icon; its middle is half its own width further along.
-                val label = s.shield[i].toString()
-                outlined(c, label, cx + dp(12f) + text.measureText(label) / 2, rect.bottom - bh * 0.15f, Color.rgb(170, 228, 255), dp(2.5f))
-            }
             if (s.relation[i] == 0) {
                 val segW = (bw - dp(4f)) / s.ammoMax
                 val ay = rect.bottom + dp(5f)
@@ -226,7 +211,7 @@ class HudView(
         val top = dp(10f)
         val panelW = dp(260f)
         val panelH = dp(58f)
-        chamfer(c, cx - panelW / 2, top, cx + panelW / 2, top + panelH, dp(13f), Color.argb(235, 34, 22, 84), INK)
+        chamfer(c, cx - panelW / 2, top, cx + panelW / 2, top + panelH, dp(13f), Color.argb(235, 20, 44, 72), INK)
         if (s.practice) {
             // Knockouts so far + running damage total: it is a practice ground, so show the numbers.
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
@@ -250,7 +235,7 @@ class HudView(
             val fr = (s.bossHp.toFloat() / s.bossMaxHp).coerceIn(0f, 1f)
             fill.color = INK
             c.drawRoundRect(cx - bw / 2 - dp(3f), by - dp(3f), cx + bw / 2 + dp(3f), by + dp(19f), dp(10f), dp(10f), fill)
-            fill.color = Color.rgb(50, 30, 70)
+            fill.color = Color.rgb(22, 40, 62)
             c.drawRoundRect(cx - bw / 2, by, cx + bw / 2, by + dp(16f), dp(8f), dp(8f), fill)
             if (fr > 0f) {
                 fill.color = ENEMY
@@ -428,7 +413,7 @@ class HudView(
     private fun withAlpha(c: Int, a: Float) = Color.argb((a * 255).toInt().coerceIn(0, 255), Color.red(c), Color.green(c), Color.blue(c))
 
     companion object {
-        val INK = Color.rgb(27, 16, 53)
+        val INK = Color.rgb(20, 36, 53)
         val PLAYER = Color.rgb(92, 255, 122)
         val ALLY = Color.rgb(63, 182, 255)
         val ENEMY = Color.rgb(255, 77, 94)

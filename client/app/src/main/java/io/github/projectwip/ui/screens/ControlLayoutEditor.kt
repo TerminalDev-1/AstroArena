@@ -55,7 +55,7 @@ fun ControlLayoutEditor(settings: Settings, onChange: (ControlLayout) -> Unit, o
     var held by remember { mutableIntStateOf(-1) }
     BackHandler(onBack = onClose)
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xF20B0620))) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xF2091520))) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
         // The real control code decides sizes and default spots, so the editor can't drift from the match.

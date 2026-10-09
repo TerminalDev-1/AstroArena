@@ -55,7 +55,7 @@ object Toon {
     val LIGHT = floatArrayOf(0.45f, -1f, -0.5f).let { v ->
         val l = kotlin.math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); floatArrayOf(v[0] / l, v[1] / l, v[2] / l)
     }
-    val INK = floatArrayOf(0.106f, 0.063f, 0.208f)
+    val INK = floatArrayOf(0.078f, 0.141f, 0.208f)
     val IDENTITY = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
 
     /** Binds [p] and sets every uniform of the lit shader to the house style. */

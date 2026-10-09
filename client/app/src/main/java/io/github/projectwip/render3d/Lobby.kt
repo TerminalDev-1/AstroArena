@@ -129,7 +129,7 @@ class LobbyScene {
                 val phi = PI * j / lat
                 val y = cos(phi).toFloat(); val s = sin(phi).toFloat()
                 val t = (y * 0.5f + 0.5f)
-                color(0.42f * (1 - t) + 0.07f * t, 0.18f * (1 - t) + 0.04f * t, 0.6f * (1 - t) + 0.22f * t)
+                color(0.12f * (1 - t) + 0.03f * t, 0.4f * (1 - t) + 0.08f * t, 0.62f * (1 - t) + 0.18f * t)
                 for (i in 0..lon) {
                     val th = 2 * PI * i / lon
                     vertex((cos(th) * s).toFloat() * r, y * r, (sin(th) * s).toFloat() * r, 0f, -y, 0f)
@@ -141,9 +141,9 @@ class LobbyScene {
             }
         }.build()
         floor = MeshBuilder().apply {
-            color(0.2f, 0.15f, 0.42f); ring(0f, 26f, 64)
+            color(0.18f, 0.3f, 0.42f); ring(0f, 26f, 64)
             // Radial spokes and tile rings for a sense of depth.
-            color(0.26f, 0.2f, 0.52f)
+            color(0.23f, 0.38f, 0.52f)
             for (k in 0 until 24) with { rotate(k * 15f, 0f, 1f, 0f); groundQuad(1.6f, -0.03f, 26f, 0.03f, 0.004f) }
             for (r in listOf(4.5f, 7f, 10f, 14f)) with { translate(0f, 0.005f, 0f); ring(r - 0.04f, r + 0.04f, 64) }
         }.build()
@@ -155,14 +155,14 @@ class LobbyScene {
             for (k in 0 until 7) {
                 val a = Math.toRadians(-160.0 + k * (140.0 / 6))
                 val x = (cos(a) * 11).toFloat(); val z = (sin(a) * 11).toFloat()
-                color(0.3f, 0.24f, 0.62f)
+                color(0.28f, 0.46f, 0.62f)
                 with { translate(x, 3.5f, z); roundedBox(1.0f, 7f, 1.0f, 0.18f, 2) }
-                color(0.22f, 0.17f, 0.45f)
+                color(0.2f, 0.33f, 0.45f)
                 with { translate(x, 0.3f, z); roundedBox(1.4f, 0.6f, 1.4f, 0.12f, 2) }
                 pillarTops += floatArrayOf(x, 7.2f, z)
             }
             // Back wall arc
-            color(0.17f, 0.12f, 0.36f)
+            color(0.14f, 0.25f, 0.36f)
             for (k in 0 until 12) {
                 val a = Math.toRadians(-165.0 + k * (150.0 / 11))
                 with { translate((cos(a) * 13.5).toFloat(), 4f, (sin(a) * 13.5).toFloat()); rotate(-Math.toDegrees(a).toFloat() - 90f, 0f, 1f, 0f); roundedBox(4.2f, 8f, 0.6f, 0.15f, 1) }
@@ -172,7 +172,7 @@ class LobbyScene {
             for (k in 0 until 7) {
                 val a = Math.toRadians(-160.0 + k * (140.0 / 6))
                 val x = (cos(a) * 11).toFloat(); val z = (sin(a) * 11).toFloat()
-                if (k % 2 == 0) color(0.2f, 0.85f, 1f) else color(1f, 0.35f, 0.85f)
+                if (k % 2 == 0) color(0.2f, 0.85f, 1f) else color(1f, 0.66f, 0.2f)
                 with { translate(x + 0.52f * cos(a + PI / 2).toFloat() * 0f, 3.5f, z); roundedBox(1.08f, 0.16f, 1.08f, 0.06f, 1) }
                 with { translate(x, 5.6f, z); roundedBox(1.08f, 0.1f, 1.08f, 0.04f, 1) }
                 with { translate(x, 1.4f, z); roundedBox(1.08f, 0.1f, 1.08f, 0.04f, 1) }
@@ -189,15 +189,15 @@ class LobbyScene {
             color(0.2f, 0.95f, 0.88f)
             with { translate(0f, 0f, 0.3f); rotate(-20f, 0f, 0f, 1f); roundedBox(0.45f, 2.4f, 0.2f, 0.08f, 1) }
         }.build()
-        pedestal = MeshBuilder().apply { color(0.3f, 0.22f, 0.66f); with { translate(0f, -0.2f, 0f); cylinder(1.25f, 0.4f, 40) } }.build()
+        pedestal = MeshBuilder().apply { color(0.26f, 0.47f, 0.66f); with { translate(0f, -0.2f, 0f); cylinder(1.25f, 0.4f, 40) } }.build()
         pedestalTop = MeshBuilder().apply {
-            color(0.5f, 0.42f, 0.95f); with { translate(0f, 0.005f, 0f); cylinder(1.08f, 0.02f, 40) }
+            color(0.47f, 0.72f, 0.95f); with { translate(0f, 0.005f, 0f); cylinder(1.08f, 0.02f, 40) }
             color(0.62f, 0.55f, 1f); with { translate(0f, 0.02f, 0f); ring(0.55f, 0.62f, 40) }
         }.build()
         pedestalRim = MeshBuilder().apply { torus(1.17f, 0.06f, 48, 8) }.build()
         crate = MeshBuilder().apply {
             color(0.93f, 0.55f, 0.18f); roundedBox(0.7f, 0.7f, 0.7f, 0.09f, 2)
-            color(0.3f, 0.22f, 0.4f); for (y in listOf(-0.22f, 0.22f)) with { translate(0f, y, 0f); roundedBox(0.74f, 0.08f, 0.74f, 0.03f, 1) }
+            color(0.24f, 0.31f, 0.4f); for (y in listOf(-0.22f, 0.22f)) with { translate(0f, y, 0f); roundedBox(0.74f, 0.08f, 0.74f, 0.03f, 1) }
         }.build()
         bolt = MeshBuilder().apply {
             color(0.61f, 0.9f, 1f); with { rotate(90f, 1f, 0f, 0f); cylinder(0.32f, 0.16f, 6) }
@@ -205,18 +205,18 @@ class LobbyScene {
         }.build()
         cell = MeshBuilder().apply {
             color(1f, 0.85f, 0.25f); cylinder(0.16f, 0.36f, 14)
-            color(0.22f, 0.16f, 0.36f); with { translate(0f, 0.2f, 0f); cylinder(0.17f, 0.07f, 14) }; with { translate(0f, -0.2f, 0f); cylinder(0.17f, 0.07f, 14) }
+            color(0.18f, 0.27f, 0.36f); with { translate(0f, 0.2f, 0f); cylinder(0.17f, 0.07f, 14) }; with { translate(0f, -0.2f, 0f); cylinder(0.17f, 0.07f, 14) }
         }.build()
 
         val roadEnd = (roadStops.size - 1) * ROAD_SPACING
         roadGround = MeshBuilder().apply {
-            color(0.15f, 0.11f, 0.33f); groundQuad(-16f, -12f, roadEnd + 16f, 10f, -0.03f)
-            color(0.2f, 0.15f, 0.42f)
+            color(0.13f, 0.23f, 0.33f); groundQuad(-16f, -12f, roadEnd + 16f, 10f, -0.03f)
+            color(0.18f, 0.3f, 0.42f)
             for (k in -3..(roadEnd / 2f).toInt() + 3) groundQuad(k * 2f - 0.03f, -12f, k * 2f + 0.03f, 10f, -0.025f)
         }.build()
         roadBand = MeshBuilder().apply {
-            color(0.1f, 0.07f, 0.22f); with { translate(roadEnd / 2f, 0f, 0f); box(roadEnd + 3.4f, 0.06f, 2.9f) }
-            color(0.3f, 0.24f, 0.68f); with { translate(roadEnd / 2f, 0.04f, 0f); box(roadEnd + 3f, 0.06f, 2.5f) }
+            color(0.08f, 0.15f, 0.22f); with { translate(roadEnd / 2f, 0f, 0f); box(roadEnd + 3.4f, 0.06f, 2.9f) }
+            color(0.28f, 0.49f, 0.68f); with { translate(roadEnd / 2f, 0.04f, 0f); box(roadEnd + 3f, 0.06f, 2.5f) }
         }.build()
         roadDashes = MeshBuilder().apply {
             color(1f, 1f, 1f)
@@ -366,7 +366,7 @@ class LobbyScene {
         shadow.end()
 
         GLES30.glViewport(0, 0, width, height)
-        GLES30.glClearColor(0.08f, 0.05f, 0.2f, 1f)
+        GLES30.glClearColor(0.06f, 0.13f, 0.2f, 1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
         GLES30.glDepthFunc(GLES30.GL_LEQUAL)
@@ -417,7 +417,7 @@ class LobbyScene {
                 if ((p.roadUnlocked shr i) and 1 != 0) roadFighter(lit, p, i, id, x, time, Pass.COLOR)
                 else {
                     // Not unlocked yet: only its shape, dark.
-                    lit.i("uMode", 2); lit.v4("uTint", 0.13f, 0.09f, 0.28f, 1f)
+                    lit.i("uMode", 2); lit.v4("uTint", 0.11f, 0.2f, 0.28f, 1f)
                     roadFighter(lit, p, i, id, x, time, Pass.SILHOUETTE)
                     lit.i("uMode", 0); lit.v4("uTint", 1f, 1f, 1f, 1f)
                 }
@@ -428,7 +428,7 @@ class LobbyScene {
         if (drawFighter) {
             lit.f("uRim", 0.5f)
             if (p.locked) {
-                lit.i("uMode", 2); lit.v4("uTint", 0.13f, 0.09f, 0.28f, 1f)
+                lit.i("uMode", 2); lit.v4("uTint", 0.11f, 0.2f, 0.28f, 1f)
                 models.draw(lit, def, p.skin, 0f, 0f, facing, anim, Pass.SILHOUETTE)
                 lit.i("uMode", 0)
             } else models.draw(lit, def, p.skin, 0f, 0f, facing, anim, Pass.COLOR)

@@ -90,6 +90,8 @@ class MatchRenderer(
     private var lookZ = 0f
     private var eyeX = 0f; private var eyeY = 0f; private var eyeZ = 0f
     private var shake = 0f
+    /** Ground a hammer has cracked: x, z, how far the cracks reach, when it came down, and a seed for their shape. */
+    private val quakes = ArrayList<FloatArray>()
     private var time = 0f
     private val rng = Random(11)
 
@@ -593,6 +595,24 @@ class MatchRenderer(
             dashRing.draw()
         }
 
+        // Cracked ground where a hammer came down: the cracks shoot out glowing, then stay as scars for the match.
+        for (q in quakes) {
+            val age = time - q[3]
+            val grow = (age / 0.22f).coerceIn(0f, 1f)
+            val glow = (1f - age / 1.6f).coerceIn(0f, 1f)
+            for (k in 0 until 8) {
+                var ang = q[4] + k * 0.785f + (noise(q[4], k, 9) - 0.5f) * 0.4f
+                var cx = q[0]; var cz = q[1]
+                val piece = q[2] * (0.62f + 0.38f * noise(q[4], k, 7)) * grow / 3f
+                for (sg in 0 until 3) {
+                    ang += (noise(q[4], k, sg) - 0.5f) * 0.9f
+                    lit.v4("uTint", 0.07f + 0.93f * glow, 0.04f + 0.5f * glow, 0.1f * (1f - glow), 0.82f)
+                    setModel(cx, 0.032f, cz, piece, 1f, 0.13f - sg * 0.035f, -Math.toDegrees(ang.toDouble()).toFloat()); rect.draw()
+                    cx += cos(ang) * piece; cz += sin(ang) * piece
+                }
+            }
+        }
+
         // Marked ground (Boss Mode): where something is about to land. The patch fills in as its time runs out.
         for (h in world.hazards) {
             val t = (h.age / h.delay).coerceIn(0f, 1f)
@@ -645,6 +665,16 @@ class MatchRenderer(
                         SuperKind.VOLLEY -> fan(s.range, s.spreadDegrees + 8f)
                         SuperKind.PIERCE -> beam(clip(a, px, pz, dx, dz, s.range), s.radius * 3.2f)
                         SuperKind.RAM -> beam(s.range, p.radius * 2.2f)
+                        // The hammer's path, and the ground that will quake where it comes down.
+                        SuperKind.QUAKE -> {
+                            val reach = clip(a, px, pz, dx, dz, s.range)
+                            beam(reach, 0.8f)
+                            val tx = px + dx * reach
+                            val tz = pz + dz * reach
+                            lit.v4("uTint", 1f, 0.78f, 0.1f, 0.2f + 0.1f * pulse)
+                            setModel(tx, 0.05f, tz, s.radius, 1f, s.radius); sector(360f).draw()
+                            tint(2); setModel(tx, 0.056f, tz, s.radius, 1f, s.radius); ring.draw()
+                        }
                         // No aiming to do: a ring shows how far the code reaches.
                         SuperKind.CORRUPT -> {
                             tint(1); setModel(px, 0.05f, pz, s.range, 1f, s.range); ring.draw()
@@ -680,7 +710,7 @@ class MatchRenderer(
                     val at = p.def.attack
                     if (at.shape == AttackShape.SPREAD) fan(at.range, at.spreadDegrees + 8f)
                     else if (at.shape == AttackShape.ROCKETS) beam(clip(a, px, pz, dx, dz, at.range), io.github.projectwip.data.Balance.ROCKET_LANE * (at.projectiles - 1) + 0.4f)
-                    else beam(clip(a, px, pz, dx, dz, at.range), if (at.shape == AttackShape.SMASH) 0.95f else if (at.shape == AttackShape.BURST) 0.55f else 0.34f)
+                    else beam(clip(a, px, pz, dx, dz, at.range), if (at.shape == AttackShape.SMASH) 0.95f else if (at.shape == AttackShape.BURST || at.shape == AttackShape.PAWS) 0.55f else 0.34f)
                 }
             }
         }
@@ -743,6 +773,33 @@ class MatchRenderer(
                     setModel(x, y - size * 0.73f, z, size * 0.7f, size * 0.08f, size * 0.45f, spin); bit.draw()
                     tint(0xFF8C95B4)
                     setModel(x, y - size * 0.95f, z, size * 1.05f, size * 0.07f, size * 0.36f, spin + 35f); bit.draw()
+                }
+                ShotStyle.PAW -> {
+                    // A paw print flying flat, toes first: the big pad, and four toes fanned out ahead of it.
+                    val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
+                    val dx = pr.vx / len; val dz = pr.vy / len
+                    val k = pr.radius * (1.25f + 0.12f * sin(pr.age * 22f))
+                    tint(skin.secondary)
+                    setModel(x, 0.7f, z, k, k * 0.45f, k * 0.9f, yaw); sphere.draw()
+                    for (i in 0 until 4) {
+                        val side = (i - 1.5f) * 0.55f
+                        val fwd = 1.2f - kotlin.math.abs(side) * 0.35f
+                        setModel(x + (dx * fwd - dz * side) * k, 0.7f, z + (dz * fwd + dx * side) * k, k * 0.36f, k * 0.3f, k * 0.36f); sphere.draw()
+                    }
+                }
+                ShotStyle.HAMMER -> {
+                    // A giant hammer, spinning flat as it flies: a long handle, and a head banded in the fighter's colours.
+                    val spin = pr.age * 620f
+                    val hx = cos(spin * 0.017453f) * 0.5f
+                    val hz = -sin(spin * 0.017453f) * 0.5f
+                    tint(0xFF7A5A3A)
+                    setModel(x, 1f, z, 1.3f, 0.13f, 0.13f, spin); bit.draw()
+                    tint(0xFF8C95B4)
+                    setModel(x + hx, 1f, z + hz, 0.5f, 0.56f, 1f, spin); bit.draw()
+                    tint(skin.secondary)
+                    setModel(x + hx, 1f, z + hz, 0.2f, 0.62f, 1.06f, spin); bit.draw()
+                    tint(skin.accent)
+                    setModel(x - hx * 1.3f, 1f, z - hz * 1.3f, 0.12f, 0.2f, 0.2f, spin); bit.draw()
                 }
                 ShotStyle.PELLET -> {
                     tint(skin.secondary)
@@ -863,6 +920,12 @@ class MatchRenderer(
         sprites.flush()
     }
 
+    /** A steady 0..1 from a seed and two indices: the same crack is drawn the same way every frame. */
+    private fun noise(seed: Float, a: Int, b: Int): Float {
+        val v = sin(seed * 12.9898f + a * 78.233f + b * 37.719f) * 43758.547f
+        return v - kotlin.math.floor(v)
+    }
+
     private fun colorOf(style: ShotStyle, f: Fighter): Int {
         val s = f.def.skins[f.skin]
         return when (style) {
@@ -954,6 +1017,28 @@ class MatchRenderer(
                     val sp = 1.5f + rng.nextFloat() * 3.5f
                     particles.spawn(e.x, 0.6f, e.y, cos(a) * sp, 1f + rng.nextFloat() * 3f, sin(a) * sp, 0.35f + rng.nextFloat() * 0.2f, 0.2f, 0xFFFF8A1F.toInt(), 0.9f)
                 }
+            }
+            is GameEvent.Quake -> {
+                quakes += floatArrayOf(e.x, e.y, e.radius, time, e.x * 3.7f + e.y * 1.3f)
+                if (quakes.size > 24) quakes.removeAt(0)
+                particles.spawn(e.x, 0.4f, e.y, 0f, 0f, 0f, 0.3f, e.radius * 2.4f, 0xFFFFE0B0.toInt(), 0.5f)
+                // A ring of dirt thrown outwards, rubble kicked up, and dust hanging over it.
+                repeat(36) {
+                    val a = it * 0.1745f
+                    val sp = e.radius * (2.6f + rng.nextFloat())
+                    particles.spawn(e.x, 0.15f, e.y, cos(a) * sp, 0.5f, sin(a) * sp, 0.4f, 0.28f, 0xFFC9A46A.toInt(), 0.8f)
+                }
+                repeat(22) {
+                    val a = rng.nextFloat() * 6.28f
+                    val sp = (1f + rng.nextFloat() * 3f) * e.radius * 0.6f
+                    particles.spawn(e.x, 0.3f, e.y, cos(a) * sp, 3f + rng.nextFloat() * 5f, sin(a) * sp, 0.6f + rng.nextFloat() * 0.3f, 0.16f, 0xFF6B5A4A.toInt(), 1f, grav = 12f)
+                }
+                repeat(7) {
+                    particles.spawn(e.x + (rng.nextFloat() - 0.5f) * e.radius * 1.4f, 0.3f, e.y + (rng.nextFloat() - 0.5f) * e.radius * 1.4f, 0f, 0.9f + rng.nextFloat(), 0f,
+                        1.1f, 0.6f, 0xFF4A4038.toInt(), 0.45f, growth = 0.9f, add = false)
+                }
+                val away = hypot(e.x - match.player.x, e.y - match.player.y)
+                shake = max(shake, (0.4f - away * 0.035f).coerceAtLeast(0f))
             }
             is GameEvent.Hyper -> world.fighter(e.fighterId)?.let { f ->
                 if (f === match.player) shake = max(shake, 0.12f)
@@ -1059,7 +1144,7 @@ class MatchRenderer(
                 }
             }
             s.visible[i] = vis && onScreen
-            s.hp[i] = f.hp; s.maxHp[i] = f.maxHp; s.shield[i] = f.shieldHp
+            s.hp[i] = f.hp; s.maxHp[i] = f.maxHp
             s.relation[i] = if (f === p) 0 else if (f.team == p.team) 1 else 2
             s.names[i] = f.name
             s.superReady[i] = f.superReady
@@ -1072,8 +1157,7 @@ class MatchRenderer(
 
     private fun headHeight(id: FighterId) = FIGHTER_SCALE * when (id) {
         FighterId.BYTE -> 1.85f
-        FighterId.BRAKK -> 1.8f
-        FighterId.MIRA -> 2.0f
+        FighterId.BRAKK -> 1.6f
         FighterId.KITO -> 1.9f
         FighterId.VARUN -> 1.95f
         FighterId.BUDDY -> 2.05f

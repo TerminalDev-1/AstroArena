@@ -25,7 +25,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|duel|fighters|roster|kito|varun|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `tryvarun` / `trybuddy` the Training Area as Varun / Buddy, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
+  (`match|boss|train|duel|fighters|roster|kito|varun|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `trybyte` / `trybrakk` / `trykito` / `tryvarun` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - UI changes must be checked with a screenshot (`adb exec-out screencap -p`) and `adb logcat -b crash -d`.
 - The tablet is the user's everyday device. Before every `input tap` or `am start`, confirm
   `dumpsys window | grep mCurrentFocus` shows `io.github.projectwip` or the home screen (`com.miui.home`): on
@@ -42,16 +42,28 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Boss Mode bosses are their own things (`BossKind`, `Balance.bosses`), not giant fighters: each fights through
   moves of its own in `sim/Boss.kt` (telegraphed ground hazards, sweeps, rings, charges) and has its own model.
   Keep their names, looks and moves original.
-- Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls a
-  whole computer a long way, and it smashes into the first enemy in its path (`AttackShape.SMASH`: one long, heavy shot drawn
-  as a desktop computer, `ShotStyle.COMPUTER`). The long range is the user's decision: don't shorten it.
+- Mira was removed, by the user's decision (`REMOVED_FIGHTERS` in `economy.py` pays her road Credits back). The
+  Training Area's sentry keeps her old lance shot as a def of its own (`Balance.sentry`).
+- Brakk is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, so he
+  barks when he fires). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its
+  target has left (`AttackSpec.healthShare`), never less than the attack's own damage, and a fixed amount on a giant.
+- Kito's numbers are the user's: 8,000 health and 2,200 damage an attack (four blades of 550). His super
+  (`SuperKind.QUAKE`) hurls a giant hammer; where it comes down the ground quakes in every direction
+  (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match.
+- Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls two
+  whole computers a long way, one after the other, and each smashes into the first enemy in its path
+  (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Two computers and the long range are the
+  user's decisions: don't change them.
   His super (`SuperKind.CORRUPT`) needs no aiming: it picks the nearest enemy in sight and poisons them (`Fighter.poisonBy`,
-  `World.stepPoison`): no healing, and it only ends with a knockout (a boss shakes it off after `POISON_GIANT_SECONDS`).
+  `World.stepPoison`): no healing while it lasts. It wears off after `POISON_SECONDS` (a boss after
+  `POISON_GIANT_SECONDS`): the user took away the poison that never ended and cut the super's range by a quarter.
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
   With nobody in sight the super isn't spent. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
 - Every fighter has a hyper (`Control.hyper`, the `HYPER_*` numbers in `Balance.kt`): a third button that charges from
-  main-attack hits. Shields are a share of health (`SHIELD_FRACTION`), and there are none in Boss Mode (`World.shields`).
+  main-attack hits. There are no shields: the user removed them (the two seconds of spawn protection, `Fighter.shield`,
+  are a different thing). Healing only starts after `REGEN_DELAY_SECONDS` without attacking or being hit.
+- The menus are steel blue, not purple, by the user's decision (`Palette`; panels are slabs with a visible side).
 - All balance numbers live in `data/Balance.kt` and `data/Catalog.kt`; progression is pure functions in `Progression`.
 - New save field: update both `toJson` and `fromJson` in `SaveStore`, with an `opt*` default.
 - Changed a sound: bump `CACHE` in `audio/Sfx.kt`, or devices keep the old WAVs.

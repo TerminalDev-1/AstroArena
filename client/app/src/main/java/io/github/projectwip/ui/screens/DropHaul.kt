@@ -392,7 +392,7 @@ fun previewHaul(): List<BoxItem> = List(46) { i ->
     val tier = CapsuleTier.entries[when { i % 23 == 22 -> 5; i % 15 == 14 -> 4; i % 8 == 7 -> 3; i % 4 == 3 -> 2; i % 2 == 1 -> 1; else -> 0 }]
     val reward = when (tier) {
         CapsuleTier.ULTRA -> Reward.Bundle(listOf(Reward.SkinReward(FighterId.BRAKK, 1), Reward.Prisms(1350), Reward.Bolts(6600)))
-        CapsuleTier.PRISMATIC -> if (i < 20) Reward.UnlockFighter(FighterId.MIRA) else Reward.SkinReward(FighterId.BYTE, 2)
+        CapsuleTier.PRISMATIC -> if (i < 20) Reward.UnlockFighter(FighterId.KITO) else Reward.SkinReward(FighterId.BYTE, 2)
         CapsuleTier.OVERCLOCKED -> if (i % 16 == 7) Reward.Credits(55) else Reward.Prisms(270 + i)
         else -> if (i % 3 == 0) Reward.Prisms(45 * (tier.ordinal + 1)) else Reward.Bolts(270 * (tier.ordinal + 1) + i * 15)
     }

@@ -195,7 +195,7 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
                 p.lineTo(x1, y1)
             }
             p.close()
-            drawPath(p, tint ?: Color(0xFFE6E0FF)); outline(p)
+            drawPath(p, tint ?: Color(0xFFE3F1FF)); outline(p)
             drawCircle(INK, 0.15f, c)
             drawCircle(Palette.PanelLight, 0.1f, c)
         }
@@ -235,7 +235,7 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
         }
         IconKind.LOCK -> {
             drawArc(INK, 180f, 180f, false, Offset(0.28f, 0.14f), Size(0.44f, 0.5f), style = Stroke(0.16f))
-            drawArc(Color(0xFFCFC8EA), 180f, 180f, false, Offset(0.28f, 0.14f), Size(0.44f, 0.5f), style = Stroke(0.08f))
+            drawArc(Color(0xFFCBDBEA), 180f, 180f, false, Offset(0.28f, 0.14f), Size(0.44f, 0.5f), style = Stroke(0.08f))
             val body = poly(0.2f, 0.42f, 0.8f, 0.42f, 0.8f, 0.9f, 0.2f, 0.9f)
             drawPath(body, Palette.Gold); outline(body)
             drawCircle(INK, 0.07f, Offset(0.5f, 0.62f))
@@ -289,7 +289,7 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             drawPath(body, Brush.verticalGradient(listOf(Palette.Orange, Palette.OrangeDeep), 0.52f, 0.92f)); outline(body)
             for (x in listOf(0.27f, 0.67f)) {
                 val band = poly(x, 0.52f, x + 0.06f, 0.52f, x + 0.06f, 0.92f, x, 0.92f)
-                drawPath(band, Color(0xFF3A2F6B)); outline(band, 0.03f)
+                drawPath(band, Color(0xFF35516B)); outline(band, 0.03f)
             }
             val rim = poly(0.11f, 0.47f, 0.89f, 0.47f, 0.89f, 0.58f, 0.11f, 0.58f)
             drawPath(rim, Brush.verticalGradient(listOf(Color(0xFFFFC56B), Palette.Orange), 0.47f, 0.58f)); outline(rim, 0.05f)

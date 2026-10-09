@@ -144,7 +144,7 @@ CREDIT_BUFF = 12
 MAX_OPEN_ALL = 10000
 
 # Every fighter and how many colourways it has (index 0 is the one it comes with). Keep in step with Balance.kt.
-FIGHTER_SKINS = {name: 3 for name in ("BYTE", "BRAKK", "MIRA", "KITO", "VARUN", "BUDDY")}
+FIGHTER_SKINS = {name: 3 for name in ("BYTE", "BRAKK", "KITO", "VARUN", "BUDDY")}
 STARTING_FIGHTER = "BYTE"
 
 

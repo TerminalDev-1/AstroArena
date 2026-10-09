@@ -71,9 +71,9 @@ class StageScene(private val withPedestal: Boolean) {
     private var lastCelebrate = 0L
 
     init {
-        base = MeshBuilder().apply { color(0.3f, 0.22f, 0.66f); with { translate(0f, -0.2f, 0f); cylinder(1.25f, 0.4f, 40) } }.build()
+        base = MeshBuilder().apply { color(0.26f, 0.47f, 0.66f); with { translate(0f, -0.2f, 0f); cylinder(1.25f, 0.4f, 40) } }.build()
         top = MeshBuilder().apply {
-            color(0.5f, 0.42f, 0.95f); with { translate(0f, 0.005f, 0f); cylinder(1.08f, 0.02f, 40) }
+            color(0.47f, 0.72f, 0.95f); with { translate(0f, 0.005f, 0f); cylinder(1.08f, 0.02f, 40) }
             color(0.62f, 0.55f, 1f); with { translate(0f, 0.02f, 0f); ring(0.55f, 0.62f, 40) }
         }.build()
         rim = MeshBuilder().apply { with { translate(0f, 0.0f, 0f); torus(1.17f, 0.06f, 48, 8) } }.build()
@@ -153,7 +153,7 @@ class StageScene(private val withPedestal: Boolean) {
         lit.f("uRim", 0.5f)
         if (p.locked) {
             lit.i("uMode", 2)
-            lit.v4("uTint", 0.13f, 0.09f, 0.28f, 1f)
+            lit.v4("uTint", 0.11f, 0.2f, 0.28f, 1f)
             models.draw(lit, def, p.skin, 0f, 0f, facing, anim, Pass.SILHOUETTE)
             lit.i("uMode", 0)
         } else {

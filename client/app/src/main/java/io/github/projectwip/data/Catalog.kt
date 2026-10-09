@@ -155,7 +155,7 @@ object CupTrack {
         Milestone(300, Reward.Prisms(40)),
         Milestone(350, Reward.Credits(200)),
         Milestone(420, Reward.Bolts(400)),
-        Milestone(500, Reward.SkinReward(FighterId.MIRA, 1)),
+        Milestone(500, Reward.Credits(300)),
         Milestone(600, Reward.Prisms(60)),
         Milestone(700, Reward.Bolts(600)),
         Milestone(850, Reward.SkinReward(FighterId.BYTE, 2)),

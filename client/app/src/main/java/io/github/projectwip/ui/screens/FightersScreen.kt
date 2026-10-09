@@ -222,7 +222,7 @@ private fun FighterPage(save: SaveData, repo: GameRepository, id: FighterId, go:
                         // White on a dark plate: the floor behind it is bright, and the dim body colour was lost on it.
                         PlainText(def.lore, Type.Body, color = Palette.Text, align = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier.width(430.dp)
-                                .background(androidx.compose.ui.graphics.Color(0xD9140A32), androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                                .background(androidx.compose.ui.graphics.Color(0xD90E2032), androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
                                 .padding(horizontal = 12.dp, vertical = 7.dp))
                         Spacer(Modifier.height(8.dp))
                     }
@@ -432,7 +432,8 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
     Spacer(Modifier.height(6.dp))
     PlainText("${def.superSpec.name}: ${def.superSpec.description}", Type.Small, color = Palette.Text)
     val pct = { v: Float -> "${Math.round(v * 100)}%" }
-    PlainText("Hyper: for ${(def.hyper?.seconds ?: Balance.HYPER_SECONDS).toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage, +${pct(Balance.HYPER_HEALTH_BONUS)} health and +${pct(Balance.HYPER_SHIELD_BONUS)} shield.", Type.Small, color = Palette.Text)
+    if (def.attack.healthShare > 0f) PlainText("${def.attackName}: each one takes ${pct(def.attack.healthShare)} of the health its target has left, and never less than its own damage.", Type.Small, color = Palette.Text)
+    PlainText("Hyper: for ${(def.hyper?.seconds ?: Balance.HYPER_SECONDS).toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage and +${pct(Balance.HYPER_HEALTH_BONUS)} health.", Type.Small, color = Palette.Text)
     def.hyper?.let { PlainText("${it.name}, ${def.name}'s own hyper: ${it.description}", Type.Small, color = Palette.Gold) }
     PlainText("Upgrades raise Health, ${def.attackName} and ${def.superSpec.name} by the same amount every level.", Type.Small, color = Palette.Text.copy(alpha = 0.85f))
 }

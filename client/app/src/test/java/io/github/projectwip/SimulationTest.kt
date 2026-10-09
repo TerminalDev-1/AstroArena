@@ -36,7 +36,7 @@ class SimulationTest {
 
     @Test fun freeForAllEndsWithUniquePlacements() {
         repeat(3) { seed ->
-            val m = Match(MatchConfig(FighterId.MIRA, 4, 0, "Test", if (seed == 0) BotDifficulty.NORMAL else BotDifficulty.HARD, mode = GameMode.LAST_SPARK, humanPlayer = false, seed = 7L + seed))
+            val m = Match(MatchConfig(FighterId.KITO, 4, 0, "Test", if (seed == 0) BotDifficulty.NORMAL else BotDifficulty.HARD, mode = GameMode.LAST_SPARK, humanPlayer = false, seed = 7L + seed))
             var t = 0f
             while (m.world.phase != Phase.ENDED && t < 300f) { m.step(Match.STEP); t += Match.STEP }
             println("FFA seed $seed ended at ${"%.1f".format(t)}s storm r=${"%.1f".format(m.world.storm!!.radius)}")
@@ -49,7 +49,7 @@ class SimulationTest {
 
     @Test fun leadAimHitsAStrafingTarget() {
         val a = Arenas.staticCanyon()
-        val def = Balance.fighter(FighterId.MIRA)
+        val def = Balance.sentry
         val shooter = Fighter(0, def, 1, 0, 0, "S", true)
         val target = Fighter(1, def, 1, 0, 1, "T", true)
         val w = World(a, listOf(shooter, target), io.github.projectwip.sim.MatchRules.lastSpark())
@@ -242,7 +242,7 @@ class SimulationTest {
         assertEquals("outside the mark: untouched", full, me.hp)
         m.world.hazards += io.github.projectwip.sim.Hazard(boss.id, boss.team, me.x, me.y, 1f, 0.02f, 500, io.github.projectwip.sim.HazardKind.ROCKET)
         m.world.step(Match.STEP); m.world.step(Match.STEP)
-        assertTrue("inside it: hurt", me.hp + me.shieldHp < full || !me.alive)
+        assertTrue("inside it: hurt", me.hp < full || !me.alive)
     }
 
     /** Training Area: nineteen fighters, the targets never leave their spots, and it never ends by itself. */
@@ -324,20 +324,29 @@ class SimulationTest {
         }
     }
 
-    @Test fun fightersAlwaysHealBotsMoreSlowlyAndGiantsSlowest() {
+    @Test fun healingWaitsForAPauseInTheFightBotsHealMoreSlowlyAndGiantsSlowest() {
         // A human player and a bot of the same kind, in the same match.
         val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 4L))
         val me = m.world.fighters.first { !it.isBot }
         val bot = m.world.fighters.first { it.isBot }
         me.hp = me.maxHp / 2; bot.hp = bot.maxHp / 2
-        // Both have just been hit and have just fired: neither stops a fighter healing.
-        me.sinceDamaged = 0f; me.sinceAttack = 0f; bot.sinceDamaged = 0f; bot.sinceAttack = 0f
+        // Just hit, or just fired: no healing yet.
+        me.sinceDamaged = 0f; me.sinceAttack = 60f
+        m.world.regenerate(me, 1f)
+        assertEquals("not while being hit", me.maxHp / 2, me.hp)
+        me.sinceDamaged = 60f; me.sinceAttack = Balance.REGEN_DELAY_SECONDS - 0.5f
+        m.world.regenerate(me, 1f)
+        assertEquals("and not while attacking", me.maxHp / 2, me.hp)
+        // A few seconds out of the fight, and it starts.
+        me.sinceAttack = 60f; bot.sinceDamaged = 60f; bot.sinceAttack = 60f
         m.world.regenerate(me, 1f); m.world.regenerate(bot, 1f)
         val myShare = (me.hp - me.maxHp / 2).toFloat() / me.maxHp
         val botShare = (bot.hp - bot.maxHp / 2).toFloat() / bot.maxHp
-        assertTrue("the player heals even while being hit", myShare > 0.1f)
+        assertTrue("then the player heals", myShare > 0.1f)
         assertEquals("a bot heals at half the pace", myShare / 2, botShare, 0.005f)
-        // A giant waits a few seconds after being hit, and then heals far more slowly.
+        repeat(60) { m.world.regenerate(me, 1f) }
+        assertEquals("up to full health, and no further: there are no shields", me.maxHp, me.hp)
+        // A giant heals far more slowly.
         val b = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
         val boss = b.world.fighters.first { it.scale > 1f }
         boss.hp = boss.maxHp / 2; boss.sinceDamaged = 1f
@@ -347,31 +356,6 @@ class SimulationTest {
         b.world.regenerate(boss, 1f)
         val bossShare = (boss.hp - boss.maxHp / 2).toFloat() / boss.maxHp
         assertTrue(bossShare > 0f && bossShare < botShare / 8)
-    }
-
-    @Test fun aShieldBuildsOnTopOfFullHealth() {
-        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 4L))
-        val me = m.player
-        me.hp = me.maxHp - 1; me.sinceDamaged = 60f
-        m.world.regenerate(me, 1f)
-        assertEquals("health is topped up before any shield", me.maxHp to 0, me.hp to me.shieldHp)
-        me.sinceDamaged = 1f
-        m.world.regenerate(me, 1f)
-        assertEquals("no shield builds while the fighter is being hit", 0, me.shieldHp)
-        me.sinceDamaged = 60f
-        m.world.regenerate(me, 1f)
-        assertTrue("then the shield starts", me.shieldHp > 0)
-        repeat(200) { m.world.regenerate(me, 1f) }
-        assertEquals("up to its cap, a share of full health", (me.maxHp * Balance.SHIELD_FRACTION).toInt(), me.shieldHp)
-        assertTrue("which is well short of a second health bar", me.shieldHp < me.maxHp / 2)
-        assertEquals(me.maxHp, me.hp)
-        // Boss Mode has no shields at all: not the boss, and not the player either.
-        val b = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
-        for (f in b.world.fighters) {
-            f.sinceDamaged = 60f
-            repeat(50) { b.world.regenerate(f, 1f) }
-            assertEquals("${f.name} has no shield in Boss Mode", 0, f.shieldHp)
-        }
     }
 
     /** Two fighters past the countdown: Varun, and a target standing where a wall blocks every straight shot. */
@@ -447,7 +431,7 @@ class SimulationTest {
         assertTrue("massive damage: ${varun.damageDealt}", varun.damageDealt >= minOf(target.maxHp - 1, 4 * varun.superDamage))
         assertTrue("but the target is left standing", target.alive && target.hp >= 1)
         // Even a target on its last legs survives a whole salvo.
-        target.hp = 5; target.shieldHp = 0
+        target.hp = 5
         fire()
         t = 0f
         do { w.step(Match.STEP); t += Match.STEP } while (w.hazards.isNotEmpty() && t < 6f)
@@ -468,11 +452,10 @@ class SimulationTest {
         assertEquals(varun.x + spec.range, w.hazards[0].x, 0.01f)
     }
 
-    @Test fun aHyperBuffsDamageHealthAndShield() {
+    @Test fun aHyperBuffsDamageAndHealth() {
         val (w, varun, _) = varunBehindAWall()
         val hp = varun.maxHp; val dmg = varun.attackDamage
-        varun.hp = hp; varun.shieldHp = varun.shieldMax
-        val shield = varun.shieldHp
+        varun.hp = hp
         varun.control.hyper = true
         w.step(Match.STEP)
         assertFalse("nothing happens until it is charged", varun.hyperActive)
@@ -483,14 +466,12 @@ class SimulationTest {
         assertEquals("a quarter more health", hp + hp / 4, varun.maxHp)
         assertEquals("which it has at once", varun.maxHp, varun.hp)
         assertEquals("a quarter more damage", dmg * 1.25f, varun.attackDamage.toFloat(), 1f)
-        assertEquals("a quarter more shield", shield * 1.25f, varun.shieldHp.toFloat(), 2f)
         assertEquals("and the charge is spent", 0f, varun.hyperCharge, 0f)
         var t = 0f
         while (varun.hyperActive && t < 20f) { w.step(Match.STEP); t += Match.STEP }
         assertEquals("Varun's own hyper runs fourteen seconds; a plain one eight", 14f to 8f, varun.hyperSeconds to Fighter(9, Balance.fighter(FighterId.BYTE), 1, 0, 0, "J", true).hyperSeconds)
         assertEquals(varun.hyperSeconds, t, 0.1f)
         assertEquals("then everything is as it was", Triple(hp, hp, dmg), Triple(varun.maxHp, varun.hp, varun.attackDamage))
-        assertTrue(varun.shieldHp <= varun.shieldMax)
     }
 
     @Test fun varunsOwnHyperSpeedsUpHisRocketsAndHisSuper() {
@@ -544,7 +525,7 @@ class SimulationTest {
         a.world.fighters[0].hp -= 1
         assertTrue(before != a.world.checksum())
         a.world.fighters[0].hp += 1
-        fun state(m: Match) = m.world.fighters.map { listOf(it.x, it.y, it.hp, it.shieldHp, it.kos, it.superCharge, it.hyperCharge) } + listOf(m.world.score.toList(), listOf(m.world.phase, m.world.winningTeam))
+        fun state(m: Match) = m.world.fighters.map { listOf(it.x, it.y, it.hp, it.kos, it.superCharge, it.hyperCharge) } + listOf(m.world.score.toList(), listOf(m.world.phase, m.world.winningTeam))
         assertEquals("after $t ticks the two devices agree on everything", state(a), state(b))
         assertTrue("and something happened", a.world.fighters.sumOf { it.damageDealt } > 0)
         // One player leaving hands the other the win.
@@ -623,19 +604,18 @@ class SimulationTest {
         return Triple(w, buddy, others)
     }
 
-    @Test fun buddyHurlsAComputerThatSmashesIntoTheFirstInItsWay() {
+    @Test fun buddyHurlsTwoComputersThatSmashIntoTheFirstInTheirWay() {
         val (w, buddy, others) = buddyAndTargets(2)
         val (near, far) = others
         buddy.control.aimX = 1f; buddy.control.aimY = 0f; buddy.control.attack = true
         val hits = ArrayList<io.github.projectwip.sim.GameEvent.Hit>()
-        repeat(40) { w.step(Match.STEP); hits += w.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>(); w.events.clear() }
-        assertEquals("one heavy hit, on the first in its way", listOf(near.id to buddy.attackDamage), hits.map { it.targetId to it.damage })
-        assertTrue("it is the hardest single hit in the game", buddy.def.attackDamage.base >= Balance.fighters.maxOf { it.attackDamage.base })
-        assertEquals("it stops at whoever it smashes into", far.maxHp, far.hp)
-        assertTrue("and it is thrown a long way", buddy.def.attack.range >= 8f)
+        repeat(50) { w.step(Match.STEP); hits += w.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>(); w.events.clear() }
+        assertEquals("two heavy hits, both on the first in their way", listOf(near.id to buddy.attackDamage, near.id to buddy.attackDamage), hits.map { it.targetId to it.damage })
+        assertEquals("they stop at whoever they smash into", far.maxHp, far.hp)
+        assertTrue("and they are thrown a long way", buddy.def.attack.range >= 8f)
     }
 
-    @Test fun buddysMalformedCodePoisonsTheNearestEnemyUntilTheyAreKnockedOut() {
+    @Test fun buddysMalformedCodePoisonsTheNearestEnemyForAWhileAndThenWearsOff() {
         val (w, buddy, others) = buddyAndTargets(2)
         val (near, far) = others
         buddy.superCharge = 1f
@@ -647,17 +627,68 @@ class SimulationTest {
         var t = 0f
         var healedWhilePoisoned = false
         var last = near.hp
-        while (near.alive && t < 30f) {
+        while (near.poisoned && t < 30f) {
             w.step(Match.STEP); t += Match.STEP
             if (near.hp > last) healedWhilePoisoned = true
             last = near.hp
         }
-        assertFalse("it never lets up: they are knocked out", near.alive)
-        assertFalse("and they could not heal through it", healedWhilePoisoned)
-        assertFalse("the knockout clears it", near.poisoned)
-        assertEquals("Buddy gets the knockout", 1, buddy.kos)
+        assertEquals("it wears off by itself", Balance.POISON_SECONDS, t, 0.2f)
+        assertTrue("having hurt, but not finished, a healthy fighter", near.alive && near.hp < near.maxHp)
+        assertFalse("who could not heal through it", healedWhilePoisoned)
         assertEquals(far.maxHp, far.hp)
-        println("malformed code took ${"%.1f".format(t)}s to knock out ${near.maxHp} health")
+        assertTrue("a boss shakes it off sooner still", Balance.POISON_GIANT_SECONDS < Balance.POISON_SECONDS)
+        // It only reaches three quarters as far as it used to.
+        assertEquals(6.75f, buddy.def.superSpec.range, 0f)
+        println("malformed code did ${near.maxHp - near.hp} of ${near.maxHp} health")
+    }
+
+    @Test fun brakksPawPrintsTakeAShareOfTheHealthTheirTargetHasLeft() {
+        val (w, _, others) = buddyAndTargets(1)
+        val target = others[0]
+        // (A new world puts everyone back on a spawn: remember the open ground the helper found.)
+        val x = target.x; val y = target.y
+        val brakk = Fighter(7, Balance.fighter(FighterId.BRAKK), 1, 0, 0, "D", false)
+        val w2 = World(w.arena, listOf(brakk, target), io.github.projectwip.sim.MatchRules.lastSpark())
+        repeat((3.1f / Match.STEP).toInt()) { w2.step(Match.STEP) }
+        fun throwAt(hp: Int): List<Int> {
+            target.x = x; target.y = y
+            brakk.x = x - 3f; brakk.y = y; brakk.shield = 0f; target.shield = 0f
+            target.hp = hp; brakk.ammo = 3f
+            brakk.control.aimX = 1f; brakk.control.aimY = 0f; brakk.control.attack = true
+            val hits = ArrayList<Int>()
+            repeat(40) { w2.step(Match.STEP); hits += w2.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Hit>().map { it.damage }; w2.events.clear() }
+            return hits
+        }
+        val share = brakk.def.attack.healthShare
+        val full = target.maxHp
+        val first = (full * share).toInt()
+        assertEquals("two paw prints, each a share of what is left", listOf(first, ((full - first) * share).toInt()), throwAt(full))
+        assertEquals("never less than its own damage", listOf(brakk.attackDamage, brakk.attackDamage), throwAt(2000))
+        assertTrue("and he throws them a long way", brakk.def.attack.range >= 8f)
+    }
+
+    @Test fun kitosHammerQuakesInEveryDirectionWhereItComesDown() {
+        val (w, _, others) = buddyAndTargets(2)
+        val (hit, beside) = others
+        val x = hit.x; val y = hit.y
+        val kito = Fighter(7, Balance.fighter(FighterId.KITO), 1, 0, 0, "K", false)
+        val w2 = World(w.arena, listOf(kito, hit, beside), io.github.projectwip.sim.MatchRules.lastSpark())
+        repeat((3.1f / Match.STEP).toInt()) { w2.step(Match.STEP) }
+        kito.x = x - 3f; kito.y = y; hit.x = x; hit.y = y
+        // The other stands behind the first, out of the hammer's way but inside the quake.
+        beside.x = hit.x + 1.6f; beside.y = hit.y
+        for (f in w2.fighters) f.shield = 0f
+        assertEquals(8000 to 2200, kito.def.health.base to kito.def.attackDamage.base * kito.def.attack.projectiles)
+        kito.superCharge = 1f
+        kito.control.aimX = 1f; kito.control.aimY = 0f; kito.control.superAttack = true
+        val quakes = ArrayList<io.github.projectwip.sim.GameEvent.Quake>()
+        repeat(40) { w2.step(Match.STEP); quakes += w2.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Quake>(); w2.events.clear() }
+        assertEquals("the hammer comes down once", 1, quakes.size)
+        assertEquals("on the first enemy in its way", hit.x, quakes[0].x, 0.9f)
+        assertEquals(kito.def.superSpec.radius, quakes[0].radius, 0f)
+        assertEquals("the quake hits them", hit.maxHp - kito.superDamage, hit.hp)
+        assertEquals("and everyone else near where it landed", beside.maxHp - kito.superDamage, beside.hp)
+        assertFalse("he doesn't go anywhere himself", kito.isDashing)
     }
 
     @Test fun buddyKeepsHisSuperWhenThereIsNobodyToPoison() {

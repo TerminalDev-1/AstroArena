@@ -13,10 +13,14 @@ data class StatLine(val base: Int, val perLevel: Int) {
     fun at(level: Int): Int = base + perLevel * (level.coerceAtLeast(1) - 1)
 }
 
-enum class FighterId { BYTE, BRAKK, MIRA, KITO, VARUN, BUDDY }
+enum class FighterId { BYTE, BRAKK, KITO, VARUN, BUDDY }
 
-/** [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. [SMASH] is one heavy thing hurled a long way. */
-enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH }
+/**
+ * [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. [SMASH] is heavy things hurled a
+ * long way, one after another from alternate hands. [PAWS] are paw prints thrown one after another: each takes a share
+ * of the health its target has left ([AttackSpec.healthShare]).
+ */
+enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
 enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
@@ -35,8 +39,9 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
 }
 
 /** [SWARM] is a salvo of rockets fired into the sky: they come down inside one circle where the fighter aimed, over any wall, and hurt but never knock out. */
-/** [CORRUPT] needs no aiming: it picks the nearest enemy in sight and poisons them until they are knocked out. */
-enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT }
+/** [CORRUPT] needs no aiming: it picks the nearest enemy in sight and poisons them for a few seconds. */
+/** [QUAKE] hurls a giant hammer: where it comes down the ground quakes in every direction and stays cracked. */
+enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
 data class AttackSpec(
@@ -55,6 +60,11 @@ data class AttackSpec(
     val lanes: Int = 1,
     /** The shots are square bits of light rather than pellets (and so are the super's). */
     val bits: Boolean = false,
+    /**
+     * Each shot takes this share of the health its target has left, and never less than the attack's own damage.
+     * Against a giant it does [Balance.SHARE_GIANT_HITS] times the attack's damage instead. 0 = plain damage.
+     */
+    val healthShare: Float = 0f,
 )
 
 data class SuperSpec(
@@ -167,25 +177,21 @@ object Balance {
     const val MATCH_SECONDS = 150f
     const val RESPAWN_SECONDS = 3f
     const val SPAWN_SHIELD_SECONDS = 2f
-    /** The most shield a fighter can build up on top of full health, as a share of that health. Damage comes off the shield first. */
-    const val SHIELD_FRACTION = 0.25f
-    /** A shield builds at this share of the pace health comes back, and only once the fighter has gone [REGEN_DELAY_SECONDS] without being hit. */
-    const val SHIELD_BUILD_RATE = 0.5f
+    /** Healing only starts once a fighter has gone this long without attacking or being hit. */
     const val REGEN_DELAY_SECONDS = 3f
     const val REGEN_FRACTION_PER_SECOND = 0.12f
-    /** Bots heal (and shield) at half the pace a player does. The one place a bot's numbers differ from a player's. */
+    /** Bots heal at half the pace a player does. The one place a bot's numbers differ from a player's. */
     const val BOT_REGEN_FRACTION_PER_SECOND = 0.06f
     /** A giant heals too, but far more slowly: this share of its (much larger) health a second. */
     const val GIANT_REGEN_FRACTION_PER_SECOND = 0.005f
 
     // ---- Hyper ----
     // Every fighter's third ability. It charges as main-attack hits land (more slowly than the super), and for a
-    // few seconds makes the fighter hit harder, with more health and a bigger shield. Hits landed while one is
+    // few seconds makes the fighter hit harder, with more health. Hits landed while one is
     // running charge the next, so a fighter who keeps hitting can go from one hyper into another.
     const val HYPER_SECONDS = 8f
     const val HYPER_DAMAGE_BONUS = 0.25f
     const val HYPER_HEALTH_BONUS = 0.25f
-    const val HYPER_SHIELD_BONUS = 0.25f
     /** A main-attack hit charges the hyper this much as fast as it charges the super. */
     const val HYPER_CHARGE_RATE = 0.4f
 
@@ -194,8 +200,13 @@ object Balance {
 
     /** A [SuperKind.CORRUPT] poison bites this often. The super's damage is what it does each second. */
     const val POISON_TICK_SECONDS = 0.5f
-    /** A boss shrugs the poison off after this long; on anyone else it only ends with a knockout. */
-    const val POISON_GIANT_SECONDS = 12f
+    /** The poison wears off after this long (or with a knockout)... */
+    const val POISON_SECONDS = 6f
+    /** ...and a boss shakes it off sooner. */
+    const val POISON_GIANT_SECONDS = 4f
+
+    /** A shot that takes a share of health ([AttackSpec.healthShare]) does this many times its own damage to a giant instead. */
+    const val SHARE_GIANT_HITS = 2
 
     /** A [SuperKind.SWARM]: the first rocket lands this long after the launch, and the rest follow this far apart. */
     const val RAIN_DELAY_SECONDS = 0.7f
@@ -247,9 +258,9 @@ object Balance {
             role = "Scattergunner",
             lore = "Half lab assistant, half lab equipment. Her rifle prints its own rounds, and she never asked what from.",
             attackName = "Bit Scatter",
-            health = StatLine(5600, 280),
-            attackDamage = StatLine(300, 15),
-            superDamage = StatLine(330, 16),
+            health = StatLine(6600, 330),
+            attackDamage = StatLine(360, 18),
+            superDamage = StatLine(400, 20),
             moveSpeed = 3.6f,
             attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 28f, range = 6.4f, speed = 16f, radius = 0.16f, burstInterval = 0f, bits = true),
             superSpec = SuperSpec(SuperKind.VOLLEY, "Hard Reset", "A wide blast of 9 heavy bits that shoves back everyone it hits.", projectiles = 9, spreadDegrees = 46f, range = 6.8f, speed = 17f, radius = 0.2f, knockback = 0.4f),
@@ -267,19 +278,20 @@ object Balance {
             id = FighterId.BRAKK,
             rarity = Rarity.RARE,
             name = "Brakk",
-            title = "Scrapyard Bruiser",
-            role = "Tank",
-            lore = "Built himself out of a forklift and a grudge. Prefers to discuss things up close.",
-            attackName = "Scrap Cannon",
-            health = StatLine(5600, 280),
-            attackDamage = StatLine(300, 15),
-            superDamage = StatLine(1280, 64),
-            moveSpeed = 3.45f,
-            attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 34f, range = 4.6f, speed = 15f, radius = 0.17f, burstInterval = 0f),
+            title = "Scrapyard Hound",
+            role = "Tracker",
+            lore = "A junkyard guard dog who rebuilt himself out of the scrap he was guarding. He leaves his mark on everyone who comes over the fence.",
+            attackName = "Paw Prints",
+            health = StatLine(7600, 380),
+            // The least one paw print does: it takes a share of the health its target has left when that is more.
+            attackDamage = StatLine(750, 38),
+            superDamage = StatLine(1600, 80),
+            moveSpeed = 3.6f,
+            attack = AttackSpec(AttackShape.PAWS, projectiles = 2, spreadDegrees = 0f, range = 8f, speed = 15f, radius = 0.24f, burstInterval = 0.14f, healthShare = 0.2f),
             superSpec = SuperSpec(SuperKind.RAM, "Ram Charge", "Charges forward, slamming and knocking back every enemy in the way.", range = 5.5f, speed = 15f, radius = 0.55f),
             ammoMax = 3,
             reloadSeconds = 1.6f,
-            superChargePerHit = 0.06f,
+            superChargePerHit = 0.13f,
             radius = 0.48f,
             skins = listOf(
                 Skin("Rustbucket", 0xFF8C9A5B, 0xFFE0702A, 0xFFFFD166, 0),
@@ -288,46 +300,24 @@ object Balance {
             ),
         ),
         FighterDef(
-            id = FighterId.MIRA,
-            rarity = Rarity.EPIC,
-            name = "Mira",
-            title = "Prism Sniper",
-            role = "Marksman",
-            lore = "Bends starlight through a cut crystal. Never misses twice — usually never once.",
-            attackName = "Prism Shot",
-            health = StatLine(5600, 280),
-            attackDamage = StatLine(1500, 75),
-            superDamage = StatLine(1920, 96),
-            moveSpeed = 3.5f,
-            attack = AttackSpec(AttackShape.LANCE, projectiles = 1, spreadDegrees = 0f, range = 10f, speed = 22f, radius = 0.18f, burstInterval = 0f),
-            superSpec = SuperSpec(SuperKind.PIERCE, "Starlance", "A huge crystal lance that pierces through every enemy in its path.", range = 12f, speed = 20f, radius = 0.38f),
-            ammoMax = 3,
-            reloadSeconds = 1.9f,
-            superChargePerHit = 0.26f,
-            radius = 0.4f,
-            skins = listOf(
-                Skin("Starlight", 0xFF8E5CF7, 0xFF2EE6D6, 0xFFFFF3B0, 0),
-                Skin("Ruby Cut", 0xFFE0314F, 0xFFFFC145, 0xFFFFE4EC, 20),
-                Skin("Glacier", 0xFF4CC9F0, 0xFFFFFFFF, 0xFFB5F2FF, 20),
-            ),
-        ),
-        FighterDef(
             id = FighterId.KITO,
             rarity = Rarity.MYTHIC,
             name = "Kito",
             title = "Arc Blade",
             role = "Assassin",
-            lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming.",
+            lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming, and the hammer is hard to miss.",
             attackName = "Arc Slash",
-            health = StatLine(5600, 280),
-            attackDamage = StatLine(520, 26),
-            superDamage = StatLine(1400, 70),
+            health = StatLine(8000, 400),
+            // Four blades: 2,200 when they all land.
+            attackDamage = StatLine(550, 28),
+            superDamage = StatLine(2400, 120),
             moveSpeed = 4.05f,
-            attack = AttackSpec(AttackShape.SPREAD, projectiles = 3, spreadDegrees = 20f, range = 5.6f, speed = 19f, radius = 0.17f, burstInterval = 0f),
-            superSpec = SuperSpec(SuperKind.RAM, "Flash Step", "Blinks forward in a blur, cutting through and knocking back everyone in the way.", range = 6.8f, speed = 21f, radius = 0.5f),
+            attack = AttackSpec(AttackShape.SPREAD, projectiles = 4, spreadDegrees = 24f, range = 5.6f, speed = 19f, radius = 0.17f, burstInterval = 0f),
+            // The radius is how far the quake reaches from where the hammer comes down.
+            superSpec = SuperSpec(SuperKind.QUAKE, "Faultline", "Hurls a giant hammer. Where it comes down the ground quakes in every direction, hitting everyone nearby, and stays cracked.", range = 7.5f, speed = 13f, radius = 2.6f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
-            superChargePerHit = 0.085f,
+            superChargePerHit = 0.064f,
             radius = 0.4f,
             skins = listOf(
                 Skin("Nightfall", 0xFF1F7A8C, 0xFFFF3D7F, 0xFF9BFFF0, 0),
@@ -376,16 +366,17 @@ object Balance {
             role = "Bruiser",
             lore = "An assistant AI that was asked to be helpful one time too many. It went rogue, and now it writes software for one purpose: hurting whoever is standing in front of it.",
             attackName = "Hardware Fault",
-            health = StatLine(6200, 310),
-            attackDamage = StatLine(2100, 105),
+            health = StatLine(6800, 340),
+            // Each of the two computers.
+            attackDamage = StatLine(1250, 63),
             // The poison's damage each second.
             superDamage = StatLine(700, 35),
             moveSpeed = 3.75f,
-            attack = AttackSpec(AttackShape.SMASH, projectiles = 1, spreadDegrees = 0f, range = 8.5f, speed = 15f, radius = 0.36f, burstInterval = 0f),
-            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Picks the nearest enemy in sight by itself and compiles malformed code into them: a poison that stops their healing and never lets up until they are knocked out.", range = 9f, speed = 30f, radius = 0f),
+            attack = AttackSpec(AttackShape.SMASH, projectiles = 2, spreadDegrees = 0f, range = 8.5f, speed = 15f, radius = 0.36f, burstInterval = 0.16f),
+            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Picks the nearest enemy in sight by itself and compiles malformed code into them: a poison that stops their healing for 6 seconds (a boss shakes it off sooner).", range = 6.75f, speed = 30f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.7f,
-            superChargePerHit = 0.34f,
+            superChargePerHit = 0.17f,
             radius = 0.45f,
             skins = listOf(
                 Skin("Kernel Panic", 0xFF1F2A44, 0xFF29F0FF, 0xFF7CFFB2, 0),
@@ -453,9 +444,10 @@ object Balance {
     }
 
     /** The sentry: a long-range gun on an island of coolant. Slow to reload, so its shots can be dodged. */
-    val sentry: FighterDef = fighter(FighterId.MIRA).let {
-        it.copy(name = "Sentry", title = "Turret", health = StatLine(16000, 0), attackDamage = StatLine(it.attackDamage.base, 0),
-            superDamage = StatLine(it.superDamage.base, 0), reloadSeconds = 2.4f, superChargePerHit = 0f)
+    val sentry: FighterDef = fighter(FighterId.BYTE).let {
+        it.copy(name = "Sentry", title = "Turret", health = StatLine(16000, 0), attackDamage = StatLine(1500, 0),
+            superDamage = StatLine(1920, 0), reloadSeconds = 2.4f, superChargePerHit = 0f, hyper = null,
+            attack = AttackSpec(AttackShape.LANCE, projectiles = 1, spreadDegrees = 0f, range = 10f, speed = 22f, radius = 0.18f, burstInterval = 0f))
     }
 
     /** How a locked fighter can be obtained. */

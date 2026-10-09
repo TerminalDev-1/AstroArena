@@ -100,10 +100,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "kito" -> Screen.Fighters(FighterId.KITO)
                 "varun" -> Screen.Fighters(FighterId.VARUN)
                 "buddy" -> Screen.Fighters(FighterId.BUDDY)
-                // The Training Area as Buddy, unlocked or not.
-                "trybuddy" -> Screen.Match(startMatchConfig(repo.save.value).copy(playerFighter = FighterId.BUDDY, playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
-                // The Training Area as Varun, unlocked or not, for looking at him in play.
-                "tryvarun" -> Screen.Match(startMatchConfig(repo.save.value).copy(playerFighter = FighterId.VARUN, playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
+                // The Training Area as any fighter, unlocked or not, for looking at them in play.
+                "trybuddy", "tryvarun", "trykito", "trybrakk", "trybyte" -> Screen.Match(startMatchConfig(repo.save.value).copy(
+                    playerFighter = FighterId.valueOf(startScreen.removePrefix("try").uppercase()), playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road
                 "track" -> Screen.CupTrack
@@ -123,7 +122,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             val tier = CapsuleTier.entries[(it.removePrefix("capsule").trimEnd('s', 'f', 'b').toIntOrNull() ?: 0).coerceIn(0, CapsuleTier.entries.lastIndex)]
             // Suffixes: s = a full box, f = a fighter comes out, b = a bundle comes out.
             val reward = when {
-                it.endsWith("f") -> Reward.UnlockFighter(FighterId.MIRA)
+                it.endsWith("f") -> Reward.UnlockFighter(FighterId.KITO)
                 it.endsWith("b") -> Reward.Bundle(listOf(Reward.SkinReward(FighterId.BRAKK, 1), Reward.Prisms(150), Reward.Bolts(800)))
                 else -> Reward.Bolts(100 * (tier.ordinal + 1))
             }

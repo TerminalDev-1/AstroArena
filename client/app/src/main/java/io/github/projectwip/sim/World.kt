@@ -186,7 +186,7 @@ class World(
         var h = 17
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
-            mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.shieldHp); mix(f.kos)
+            mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
             mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy)
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
@@ -261,6 +261,10 @@ class World(
                 AttackShape.ROCKETS -> for (i in 0 until a.projectiles) {
                     f.pending += PendingShot((i / a.lanes) * a.burstInterval, dx, dy, (i % a.lanes - (a.lanes - 1) / 2f) * Balance.ROCKET_LANE)
                 }
+                // One after another, from alternate hands.
+                AttackShape.SMASH, AttackShape.PAWS -> for (i in 0 until a.projectiles) {
+                    f.pending += PendingShot(i * a.burstInterval, dx, dy, if (a.projectiles == 1) 0f else (0.5f - i % 2) * f.radius)
+                }
                 else -> f.pending += PendingShot(0f, dx, dy)
             }
             events += GameEvent.Shot(f.id, false, f.x, f.y, dx, dy)
@@ -306,7 +310,7 @@ class World(
             f.ammo = (f.ammo + dt / f.def.reloadSeconds).coerceAtMost(f.def.ammoMax.toFloat())
         }
 
-        // Malformed code stops its victim healing, and bites until they are knocked out.
+        // Malformed code stops its victim healing while it lasts.
         if (f.poisoned) stepPoison(f, dt) else regenerate(f, dt)
     }
 
@@ -330,39 +334,27 @@ class World(
     }
 
     /**
-     * Healing. A fighter heals all the time: attacking doesn't stop it, and neither does being hit. Health comes
-     * back first. Once it is full, and the fighter has gone a few seconds without being hit, a slower trickle
-     * builds a shield on top of it, up to [Fighter.shieldMax]; there are no shields in Boss Mode. Bots heal at
-     * half a player's pace. Giants and the Training Area's targets are the exception: they wait a few seconds
-     * after being hit before healing at all, and a giant heals far more slowly.
+     * Healing. Nobody heals in the middle of a fight: a fighter has to go [Balance.REGEN_DELAY_SECONDS] without
+     * attacking or being hit first, and then health comes back steadily. Bots heal at half a player's pace, and a
+     * giant far more slowly.
      */
     fun regenerate(f: Fighter, dt: Float) {
-        if (!f.canShield && f.sinceDamaged <= Balance.REGEN_DELAY_SECONDS) return
+        if (f.hp >= f.maxHp || f.sinceDamaged <= Balance.REGEN_DELAY_SECONDS || f.sinceAttack <= Balance.REGEN_DELAY_SECONDS) return
         val rate = when {
             f.scale > 1f -> Balance.GIANT_REGEN_FRACTION_PER_SECOND
             f.isBot -> Balance.BOT_REGEN_FRACTION_PER_SECOND
             else -> Balance.REGEN_FRACTION_PER_SECOND
         }
-        val gain = (f.maxHp * rate * dt).toInt().coerceAtLeast(1)
-        if (f.hp < f.maxHp) f.hp = (f.hp + gain).coerceAtMost(f.maxHp)
-        else if (shields(f) && f.sinceDamaged > Balance.REGEN_DELAY_SECONDS && f.shieldHp < f.shieldMax) {
-            f.shieldHp = (f.shieldHp + (gain * Balance.SHIELD_BUILD_RATE).toInt().coerceAtLeast(1)).coerceAtMost(f.shieldMax)
-        }
+        f.hp = (f.hp + (f.maxHp * rate * dt).toInt().coerceAtLeast(1)).coerceAtMost(f.maxHp)
     }
 
-    /** Whether [f] can hold a shield in this match: nobody can in Boss Mode. */
-    fun shields(f: Fighter) = f.canShield && !rules.boss
-
-    /** Switches a charged hyper on: more damage (see [Fighter.damageMultiplier]), more health and a bigger shield, for a few seconds. */
+    /** Switches a charged hyper on: more damage (see [Fighter.damageMultiplier]) and more health, for a few seconds. */
     private fun startHyper(f: Fighter) {
-        val shieldBefore = f.shieldMax
         f.hyperCharge = 0f
         f.hyperTime = f.hyperSeconds
         f.hyperHpBonus = (f.maxHp * Balance.HYPER_HEALTH_BONUS).toInt()
         f.maxHp += f.hyperHpBonus
         f.hp += f.hyperHpBonus
-        // The shield grows by as much as its cap does, so the bonus is there at once.
-        if (shields(f)) f.shieldHp += f.shieldMax - shieldBefore
         f.revealTimer = maxOf(f.revealTimer, 1.5f)
         events += GameEvent.Hyper(f.id)
     }
@@ -372,16 +364,6 @@ class World(
         f.maxHp -= f.hyperHpBonus
         f.hyperHpBonus = 0
         f.hp = f.hp.coerceAtMost(f.maxHp)
-        f.shieldHp = f.shieldHp.coerceAtMost(f.shieldMax)
-    }
-
-    /** Takes [amount] off a fighter: the shield goes first, then health. Returns how much landed. */
-    private fun wound(f: Fighter, amount: Int): Int {
-        val dealt = minOf(amount, f.shieldHp + f.hp)
-        val blocked = minOf(dealt, f.shieldHp)
-        f.shieldHp -= blocked
-        f.hp -= dealt - blocked
-        return dealt
     }
 
     /** Tracks who is tucked away in a thicket and which teams have spotted them up close. */
@@ -418,13 +400,14 @@ class World(
             AttackShape.LANCE -> ShotStyle.PRISM
             AttackShape.ROCKETS -> ShotStyle.ROCKET
             AttackShape.SMASH -> ShotStyle.COMPUTER
+            AttackShape.PAWS -> ShotStyle.PAW
         }
         val baseAng = atan2(dy, dx)
         val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
         val spread = Math.toRadians(a.spreadDegrees.toDouble()).toFloat()
         for (i in 0 until n) {
             val ang = if (n == 1) baseAng else baseAng - spread / 2 + spread * i / (n - 1)
-            spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast)
+            spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast, share = a.healthShare * f.damageMultiplier)
         }
     }
 
@@ -443,6 +426,8 @@ class World(
                 }
             }
             SuperKind.PIERCE -> spawnProjectile(f, baseAng, s.speed, s.radius, f.superDamage, s.range, true, true, ShotStyle.LANCE)
+            // The hammer flies until it meets an enemy, a wall or the end of its reach, and the quake is its blast.
+            SuperKind.QUAKE -> spawnProjectile(f, baseAng, s.speed, 0.42f, f.superDamage, s.range, false, true, ShotStyle.HAMMER, blast = s.radius)
             SuperKind.SWARM -> {
                 // The rockets go up, and come down one after another inside one circle where the fighter aimed. For
                 // this super the aim is not just a direction: it is how far away, in tiles, the circle is.
@@ -471,7 +456,7 @@ class World(
                 t.poisonBy = f.id
                 t.poisonDamage = f.superDamage
                 t.poisonTick = Balance.POISON_TICK_SECONDS
-                t.poisonLeft = if (t.scale > 1f) Balance.POISON_GIANT_SECONDS else Float.MAX_VALUE
+                t.poisonLeft = if (t.scale > 1f) Balance.POISON_GIANT_SECONDS else Balance.POISON_SECONDS
                 t.revealTimer = maxOf(t.revealTimer, 1.5f)
             }
         }
@@ -479,7 +464,7 @@ class World(
 
     private fun spawnProjectile(
         f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float,
-        pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f, knock: Float = 0f,
+        pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f, knock: Float = 0f, share: Float = 0f,
     ) {
         val dx = cos(ang)
         val dy = sin(ang)
@@ -487,7 +472,7 @@ class World(
         val off = f.radius * 0.6f
         val sx = f.x + dx * off - dy * side
         val sy = f.y + dy * off + dx * side
-        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock)
+        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock, share)
         if (arena.tileAt(sx, sy).blocksShots) {
             events += GameEvent.WallHit(sx, sy, style)
             return
@@ -495,9 +480,9 @@ class World(
         projectiles += p
     }
 
-    /** A rocket goes off at ([x], [y]): every enemy within its blast is hit, once. */
+    /** A rocket goes off (or a hammer comes down) at ([x], [y]): every enemy within its blast is hit, once. */
     private fun detonate(p: Projectile, x: Float, y: Float) {
-        events += GameEvent.Burst(x, y, p.blast)
+        events += if (p.style == ShotStyle.HAMMER) GameEvent.Quake(x, y, p.blast) else GameEvent.Burst(x, y, p.blast)
         if (phase != Phase.PLAYING) return
         val owner = fighter(p.ownerId)
         for (f in fighters) {
@@ -596,7 +581,7 @@ class World(
                         p.hit += f.id
                         if (p.blast > 0f) { detonate(p, p.x, p.y); p.alive = false; break@loop }
                         val owner = fighter(p.ownerId)
-                        damage(f, owner, p.damage, p.isSuper, p.x, p.y)
+                        damage(f, owner, shotDamage(p, f), p.isSuper, p.x, p.y)
                         if (p.knock > 0f && f.alive && !f.rooted && speed > 0f) {
                             arena.moveCircle(f.x, f.y, f.radius, p.vx / speed * p.knock, p.vy / speed * p.knock, tmp)
                             f.x = tmp[0]; f.y = tmp[1]
@@ -615,14 +600,22 @@ class World(
 
     // ------------------------------------------------------------------ damage & respawn
 
+    /** What [p] does to [f]: its own damage, or a share of the health [f] has left when the shot takes one. */
+    private fun shotDamage(p: Projectile, f: Fighter): Int = when {
+        p.share <= 0f -> p.damage
+        f.scale > 1f -> p.damage * Balance.SHARE_GIANT_HITS
+        else -> maxOf(p.damage, (f.hp * p.share).toInt())
+    }
+
     /** [lethal] false: the hit can take the target down to its last point of health, but never knocks it out. */
     private fun damage(target: Fighter, source: Fighter?, wanted: Int, isSuper: Boolean, x: Float, y: Float, lethal: Boolean = true) {
-        val amount = if (lethal) wanted else minOf(wanted, target.shieldHp + target.hp - 1)
+        val amount = if (lethal) wanted else minOf(wanted, target.hp - 1)
         if (target.shield > 0f || amount <= 0) {
             events += GameEvent.Blocked(x, y)
             return
         }
-        val dealt = wound(target, amount)
+        val dealt = minOf(amount, target.hp)
+        target.hp -= dealt
         target.sinceDamaged = 0f
         target.hitFlash = 0.12f
         target.revealTimer = maxOf(target.revealTimer, 1.0f)
@@ -652,7 +645,6 @@ class World(
         victim.respawnTimer = Balance.RESPAWN_SECONDS
         victim.pending.clear()
         victim.dashTime = 0f
-        victim.shieldHp = 0
         cure(victim)
         if (victim.hyperActive) endHyper(victim)
         // The super and hyper charges are kept: whatever was charged is still there after the respawn.
@@ -725,7 +717,7 @@ class World(
             if (f.stormTick > 0f) continue
             f.stormTick = 0.5f
             val dmg = (f.maxHp * st.damageFraction() * 0.5f).toInt().coerceAtLeast(1)
-            wound(f, dmg)
+            f.hp -= minOf(dmg, f.hp)
             f.sinceDamaged = 0f
             f.hitFlash = 0.12f
             events += GameEvent.StormHit(f.id, dmg, f.x, f.y)
@@ -737,7 +729,6 @@ class World(
         placeAtSpawn(f)
         f.alive = true
         f.hp = f.maxHp
-        f.shieldHp = 0
         f.ammo = f.def.ammoMax.toFloat()
         f.shield = Balance.SPAWN_SHIELD_SECONDS
         f.sinceDamaged = 99f

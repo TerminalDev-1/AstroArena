@@ -13,7 +13,8 @@ import kotlin.math.sin
 enum class Slot { PRIMARY, SECONDARY, ACCENT, SKIN, SKIN_BROWN, DARK, METAL, WHITE, INK }
 
 /** Simple rig. Every part is attached to exactly one bone. */
-enum class Bone { BODY, HEAD, WEAPON, ARM, LEG_L, LEG_R, FLOAT }
+/** [FORE_L] and [FORE_R] are the front legs of a fighter that walks on four. */
+enum class Bone { BODY, HEAD, WEAPON, ARM, LEG_L, LEG_R, FORE_L, FORE_R, FLOAT }
 
 class Part(val mesh: Mesh, val slot: Slot, val bone: Bone, val outline: Boolean, val emissive: Boolean)
 
@@ -25,6 +26,9 @@ class Rig(
     val shoulder: FloatArray,   // weapon shoulder (x,y,z), relative to body
     val shoulderL: FloatArray,  // free arm shoulder
     val floatY: Float = 0f,
+    /** On four legs: how far forward the front legs are hung, and how far back the hind ones. */
+    val foreX: Float = 0f,
+    val hindX: Float = 0f,
 )
 
 class FighterModel(val parts: List<Part>, val rig: Rig)
@@ -53,7 +57,6 @@ class FighterModels {
     init {
         models[FighterId.BYTE] = buildByte()
         models[FighterId.BRAKK] = buildBrakk()
-        models[FighterId.MIRA] = buildMira()
         models[FighterId.KITO] = buildKito()
         models[FighterId.VARUN] = buildVarun()
         models[FighterId.BUDDY] = buildBuddy()
@@ -127,70 +130,48 @@ class FighterModels {
         return a.build(rig)
     }
 
-    // ------------------------------------------------------------------ Brakk — scrapyard bruiser
+    // ------------------------------------------------------------------ Brakk — scrapyard hound
 
     private fun buildBrakk(): FighterModel {
         val a = Assembler()
-        val rig = Rig(headY = 1.12f, hipY = 0.38f, hipZ = 0.24f, shoulder = floatArrayOf(0.02f, 0.86f, 0.5f), shoulderL = floatArrayOf(0f, 0.92f, -0.52f))
+        // A dog on four legs. His head hangs on the weapon bone, so it snaps back when he lets fly: a bark. His tail
+        // is on the arm bone, so it wags as he runs.
+        val rig = Rig(headY = 1.0f, hipY = 0.44f, hipZ = 0.2f, shoulder = floatArrayOf(0.44f, 0.84f, 0f), shoulderL = floatArrayOf(-0.5f, 0.78f, 0f),
+            foreX = 0.3f, hindX = -0.32f)
+        // Hind legs are his own; one front leg is scrap.
         for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
-            a.add(bone, Slot.DARK) { at(0f, -0.15f, 0f) { roundedBox(0.3f, 0.32f, 0.27f, 0.09f) } }
-            a.add(bone, Slot.METAL) { at(0.06f, -0.32f, 0f) { roundedBox(0.4f, 0.14f, 0.32f, 0.06f) } }
+            a.add(bone, Slot.PRIMARY) { at(-0.02f, -0.08f, 0f) { roundedBox(0.24f, 0.26f, 0.2f, 0.09f) } }
+            a.add(bone, Slot.PRIMARY) { at(0.02f, -0.24f, 0f) { capsule(0.07f, 0.12f) } }
+            a.add(bone, Slot.DARK) { at(0.06f, -0.39f, 0f) { roundedBox(0.22f, 0.1f, 0.18f, 0.05f) } }
         }
-        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.8f, 0f) { roundedBox(0.82f, 0.66f, 0.88f, 0.24f) } }
-        a.add(Bone.BODY, Slot.SECONDARY) { at(0.38f, 0.8f, 0f) { roundedBox(0.14f, 0.42f, 0.58f, 0.06f) } }
-        a.add(Bone.BODY, Slot.DARK) { at(0f, 0.52f, 0f) { roundedBox(0.84f, 0.11f, 0.9f, 0.05f) } }
+        a.add(Bone.FORE_L, Slot.PRIMARY) { at(0f, -0.17f, 0f) { capsule(0.075f, 0.2f) } }
+        a.add(Bone.FORE_L, Slot.DARK) { at(0.05f, -0.39f, 0f) { roundedBox(0.22f, 0.1f, 0.18f, 0.05f) } }
+        a.add(Bone.FORE_R, Slot.METAL) { at(0f, -0.17f, 0f) { roundedBox(0.13f, 0.34f, 0.13f, 0.04f) } }
+        a.add(Bone.FORE_R, Slot.ACCENT, outline = false, emissive = true) { at(0.07f, -0.15f, 0f) { roundedBox(0.02f, 0.18f, 0.06f, 0.01f) } }
+        a.add(Bone.FORE_R, Slot.METAL) { at(0.05f, -0.39f, 0f) { roundedBox(0.24f, 0.1f, 0.2f, 0.05f) } }
+        // A long barrel of a body, deep in the chest, with a scrap plate bolted over the back.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(-0.04f, 0.64f, 0f) { roundedBox(0.92f, 0.42f, 0.5f, 0.2f) } }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0.26f, 0.66f, 0f) { roundedBox(0.4f, 0.5f, 0.56f, 0.2f) } }
+        a.add(Bone.BODY, Slot.WHITE) { at(0.36f, 0.56f, 0f) { roundedBox(0.24f, 0.3f, 0.4f, 0.11f) } }
+        a.add(Bone.BODY, Slot.METAL) { at(-0.1f, 0.86f, 0f) { roundedBox(0.5f, 0.08f, 0.42f, 0.03f) } }
         a.add(Bone.BODY, Slot.ACCENT, outline = false) {
-            for (y in listOf(0.98f, 0.62f)) for (z in listOf(0.31f, -0.31f)) at(0.43f, y, z) { sphere(0.045f, 6, 8) }
+            for (x in listOf(-0.3f, 0.1f)) for (z in listOf(0.16f, -0.16f)) at(x, 0.91f, z) { sphere(0.035f, 6, 8) }
         }
-        for (z in listOf(0.2f, -0.2f)) {
-            a.add(Bone.BODY, Slot.METAL) { at(-0.36f, 1.22f, z) { cylinder(0.08f, 0.5f, 10) } }
-            a.add(Bone.BODY, Slot.DARK) { at(-0.36f, 1.47f, z) { torus(0.08f, 0.03f, 10, 5) } }
-        }
-        // Head with single glowing eye
-        a.add(Bone.HEAD, Slot.DARK) { at(0.02f, 0.1f, 0f) { roundedBox(0.44f, 0.34f, 0.46f, 0.15f) } }
-        a.add(Bone.HEAD, Slot.INK, outline = false) { at(0.21f, 0.12f, 0f) { roundedBox(0.08f, 0.12f, 0.34f, 0.04f) } }
-        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.25f, 0.12f, 0.02f) { sphere(0.075f, 8, 10) } }
-        // Scrap cannon
-        a.add(Bone.WEAPON, Slot.METAL) { at(0.3f, 0f, 0f) { alongX { cylinder(0.17f, 0.72f, 14) } } }
-        a.add(Bone.WEAPON, Slot.SECONDARY) { at(0.66f, 0f, 0f) { alongX { torus(0.17f, 0.065f, 16, 6) } } }
-        a.add(Bone.WEAPON, Slot.DARK) { at(-0.06f, 0f, 0f) { sphere(0.17f, 8, 12) } }
-        a.add(Bone.WEAPON, Slot.SECONDARY) { at(0.18f, 0.18f, 0f) { alongZ { cylinder(0.12f, 0.22f, 12) } } }
-        // Big fist arm
-        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.12f, 0f) { capsule(0.13f, 0.14f) } }
-        a.add(Bone.ARM, Slot.METAL) { at(0.02f, -0.34f, 0f) { roundedBox(0.26f, 0.24f, 0.24f, 0.09f) } }
-        return a.build(rig)
-    }
-
-    // ------------------------------------------------------------------ Mira — prism sniper
-
-    private fun buildMira(): FighterModel {
-        val a = Assembler()
-        val rig = Rig(headY = 1.0f, hipY = 0.3f, hipZ = 0.12f, shoulder = floatArrayOf(0.06f, 0.82f, 0.28f), shoulderL = floatArrayOf(0f, 0.86f, -0.28f), floatY = 1.66f)
-        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
-            a.add(bone, Slot.DARK) { at(0f, -0.12f, 0f) { capsule(0.075f, 0.14f) } }
-            a.add(bone, Slot.SECONDARY) { at(0.04f, -0.28f, 0f) { roundedBox(0.22f, 0.1f, 0.15f, 0.04f) } }
-        }
-        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.52f, 0f) { cylinder(0.44f, 0.76f, 18, topRadius = 0.2f) } }
-        a.add(Bone.BODY, Slot.SECONDARY) { at(0f, 0.16f, 0f) { torus(0.43f, 0.05f, 22, 6) } }
-        a.add(Bone.BODY, Slot.ACCENT) { at(0f, 0.6f, 0f) { torus(0.32f, 0.04f, 18, 6) } }
-        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.88f, 0f) { ellipsoid(0.26f, 0.16f, 0.3f) } }
-        // Head + hood
-        a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.16f, 0f) { sphere(0.28f) } }
-        a.add(Bone.HEAD, Slot.DARK) { at(-0.05f, 0.19f, 0f) { ellipsoid(0.32f, 0.33f, 0.32f, 8, 16, 0f, 0.55f) } }
-        a.add(Bone.HEAD, Slot.INK, outline = false) {
-            at(0.255f, 0.15f, 0.09f) { sphere(0.05f, 6, 8) }
-            at(0.255f, 0.15f, -0.09f) { sphere(0.05f, 6, 8) }
-        }
-        // Floating prism
-        a.add(Bone.FLOAT, Slot.SECONDARY, emissive = true) { octa(0.13f, 0.21f, 0.13f) }
-        // Prism rifle
-        a.add(Bone.WEAPON, Slot.DARK) { at(0.42f, 0f, 0f) { alongX { cylinder(0.05f, 1.0f, 10) } } }
-        a.add(Bone.WEAPON, Slot.SECONDARY) { at(-0.04f, -0.02f, 0f) { roundedBox(0.26f, 0.13f, 0.09f, 0.04f) } }
-        a.add(Bone.WEAPON, Slot.METAL) { at(0.3f, 0.09f, 0f) { alongX { cylinder(0.045f, 0.22f, 8) } } }
-        a.add(Bone.WEAPON, Slot.SECONDARY, emissive = true) { at(0.98f, 0f, 0f) { octa(0.18f, 0.09f, 0.09f) } }
-        a.add(Bone.WEAPON, Slot.SKIN) { at(0.06f, 0f, 0f) { sphere(0.08f, 8, 10) } }
-        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.1f, 0f) { capsule(0.075f, 0.14f) } }
-        a.add(Bone.ARM, Slot.SKIN) { at(0f, -0.26f, 0f) { sphere(0.08f, 8, 10) } }
+        // The collar, with a tag that glows.
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0.42f, 0.8f, 0f) { rotate(-62f, 0f, 0f, 1f); torus(0.2f, 0.055f, 16, 6) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.56f, 0.64f, 0f) { sphere(0.06f, 8, 10) } }
+        // Head: a square skull, a long scrap muzzle, one eye of his own and one that glows, and two pricked ears.
+        a.add(Bone.WEAPON, Slot.PRIMARY) { at(0.12f, 0.16f, 0f) { roundedBox(0.38f, 0.36f, 0.42f, 0.14f) } }
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.4f, 0.08f, 0f) { roundedBox(0.3f, 0.2f, 0.26f, 0.07f) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.38f, -0.04f, 0f) { roundedBox(0.26f, 0.07f, 0.22f, 0.03f) } }
+        a.add(Bone.WEAPON, Slot.INK, outline = false) { at(0.56f, 0.13f, 0f) { sphere(0.065f, 8, 10) } }
+        a.add(Bone.WEAPON, Slot.INK, outline = false) { at(0.3f, 0.23f, 0.15f) { sphere(0.05f, 6, 8) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.3f, 0.23f, -0.15f) { sphere(0.06f, 8, 10) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.02f, 0.46f, 0.15f) { rotate(14f, 1f, 0f, 0f); cylinder(0.09f, 0.26f, 6, topRadius = 0f) } }
+        a.add(Bone.WEAPON, Slot.SECONDARY) { at(0.02f, 0.46f, -0.15f) { rotate(-14f, 1f, 0f, 0f); cylinder(0.09f, 0.26f, 6, topRadius = 0f) } }
+        // Tail: up and over, with a bright tip.
+        a.add(Bone.ARM, Slot.PRIMARY) { at(-0.08f, 0.13f, 0f) { rotate(32f, 0f, 0f, 1f); capsule(0.055f, 0.24f) } }
+        a.add(Bone.ARM, Slot.SECONDARY) { at(-0.19f, 0.29f, 0f) { sphere(0.075f, 8, 10) } }
         return a.build(rig)
     }
 
@@ -459,8 +440,15 @@ class FighterModels {
                 Bone.LEG_L, Bone.LEG_R -> {
                     val side = if (p.bone == Bone.LEG_L) -1f else 1f
                     System.arraycopy(root, 0, bone, 0, 16)
-                    Matrix.translateM(bone, 0, 0f, rig.hipY, rig.hipZ * side)
+                    Matrix.translateM(bone, 0, rig.hindX, rig.hipY, rig.hipZ * side)
                     Matrix.rotateM(bone, 0, sin(anim.walk) * 32f * mv * side, 0f, 0f, 1f)
+                }
+                // A trot: each front leg swings with the hind leg on the other side.
+                Bone.FORE_L, Bone.FORE_R -> {
+                    val side = if (p.bone == Bone.FORE_L) -1f else 1f
+                    System.arraycopy(root, 0, bone, 0, 16)
+                    Matrix.translateM(bone, 0, rig.foreX, rig.hipY, rig.hipZ * side)
+                    Matrix.rotateM(bone, 0, -sin(anim.walk) * 32f * mv * side, 0f, 0f, 1f)
                 }
                 Bone.FLOAT -> {
                     System.arraycopy(root, 0, bone, 0, 16)
@@ -494,7 +482,7 @@ class FighterModels {
             Slot.DARK -> darken(primary, 0.5f)
             Slot.METAL -> 0xFF6A7390
             Slot.WHITE -> 0xFFFFFFFF
-            Slot.INK -> 0xFF1B1035
+            Slot.INK -> 0xFF142435
         }
         val v = c.toInt()
         col[0] = ((v shr 16) and 0xFF) / 255f; col[1] = ((v shr 8) and 0xFF) / 255f; col[2] = (v and 0xFF) / 255f
@@ -502,7 +490,7 @@ class FighterModels {
     }
 
     companion object {
-        val INK = floatArrayOf(0.106f, 0.063f, 0.208f, 1f)
+        val INK = floatArrayOf(0.078f, 0.141f, 0.208f, 1f)
         /** Outline thickness in model units. */
         const val OUTLINE = 0.035f
 

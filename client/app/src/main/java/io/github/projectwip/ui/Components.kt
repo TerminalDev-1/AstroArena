@@ -125,14 +125,14 @@ enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val te
     PURPLE(Palette.PanelLight, Palette.Panel, Palette.PanelDark),
     GOLD(Color(0xFFFFE066), Palette.Gold, Color(0xFFA8650A)),
     /** Translucent plate that lets the 3D lobby show through. */
-    GLASS(Color(0xD8392A8C), Color(0xE01A1150), Color(0xFF0E0828)),
+    GLASS(Color(0xD834628C), Color(0xE0173550), Color(0xFF0B1A28)),
 }
 
 /** Soft drop shadow under a plate, so it reads as sitting above the scene. */
 private fun DrawScope.plateShadow(path: Path, depth: Float) {
     translate(top = depth) {
-        drawPath(path, Color.Black.copy(alpha = 0.16f), style = Stroke(depth * 1.6f, join = StrokeJoin.Round))
-        drawPath(path, Color.Black.copy(alpha = 0.34f))
+        drawPath(path, Color.Black.copy(alpha = 0.2f), style = Stroke(depth * 1.8f, join = StrokeJoin.Round))
+        drawPath(path, Color.Black.copy(alpha = 0.42f))
     }
 }
 
@@ -236,8 +236,14 @@ fun Panel(
         modifier.drawBehind {
             val ink = 3.dp.toPx()
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
-            plateShadow(path, 6.dp.toPx())
-            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.14f), color, colorBottom)), Palette.Ink, ink, gloss = false)
+            // A panel is a slab: its side shows under the face, and it throws a shadow past that.
+            val slab = 5.dp.toPx()
+            plateShadow(path, slab + 6.dp.toPx())
+            translate(top = slab) {
+                drawPath(path, Brush.verticalGradient(listOf(lerp(colorBottom, Color.Black, 0.25f), lerp(colorBottom, Color.Black, 0.6f))))
+                drawPath(path, Palette.Ink, style = Stroke(ink, join = StrokeJoin.Round))
+            }
+            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.26f), color, colorBottom)), Palette.Ink, ink, gloss = false)
             clipPath(path) {
                 // Faint diagonal brushing, and a sheen across the top, so large panels aren't a flat fill.
                 val step = 22.dp.toPx()
@@ -246,7 +252,9 @@ fun Panel(
                     drawLine(Color.White.copy(alpha = 0.035f), Offset(x, size.height), Offset(x + size.height, 0f), step * 0.45f)
                     x += step
                 }
-                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.13f), Color.Transparent), 0f, minOf(size.height * 0.35f, 90.dp.toPx())), size = size)
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.2f), Color.Transparent), 0f, minOf(size.height * 0.4f, 110.dp.toPx())), size = size)
+                // A warm light catches the top edge.
+                drawLine(Palette.Orange.copy(alpha = 0.55f), Offset(0f, ink * 1.4f), Offset(size.width, ink * 1.4f), 2.dp.toPx())
             }
             // inner rim highlight
             val inset = 5.dp.toPx()
@@ -321,7 +329,7 @@ fun CurrencyPill(icon: IconKind, value: Int, modifier: Modifier = Modifier, onCl
                     val o = plateShape(8.dp, 3.dp).createOutline(size, layoutDirection, this)
                     val p = Path().apply { addOutline(o) }
                     plateShadow(p, 3.dp.toPx())
-                    drawPath(p, Brush.verticalGradient(listOf(Color(0xFF0C0628), Palette.PanelInset, Color(0xFF2A1B6A))))
+                    drawPath(p, Brush.verticalGradient(listOf(Color(0xFF091928), Palette.PanelInset, Color(0xFF23476A))))
                     clipPath(p) {
                         drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent), 0f, size.height * 0.4f), size = size)
                         drawLine(Color.White.copy(alpha = 0.22f), Offset(0f, size.height - 2.dp.toPx()), Offset(size.width, size.height - 2.dp.toPx()), 2.dp.toPx())
@@ -435,7 +443,7 @@ fun FighterView(
                 Image(
                     bmp.asImageBitmap(), contentDescription = def.name, modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
-                    colorFilter = if (locked) ColorFilter.tint(Color(0xFF221545), BlendMode.SrcIn) else null,
+                    colorFilter = if (locked) ColorFilter.tint(Color(0xFF1A2F45), BlendMode.SrcIn) else null,
                 )
             }
         }
@@ -519,14 +527,14 @@ fun Modifier.lobbyAnchor(): Modifier {
 }
 
 /** Translucent wash over the 3D lobby for content-heavy screens. */
-val SCRIM = Color(0xB0120A2E)
+val SCRIM = Color(0xB00E1E2E)
 
 /** Top/bottom darkening so UI over the 3D lobby stays readable. */
 @Composable
 fun LobbyVignette(strength: Float = 1f) {
     Canvas(Modifier.fillMaxSize()) {
-        drawRect(Brush.verticalGradient(listOf(Color(0xCC0B0620).copy(alpha = 0.8f * strength), Color.Transparent), 0f, size.height * 0.22f))
-        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC0B0620).copy(alpha = 0.85f * strength)), size.height * 0.7f, size.height))
+        drawRect(Brush.verticalGradient(listOf(Color(0xCC091520).copy(alpha = 0.8f * strength), Color.Transparent), 0f, size.height * 0.22f))
+        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC091520).copy(alpha = 0.85f * strength)), size.height * 0.7f, size.height))
     }
 }
 

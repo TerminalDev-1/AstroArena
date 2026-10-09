@@ -54,7 +54,7 @@ HEADER = """\
 #   prisms      CPU Chips
 #   credits     Credits on the Spark Road, toward the next fighter (enough of them unlocks it)
 #   <fighter>   unlocked or locked, its level (1 to %d) and its own Cups (its rank follows them):
-#                   mira = unlocked, level 4, cups 120
+#                   kito = unlocked, level 4, cups 120
 #               %s can't be locked: everyone starts with it.
 #
 # A section is one account: [the player's name (their player id)]. The id is the one shown in the

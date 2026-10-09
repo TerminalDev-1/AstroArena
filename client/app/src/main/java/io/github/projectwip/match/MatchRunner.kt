@@ -288,6 +288,7 @@ class MatchRunner(
                     AttackShape.ROCKETS -> Sound.ROCKET
                     AttackShape.LANCE -> Sound.SHOOT_PRISM
                     AttackShape.SMASH -> Sound.SHOOT_HEAVY
+                    AttackShape.PAWS -> Sound.SHOOT_SPARK
                 }, gain, 0.95f + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }
@@ -331,6 +332,12 @@ class MatchRunner(
             is GameEvent.CountdownTick -> { sfx.play(Sound.TICK); hudEvents += HudEvent.Pop }
             is GameEvent.MatchStart -> { sfx.play(Sound.GO); hudEvents += HudEvent.Pop; say(VoiceCue.START) }
             is GameEvent.Spawned -> if (e.fighterId == pid) say(VoiceCue.BACK)
+            is GameEvent.Quake -> {
+                val p = match.player
+                val near = 1f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)
+                sfx.play(Sound.CRATE_BREAK, near, 0.55f); sfx.play(Sound.ROCKET_BOOM, near, 0.6f)
+                if (near > 0.5f) sfx.buzz(60, 200)
+            }
             is GameEvent.Burst -> {
                 val p = match.player
                 sfx.play(Sound.ROCKET_BOOM, 0.5f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f), 1.15f + (e.x % 0.2f))

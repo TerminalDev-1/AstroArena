@@ -258,6 +258,7 @@ class BotBrain(
         AttackShape.LANCE -> 0.78f
         AttackShape.ROCKETS -> 0.6f
         AttackShape.SMASH -> 0.7f
+        AttackShape.PAWS -> 0.7f
     }
 
     private fun chooseEngageGoal(t: Fighter) {
@@ -507,6 +508,8 @@ class BotBrain(
             SuperKind.SWARM -> d <= s.range && (!smart || t.hp > me.superDamage)
             // Malformed code finds its own target and never misses: all it needs is someone in sight.
             SuperKind.CORRUPT -> world.corruptTarget(me) != null
+            // The quake reaches past whatever the hammer hits, so it only has to get close.
+            SuperKind.QUAKE -> clear && d <= s.range * 0.95f
             SuperKind.RAM -> d <= s.range * 0.85f && arena.walkClear(me.x, me.y, t.x, t.y, me.radius * 0.9f) &&
                 (!smart || t.hp <= me.superDamage * 1.3f || d < 2.5f)
         }

@@ -79,7 +79,7 @@ class ProgressionTest {
         val verdict = ServerVerdict(8, 8, false, 1, 3, bolts = 28, credits = 6, unlocked = listOf(FighterId.BRAKK))
         val (_, rewards) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = verdict)
         assertEquals(6 to listOf(FighterId.BRAKK), rewards.credits to rewards.unlocked)
-        assertEquals("the road's prices, as the server charges them", listOf(2500, 4200, 6500, 9000, 9000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices, as the server charges them", listOf(2500, 6500, 9000, 9000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
     }
 
     @Test fun offlineMatchesEarnNothing() {
@@ -125,8 +125,8 @@ class ProgressionTest {
 
     @Test fun theServersProfileIsShownAsItIs() {
         val local = SaveData(
-            bolts = 5, prisms = 5, selectedFighter = FighterId.MIRA,
-            fighters = SaveData.defaultFighters() + (FighterId.MIRA to io.github.projectwip.data.FighterProgress(true, 3, skin = 2, ownedSkins = setOf(0, 2))) +
+            bolts = 5, prisms = 5, selectedFighter = FighterId.KITO,
+            fighters = SaveData.defaultFighters() + (FighterId.KITO to io.github.projectwip.data.FighterProgress(true, 3, skin = 2, ownedSkins = setOf(0, 2))) +
                 (FighterId.BYTE to io.github.projectwip.data.FighterProgress(true, 9, skin = 1, ownedSkins = setOf(0, 1))),
         )
         val profile = io.github.projectwip.data.ServerProfile(
@@ -145,7 +145,7 @@ class ProgressionTest {
         assertEquals("the server's level wins", 4, synced.progress(FighterId.BYTE).level)
         assertEquals("the colourway being worn is kept", 1, synced.progress(FighterId.BYTE).skin)
         assertTrue(synced.progress(FighterId.BRAKK).unlocked)
-        assertFalse("a fighter the server doesn't list as unlocked is locked", synced.progress(FighterId.MIRA).unlocked)
+        assertFalse("a fighter the server doesn't list as unlocked is locked", synced.progress(FighterId.KITO).unlocked)
         assertEquals("and can't stay selected", FighterId.BYTE, synced.selectedFighter)
         assertEquals(setOf(10, 25), synced.claimedMilestones)
         assertFalse(Progression.dailyGiftAvailable(synced, 7))

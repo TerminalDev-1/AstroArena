@@ -81,7 +81,7 @@ class EconomyTest {
 
     @Test fun creditsFillTheRoadAndTheFighterUnlocksTheMomentItIsFull() {
         val first = SparkRoad.steps.first()
-        assertEquals("the road's prices", listOf(2500, 4200, 6500, 9000, 9000), SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices", listOf(2500, 6500, 9000, 9000), SparkRoad.steps.map { it.cost })
         // Not enough yet: the Credits just sit on the road.
         val some = Economy.grant(SaveData(), Reward.Credits(first.cost - 1))
         assertEquals(Reward.Credits(first.cost - 1), some.value)
@@ -128,7 +128,7 @@ class EconomyTest {
         val kito = Economy.buy(s, "fighter_KITO")
         assertTrue(kito.save.progress(FighterId.KITO).unlocked)
         refused(409) { Economy.buy(kito.save, "fighter_KITO") }
-        refused(409) { Economy.buy(s, "skin_MIRA_1") }   // the fighter has to be unlocked first
+        refused(409) { Economy.buy(s, "skin_KITO_1") }   // the fighter has to be unlocked first
         assertTrue(Economy.buy(kito.save, "skin_KITO_1").save.progress(FighterId.KITO).ownedSkins.contains(1))
         assertEquals("every shop item can be found by its key", 0, (Shop.boltCrates + Shop.creditPacks + Shop.fighterOffers + Shop.skinOffers).count { Economy.shopItem(it.key) == null })
         assertEquals(20, Economy.shopItem("skin_BYTE_1")!!.second)

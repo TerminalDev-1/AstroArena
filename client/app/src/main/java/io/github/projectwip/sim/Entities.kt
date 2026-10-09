@@ -66,13 +66,6 @@ class Fighter(
     var alive = true
     var respawnTimer = 0f
     var shield = 0f
-    /** Shield points on top of health. They build up, out of combat, once health is full, and take damage first. */
-    var shieldHp = 0
-    /** Fighters build a shield; giants and the Training Area's fixed targets don't. (Nobody does in Boss Mode: see `World.shields`.) */
-    val canShield get() = scale == 1f && !rooted
-    /** The most shield this fighter can hold right now: a share of its full health, bigger during a hyper. */
-    val shieldMax get() = ((maxHp - hyperHpBonus) * io.github.projectwip.data.Balance.SHIELD_FRACTION *
-        (if (hyperActive) 1f + io.github.projectwip.data.Balance.HYPER_SHIELD_BONUS else 1f)).toInt()
     /** The hyper: 0..1 charged, and the seconds left of one that is running. */
     var hyperCharge = 0f
     var hyperTime = 0f
@@ -128,7 +121,7 @@ class Fighter(
     val isDashing get() = dashTime > 0f
 }
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER }
 
 class Projectile(
     val ownerId: Int,
@@ -147,6 +140,8 @@ class Projectile(
     val blast: Float = 0f,
     /** Shoves whoever it hits this many tiles the way it is flying. */
     val knock: Float = 0f,
+    /** Takes this share of the health its target has left, when that is more than [damage] (0 = plain damage). */
+    val share: Float = 0f,
 ) {
     var prevX = x
     var prevY = y
@@ -178,6 +173,8 @@ sealed interface GameEvent {
     /** A fighter switched its hyper on. */
     data class Hyper(val fighterId: Int) : GameEvent
     data class Dash(val fighterId: Int) : GameEvent
+    /** A thrown hammer came down: the ground quakes out to [radius] and stays cracked there. */
+    data class Quake(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A rocket went off. */
     data class Burst(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A fighter fired a salvo of rockets into the sky. */

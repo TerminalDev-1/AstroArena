@@ -128,8 +128,8 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.shop_item("fighter_BUDDY"), ({"type": "fighter", "fighter": "BUDDY"}, 250))
         self.assertEqual(economy.SPARK_ROAD[-1], ("BUDDY", 9000))
         self.assertEqual(economy.shop_item("skin_VARUN_2"), ({"type": "skin", "fighter": "VARUN", "skin": 2}, 20))
-        self.assertEqual(economy.shop_item("skin_MIRA_2"), ({"type": "skin", "fighter": "MIRA", "skin": 2}, 20))
-        for missing in ("fighter_BYTE", "skin_MIRA_0", "skin_MIRA_3", "skin_NOBODY_1", "crate_xl", ""):
+        self.assertEqual(economy.shop_item("skin_KITO_2"), ({"type": "skin", "fighter": "KITO", "skin": 2}, 20))
+        for missing in ("fighter_BYTE", "fighter_MIRA", "skin_MIRA_1", "skin_KITO_0", "skin_KITO_3", "skin_NOBODY_1", "crate_xl", ""):
             self.assertIsNone(economy.shop_item(missing))
         self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "VICTORY", 0, 2, "NORMAL"), 28)
         self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "DEFEAT", 0, 9, "ELITE"), 33)
@@ -191,12 +191,12 @@ class Economy(unittest.TestCase):
 
     def test_profiles_start_from_a_save(self):
         save = {"bolts": 900, "prisms": "lots", "bestCups": 77, "claimedMilestones": [10, 11, 25], "lastDailyGiftDay": 5,
-                "fighters": {"MIRA": {"unlocked": True, "level": 4, "ownedSkins": [0, 2, 9]}, "BYTE": {"unlocked": False, "level": -3}}}
+                "fighters": {"KITO": {"unlocked": True, "level": 4, "ownedSkins": [0, 2, 9]}, "BYTE": {"unlocked": False, "level": -3}}}
         p = economy.profile_from_save(save)
         self.assertEqual((p["bolts"], p["prisms"], p["bestCups"], p["claimedMilestones"], p["lastDailyGiftDay"]), (900, 0, 77, [10, 25], 5))
-        self.assertEqual(p["fighters"]["MIRA"], {"unlocked": True, "level": 4, "ownedSkins": [0, 2], "cups": 0})
+        self.assertEqual(p["fighters"]["KITO"], {"unlocked": True, "level": 4, "ownedSkins": [0, 2], "cups": 0})
         self.assertEqual(p["fighters"]["BYTE"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
-        self.assertFalse(p["fighters"]["KITO"]["unlocked"])
+        self.assertFalse(p["fighters"]["VARUN"]["unlocked"])
         self.assertEqual(economy.profile_from_save({}), economy.new_profile())
 
 
@@ -773,7 +773,7 @@ class Api(unittest.TestCase):
         # A file that can't be read changes nothing and is left for the operator to fix; so are lines that make no sense.
         save(text.replace("cups = 12", "cups = 5\n[Player (%s)]\ncups = 1" % cheat["id"], 1))
         self.assertEqual(self.store.player(cheat["id"])["cups"], 12)
-        save(text.replace("cups = 12", "cups = lots", 1).replace("mira = locked", "mira = gone", 1))
+        save(text.replace("cups = 12", "cups = lots", 1).replace("kito = locked", "kito = gone", 1))
         self.assertEqual(self.store.player(cheat["id"])["cups"], 12)
         # A copy from before the server started can't say what was changed: nothing is forced.
         save(text.replace("cups = 12", "cups = 3", 1).replace("revision = ", "revision = 9", 1))
@@ -903,8 +903,8 @@ class Api(unittest.TestCase):
         order = [f for f, _ in economy.SPARK_ROAD]
         cost = dict(economy.SPARK_ROAD)
         self.assertEqual([s["fighter"] for s in road["steps"]], order)
-        self.assertEqual(order, ["BRAKK", "MIRA", "KITO", "VARUN", "BUDDY"])
-        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 4200, 6500, 9000, 9000])
+        self.assertEqual(order, ["BRAKK", "KITO", "VARUN", "BUDDY"])
+        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 6500, 9000, 9000])
         self.assertEqual(road["steps"][0], {"fighter": "BRAKK", "cost": 2500, "rarity": "RARE"})
         self.assertEqual(len(road["steps"]), len(rules.FIGHTER_SKINS) - 1)
         # The road has a fixed order: the Credits go toward the first fighter along it that is still locked.
@@ -1087,10 +1087,10 @@ class Api(unittest.TestCase):
         self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["fighters"]["BYTE"]["level"]), (490, 2))
         self.assertEqual(self.call("POST", "/v1/fighters/upgrade", {"fighter": "KITO"}, token)[0], 409)
 
-        status, body = self.call("POST", "/v1/shop/buy", {"item": "fighter_MIRA"}, token)
-        self.assertEqual((status, body["reward"], body["account"]["profile"]["prisms"]), (200, {"type": "fighter", "fighter": "MIRA"}, 30))
+        status, body = self.call("POST", "/v1/shop/buy", {"item": "fighter_BRAKK"}, token)
+        self.assertEqual((status, body["reward"], body["account"]["profile"]["prisms"]), (200, {"type": "fighter", "fighter": "BRAKK"}, 60))
         self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "fighter_KITO"}, token)[0], 402)
-        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "fighter_MIRA"}, token)[0], 409)
+        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "fighter_BRAKK"}, token)[0], 409)
         self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "everything"}, token)[0], 404)
 
         status, body = self.call("POST", "/v1/shop/gift", {}, token)

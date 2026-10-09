@@ -11,17 +11,17 @@ import androidx.compose.ui.unit.sp
 import io.github.projectwip.audio.Sfx
 
 /**
- * Visual identity: "neon foundry". Deep indigo plates with chamfered corners, hot orange for primary
- * actions, electric cyan for secondary, gold for Cups. Everything has a thick ink outline.
+ * Visual identity: "night shift". Steel-blue plates with chamfered corners that stand off the screen like slabs,
+ * hot orange for primary actions, electric cyan for secondary, gold for Cups. Everything has a thick ink outline.
  */
 object Palette {
-    val Ink = Color(0xFF1B1035)
-    val BgTop = Color(0xFF34188A)
-    val BgBottom = Color(0xFF120A2E)
-    val Panel = Color(0xFF2D1D74)
-    val PanelLight = Color(0xFF41309F)
-    val PanelDark = Color(0xFF1D1252)
-    val PanelInset = Color(0xFF170D44)
+    val Ink = Color(0xFF142435)
+    val BgTop = Color(0xFF23568A)
+    val BgBottom = Color(0xFF0E1E2E)
+    val Panel = Color(0xFF264E74)
+    val PanelLight = Color(0xFF3B6F9F)
+    val PanelDark = Color(0xFF183652)
+    val PanelInset = Color(0xFF122C44)
 
     val Orange = Color(0xFFFF9F1C)
     val OrangeDeep = Color(0xFFFF6A00)
@@ -32,9 +32,9 @@ object Palette {
     val Green = Color(0xFF62E887)
     val GreenDeep = Color(0xFF22A852)
     val GreenLip = Color(0xFF136A33)
-    val Grey = Color(0xFF8C84A8)
-    val GreyDeep = Color(0xFF5E5780)
-    val GreyLip = Color(0xFF3A3458)
+    val Grey = Color(0xFF8898A8)
+    val GreyDeep = Color(0xFF5B6E80)
+    val GreyLip = Color(0xFF384858)
     val Red = Color(0xFFFF4D5E)
     val RedDeep = Color(0xFFD62842)
     val RedLip = Color(0xFF7E1426)
@@ -47,7 +47,7 @@ object Palette {
     val PrismDeep = Color(0xFF8E2BE0)
 
     val Text = Color.White
-    val TextDim = Color(0xFFB9ADEB)
+    val TextDim = Color(0xFFB3D0EB)
     val Positive = Color(0xFF7CFF9B)
     val Ally = Color(0xFF3FB6FF)
     val Enemy = Color(0xFFFF4D5E)
