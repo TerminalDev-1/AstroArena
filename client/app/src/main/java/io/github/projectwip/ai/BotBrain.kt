@@ -459,8 +459,8 @@ class BotBrain(
             if (superDelay <= 0f && wantsSuper(t, d, clear)) {
                 aimAt(t, superProjectileSpeed())
                 // A rain of rockets is aimed at a spot, not along a line: where the target will be when it lands.
-                if (me.def.superSpec.kind == SuperKind.SWARM) {
-                    val ahead = io.github.projectwip.data.Balance.RAIN_DELAY_SECONDS * profile.leadFactor
+                if (me.def.superSpec.kind == SuperKind.SWARM || me.def.superSpec.kind == SuperKind.BREW) {
+                    val ahead = (if (me.def.superSpec.kind == SuperKind.BREW) io.github.projectwip.data.Balance.BREW_DELAY_SECONDS else io.github.projectwip.data.Balance.RAIN_DELAY_SECONDS) * profile.leadFactor
                     c.aimX = t.x + t.vx * ahead - me.x
                     c.aimY = t.y + t.vy * ahead - me.y
                 }
@@ -507,6 +507,8 @@ class BotBrain(
             SuperKind.PIERCE -> clear && d <= s.range * 0.95f && (!smart || t.hp <= me.superDamage * 1.1f || lineHitsTwo(t))
             // The rockets come down over walls; they can't finish anyone, so a smart bot spends them on the healthy.
             SuperKind.SWARM -> d <= s.range && (!smart || t.hp > me.superDamage)
+            // A brew goes over walls, and is worth most when she has health to win back.
+            SuperKind.BREW -> d <= s.range && (!smart || me.hpFraction < 0.75f || t.hp <= me.superDamage)
             // The leap goes over walls and follows whoever it was aimed at: all it needs is someone in reach.
             SuperKind.CORRUPT -> d <= s.range * 0.95f
             // The quake reaches past whatever the hammer hits, so it only has to get close.

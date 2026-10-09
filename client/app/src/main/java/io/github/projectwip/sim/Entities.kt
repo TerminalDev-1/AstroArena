@@ -203,6 +203,8 @@ sealed interface GameEvent {
     /** A fighter switched its hyper on. */
     data class Hyper(val fighterId: Int) : GameEvent
     data class Dash(val fighterId: Int) : GameEvent
+    /** A fighter was healed by something other than resting (a brew). */
+    data class Heal(val targetId: Int, val amount: Int, val x: Float, val y: Float) : GameEvent
     /** A fighter left the ground to come down on someone's back. */
     data class Leap(val fighterId: Int) : GameEvent
     /** A leaper landed on [targetId] and started compiling malformed code into them. */

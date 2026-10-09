@@ -527,15 +527,19 @@ class World(
                 val spread = Math.toRadians(s.spreadDegrees.toDouble()).toFloat()
                 for (i in 0 until s.projectiles) {
                     val ang = baseAng - spread / 2 + spread * i / (s.projectiles - 1)
-                    // (A witch's volley is hex bolts, and poisons as her attack does.)
-                    val hexes = f.def.attack.shape == AttackShape.HEX
-                    spawnProjectile(f, ang, s.speed, s.radius, f.superDamage, s.range, false, true,
-                        if (hexes) ShotStyle.HEX else if (f.def.attack.bits) ShotStyle.BIT else ShotStyle.VOLLEY, knock = s.knockback, hex = if (hexes) f.def.attack.hexSeconds else 0f)
+                    spawnProjectile(f, ang, s.speed, s.radius, f.superDamage, s.range, false, true, if (f.def.attack.bits) ShotStyle.BIT else ShotStyle.VOLLEY, knock = s.knockback)
                 }
             }
             SuperKind.PIERCE -> spawnProjectile(f, baseAng, s.speed, s.radius, f.superDamage, s.range, true, true, ShotStyle.LANCE)
             // The hammer flies until it meets an enemy, a wall or the end of its reach, and the quake is its blast.
             SuperKind.QUAKE -> spawnProjectile(f, baseAng, s.speed, 0.42f, f.superDamage, s.range, false, true, ShotStyle.HAMMER, blast = s.radius)
+            // One flask, thrown to where the fighter aimed (as with a rain of rockets, the aim is how far as well as
+            // which way). What it does when it bursts is in [stepHazards].
+            SuperKind.BREW -> {
+                val reach = hypot(f.control.aimX, f.control.aimY).coerceAtMost(s.range)
+                val d = if (reach > 1e-3f) reach else s.range * 0.5f
+                hazards += Hazard(f.id, f.team, f.x + dx * d, f.y + dy * d, s.radius, Balance.BREW_DELAY_SECONDS, f.superDamage, HazardKind.BREW)
+            }
             SuperKind.SWARM -> {
                 // The rockets go up, and come down one after another inside one circle where the fighter aimed. For
                 // this super the aim is not just a direction: it is how far away, in tiles, the circle is.
@@ -689,6 +693,15 @@ class World(
                 if (f.team == h.team || !f.alive) continue
                 // Caught if the middle of the fighter is inside the mark (a little is forgiven at the very edge).
                 if (hypot(f.x - h.x, f.y - h.y) < h.radius + f.radius * 0.3f) damage(f, owner, h.damage, true, f.x, f.y, lethal = h.lethal)
+            }
+            // A brew gives back what it takes: to whoever threw it, wherever they are, and to any ally in the circle.
+            if (h.kind == HazardKind.BREW && phase == Phase.PLAYING) for (f in fighters) {
+                if (f.team != h.team || !f.alive) continue
+                if (f !== owner && hypot(f.x - h.x, f.y - h.y) >= h.radius + f.radius * 0.3f) continue
+                val gain = minOf(h.damage, f.maxHp - f.hp)
+                if (gain <= 0) continue
+                f.hp += gain
+                events += GameEvent.Heal(f.id, gain, f.x, f.y)
             }
         }
     }

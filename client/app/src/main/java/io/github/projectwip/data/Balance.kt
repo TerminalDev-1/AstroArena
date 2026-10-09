@@ -44,7 +44,11 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
  * poisons them, and whoever comes through it then walks over and stands in front of the fighter, out of their mind.
  */
 /** [QUAKE] hurls a giant hammer: where it comes down the ground quakes in every direction and stays cracked. */
-enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE }
+/**
+ * [BREW] lobs a flask at a spot (aimed like [SWARM]: how far the stick is pushed is how far it goes). Where it bursts,
+ * enemies in the circle are hurt, and the thrower and any allies in the circle are healed by as much.
+ */
+enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE, BREW }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
 data class AttackSpec(
@@ -231,6 +235,8 @@ object Balance {
      * A boss gets no less: the full time, by the user's decision.
      */
     const val THRALL_SECONDS = 21f
+    /** A [SuperKind.BREW] flask bursts this long after it is thrown. */
+    const val BREW_DELAY_SECONDS = 0.6f
     /** A hex ([AttackSpec.hexSeconds]) bites this often: fast. */
     const val HEX_TICK_SECONDS = 0.5f
     /** A [SuperKind.CORRUPT] poison bites this often. The super's damage is what it does each second. */
@@ -347,13 +353,14 @@ object Balance {
             // Twelve bites is 2,400 from a bolt, in line with what one ammo is worth to anyone else; three bolts
             // stacked on one target do three times that.
             attackDamage = StatLine(200, 10),
-            // (A bolt of the super is worth half as much: seven of them can land.)
-            superDamage = StatLine(100, 5),
+            // What the brew does to every enemy in its circle, and what it gives back to her and her allies.
+            superDamage = StatLine(1800, 90),
             moveSpeed = 3.7f,
             attack = AttackSpec(AttackShape.HEX, projectiles = 1, spreadDegrees = 0f, range = 7.5f, speed = 15f, radius = 0.2f, burstInterval = 0f, hexSeconds = 6f),
-            superSpec = SuperSpec(SuperKind.VOLLEY, "Witching Hour", "A wide fan of 7 hex bolts. Every one that lands is a poison of its own on whoever it hits, and they all stack.", projectiles = 7, spreadDegrees = 60f, range = 7f, speed = 15f, radius = 0.2f),
+            superSpec = SuperSpec(SuperKind.BREW, "Bitter Brew", "Lobs a flask wherever you aim, over any wall. Where it bursts, every enemy in the circle is hurt, and Kira is healed by as much, along with any ally standing in it.", range = 7.5f, speed = 12f, radius = 2.4f),
             ammoMax = 3,
-            reloadSeconds = 1.7f,
+            // (1.7 seconds until the user had it made 30% quicker.)
+            reloadSeconds = 1.2f,
             superChargePerHit = 0.2f,
             radius = 0.4f,
             skins = listOf(

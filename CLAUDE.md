@@ -47,8 +47,10 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Kira (`FighterId.KIRA`, Epic) is the user's idea: a witch whose attack poisons. Her Hex Bolt (`AttackShape.HEX`,
   `AttackSpec.hexSeconds`) hits for 200 and then bites for 200 again every `HEX_TICK_SECONDS` (half a second) for six
   seconds: 2,400 a bolt (the user had it brought down from 750 a bite, which was 9,000). Hexes stack, by the user's
-  decision: every bolt that lands is a poison of its own (`Fighter.hexes`, `World.stepHex`). Her super, Witching Hour,
-  is a fan of the same bolts at half strength. She has a sound of her own (`Sound.HEX`): don't give her another
+  decision: every bolt that lands is a poison of its own (`Fighter.hexes`, `World.stepHex`). Her super, Bitter Brew
+  (`SuperKind.BREW`, `HazardKind.BREW`), is a flask lobbed at a spot: enemies in its circle are hurt, and she is healed by
+  as much wherever she is, along with any ally in the circle. The user asked for that mechanic (hurt them, heal
+  yourself); the name, the flask and the numbers are ours. She has a sound of her own (`Sound.HEX`): don't give her another
   fighter's. Her name, look and words are ours.
 - Bark is the dog (the user renamed him from Brakk; the code and the server still say `BRAKK`, so saves carry over).
   He is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, and a front

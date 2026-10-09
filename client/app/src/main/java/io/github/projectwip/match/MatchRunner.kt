@@ -104,7 +104,7 @@ class MatchRunner(
             c.attack = true
         }
         if (input.superFire != TouchControls.FireMode.NONE && p.superReady) {
-            if (p.def.superSpec.kind == SuperKind.SWARM) aimRain(input.superFire, input.superX, input.superY, p.def.superSpec.range)
+            if (p.def.superSpec.kind == SuperKind.SWARM || p.def.superSpec.kind == SuperKind.BREW) aimRain(input.superFire, input.superX, input.superY, p.def.superSpec.range)
             else setAim(input.superFire, input.superX, input.superY, p.def.superSpec.range, p.def.superSpec.speed)
             c.superAttack = true
         }
@@ -324,7 +324,8 @@ class MatchRunner(
             is GameEvent.Blast -> {
                 val p = match.player
                 val near = 1f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)
-                if (e.kind == io.github.projectwip.sim.HazardKind.ROCKET) sfx.play(Sound.ROCKET_BOOM, near, 0.9f)
+                if (e.kind == io.github.projectwip.sim.HazardKind.BREW) { sfx.play(Sound.GLASS, near, 1.2f); sfx.play(Sound.HEX, near * 0.9f, 0.8f) }
+                else if (e.kind == io.github.projectwip.sim.HazardKind.ROCKET) sfx.play(Sound.ROCKET_BOOM, near, 0.9f)
                 else { sfx.play(Sound.CRATE_BREAK, near, 0.7f); sfx.play(Sound.SHOOT_HEAVY, near * 0.8f, 0.6f) }
             }
             is GameEvent.SuperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY); sfx.buzz(25, 120) }
@@ -355,6 +356,7 @@ class MatchRunner(
                 sfx.play(Sound.GLITCH, near, 0.55f); sfx.play(Sound.DROP_UPGRADE, near * 0.7f, 0.6f)
                 if (e.targetId == pid) sfx.buzz(160, 255)
             }
+            is GameEvent.Heal -> if (e.targetId == pid) { sfx.play(Sound.PICKUP, 0.9f, 0.8f); sfx.buzz(20, 110) }
             is GameEvent.Quake -> {
                 val p = match.player
                 val near = 1f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)

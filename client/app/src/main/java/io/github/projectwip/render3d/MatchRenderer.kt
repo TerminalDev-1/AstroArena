@@ -747,7 +747,7 @@ class MatchRenderer(
                                 tint(2); setModel(tx, 0.056f, tz, r, 1f, r); ring.draw()
                             }
                         }
-                        SuperKind.SWARM -> {
+                        SuperKind.SWARM, SuperKind.BREW -> {
                             // The rockets go up and come down: an arc from the fighter, up and over, to one big
                             // circle where they will land. How far the stick is pushed is how far away that is.
                             val reach = min(1f, len) * s.range
@@ -981,6 +981,22 @@ class MatchRenderer(
                     setModel(h.x, 0.22f, h.y, 0.3f, 0.2f, 0.3f); sphere.draw()
                 }
                 HazardKind.SLAM -> Unit
+                // A flask on its way: up from whoever threw it and down onto the mark, turning as it goes.
+                HazardKind.BREW -> {
+                    val from = world.fighter(h.ownerId)
+                    val sk = from?.let { it.def.skins[it.skin] }
+                    val fx = from?.x ?: h.x
+                    val fz = from?.y ?: h.y
+                    val x = lerp(fx, h.x, t)
+                    val z = lerp(fz, h.y, t)
+                    val y = 1.1f + (2.2f + hypot(h.x - fx, h.y - fz) * 0.25f) * 4f * t * (1f - t) - t * 0.6f
+                    tint(sk?.secondary ?: 0xFF7CFF4FL)
+                    setModel(x, y, z, 0.3f, 0.3f, 0.3f); sphere.draw()
+                    tint(0xFFDDE7F2L)
+                    setModel(x, y + 0.3f, z, 0.16f, 0.26f, 0.16f, time * 300f); bit.draw()
+                    tint(sk?.accent ?: 0xFFFFD23FL)
+                    setModel(x, y + 0.46f, z, 0.2f, 0.09f, 0.2f, time * 300f); bit.draw()
+                }
             }
         }
         lit.f("uEmissive", 0f)
@@ -1137,6 +1153,15 @@ class MatchRenderer(
                 }
             }
             is GameEvent.Dash -> shake = max(shake, 0.1f)
+            // Healed: a soft flash, and green motes drifting up off them.
+            is GameEvent.Heal -> {
+                particles.spawn(e.x, 0.9f, e.y, 0f, 0f, 0f, 0.35f, 2.2f, 0xFF7CFF9B.toInt(), 0.6f)
+                repeat(18) {
+                    val a = rng.nextFloat() * 6.28f
+                    val out = 0.2f + rng.nextFloat() * 0.5f
+                    particles.spawn(e.x + cos(a) * out, 0.2f + rng.nextFloat() * 0.8f, e.y + sin(a) * out, 0f, 1.8f + rng.nextFloat() * 1.8f, 0f, 0.7f, 0.15f, 0xFF7CFF9B.toInt(), 0.95f)
+                }
+            }
             is GameEvent.Leap -> world.fighter(e.fighterId)?.let { f ->
                 // Dust where it took off.
                 repeat(12) {
@@ -1228,7 +1253,7 @@ class MatchRenderer(
                     val a = rng.nextFloat() * 6.28f
                     val sp = (2f + rng.nextFloat() * 5f) * e.radius
                     particles.spawn(e.x, 0.4f, e.y, cos(a) * sp, 2f + rng.nextFloat() * 5f, sin(a) * sp, 0.5f + rng.nextFloat() * 0.3f, 0.14f,
-                        if (e.kind == HazardKind.MINE) 0xFFFF4FA3.toInt() else 0xFFFF8A1F.toInt(), 1f, grav = 12f)
+                        if (e.kind == HazardKind.MINE) 0xFFFF4FA3.toInt() else if (e.kind == HazardKind.BREW) 0xFF7CFF4F.toInt() else 0xFFFF8A1F.toInt(), 1f, grav = 12f)
                 }
                 repeat(5) {
                     particles.spawn(e.x + (rng.nextFloat() - 0.5f) * e.radius, 0.4f, e.y + (rng.nextFloat() - 0.5f) * e.radius, 0f, 1.2f + rng.nextFloat(), 0f,

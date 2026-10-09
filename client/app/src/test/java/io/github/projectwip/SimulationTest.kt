@@ -839,4 +839,30 @@ class SimulationTest {
         assertEquals("and the whole of both is done", 2 * 12 * 200, hpBefore - hit.hp)
         assertEquals("she is Epic", io.github.projectwip.data.Rarity.EPIC, kira.def.rarity)
     }
+
+    @Test fun kirasBrewHurtsEnemiesInItsCircleAndHealsHer() {
+        val (w, _, others) = buddyAndTargets(2)
+        val (inside, outside) = others
+        val x = inside.x; val y = inside.y
+        val kira = Fighter(7, Balance.fighter(FighterId.KIRA), 1, 0, 0, "K", false)
+        val w2 = World(w.arena, listOf(kira, inside, outside), io.github.projectwip.sim.MatchRules.lastSpark())
+        repeat((3.1f / Match.STEP).toInt()) { w2.step(Match.STEP) }
+        kira.x = x - 3f; kira.y = y; inside.x = x; inside.y = y; outside.x = x + 4f; outside.y = y
+        for (f in w2.fighters) f.shield = 0f
+        kira.hp = kira.maxHp / 2
+        kira.superCharge = 1f
+        // Thrown three tiles: right onto the first of them, and well short of the second.
+        kira.control.aimX = 3f; kira.control.aimY = 0f; kira.control.superAttack = true
+        w2.step(Match.STEP)
+        assertEquals("one flask in the air, coming down where she aimed", 1, w2.hazards.size)
+        assertEquals(x, w2.hazards[0].x, 0.01f)
+        assertEquals("nothing happens until it lands", inside.maxHp to kira.maxHp / 2, inside.hp to kira.hp)
+        val heals = ArrayList<io.github.projectwip.sim.GameEvent.Heal>()
+        repeat(((Balance.BREW_DELAY_SECONDS + 0.2f) / Match.STEP).toInt()) { w2.step(Match.STEP); heals += w2.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Heal>(); w2.events.clear() }
+        assertEquals("the enemy in the circle is hurt", inside.maxHp - kira.superDamage, inside.hp)
+        assertEquals("the one outside it is not", outside.maxHp, outside.hp)
+        assertEquals("and she is healed by as much, though she is nowhere near it", kira.maxHp / 2 + kira.superDamage, kira.hp)
+        assertEquals(listOf(kira.id to kira.superDamage), heals.map { it.targetId to it.amount })
+        assertEquals("she reloads in 1.2 seconds", 1.2f, kira.def.reloadSeconds, 0f)
+    }
 }

@@ -7,7 +7,8 @@ import kotlin.math.hypot
 import kotlin.math.sin
 
 /** What kind of ground attack a [Hazard] is, for drawing it. */
-enum class HazardKind { ROCKET, MINE, SLAM }
+/** [BREW] is a fighter's flask on its way down: it hurts one side and heals the other. */
+enum class HazardKind { ROCKET, MINE, SLAM, BREW }
 
 /**
  * A marked patch of ground that goes off after [delay] seconds, hurting everyone of the other team standing in
