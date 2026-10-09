@@ -261,7 +261,7 @@ object Balance {
     const val FIRST_WIN_PRISMS = 10
 
     // The floor every fighter stands on, so that fights are even: at least [MIN_HEALTH] health, and at least
-    // [MIN_AMMO_DAMAGE] damage from one ammo when all of its projectiles land. (Level 1; each level adds a twentieth.)
+    // [MIN_AMMO_DAMAGE] damage from one ammo when all of its projectiles land. (A legacy fighter is let fall below it.) (Level 1; each level adds a twentieth.)
     const val MIN_HEALTH = 4600
     const val MIN_AMMO_DAMAGE = 1300
 
@@ -351,16 +351,16 @@ object Balance {
             attackName = "Rocket Pack",
             // He is on his way out, so a level adds very little: about a quarter of what it adds to anyone else.
             health = StatLine(4600, 60),
-            // Two rockets: 1,300 when both land.
-            attackDamage = StatLine(650, 8),
+            // One rocket, and half a rocket at that: 60.
+            attackDamage = StatLine(60, 1),
             superDamage = StatLine(600, 8),
             notice = "Varun is a legacy fighter and will be transitioning out of the game as soon as possible.",
             upgradable = false,
             moveSpeed = 3.65f,
-            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 2, spreadDegrees = 0f, range = 6f, speed = 14f, radius = 0.17f, burstInterval = 0.1f, blast = 1.0f, lanes = 2),
+            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 1, spreadDegrees = 0f, range = 3f, speed = 14f, radius = 0.085f, burstInterval = 0.1f, blast = 1.0f, lanes = 1),
             superSpec = SuperSpec(SuperKind.SWARM, "Rocket Rain", "Fires 8 rockets into the sky. They rain down inside one big circle, wherever you aim, over any wall. They hit hard, but never land the knockout.", projectiles = 8, range = 9f, speed = 10f, radius = 2.3f),
             ammoMax = 3,
-            reloadSeconds = 4f,
+            reloadSeconds = 12f,
             superChargePerHit = 0.09f,
             radius = 0.44f,
             skins = listOf(
@@ -370,12 +370,12 @@ object Balance {
             ),
             hyper = HyperSpec("Five Alarm", "Lasts 4 seconds. His rockets fly faster, and his super charges half as fast again.", seconds = 4f, shotSpeed = 1.4f, superCharge = 1.5f, charge = 1.5f),
             voice = mapOf(
-                VoiceCue.START to listOf("Varun reporting. Where is the fire?", "Hoses down. Rockets up."),
-                VoiceCue.SUPER to listOf("Look up!", "No wall will save you!"),
-                VoiceCue.HYPER to listOf("Now I am burning bright!", "Full pressure!"),
-                VoiceCue.KO to listOf("Fire is out.", "That one is contained."),
-                VoiceCue.DOWN to listOf("I will be back on shift."),
-                VoiceCue.BACK to listOf("Back on duty."),
+                VoiceCue.START to listOf("Varun reporting. They nerfed me again.", "I am a legacy fighter now."),
+                VoiceCue.SUPER to listOf("This used to hurt.", "Look up. Or do not bother."),
+                VoiceCue.HYPER to listOf("Oh, I am being nerfed!", "Four seconds. Enjoy them."),
+                VoiceCue.KO to listOf("Even nerfed, I got one!", "Sixty damage at a time."),
+                VoiceCue.DOWN to listOf("Oh, I am legacy.", "Nerfed again."),
+                VoiceCue.BACK to listOf("Back. Still nerfed."),
             ),
         ),
         FighterDef(

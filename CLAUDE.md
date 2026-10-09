@@ -55,7 +55,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   first enemy in the way, because that is where it comes down.
 - Every voice sounds different (`VoiceStyle`: accent, pitch, pace): Varun's, and Buddy's machine voice.
   Don't give two speakers the same one. Arena Boxes have no voice: the user had an announcer added and then removed.
-- Varun is Rare, by the user's decision (he was Legendary): 4,600 health, two rockets worth 1,300, a 4-second hyper.
+- Varun is Rare, by the user's decision (he was Legendary): 4,600 health, one half-size rocket worth 60 with a
+  12-second reload and a reach of 3 tiles, a 4-second hyper, and voice lines about being nerfed (all the user's numbers).
   He is a legacy fighter on his way out: his page says so (`FighterDef.notice`), a level adds far less to him than
   to anyone else, and by the user's decision he can no longer be upgraded at all (`FighterDef.upgradable`,
   `NO_UPGRADES` in `economy.py`: both must list him). Don't buff him.

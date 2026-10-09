@@ -377,14 +377,15 @@ class SimulationTest {
         return Triple(w, varun, target)
     }
 
-    @Test fun varunFiresTwoRocketsSideBySide() {
+    @Test fun varunFiresOneSmallRocket() {
         val (w, varun, target) = varunBehindAWall()
         varun.control.aimX = -(target.x - varun.x); varun.control.aimY = 0f; varun.control.attack = true
         w.step(Match.STEP)
-        assertEquals(2, varun.def.attack.projectiles)
-        assertTrue("both leave at once", varun.pending.isEmpty())
-        assertEquals("one ammo, two rockets", 2, w.projectiles.size)
-        assertEquals("a lane apart", Balance.ROCKET_LANE, kotlin.math.abs(w.projectiles[0].y - w.projectiles[1].y), 0.01f)
+        assertEquals(1, varun.def.attack.projectiles)
+        assertTrue(varun.pending.isEmpty())
+        assertEquals("one ammo, one rocket", 1, w.projectiles.size)
+        assertEquals("worth sixty", 60, w.projectiles[0].damage)
+        assertEquals("that takes twelve seconds to reload and reaches three tiles", 12f to 3f, varun.def.reloadSeconds to varun.def.attack.range)
     }
 
     @Test fun varunsRocketsBurstAndCatchEveryoneNearby() {
@@ -398,7 +399,7 @@ class SimulationTest {
         search@ for (y in 3 until a.height - 3) for (x in 3 until a.width - 8) {
             val x0 = x + 0.5f; val y0 = y + 0.5f
             if ((0..5).any { a.circleBlocked(x0 + it, y0, 0.9f) } || a.circleBlocked(x0 + 5.9f, y0, 0.6f)) continue
-            varun.x = x0; varun.y = y0; one.x = x0 + 5f; one.y = y0; two.x = x0 + 5f; two.y = y0 + 1.3f
+            varun.x = x0; varun.y = y0; one.x = x0 + 2.5f; one.y = y0; two.x = x0 + 2.5f; two.y = y0 + 1.3f
             placed = true
             break@search
         }
@@ -407,7 +408,7 @@ class SimulationTest {
         varun.control.aimX = 1f; varun.control.aimY = 0f; varun.control.attack = true
         var bursts = 0
         repeat(90) { w.step(Match.STEP); bursts += w.events.count { it is io.github.projectwip.sim.GameEvent.Burst }; w.events.clear() }
-        assertEquals("every rocket goes off", 2, bursts)
+        assertEquals("every rocket goes off", 1, bursts)
         assertTrue("the one in the way is hit", one.hp < one.maxHp)
         assertTrue("and so is the one standing beside it, out of the rockets' path", two.hp < two.maxHp)
     }
