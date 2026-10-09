@@ -52,7 +52,7 @@ def _round(x: float) -> int:
 
 # What a fighter is: its rarity. That sets what it costs in the shop (Prisms) and on the Spark Road (Credits).
 # The starting fighter has no rarity and isn't sold. Keep in step with Balance.kt.
-FIGHTER_RARITY = {"BRAKK": "RARE", "KIRA": "EPIC", "KITO": "MYTHIC", "BUDDY": "ULTRA"}
+FIGHTER_RARITY = {"BRAKK": "RARE", "KIRA": "EPIC", "KITO": "MYTHIC", "BUDDY": "LEGENDARY"}
 # Fighters that were in the game for a few builds and were taken out again, with the Credits each took on the
 # Spark Road. A profile that still holds one loses it and gets those Credits back.
 # (Juno was the starter until Byte took her place: she cost nothing, so nothing comes back for her. Mira was the
@@ -61,7 +61,7 @@ FIGHTER_RARITY = {"BRAKK": "RARE", "KIRA": "EPIC", "KITO": "MYTHIC", "BUDDY": "U
 REMOVED_FIGHTERS = {"JUNO": 0, "MIRA": 4200, "VARUN": 9000, "PIP": 160, "DOZER": 160, "NOVA": 420, "FENN": 420, "VOLT": 900, "ONYX": 900, "AURA": 1600, "ZERO": 2600}
 # Legacy fighters: on their way out of the game, and stuck at whatever level they have. Keep in step with Balance.kt.
 NO_UPGRADES: set = set()
-RARITY_PRICE = {"RARE": 40, "EPIC": 70, "MYTHIC": 90, "LEGENDARY": 160, "ULTRA": 250}
+RARITY_PRICE = {"RARE": 40, "EPIC": 70, "MYTHIC": 90, "LEGENDARY": 160}
 FIGHTER_PRICE = {name: RARITY_PRICE[rarity] for name, rarity in FIGHTER_RARITY.items()}
 SKIN_PRICE = 20  # Prisms, for every colourway but a fighter's first
 BOLT_CRATES = {"crate_s": (400, 10), "crate_m": (1200, 25), "crate_l": (3000, 50)}  # key: (Bolts, price in Prisms)
@@ -141,8 +141,8 @@ CUP_TRACK = {
 # Credits are not a wallet: whatever is earned goes straight into the Spark Road, toward the next fighter along
 # it. The moment that fighter's cost is covered it is unlocked, and what is left over carries on toward the next.
 # Fighters have a rarity; a rarer one takes more Credits. (Fighters are also sold in the shop for Prisms.)
-RARITIES = ["RARE", "EPIC", "MYTHIC", "LEGENDARY", "ULTRA"]
-ROAD_COST = {"RARE": 2500, "EPIC": 4200, "MYTHIC": 6500, "LEGENDARY": 9000, "ULTRA": 9000}
+RARITIES = ["RARE", "EPIC", "MYTHIC", "LEGENDARY"]
+ROAD_COST = {"RARE": 2500, "EPIC": 4200, "MYTHIC": 6500, "LEGENDARY": 7000}
 # The road: every fighter in the order it is unlocked (the cheapest rarity first) with what it costs.
 SPARK_ROAD = sorted(((name, ROAD_COST[rarity]) for name, rarity in FIGHTER_RARITY.items()), key=lambda step: step[1])  # stable: the order above within a rarity
 

@@ -69,7 +69,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Running out of ammo has a sound of its own (`Sound.EMPTY`); `Sound.DENIED` is only for things that went wrong.
   Buddy's computers break like glass on whoever they hit (`Sound.GLASS`).
 - In the Training Area the player's super starts charged (`Match`), so it can be tried at once.
-- Buddy (`FighterId.BUDDY`, Ultra, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls four
+- Buddy (`FighterId.BUDDY`, Legendary, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls four
   whole computers a long way, one after the other, and each smashes into the first enemy in its path
   (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Four computers (1,400 each at level 10) and the long range are the
   user's decisions: don't change them.
@@ -184,7 +184,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Fighters are unlocked on the Spark Road with Credits (or bought with CPU Chips): drops and the Cup Track pay
   Credits, never a fighter. Credits are not a wallet and must never be shown as one: they go straight onto the
   road toward the next fighter along it (a fixed order; rarity decides the cost: Rare 2,500, Epic 4,200, Mythic
-  6,500, Legendary 9,000, Ultra 9,000: the user lowered Ultra from 13,000), and the moment they cover it the server unlocks that fighter
+  6,500, Legendary 7,000: the user removed the Ultra rarity and made Buddy Legendary), and the moment they cover it the server unlocks that fighter
   (`economy.fill_road`), with the leftover carried on: there is nothing to claim. A reward that unlocked someone
   comes back as a bundle (the Credits and the fighter), and a match's verdict lists them in `unlocked`. Once every
   fighter is unlocked Credits are paid as Upgrade Credits. Arena Boxes are the main source of Credits: every

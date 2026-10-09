@@ -81,7 +81,7 @@ class EconomyTest {
 
     @Test fun creditsFillTheRoadAndTheFighterUnlocksTheMomentItIsFull() {
         val first = SparkRoad.steps.first()
-        assertEquals("the road's prices", listOf(2500, 4200, 6500, 9000), SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices", listOf(2500, 4200, 6500, 7000), SparkRoad.steps.map { it.cost })
         // Not enough yet: the Credits just sit on the road.
         val some = Economy.grant(SaveData(), Reward.Credits(first.cost - 1))
         assertEquals(Reward.Credits(first.cost - 1), some.value)

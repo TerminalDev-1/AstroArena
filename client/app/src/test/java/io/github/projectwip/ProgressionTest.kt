@@ -79,7 +79,7 @@ class ProgressionTest {
         val verdict = ServerVerdict(8, 8, false, 1, 3, bolts = 28, credits = 6, unlocked = listOf(FighterId.BRAKK))
         val (_, rewards) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = verdict)
         assertEquals(6 to listOf(FighterId.BRAKK), rewards.credits to rewards.unlocked)
-        assertEquals("the road's prices, as the server charges them", listOf(2500, 4200, 6500, 9000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
+        assertEquals("the road's prices, as the server charges them", listOf(2500, 4200, 6500, 7000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
     }
 
     @Test fun offlineMatchesEarnNothing() {

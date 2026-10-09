@@ -35,8 +35,7 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
     RARE("Rare", 0xFF4ED36A, 2500),
     EPIC("Epic", 0xFFA66BFF, 4200),
     MYTHIC("Mythic", 0xFFFF4F6D, 6500),
-    LEGENDARY("Legendary", 0xFFFFD23F, 9000),
-    ULTRA("Ultra", 0xFF29F0FF, 9000),
+    LEGENDARY("Legendary", 0xFFFFD23F, 7000),
 }
 
 /** [SWARM] is a salvo of rockets fired into the sky: they come down inside one circle where the fighter aimed, over any wall, and hurt but never knock out. */
@@ -387,7 +386,7 @@ object Balance {
         ),
         FighterDef(
             id = FighterId.BUDDY,
-            rarity = Rarity.ULTRA,
+            rarity = Rarity.LEGENDARY,
             name = "Buddy",
             title = "Rogue Build",
             role = "Bruiser",
@@ -488,6 +487,5 @@ object Balance {
         Rarity.EPIC -> 70
         Rarity.MYTHIC -> 90
         Rarity.LEGENDARY -> 160
-        Rarity.ULTRA -> 250
     }
 }

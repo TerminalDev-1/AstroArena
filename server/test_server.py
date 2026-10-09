@@ -124,8 +124,8 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.upgrade_cost(3, 99), 105)  # the factor is capped at x3
         self.assertEqual(economy.shop_item("crate_l"), ({"type": "bolts", "amount": 3000}, 50))
         self.assertEqual(economy.shop_item("fighter_KITO"), ({"type": "fighter", "fighter": "KITO"}, 90))
-        self.assertEqual(economy.shop_item("fighter_BUDDY"), ({"type": "fighter", "fighter": "BUDDY"}, 250))
-        self.assertEqual(economy.SPARK_ROAD[-1], ("BUDDY", 9000))
+        self.assertEqual(economy.shop_item("fighter_BUDDY"), ({"type": "fighter", "fighter": "BUDDY"}, 160))
+        self.assertEqual(economy.SPARK_ROAD[-1], ("BUDDY", 7000))
         self.assertEqual(economy.shop_item("skin_BUDDY_2"), ({"type": "skin", "fighter": "BUDDY", "skin": 2}, 20))
         self.assertEqual(economy.shop_item("skin_KITO_2"), ({"type": "skin", "fighter": "KITO", "skin": 2}, 20))
         for missing in ("fighter_BYTE", "fighter_MIRA", "fighter_VARUN", "skin_MIRA_1", "skin_KITO_0", "skin_KITO_3", "skin_NOBODY_1", "crate_xl", ""):
@@ -910,7 +910,7 @@ class Api(unittest.TestCase):
         cost = dict(economy.SPARK_ROAD)
         self.assertEqual([s["fighter"] for s in road["steps"]], order)
         self.assertEqual(order, ["BRAKK", "KIRA", "KITO", "BUDDY"])
-        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 4200, 6500, 9000])
+        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 4200, 6500, 7000])
         self.assertEqual(road["steps"][0], {"fighter": "BRAKK", "cost": 2500, "rarity": "RARE"})
         self.assertEqual(len(road["steps"]), len(rules.FIGHTER_SKINS) - 1)
         # The road has a fixed order: the Credits go toward the first fighter along it that is still locked.
