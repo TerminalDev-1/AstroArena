@@ -287,8 +287,8 @@ object Balance {
             lore = "Half lab assistant, half lab equipment. Her rifle prints its own rounds, and she never asked what from.",
             attackName = "Bit Scatter",
             health = StatLine(8200, 410),
-            attackDamage = StatLine(360, 18),
-            superDamage = StatLine(400, 20),
+            attackDamage = StatLine(450, 23),
+            superDamage = StatLine(500, 25),
             moveSpeed = 3.6f,
             attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 28f, range = 6.4f, speed = 16f, radius = 0.16f, burstInterval = 0f, bits = true),
             superSpec = SuperSpec(SuperKind.VOLLEY, "Hard Reset", "A wide blast of 9 heavy bits that shoves back everyone it hits.", projectiles = 9, spreadDegrees = 46f, range = 6.8f, speed = 17f, radius = 0.2f, knockback = 0.4f),
@@ -312,10 +312,10 @@ object Balance {
             attackName = "Paw Prints",
             health = StatLine(9500, 475),
             // The least one paw print does: it takes a share of the health its target has left when that is more.
-            attackDamage = StatLine(750, 38),
-            superDamage = StatLine(1600, 80),
+            attackDamage = StatLine(940, 47),
+            superDamage = StatLine(2000, 100),
             moveSpeed = 3.6f,
-            attack = AttackSpec(AttackShape.PAWS, projectiles = 2, spreadDegrees = 0f, range = 8f, speed = 15f, radius = 0.24f, burstInterval = 0.14f, healthShare = 0.2f),
+            attack = AttackSpec(AttackShape.PAWS, projectiles = 2, spreadDegrees = 0f, range = 8f, speed = 15f, radius = 0.24f, burstInterval = 0.14f, healthShare = 0.25f),
             superSpec = SuperSpec(SuperKind.RAM, "Ram Charge", "Charges forward, slamming and knocking back every enemy in the way.", range = 5.5f, speed = 15f, radius = 0.55f),
             ammoMax = 3,
             reloadSeconds = 1.6f,
@@ -336,9 +336,9 @@ object Balance {
             lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming, and the hammer is hard to miss.",
             attackName = "Arc Slash",
             health = StatLine(10000, 500),
-            // Four blades: 2,200 when they all land.
-            attackDamage = StatLine(550, 28),
-            superDamage = StatLine(2400, 120),
+            // Four blades: 2,800 when they all land.
+            attackDamage = StatLine(700, 35),
+            superDamage = StatLine(3000, 150),
             moveSpeed = 4.05f,
             attack = AttackSpec(AttackShape.SPREAD, projectiles = 4, spreadDegrees = 24f, range = 5.6f, speed = 19f, radius = 0.17f, burstInterval = 0f),
             // The radius is how far the quake reaches from where the hammer comes down.
