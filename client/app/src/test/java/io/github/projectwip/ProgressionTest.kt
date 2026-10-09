@@ -315,7 +315,7 @@ class ProgressionTest {
             assertTrue("${f.name} health ${f.health.base}", f.health.base >= Balance.MIN_HEALTH)
             assertTrue("${f.name} damage an ammo ${f.attackDamage.base * f.attack.projectiles}", f.attackDamage.base * f.attack.projectiles >= Balance.MIN_AMMO_DAMAGE)
         }
-        assertEquals("Varun, a legacy fighter, has been let fall below it", 4600 to 60, varun.health.base to varun.attackDamage.base * varun.attack.projectiles)
+        assertEquals("Varun, a legacy fighter, has been let fall below it", 950 to 60, varun.health.base to varun.attackDamage.base * varun.attack.projectiles)
     }
 
     @Test fun serverCanRetuneBotsAndFreshSavesAreRecognised() {

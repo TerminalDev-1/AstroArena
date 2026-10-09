@@ -385,7 +385,7 @@ class SimulationTest {
         assertTrue(varun.pending.isEmpty())
         assertEquals("one ammo, one rocket", 1, w.projectiles.size)
         assertEquals("worth sixty", 60, w.projectiles[0].damage)
-        assertEquals("that takes twelve seconds to reload and reaches three tiles", 12f to 3f, varun.def.reloadSeconds to varun.def.attack.range)
+        assertEquals("that takes twelve seconds to reload and reaches one tile", 12f to 1f, varun.def.reloadSeconds to varun.def.attack.range)
     }
 
     @Test fun varunsRocketsBurstAndCatchEveryoneNearby() {
@@ -399,7 +399,7 @@ class SimulationTest {
         search@ for (y in 3 until a.height - 3) for (x in 3 until a.width - 8) {
             val x0 = x + 0.5f; val y0 = y + 0.5f
             if ((0..5).any { a.circleBlocked(x0 + it, y0, 0.9f) } || a.circleBlocked(x0 + 5.9f, y0, 0.6f)) continue
-            varun.x = x0; varun.y = y0; one.x = x0 + 2.5f; one.y = y0; two.x = x0 + 2.5f; two.y = y0 + 1.3f
+            varun.x = x0; varun.y = y0; one.x = x0 + 1.5f; one.y = y0; two.x = x0 + 1.5f; two.y = y0 + 1.3f
             placed = true
             break@search
         }

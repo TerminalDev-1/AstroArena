@@ -344,20 +344,22 @@ object Balance {
         FighterDef(
             id = FighterId.VARUN,
             rarity = Rarity.RARE,
-            name = "Varun",
+            // The user renamed him: he is shown as what he is, with his own name after it.
+            name = "Legacy (Varun)",
             title = "Rocket Firefighter",
             role = "Artillery",
             lore = "An Indian firefighter who was captured and told to work for the people of the Sparks. He has never left since. Nobody knows why.",
             attackName = "Rocket Pack",
             // He is on his way out, so a level adds very little: about a quarter of what it adds to anyone else.
-            health = StatLine(4600, 60),
+            health = StatLine(950, 10),
             // One rocket, and half a rocket at that: 60.
             attackDamage = StatLine(60, 1),
-            superDamage = StatLine(600, 8),
+            // The user asked for half a point a rocket; damage is whole numbers, so it is one.
+            superDamage = StatLine(1, 0),
             notice = "Varun is a legacy fighter and will be transitioning out of the game as soon as possible.",
             upgradable = false,
             moveSpeed = 3.65f,
-            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 1, spreadDegrees = 0f, range = 3f, speed = 14f, radius = 0.085f, burstInterval = 0.1f, blast = 1.0f, lanes = 1),
+            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 1, spreadDegrees = 0f, range = 1f, speed = 14f, radius = 0.085f, burstInterval = 0.1f, blast = 1.0f, lanes = 1),
             superSpec = SuperSpec(SuperKind.SWARM, "Rocket Rain", "Fires 8 rockets into the sky. They rain down inside one big circle, wherever you aim, over any wall. They hit hard, but never land the knockout.", projectiles = 8, range = 9f, speed = 10f, radius = 2.3f),
             ammoMax = 3,
             reloadSeconds = 12f,
