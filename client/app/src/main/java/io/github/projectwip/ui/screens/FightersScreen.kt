@@ -244,7 +244,7 @@ private fun FighterPage(save: SaveData, repo: GameRepository, id: FighterId, go:
                 // ---------------- level, stats, upgrade
                 Panel(Modifier.width(if (ui.wide) 390.dp else 330.dp).fillMaxHeight(), cut = 18.dp) {
                     Column(Modifier.fillMaxSize().padding(16.dp)) {
-                        LevelHeader(prog.level, prog.unlocked, upgradeCount, capped)
+                        LevelHeader(prog.level, prog.unlocked, upgradeCount, capped, legacy = !def.upgradable)
                         Spacer(Modifier.height(10.dp))
                         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             val rows = Progression.statPreview(def, prog.level, capped)
@@ -341,7 +341,7 @@ private fun LevelUpMoment(def: io.github.projectwip.data.FighterDef, m: UpgradeM
 }
 
 @Composable
-private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int, capped: Boolean) {
+private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int, capped: Boolean, legacy: Boolean = false) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(64.dp).popOnChange(upgradeCount), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
@@ -357,12 +357,12 @@ private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int, capped
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                GameText(if (capped) "MAX LEVEL" else "LEVEL $level", Type.Heading, color = if (capped) Palette.Gold else Color.White, outline = 2.5.dp)
+                GameText(if (legacy) "LEVEL $level" else if (capped) "MAX LEVEL" else "LEVEL $level", Type.Heading, color = if (capped) Palette.Gold else Color.White, outline = 2.5.dp)
                 if (unlocked && !capped) {
                     GameText("  →  ${level + 1}", Type.Heading, color = Palette.Positive, outline = 2.5.dp)
                 }
                 Spacer(Modifier.weight(1f))
-                PlainText(if (capped) "fully upgraded" else "max ${maxOf(level, Balance.MAX_LEVEL)}", Type.Small)
+                PlainText(if (legacy) "no more upgrades" else if (capped) "fully upgraded" else "max ${maxOf(level, Balance.MAX_LEVEL)}", Type.Small)
             }
             Spacer(Modifier.height(6.dp))
             // The level as a bar: one segment for each level up to the top one.
@@ -478,7 +478,9 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
         if (save.selectedFighter != id) {
             ChunkyButton({ repo.selectFighter(id); go(Screen.Home) }, Modifier.width(110.dp).height(72.dp), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }
         }
-        if (Progression.levelCapped(save, id)) {
+        if (!Balance.fighter(id).upgradable) {
+            ChunkyButton({}, Modifier.weight(1f).height(72.dp), ButtonStyle.GREY, enabled = false) { GameText("NO UPGRADES", Type.Heading) }
+        } else if (Progression.levelCapped(save, id)) {
             ChunkyButton({}, Modifier.weight(1f).height(72.dp), ButtonStyle.GOLD, enabled = true) { GameText("MAX LEVEL", Type.Heading) }
         } else {
             val afford = save.bolts >= cost

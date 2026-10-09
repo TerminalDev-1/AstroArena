@@ -144,6 +144,12 @@ class Economy(unittest.TestCase):
         with self.assertRaises(Refused) as caught:
             economy.upgrade(p, "BRAKK")  # locked
         self.assertEqual(caught.exception.status, 409)
+        # A legacy fighter stays at the level it has, however many Credits there are and whoever asks.
+        p["fighters"]["VARUN"]["unlocked"] = True
+        p["bolts"] = 100000
+        with self.assertRaises(Refused) as caught:
+            economy.upgrade(p, "VARUN", no_cap=True)
+        self.assertEqual((caught.exception.status, p["fighters"]["VARUN"]["level"], p["bolts"]), (409, 1, 100000))
         p["bolts"] = 5
         with self.assertRaises(Refused) as caught:
             economy.upgrade(p, "BYTE")

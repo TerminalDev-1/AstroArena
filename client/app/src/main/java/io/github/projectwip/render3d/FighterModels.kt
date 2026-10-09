@@ -238,10 +238,10 @@ class FighterModels {
         a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.06f, 0.3f, 0f) { rotate(-10f, 0f, 0f, 1f); cylinder(0.5f, 0.04f, 18) } }
         a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.04f, 0.58f, 0f) { roundedBox(0.56f, 0.12f, 0.08f, 0.03f) } }
         a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.33f, 0.42f, 0f) { roundedBox(0.05f, 0.14f, 0.14f, 0.03f) } }
-        // The rocket rack on his shoulder: three tubes side by side, a warhead showing in each.
-        a.add(Bone.WEAPON, Slot.METAL) { for (z in listOf(-0.14f, 0f, 0.14f)) at(0.3f, 0.04f, z) { alongX { cylinder(0.075f, 0.62f, 10) } } }
-        a.add(Bone.WEAPON, Slot.DARK) { for (x in listOf(0.12f, 0.46f)) at(x, 0.04f, 0f) { roundedBox(0.08f, 0.2f, 0.48f, 0.03f) } }
-        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { for (z in listOf(-0.14f, 0f, 0.14f)) at(0.63f, 0.04f, z) { sphere(0.065f, 6, 8) } }
+        // The rocket rack on his shoulder: two tubes side by side, a warhead showing in each.
+        a.add(Bone.WEAPON, Slot.METAL) { for (z in listOf(-0.09f, 0.09f)) at(0.3f, 0.04f, z) { alongX { cylinder(0.075f, 0.62f, 10) } } }
+        a.add(Bone.WEAPON, Slot.DARK) { for (x in listOf(0.12f, 0.46f)) at(x, 0.04f, 0f) { roundedBox(0.08f, 0.2f, 0.38f, 0.03f) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { for (z in listOf(-0.09f, 0.09f)) at(0.63f, 0.04f, z) { sphere(0.065f, 6, 8) } }
         a.add(Bone.WEAPON, Slot.DARK) { at(0.04f, -0.08f, 0f) { sphere(0.1f, 8, 10) } }
         a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.12f, 0f) { capsule(0.1f, 0.14f) } }
         a.add(Bone.ARM, Slot.DARK) { at(0f, -0.31f, 0f) { sphere(0.1f, 8, 10) } }

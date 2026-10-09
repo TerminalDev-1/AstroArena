@@ -114,6 +114,8 @@ data class FighterDef(
     val voiceStyle: VoiceStyle = VoiceStyle.FIREFIGHTER,
     /** Something players are told on this fighter's page, above everything else about them. Null: nothing. */
     val notice: String? = null,
+    /** False for a fighter that can no longer be levelled up: it stays at whatever level it has. */
+    val upgradable: Boolean = true,
 )
 
 /**
@@ -223,8 +225,8 @@ object Balance {
     const val SHARE_GIANT_HITS = 2
 
     /** A [SuperKind.SWARM]: the first rocket lands this long after the launch, and the rest follow this far apart. */
-    const val RAIN_DELAY_SECONDS = 0.7f
-    const val RAIN_GAP_SECONDS = 0.1f
+    const val RAIN_DELAY_SECONDS = 1.1f
+    const val RAIN_GAP_SECONDS = 0.16f
     /** Each rocket of the rain hits everyone within this many tiles of where it lands (the super's own radius is the whole circle they fall in). */
     const val RAIN_BLAST = 1.1f
 
@@ -353,13 +355,13 @@ object Balance {
             attackDamage = StatLine(650, 8),
             superDamage = StatLine(600, 8),
             notice = "Varun is a legacy fighter and will be transitioning out of the game as soon as possible.",
+            upgradable = false,
             moveSpeed = 3.65f,
-            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 2, spreadDegrees = 0f, range = 8.5f, speed = 14f, radius = 0.17f, burstInterval = 0.1f, blast = 1.0f, lanes = 2),
+            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 2, spreadDegrees = 0f, range = 6f, speed = 14f, radius = 0.17f, burstInterval = 0.1f, blast = 1.0f, lanes = 2),
             superSpec = SuperSpec(SuperKind.SWARM, "Rocket Rain", "Fires 8 rockets into the sky. They rain down inside one big circle, wherever you aim, over any wall. They hit hard, but never land the knockout.", projectiles = 8, range = 9f, speed = 10f, radius = 2.3f),
             ammoMax = 3,
-            reloadSeconds = 1.35f,
-            // (A third as many rockets, each charging three times as much: the super comes as often as it did.)
-            superChargePerHit = 0.18f,
+            reloadSeconds = 4f,
+            superChargePerHit = 0.09f,
             radius = 0.44f,
             skins = listOf(
                 Skin("Fire Engine", 0xFFD9342B, 0xFFFFC72C, 0xFFFFF1C2, 0),

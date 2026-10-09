@@ -56,8 +56,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Every voice sounds different (`VoiceStyle`: accent, pitch, pace): Varun's, and Buddy's machine voice.
   Don't give two speakers the same one. Arena Boxes have no voice: the user had an announcer added and then removed.
 - Varun is Rare, by the user's decision (he was Legendary): 4,600 health, two rockets worth 1,300, a 4-second hyper.
-  He is a legacy fighter on his way out: his page says so (`FighterDef.notice`), and by the user's decision a level
-  adds far less to him than to anyone else. Don't buff him.
+  He is a legacy fighter on his way out: his page says so (`FighterDef.notice`), a level adds far less to him than
+  to anyone else, and by the user's decision he can no longer be upgraded at all (`FighterDef.upgradable`,
+  `NO_UPGRADES` in `economy.py`: both must list him). Don't buff him.
 - Running out of ammo has a sound of its own (`Sound.EMPTY`); `Sound.DENIED` is only for things that went wrong.
   Buddy's computers break like glass on whoever they hit (`Sound.GLASS`).
 - In the Training Area the player's super starts charged (`Match`), so it can be tried at once.

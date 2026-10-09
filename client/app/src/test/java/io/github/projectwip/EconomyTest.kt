@@ -366,4 +366,12 @@ class EconomyTest {
         assertEquals(4, held.value.size)
         assertTrue("the three held are still there", held.save.capsules >= 3)
     }
+
+    @Test fun aLegacyFighterCannotBeUpgraded() {
+        val s = SaveData(bolts = 100_000, fighters = SaveData.defaultFighters() + (FighterId.VARUN to io.github.projectwip.data.FighterProgress(true, 3)))
+        assertFalse(Balance.fighter(FighterId.VARUN).upgradable)
+        assertFalse(io.github.projectwip.data.Progression.canUpgrade(s, FighterId.VARUN))
+        refused(409) { Economy.upgrade(s, FighterId.VARUN, noCap = true) }
+        assertTrue(io.github.projectwip.data.Progression.canUpgrade(s, FighterId.BYTE))
+    }
 }

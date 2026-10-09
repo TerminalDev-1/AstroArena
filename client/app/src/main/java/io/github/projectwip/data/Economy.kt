@@ -29,6 +29,7 @@ object Economy {
     fun upgrade(save: SaveData, fighter: FighterId, factor: Float = 1f, noCap: Boolean = false): Done<Int> {
         val p = save.progress(fighter)
         if (!p.unlocked) throw Refused(409, "that fighter isn't unlocked")
+        if (!Balance.fighter(fighter).upgradable) throw Refused(409, "that fighter can no longer be upgraded")
         if (p.level >= if (noCap) Balance.LEVEL_LIMIT else Balance.MAX_LEVEL) throw Refused(409, "that fighter is at the top level")
         val cost = upgradeCost(p.level, factor)
         if (save.bolts < cost) throw Refused(402, "not enough Upgrade Credits")

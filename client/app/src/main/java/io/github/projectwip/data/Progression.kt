@@ -178,7 +178,7 @@ object Progression {
 
     /** At [Balance.MAX_LEVEL] (or beyond) with the cap in force. */
     fun levelCapped(save: SaveData, id: FighterId): Boolean =
-        save.progress(id).level >= Balance.MAX_LEVEL && !save.settings.debugNoLevelCap
+        !Balance.fighter(id).upgradable || (save.progress(id).level >= Balance.MAX_LEVEL && !save.settings.debugNoLevelCap)
 
     /** The debug menu's upgrade-cost slider goes from free up to this many times the normal price. */
     const val MAX_COST_FACTOR = 3f
@@ -194,7 +194,7 @@ object Progression {
     }
 
     fun statPreview(def: FighterDef, level: Int, capped: Boolean = false): List<StatPreview> {
-        val next: Int? = if (capped) null else level + 1
+        val next: Int? = if (capped || !def.upgradable) null else level + 1
         fun line(label: String, s: StatLine, suffix: String = "") = StatPreview(label, s.at(level), next?.let { s.at(it) }, suffix)
         val shots = def.attack.projectiles
         return listOf(

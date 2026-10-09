@@ -58,6 +58,8 @@ FIGHTER_RARITY = {"BRAKK": "RARE", "KITO": "MYTHIC", "VARUN": "RARE", "BUDDY": "
 # (Juno was the starter until Byte took her place: she cost nothing, so nothing comes back for her. Mira was the
 # Epic stop on the road for a long while before she was taken out.)
 REMOVED_FIGHTERS = {"JUNO": 0, "MIRA": 4200, "PIP": 160, "DOZER": 160, "NOVA": 420, "FENN": 420, "VOLT": 900, "ONYX": 900, "AURA": 1600, "ZERO": 2600}
+# Legacy fighters: on their way out of the game, and stuck at whatever level they have. Keep in step with Balance.kt.
+NO_UPGRADES = {"VARUN"}
 RARITY_PRICE = {"RARE": 40, "EPIC": 70, "MYTHIC": 90, "LEGENDARY": 160, "ULTRA": 250}
 FIGHTER_PRICE = {name: RARITY_PRICE[rarity] for name, rarity in FIGHTER_RARITY.items()}
 SKIN_PRICE = 20  # Prisms, for every colourway but a fighter's first
@@ -329,6 +331,8 @@ def upgrade(profile: dict, fighter: str, factor: float = 1.0, no_cap: bool = Fal
     entry = profile["fighters"].get(fighter)
     if entry is None or not entry.get("unlocked"):
         raise Refused(409, "that fighter isn't unlocked")
+    if fighter in NO_UPGRADES:
+        raise Refused(409, "that fighter can no longer be upgraded")
     level = entry["level"]
     if level >= (LEVEL_LIMIT if no_cap else MAX_LEVEL):
         raise Refused(409, "that fighter is at the top level")
