@@ -1,5 +1,6 @@
 package io.github.projectwip.ui.screens
 
+import io.github.projectwip.ui.bleed
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -104,7 +105,7 @@ private fun FighterGrid(save: SaveData, go: (Screen) -> Unit, open: (FighterId) 
     val ui = LocalUi.current
     Box(Modifier.fillMaxSize()) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
-        Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
+        Box(Modifier.bleed().fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("FIGHTERS", { go(Screen.Home) }, save.bolts, save.prisms)
             androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
@@ -243,19 +244,21 @@ private fun FighterPage(save: SaveData, repo: GameRepository, id: FighterId, go:
 
                 // ---------------- level, stats, upgrade
                 Panel(Modifier.width(if (ui.wide) 390.dp else 330.dp).fillMaxHeight(), cut = 18.dp) {
-                    Column(Modifier.fillMaxSize().padding(16.dp)) {
-                        LevelHeader(prog.level, prog.unlocked, upgradeCount, capped, legacy = !def.upgradable)
-                        Spacer(Modifier.height(10.dp))
-                        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // A phone is short: tighter rows, so the level, all three stats and the buttons are on screen at once.
+                    val compact = !ui.roomy
+                    Column(Modifier.fillMaxSize().padding(if (compact) 10.dp else 16.dp)) {
+                        LevelHeader(prog.level, prog.unlocked, upgradeCount, capped, legacy = !def.upgradable, compact = compact)
+                        Spacer(Modifier.height(if (compact) 7.dp else 10.dp))
+                        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 8.dp)) {
                             val rows = Progression.statPreview(def, prog.level, capped)
                             androidx.compose.runtime.key(id) {
-                                rows.forEachIndexed { i, r -> StatRow(r, i, prog.unlocked, STAT_ICONS[i % STAT_ICONS.size]) }
+                                rows.forEachIndexed { i, r -> StatRow(r, i, prog.unlocked, STAT_ICONS[i % STAT_ICONS.size], compact) }
                             }
                             Spacer(Modifier.height(4.dp))
                             FixedStats(def)
                         }
-                        Spacer(Modifier.height(10.dp))
-                        ActionButtons(save, id, repo, go) {
+                        Spacer(Modifier.height(if (compact) 7.dp else 10.dp))
+                        ActionButtons(save, id, repo, go, compact) {
                             // What the stats are now, and are about to become: the level-up moment counts between them.
                             val before = Progression.statPreview(def, prog.level, capped)
                             val reached = prog.level + 1
@@ -341,16 +344,16 @@ private fun LevelUpMoment(def: io.github.projectwip.data.FighterDef, m: UpgradeM
 }
 
 @Composable
-private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int, capped: Boolean, legacy: Boolean = false) {
+private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int, capped: Boolean, legacy: Boolean = false, compact: Boolean = false) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(64.dp).popOnChange(upgradeCount), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(if (compact) 50.dp else 64.dp).popOnChange(upgradeCount), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
                 drawCircle(Palette.Ink)
                 drawCircle(Palette.OrangeDeep, size.minDimension / 2 - 3.dp.toPx())
                 drawCircle(Palette.Orange, size.minDimension / 2 - 7.dp.toPx())
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                PlainText("LV", Type.Small, color = Color.White)
+                if (!compact) PlainText("LV", Type.Small, color = Color.White)
                 GameText(level.toString(), Type.Title, outline = 2.5.dp)
             }
         }
@@ -372,7 +375,7 @@ private fun LevelHeader(level: Int, unlocked: Boolean, upgradeCount: Int, capped
 }
 
 @Composable
-private fun StatRow(r: StatPreview, index: Int, unlocked: Boolean, icon: IconKind) {
+private fun StatRow(r: StatPreview, index: Int, unlocked: Boolean, icon: IconKind, compact: Boolean = false) {
     val shown by animateIntAsState(r.current, tween(700, delayMillis = index * 90), label = "stat")
     // Highlight flash + floating "+N" after an upgrade.
     val flash = remember { Animatable(0f) }
@@ -401,9 +404,19 @@ private fun StatRow(r: StatPreview, index: Int, unlocked: Boolean, icon: IconKin
             drawPath(p, Palette.PanelInset)
             if (flash.value > 0f) drawPath(p, Palette.Positive.copy(alpha = 0.35f * flash.value))
             drawPath(p, Palette.Ink, style = Stroke(2.dp.toPx()))
-        }.padding(horizontal = 12.dp, vertical = 8.dp),
+        }.padding(horizontal = 12.dp, vertical = if (compact) 5.dp else 8.dp),
     ) {
-        Column {
+        // One line on a phone: the name, what it is now, and what the next level makes it.
+        if (compact) Row(verticalAlignment = Alignment.CenterVertically) {
+            GameIcon(icon, Modifier.size(16.dp))
+            Spacer(Modifier.width(5.dp))
+            PlainText(r.label.uppercase(), Type.Small, Modifier.weight(1f), color = Palette.TextDim, maxLines = 1)
+            GameText("%,d".format(shown) + r.suffix, Type.Heading, outline = 2.5.dp)
+            if (r.next != null && unlocked) {
+                Spacer(Modifier.width(8.dp))
+                GameText("→ %,d".format(r.next), Type.Label, color = Palette.Positive, outline = 2.dp)
+            }
+        } else Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GameIcon(icon, Modifier.size(16.dp))
                 Spacer(Modifier.width(5.dp))
@@ -452,11 +465,31 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
 }
 
 @Composable
-private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, go: (Screen) -> Unit, onUpgrade: () -> Unit) {
+private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, go: (Screen) -> Unit, compact: Boolean = false, onUpgrade: () -> Unit) {
     val p = save.progress(id)
     if (!p.unlocked) {
         // Fighters are unlocked on the Spark Road with Credits; the shop sells them for CPU Chips as a shortcut.
         val step = io.github.projectwip.data.SparkRoad.steps.firstOrNull { it.fighter == id }
+        // Side by side on a phone: one above the other left no room for the stats.
+        if (compact) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChunkyButton({ go(Screen.Road) }, Modifier.weight(1.5f).height(54.dp), ButtonStyle.GREEN) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameText("SPARK ROAD ", Type.Label, outline = 2.dp)
+                        GameIcon(IconKind.CREDIT, Modifier.size(22.dp))
+                        GameText(" ${step?.cost ?: "-"}", Type.Label, outline = 2.dp)
+                    }
+                }
+                ChunkyButton({ go(Screen.Shop) }, Modifier.weight(1f).height(54.dp), ButtonStyle.CYAN) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameText("BUY ", Type.Label, outline = 2.dp)
+                        GameIcon(IconKind.PRISM, Modifier.size(22.dp))
+                        GameText(" ${Balance.unlockPrismPrice(id) ?: "-"}", Type.Label, outline = 2.dp)
+                    }
+                }
+            }
+            return
+        }
         ChunkyButton({ go(Screen.Road) }, Modifier.fillMaxWidth().height(60.dp), ButtonStyle.GREEN) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GameText("SPARK ROAD  ", Type.Heading)
@@ -475,18 +508,19 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
         return
     }
     val cost = Progression.upgradeCost(save, id)
+    val tall = if (compact) 56.dp else 72.dp
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (save.selectedFighter != id) {
-            ChunkyButton({ repo.selectFighter(id); go(Screen.Home) }, Modifier.width(110.dp).height(72.dp), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }
+            ChunkyButton({ repo.selectFighter(id); go(Screen.Home) }, Modifier.width(110.dp).height(tall), ButtonStyle.CYAN) { GameText("SELECT", Type.Heading) }
         }
         if (!Balance.fighter(id).upgradable) {
-            ChunkyButton({}, Modifier.weight(1f).height(72.dp), ButtonStyle.GREY, enabled = false) { GameText("NO UPGRADES", Type.Heading) }
+            ChunkyButton({}, Modifier.weight(1f).height(tall), ButtonStyle.GREY, enabled = false) { GameText("NO UPGRADES", Type.Heading) }
         } else if (Progression.levelCapped(save, id)) {
-            ChunkyButton({}, Modifier.weight(1f).height(72.dp), ButtonStyle.GOLD, enabled = true) { GameText("MAX LEVEL", Type.Heading) }
+            ChunkyButton({}, Modifier.weight(1f).height(tall), ButtonStyle.GOLD, enabled = true) { GameText("MAX LEVEL", Type.Heading) }
         } else {
             val afford = save.bolts >= cost
             // One wide button: what it does on the left, what it costs on the right.
-            ChunkyButton(onUpgrade, Modifier.weight(1f).height(72.dp), ButtonStyle.GREEN, enabled = afford, sound = Sound.UPGRADE) {
+            ChunkyButton(onUpgrade, Modifier.weight(1f).height(tall), ButtonStyle.GREEN, enabled = afford, sound = Sound.UPGRADE) {
                 Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                     GameText("UPGRADE", Type.Title, outline = 3.dp)
                     Spacer(Modifier.weight(1f))

@@ -41,6 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
@@ -332,10 +335,14 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         val base = LocalDensity.current
         val scale = (maxHeight.value / 480f).coerceIn(0.92f, 1.4f)
         val density = Density(base.density * scale, 1f)
-        val metrics = UiMetrics(maxWidth.value / scale, maxHeight.value / scale, scale)
+        // The menus keep clear of a phone's camera cut-out; the 3D lobby behind them still fills the screen.
+        val cutout = androidx.compose.foundation.layout.WindowInsets.displayCutout.only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal)
+        val cutoutSides = cutout.getLeft(base, androidx.compose.ui.unit.LayoutDirection.Ltr) to cutout.getRight(base, androidx.compose.ui.unit.LayoutDirection.Ltr)
+        val cutoutPx = cutoutSides.first + cutoutSides.second
+        val metrics = UiMetrics((maxWidth.value - cutoutPx / base.density) / scale, maxHeight.value / scale, scale)
 
         val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
-        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalOfflineGame provides local, LocalOfflineMode provides offline, LocalDev provides dev, LocalServerCall provides ask) {
+        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalCutout provides cutoutSides, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalOfflineGame provides local, LocalOfflineMode provides offline, LocalDev provides dev, LocalServerCall provides ask) {
             if (screen !is Screen.Match) {
                 androidx.compose.ui.viewinterop.AndroidView(
                     factory = { ctx -> io.github.projectwip.render3d.LobbyView(ctx, lobby) },
@@ -345,17 +352,18 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             // The menu steps aside while a capsule is being opened, so nothing sits on top of the 3D capsule.
             val menuAlpha by androidx.compose.animation.core.animateFloatAsState(if (capsule != null || haul != null) 0f else 1f, tween(160), label = "menu")
             AnimatedContent(
-                modifier = Modifier.graphicsLayer { alpha = menuAlpha },
+                modifier = Modifier.graphicsLayer { alpha = menuAlpha }.then(if (screen is Screen.Match) Modifier else Modifier.windowInsetsPadding(cutout)),
                 targetState = screen,
                 contentKey = { it::class },
                 transitionSpec = {
                     val forward = targetState.depth >= initialState.depth
-                    if (targetState is Screen.Match || initialState is Screen.Match) {
+                    // (Unclipped: a screen's background runs out under the camera cut-out, see Modifier.bleed.)
+                    (if (targetState is Screen.Match || initialState is Screen.Match) {
                         fadeIn(tween(250)) togetherWith fadeOut(tween(200))
                     } else {
                         (slideInHorizontally(tween(260)) { w -> if (forward) w / 4 else -w / 4 } + fadeIn(tween(220))) togetherWith
                             (slideOutHorizontally(tween(220)) { w -> if (forward) -w / 6 else w / 6 } + fadeOut(tween(180)))
-                    }
+                    }) using androidx.compose.animation.SizeTransform(clip = false)
                 },
                 label = "screens",
             ) { s ->
@@ -411,7 +419,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             if (screen !is Screen.Match && screen !is Screen.Settings && capsule == null && haul == null && reveal == null) {
                 PlainText(
                     if (serverStatus.online && !offline) "● ONLINE" else "● OFFLINE · CHAOS MODE · your offline profile, kept on this device", Type.Small,
-                    if (screen is Screen.Home) Modifier.align(Alignment.TopStart).padding(start = 22.dp, top = 68.dp)
+                    if (screen is Screen.Home) Modifier.align(Alignment.TopStart).windowInsetsPadding(cutout).padding(start = 22.dp, top = 68.dp)
+                    // On a phone the bottom corner is under a panel on most screens; the top edge is clear on all of them.
+                    else if (!metrics.roomy) Modifier.align(Alignment.TopCenter).padding(top = 3.dp)
                     else Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 12.dp),
                     color = if (serverStatus.online) Palette.Positive else Palette.TextDim,
                 )

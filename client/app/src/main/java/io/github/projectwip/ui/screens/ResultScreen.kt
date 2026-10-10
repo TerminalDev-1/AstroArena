@@ -1,5 +1,6 @@
 package io.github.projectwip.ui.screens
 
+import io.github.projectwip.ui.bleed
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -157,7 +158,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { flyOrigin = it.positionInRoot() }) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
-        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
+        androidx.compose.foundation.layout.Box(Modifier.bleed().fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Row(Modifier.fillMaxSize().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // ---------------- left: banner + scoreboard
             Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -382,9 +383,9 @@ private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, mo
                 ) {
                     if (ranked) {
                         GameText(if (p.placement == 0) "—" else "#${p.placement}", Type.Heading,
-                            color = if (p.placement == 1) Palette.Gold else Color.White, outline = 2.dp, modifier = Modifier.width(44.dp))
+                            color = if (p.placement == 1) Palette.Gold else Color.White, outline = 2.dp, modifier = Modifier.width(40.dp))
                     }
-                    Box(Modifier.fillMaxHeight().width(46.dp)) {
+                    Box(Modifier.fillMaxHeight().width(if (ranked) 32.dp else 46.dp)) {
                         FighterView(p.boss?.let { Balance.boss(it) } ?: Balance.fighter(p.fighter), p.skin, Modifier.fillMaxSize(), pedestal = false)
                     }
                     Column(Modifier.weight(1f)) {
@@ -393,7 +394,7 @@ private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, mo
                             if (p.isBot) PlainText("  BOT", Type.Small)
                             if (p.isMvp) { Spacer(Modifier.width(4.dp)); GameIcon(IconKind.STAR, Modifier.size(18.dp)) }
                         }
-                        PlainText("${p.kos} KO · ${p.deaths} down · ${"%,d".format(p.damage)} dmg", Type.Small)
+                        PlainText("${p.kos} KO · ${p.deaths} down · ${"%,d".format(p.damage)} dmg", Type.Small, maxLines = 1)
                     }
                 }
             }

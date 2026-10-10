@@ -50,6 +50,7 @@ import kotlin.math.sin
 @Composable
 fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null) {
     val time by rememberAnimTime()
+    val roomy = io.github.projectwip.ui.LocalUi.current.roomy
     Box(
         // Swallows touches so nothing underneath can be pressed while loading.
         Modifier.fillMaxSize().background(Color(0xF0091520)).clickable(remember { MutableInteractionSource() }, null) { },
@@ -57,9 +58,9 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             // The roster, bobbing out of step with each other.
-            Row(horizontalArrangement = Arrangement.spacedBy((-70).dp), verticalAlignment = Alignment.Bottom) {
+            Row(horizontalArrangement = Arrangement.spacedBy(if (roomy) (-70).dp else (-50).dp), verticalAlignment = Alignment.Bottom) {
                 io.github.projectwip.data.Balance.fighters.forEachIndexed { i, def ->
-                    io.github.projectwip.ui.FighterView(def, 0, Modifier.size(if (i == 1 || i == 2) 230.dp else 200.dp)
+                    io.github.projectwip.ui.FighterView(def, 0, Modifier.size((if (i == 1 || i == 2) 230.dp else 200.dp) * if (roomy) 1f else 0.72f)
                         .graphicsLayer { translationY = 7.dp.toPx() * sin(time * 2.6f + i * 1.3f) }, pedestal = false)
                 }
             }
@@ -78,11 +79,16 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
             }
             Spacer(Modifier.height(8.dp))
             PlainText(status, Type.Label, color = Palette.TextDim)
+            // On a phone the tip sits under the status line: at the bottom of the screen the two ran into each other.
+            if (!roomy) {
+                Spacer(Modifier.height(6.dp))
+                PlainText(TIPS[(time / 4f).toInt() % TIPS.size], Type.Body, color = Color.White, align = TextAlign.Center)
+            }
         }
         if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
             GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
         }
-        PlainText(TIPS[(time / 4f).toInt() % TIPS.size], Type.Body, Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp), color = Color.White, align = TextAlign.Center)
+        if (roomy) PlainText(TIPS[(time / 4f).toInt() % TIPS.size], Type.Body, Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp), color = Color.White, align = TextAlign.Center)
         PlainText(BuildConfig.VERSION_NAME, Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
     }
 }

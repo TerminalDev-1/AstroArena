@@ -1,5 +1,6 @@
 package io.github.projectwip.ui.screens
 
+import io.github.projectwip.ui.bleed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,7 +66,7 @@ fun LeaderboardScreen(save: SaveData, go: (Screen) -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
-        Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
+        Box(Modifier.bleed().fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("LEADERBOARD", { go(Screen.Home) }, null, null) {
                 if (me != null && rows != null) Badge("YOU ARE #${me.rank} OF ${rows.size}", color = Palette.OrangeDeep)

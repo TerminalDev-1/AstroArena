@@ -1,5 +1,6 @@
 package io.github.projectwip.ui.screens
 
+import io.github.projectwip.ui.bleed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,7 +81,7 @@ fun TeamScreen(save: SaveData, team: TeamLink?, setTeam: (TeamLink?) -> Unit, go
 
     Box(Modifier.fillMaxSize()) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
-        Box(Modifier.fillMaxSize().background(io.github.projectwip.ui.SCRIM))
+        Box(Modifier.bleed().fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("TEAM", { go(Screen.Home) }, null, null) {}
             Box(Modifier.weight(1f).fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp), contentAlignment = Alignment.Center) {

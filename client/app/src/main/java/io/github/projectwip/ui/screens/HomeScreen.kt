@@ -1,5 +1,6 @@
 package io.github.projectwip.ui.screens
 
+import io.github.projectwip.ui.bleed
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -350,7 +351,7 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
     val ui = LocalUi.current
     val ask = io.github.projectwip.ui.LocalServerCall.current
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
+        Modifier.bleed().fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
             .clickable(remember { MutableInteractionSource() }, null, onClick = onClose),
         contentAlignment = Alignment.Center,
     ) {

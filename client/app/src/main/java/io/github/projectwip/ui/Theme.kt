@@ -70,6 +70,8 @@ data class UiMetrics(val widthDp: Float, val heightDp: Float, val scale: Float) 
     val wide get() = widthDp >= 900f
 }
 
+/** How far a camera cut-out reaches in from the left and the right edge, in pixels. The menus keep out of it. */
+val LocalCutout = compositionLocalOf { 0 to 0 }
 val LocalUi = compositionLocalOf { UiMetrics(800f, 400f, 1f) }
 val LocalSfx = staticCompositionLocalOf<Sfx?> { null }
 val LocalServer = staticCompositionLocalOf<io.github.projectwip.net.GameServer?> { null }

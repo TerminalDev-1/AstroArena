@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -532,9 +533,24 @@ val SCRIM = Color(0xB00E1E2E)
 /** Top/bottom darkening so UI over the 3D lobby stays readable. */
 @Composable
 fun LobbyVignette(strength: Float = 1f) {
-    Canvas(Modifier.fillMaxSize()) {
+    Canvas(Modifier.bleed().fillMaxSize()) {
         drawRect(Brush.verticalGradient(listOf(Color(0xCC091520).copy(alpha = 0.8f * strength), Color.Transparent), 0f, size.height * 0.22f))
         drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC091520).copy(alpha = 0.85f * strength)), size.height * 0.7f, size.height))
+    }
+}
+
+/**
+ * Lets a screen's background run under a phone's camera cut-out. The menus are laid out clear of the cut-out
+ * ([LocalCutout]); a background that stopped there too would leave a strip of bare lobby down the edge.
+ * Goes first in the chain, before `fillMaxSize()`.
+ */
+@Composable
+fun Modifier.bleed(): Modifier {
+    val (left, right) = LocalCutout.current
+    if (left == 0 && right == 0) return this
+    return this.layout { measurable, constraints ->
+        val p = measurable.measure(constraints.copy(minWidth = constraints.minWidth + left + right, maxWidth = constraints.maxWidth + left + right))
+        layout(p.width - left - right, p.height) { p.place(-left, 0) }
     }
 }
 
