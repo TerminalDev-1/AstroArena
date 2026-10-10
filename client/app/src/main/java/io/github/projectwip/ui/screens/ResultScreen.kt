@@ -383,9 +383,9 @@ private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, mo
                 ) {
                     if (ranked) {
                         GameText(if (p.placement == 0) "—" else "#${p.placement}", Type.Heading,
-                            color = if (p.placement == 1) Palette.Gold else Color.White, outline = 2.dp, modifier = Modifier.width(40.dp))
+                            color = if (p.placement == 1) Palette.Gold else Color.White, outline = 2.dp, modifier = Modifier.width(38.dp))
                     }
-                    Box(Modifier.fillMaxHeight().width(if (ranked) 32.dp else 46.dp)) {
+                    Box(Modifier.fillMaxHeight().width(if (ranked) 22.dp else 46.dp)) {
                         FighterView(p.boss?.let { Balance.boss(it) } ?: Balance.fighter(p.fighter), p.skin, Modifier.fillMaxSize(), pedestal = false)
                     }
                     Column(Modifier.weight(1f)) {
@@ -394,7 +394,7 @@ private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, mo
                             if (p.isBot) PlainText("  BOT", Type.Small)
                             if (p.isMvp) { Spacer(Modifier.width(4.dp)); GameIcon(IconKind.STAR, Modifier.size(18.dp)) }
                         }
-                        PlainText("${p.kos} KO · ${p.deaths} down · ${"%,d".format(p.damage)} dmg", Type.Small, maxLines = 1)
+                        PlainText("${p.kos} KO · ${p.deaths} down · ${"%,d".format(p.damage)} dmg", Type.Small)
                     }
                 }
             }
