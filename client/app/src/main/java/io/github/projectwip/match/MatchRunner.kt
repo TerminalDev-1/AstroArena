@@ -91,6 +91,7 @@ class MatchRunner(
         val p = match.player
         controls.superReady = p.superReady && p.alive
         controls.hyperReady = p.hyperReady && p.alive
+        controls.rocketsDown = if (p.def.attack.shape == AttackShape.PLANT) match.world.planted.count { it.ownerId == p.id && it.landed } else -1
         controls.poll(input)
         if (input.pause) onPause()
 
@@ -100,7 +101,8 @@ class MatchRunner(
         c.aiming = input.aimingAttack || input.aimingSuper
         if (c.aiming) { c.aimX = input.aimX; c.aimY = input.aimY }
         if (input.attack != TouchControls.FireMode.NONE) {
-            setAim(input.attack, input.attackX, input.attackY, p.def.attack.range, p.def.attack.speed)
+            if (p.def.attack.shape == AttackShape.PLANT) aimPlant(input.attack, input.attackX, input.attackY, p.def.attack.range)
+            else setAim(input.attack, input.attackX, input.attackY, p.def.attack.range, p.def.attack.speed)
             c.attack = true
         }
         if (input.superFire != TouchControls.FireMode.NONE && p.superReady) {
@@ -109,6 +111,7 @@ class MatchRunner(
             c.superAttack = true
         }
         if (input.hyper && p.hyperReady) c.hyper = true
+        if (input.detonate) c.detonate = true
 
         val link = duel
         val them = match.opponent
@@ -132,7 +135,7 @@ class MatchRunner(
                 if (link.sent <= simTick) link.sendLocal(c)
                 // ...and this tick only runs if both players' inputs for it have arrived.
                 if (!link.ready(simTick)) {
-                    c.attack = false; c.superAttack = false; c.hyper = false
+                    c.attack = false; c.superAttack = false; c.hyper = false; c.detonate = false
                     // Held up. What that means is the lobby's call (it can see both players); this device only gives
                     // up by itself if the lobby has gone quiet too.
                     stalled += Match.STEP
@@ -161,7 +164,7 @@ class MatchRunner(
             } else {
                 if (squad.sent <= simTick) squad.sendLocal(c)
                 if (!squad.ready(simTick)) {
-                    c.attack = false; c.superAttack = false; c.hyper = false
+                    c.attack = false; c.superAttack = false; c.hyper = false; c.detonate = false
                     // Held up by someone's inputs. The lobby drops whoever has stopped; this device only gives up
                     // by itself if the lobby has gone quiet too.
                     stalled += Match.STEP
@@ -231,6 +234,27 @@ class MatchRunner(
     }
 
     /**
+     * Aims a planted rocket: like a rain of rockets, the aim is the spot it lands on. Dragged, that is where the stick
+     * points. Tapped, it is where the nearest enemy in sight will be when it lands, then a Spark Crate, then a spot ahead.
+     */
+    private fun aimPlant(mode: TouchControls.FireMode, ax: Float, ay: Float, range: Float) {
+        val p = match.player
+        val c = p.control
+        val w = match.world
+        if (mode == TouchControls.FireMode.AIMED && hypot(ax, ay) >= 0.01f) { aimRain(mode, ax, ay, range); return }
+        val t = w.nearestVisibleEnemy(p, range + 0.5f)
+        val crate = if (t == null) w.nearestHittableCrate(p, range + 0.4f) else -1
+        if (t != null) {
+            val ahead = io.github.projectwip.data.Balance.PLANT_FLIGHT_SECONDS
+            c.aimX = t.x + t.vx * ahead - p.x; c.aimY = t.y + t.vy * ahead - p.y
+        } else if (crate >= 0) {
+            c.aimX = crate % w.arena.width + 0.5f - p.x; c.aimY = crate / w.arena.width + 0.5f - p.y
+        } else {
+            c.aimX = cos(p.facing) * range * 0.6f; c.aimY = sin(p.facing) * range * 0.6f
+        }
+    }
+
+    /**
      * Auto = lock onto the nearest visible enemy and lead the shot so it meets them.
      * Aimed shots get gentle aim assist (also leading) if enabled.
      */
@@ -291,6 +315,7 @@ class MatchRunner(
                     AttackShape.SMASH -> Sound.WHOOSH
                     AttackShape.PAWS -> Sound.BARK
                     AttackShape.HEX -> Sound.HEX
+                    AttackShape.PLANT -> Sound.WHOOSH
                 }, gain, 0.95f + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }
@@ -366,6 +391,19 @@ class MatchRunner(
             is GameEvent.Burst -> {
                 val p = match.player
                 sfx.play(Sound.ROCKET_BOOM, 0.5f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f), 1.15f + (e.x % 0.2f))
+            }
+            // A planted rocket clicks as it arms.
+            is GameEvent.Armed -> {
+                val p = match.player
+                sfx.play(Sound.TICK, (if (e.fighterId == pid) 0.7f else 0.35f) / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f), 1.5f)
+            }
+            is GameEvent.Realm -> {
+                val f = world.fighter(e.targetId) ?: return
+                val mine = e.fighterId == pid || e.targetId == pid
+                val near = (if (mine) 1f else 0.6f) / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
+                if (e.open) { sfx.play(Sound.WHOOSH, near, 0.5f); sfx.play(Sound.HYPER, near * 0.8f, 0.7f) }
+                else sfx.play(Sound.WHOOSH, near * 0.8f, 1.4f)
+                if (mine) sfx.buzz(if (e.open) 120 else 40, 220)
             }
             is GameEvent.Launch -> {
                 val f = world.fighter(e.fighterId) ?: return

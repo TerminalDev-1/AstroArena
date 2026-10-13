@@ -45,7 +45,7 @@ class TeamLink(private val host: String, private val port: Int) : Closeable {
     private class Frame(val flags: Int, val moveX: Float, val moveY: Float, val aimX: Float, val aimY: Float) {
         fun into(c: Control) {
             c.moveX = moveX; c.moveY = moveY; c.aimX = aimX; c.aimY = aimY
-            c.aiming = flags and 1 != 0; c.attack = flags and 2 != 0; c.superAttack = flags and 4 != 0; c.hyper = flags and 8 != 0
+            c.aiming = flags and 1 != 0; c.attack = flags and 2 != 0; c.superAttack = flags and 4 != 0; c.hyper = flags and 8 != 0; c.detonate = flags and 16 != 0
         }
     }
 
@@ -178,7 +178,7 @@ class TeamLink(private val host: String, private val port: Int) : Closeable {
 
     /** Records what the player wants ([c], as it stands now) as their next frame, and sends it to the team. */
     fun sendLocal(c: Control) {
-        val flags = (if (c.aiming) 1 else 0) or (if (c.attack) 2 else 0) or (if (c.superAttack) 4 else 0) or (if (c.hyper) 8 else 0)
+        val flags = (if (c.aiming) 1 else 0) or (if (c.attack) 2 else 0) or (if (c.superAttack) 4 else 0) or (if (c.hyper) 8 else 0) or (if (c.detonate) 16 else 0)
         synchronized(lock) { frames.getOrNull(slot)?.add(Frame(flags, c.moveX, c.moveY, c.aimX, c.aimY)) }
         send { o ->
             o.writeByte('I'.code); o.writeByte(flags)

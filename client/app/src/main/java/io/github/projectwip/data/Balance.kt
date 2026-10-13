@@ -19,9 +19,11 @@ enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
  * [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. [SMASH] is heavy things hurled a
  * long way, one after another from alternate hands. [PAWS] are paw prints thrown one after another: each takes a share
  * of the health its target has left ([AttackSpec.healthShare]). [HEX] is one bolt that poisons whoever it hits
- * ([AttackSpec.hexSeconds]).
+ * ([AttackSpec.hexSeconds]). [PLANT] lobs one rocket at a spot (the aim is how far as well as which way), over any wall:
+ * it sticks in the ground there and does nothing at all until its owner sets it off (`Control.detonate`), and then it
+ * hits every enemy within [AttackSpec.blast].
  */
-enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX }
+enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
 enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
@@ -48,7 +50,12 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
  * [BREW] lobs a flask at a spot (aimed like [SWARM]: how far the stick is pushed is how far it goes). Where it bursts,
  * enemies in the circle are hurt, and the thrower and any allies in the circle are healed by as much.
  */
-enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE, BREW }
+/**
+ * [REALM] is aimed along a line like [CORRUPT]: the fighter takes the first enemy on it away into a realm of their own
+ * for [Balance.REALM_SECONDS]. In there the enemy can do nothing, nobody outside can touch either of them, and the
+ * fighter reloads and charges faster while a rocket of the realm's own hits the enemy every second.
+ */
+enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE, BREW, REALM }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
 data class AttackSpec(
@@ -67,6 +74,8 @@ data class AttackSpec(
     val lanes: Int = 1,
     /** The shots are square bits of light rather than pellets (and so are the super's). */
     val bits: Boolean = false,
+    /** The shots are thrown hammers (drawn as such; they hit like any other shot). */
+    val hammers: Boolean = false,
     /**
      * Each shot takes this share of the health its target has left, and never less than the attack's own damage.
      * Against a giant it does [Balance.SHARE_GIANT_HITS] times the attack's damage instead. 0 = plain damage.
@@ -246,6 +255,20 @@ object Balance {
     /** ...and a boss shakes it off sooner. */
     const val POISON_GIANT_SECONDS = 4f
 
+    /** A planted rocket ([AttackShape.PLANT]) takes this long to fly to its spot, and a fighter can have this many in the ground: one more sets the oldest off. */
+    const val PLANT_FLIGHT_SECONDS = 0.45f
+    const val PLANT_MAX = 4
+
+    /** A [SuperKind.REALM] lasts this long (or until either of the two in it is knocked out). */
+    const val REALM_SECONDS = 12f
+    /** In the realm a rocket of its own hits the captive this often, for the super's damage. It costs no ammo and charges nothing. */
+    const val REALM_ROCKET_SECONDS = 1f
+    /** Whoever opened the realm reloads this many times as fast in it, and charges their super this many times as fast. */
+    const val REALM_RELOAD = 1.5f
+    const val REALM_CHARGE = 1.5f
+    /** Whoever comes out of a realm can't be taken into another for this long. */
+    const val REALM_REST_SECONDS = 10f
+
     /** A shot that takes a share of health ([AttackSpec.healthShare]) does this many times its own damage to a giant instead. */
     const val SHARE_GIANT_HITS = 2
 
@@ -294,26 +317,30 @@ object Balance {
         FighterDef(
             id = FighterId.BYTE,
             rarity = Rarity.STARTER,
-            name = "Byte",
-            title = "Lab Runaway",
-            role = "Scattergunner",
-            lore = "Half lab assistant, half lab equipment. Her rifle prints its own rounds, and she never asked what from.",
-            attackName = "Bit Scatter",
+            // (The id is still BYTE: Rocket took Byte's place, by the user's decision, and whoever had Byte has her.)
+            name = "Rocket",
+            title = "Star Sapper",
+            role = "Demolitionist",
+            lore = "Ran away from a fireworks barge with the whole stock strapped to her back. Nothing she plants goes off until she says so, and she likes to make people wait.",
+            attackName = "Ground Rockets",
             health = StatLine(6600, 330),
-            attackDamage = StatLine(450, 23),
-            superDamage = StatLine(500, 25),
+            // One rocket, to every enemy in its blast when she sets it off.
+            attackDamage = StatLine(1500, 75),
+            // One of the realm's own rockets: one a second for as long as it lasts.
+            superDamage = StatLine(1500, 75),
             moveSpeed = 3.6f,
-            attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 28f, range = 6.4f, speed = 16f, radius = 0.16f, burstInterval = 0f, bits = true),
-            superSpec = SuperSpec(SuperKind.VOLLEY, "Hard Reset", "A wide blast of 9 heavy bits that shoves back everyone it hits.", projectiles = 9, spreadDegrees = 46f, range = 6.8f, speed = 17f, radius = 0.2f, knockback = 0.4f),
-            ammoMax = 3,
+            // (The speed is only what a tap leads its target by; the flight always takes [PLANT_FLIGHT_SECONDS].)
+            attack = AttackSpec(AttackShape.PLANT, projectiles = 1, spreadDegrees = 0f, range = 7f, speed = 15f, radius = 0.2f, burstInterval = 0f, blast = 1.6f),
+            superSpec = SuperSpec(SuperKind.REALM, "Star Vault", "Aim it at an enemy (or tap, and it picks the nearest): she takes them away into a realm of her own for 12 seconds. In there they can do nothing, bosses included, and nobody outside can touch either of them. She reloads and charges her super half as fast again, and a rocket of the realm's own hits them every second without costing her any ammo.", range = 7f, speed = 30f, radius = 0f),
+            ammoMax = 4,
             reloadSeconds = 1.5f,
-            superChargePerHit = 0.05f,
+            superChargePerHit = 0.2f,
             skins = listOf(
-                Skin("Test Build", 0xFF19B8C4, 0xFFE84FD8, 0xFFB6FF3C, 0),
-                Skin("Mainframe", 0xFF27324F, 0xFF3CFF9E, 0xFFEAFBFF, 20),
-                Skin("Sunset Patch", 0xFFFF7A3D, 0xFF7B4DFF, 0xFFFFE066, 20),
+                Skin("Launch Day", 0xFFF2F5FA, 0xFFFF4D5E, 0xFF3CE6FF, 0),
+                Skin("Midnight Fuse", 0xFF27324F, 0xFF3CFF9E, 0xFFEAFBFF, 20),
+                Skin("Solar Flare", 0xFFFF7A3D, 0xFF7B4DFF, 0xFFFFE066, 20),
             ),
-            hyper = HyperSpec("Overclock", "Lasts 8 seconds. Her bits fly faster, and her super charges half as fast again.", seconds = 8f, shotSpeed = 1.35f, superCharge = 1.5f),
+            hyper = HyperSpec("Afterburner", "Lasts 8 seconds. Her rockets reach their spot half as fast again.", seconds = 8f, shotSpeed = 1.5f),
         ),
         FighterDef(
             id = FighterId.BRAKK,
@@ -375,14 +402,16 @@ object Balance {
             name = "Kito",
             title = "Arc Blade",
             role = "Assassin",
-            lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming, and the hammer is hard to miss.",
-            attackName = "Arc Slash",
+            lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. He juggles hammers now, and the big one is hard to miss.",
+            attackName = "Hammer Fan",
             health = StatLine(8000, 400),
-            // Four blades: 2,800 when they all land.
+            // Four hammers thrown in a wide fan: 2,800 when they all land. (They were blades in a narrower fan of 24
+            // degrees, reaching 5.6 tiles, until the user asked for hammers, a wider spread and half as much range again.
+            // A thrown hammer only hits what it touches: the quake is the super's.)
             attackDamage = StatLine(700, 35),
             superDamage = StatLine(3000, 150),
             moveSpeed = 4.05f,
-            attack = AttackSpec(AttackShape.SPREAD, projectiles = 4, spreadDegrees = 24f, range = 5.6f, speed = 19f, radius = 0.17f, burstInterval = 0f),
+            attack = AttackSpec(AttackShape.SPREAD, projectiles = 4, spreadDegrees = 40f, range = 8.4f, speed = 19f, radius = 0.2f, burstInterval = 0f, hammers = true),
             // The radius is how far the quake reaches from where the hammer comes down.
             superSpec = SuperSpec(SuperKind.QUAKE, "Faultline", "Hurls a giant hammer. Where it comes down the ground quakes in every direction, hitting everyone nearby, and stays cracked.", range = 6.5f, speed = 13f, radius = 2.6f),
             ammoMax = 3,
@@ -404,14 +433,14 @@ object Balance {
             lore = "An assistant AI that was asked to be helpful one time too many. It went rogue, and now it writes software for one purpose: hurting whoever is standing in front of it.",
             attackName = "Hardware Fault",
             health = StatLine(6800, 340),
-            // Each of the four computers. (The user asked for 1,400 each, down from the 1,817 a max-level Buddy did:
-            // that is what this comes to at level 10.)
+            // Each of the three computers (there were four until the user took one away). (The user asked for 1,400
+            // each, down from the 1,817 a max-level Buddy did: that is what this comes to at level 10.)
             attackDamage = StatLine(968, 48),
             // The code does no damage of its own any more (the user took it away: it was finishing bosses too soon).
             // It pins its victim, stops them healing, and leaves them corrupted.
             superDamage = StatLine(0, 0),
             moveSpeed = 3.75f,
-            attack = AttackSpec(AttackShape.SMASH, projectiles = 4, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.36f, burstInterval = 0.13f),
+            attack = AttackSpec(AttackShape.SMASH, projectiles = 3, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.36f, burstInterval = 0.13f),
             superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Aim it at an enemy (or tap, and it picks the nearest): he leaps high along the line, latches onto the back of the first one on it and compiles malformed code into them for 6 seconds. It does no damage, but they cannot heal, and afterwards they are corrupted: for 21 seconds they follow him around and stand in front of him, out of their mind. Bosses too.", range = 6.75f, speed = 30f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.35f,

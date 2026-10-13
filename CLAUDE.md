@@ -25,7 +25,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `trybyte` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
+  (`match|boss|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news`; `roster` is the fighter grid with every model shown unlocked, `tryrocket` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - UI changes must be checked with a screenshot (`adb exec-out screencap -p`) and `adb logcat -b crash -d`.
 - The tablet is the user's everyday device. Before every `input tap` or `am start`, confirm
   `dumpsys window | grep mCurrentFocus` shows `io.github.projectwip` or the home screen (`com.miui.home`): on
@@ -36,9 +36,19 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - `sim/`, `ai/`, `data/` and `audio/SfxSynth.kt` are pure Kotlin (no Android imports); they run in JVM tests.
 - Humans and bots drive fighters through the same `Control`. Visibility goes through `World.isVisibleTo`.
-- The starter fighter is Byte (`FighterId.BYTE`, `STARTING_FIGHTER`); Juno was removed, by the user's decision, and
-  accounts that had her lost her. Byte's kit is modelled on a familiar shotgun brawler at the user's request; her
-  name, look and words are ours and must stay so.
+- The starter fighter is Rocket. The code, the server and the saves still call her `BYTE` (`FighterId.BYTE`,
+  `STARTING_FIGHTER`), by the user's decision: Byte was removed for good and Rocket took her place, so whoever had
+  Byte has Rocket at the same level, and nothing was renamed underneath. Don't bring Byte back. (Juno, the starter
+  before Byte, was removed too.) Rocket's kit is the user's design: four ammo, and each lobs a rocket that sticks in
+  the ground (`AttackShape.PLANT`, `World.planted`) and does nothing until she sets them all off with a button of her
+  own (`Control.detonate`, the BOOM button in `TouchControls`; flag 16 in the input log and on the wire). Her super
+  (`SuperKind.REALM`) is aimed like Buddy's: it takes the first enemy on the line, boss or not, into a realm for
+  `REALM_SECONDS` (12). In there the captive can do nothing (`Fighter.captive`), nobody outside can touch either of
+  them (`Fighter.realm`: damage only passes between fighters in the same realm), she reloads and charges her super
+  half as fast again, and a rocket of the realm's own hits the captive every second without costing ammo. Those
+  numbers are the user's. Two things are ours, to stop the realm following itself for ever: the realm's own rockets
+  charge nothing, and whoever comes out can't be taken again for `REALM_REST_SECONDS`. Her name, look and words are
+  ours and must stay so.
 - Boss Mode bosses are their own things (`BossKind`, `Balance.bosses`), not giant fighters: each fights through
   moves of its own in `sim/Boss.kt` (telegraphed ground hazards, sweeps, rings, charges) and has its own model.
   Keep their names, looks and moves original.
@@ -56,7 +66,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   He is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, and a front
   leg is flung forward for each paw print: `FighterAnim.throwL/R`). His attack sound is a bark of his own (`Sound.BARK`). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its
   target has left (`AttackSpec.healthShare`), never less than the attack's own damage, and a fixed amount on a giant.
-- Kito's numbers are the user's: 8,000 health and 2,800 damage an attack (the damage was 2,200 until the user had every fighter's raised; a health raise to 10,000 was taken back) (four blades of 700). His super
+- Kito's numbers are the user's: 8,000 health and 2,800 damage an attack (the damage was 2,200 until the user had every fighter's raised; a health raise to 10,000 was taken back). His attack is four thrown hammers of 700 in a wide fan (`AttackSpec.hammers`, `ShotStyle.MALLET`): the user had them replace his blades, with a wider spread, half as much range again (8.4 tiles) and no quake: a thrown hammer only hits what it touches. His super
   (`SuperKind.QUAKE`) hurls a giant hammer; where it comes down the ground quakes in every direction
   (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match. He leaps as he throws, and the
   hammer flies straight at the enemy, head first (the user asked for that instead of a tumbling arc). The aiming reticle stops at the
@@ -72,10 +82,10 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Running out of ammo has a sound of its own (`Sound.EMPTY`); `Sound.DENIED` is only for things that went wrong.
   Buddy's computers break like glass on whoever they hit (`Sound.GLASS`).
 - In the Training Area the player's super starts charged (`Match`), so it can be tried at once.
-- Buddy (`FighterId.BUDDY`, Legendary, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls four
+- Buddy (`FighterId.BUDDY`, Legendary, last on the Spark Road) is the user's own design: a rogue AI. His attack hurls three
   whole computers a long way, one after the other, and each smashes into the first enemy in its path
-  (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Four computers (1,400 each at level 10) and the long range are the
-  user's decisions: don't change them.
+  (`AttackShape.SMASH`, drawn as a desktop computer, `ShotStyle.COMPUTER`). Three computers (there were four until the
+  user took one away as a nerf), 1,400 each at level 10, and the long range are the user's decisions: don't change them.
   His super (`SuperKind.CORRUPT`) is aimed along a line (a tap auto-aims at the nearest enemy): he leaps high
   (`Fighter.leapTime`, `World.stepLeap`; nothing can hit him in the air, and walls don't stop him) and comes down on
   the back of the first enemy on that line (`World.corruptTarget`). He stays latched

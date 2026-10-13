@@ -19,9 +19,11 @@ class Control {
     var attack = false
     var superAttack = false
     var hyper = false
+    /** Sets off every rocket this fighter has planted (`AttackShape.PLANT`). Nothing to anyone else. */
+    var detonate = false
 
     fun clear() {
-        moveX = 0f; moveY = 0f; aiming = false; attack = false; superAttack = false; hyper = false
+        moveX = 0f; moveY = 0f; aiming = false; attack = false; superAttack = false; hyper = false; detonate = false
     }
 }
 
@@ -123,6 +125,17 @@ class Fighter(
     var poisonLeft = 0f
     val poisoned get() = poisonBy >= 0
 
+    // The realm (Rocket's super): the id of whoever opened the realm this fighter is in (-1 = it is in the arena, like
+    // everybody else). The one who opened it also keeps how long it has left and the time to its next rocket.
+    var realm = -1
+    var realmLeft = 0f
+    var realmTick = 0f
+    /** Seconds until this fighter can be taken into a realm again. */
+    var realmRest = 0f
+    val inRealm get() = realm >= 0
+    /** Taken into somebody else's realm: it can do nothing until it is over. */
+    val captive get() = realm >= 0 && realm != id
+
     var lastAttackerId = -1
     var spawnIndex = 0
     /** Free-for-all: out for good. */
@@ -149,7 +162,8 @@ class Fighter(
 /** One hex on a fighter: who did it, what each bite does, the time to the next bite, and how long it has left. */
 class Hex(val by: Int, val damage: Int, var tick: Float, var left: Float)
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX }
+/** [MALLET] is one of the small hammers of a main attack; [HAMMER] is the giant one that makes the ground quake. */
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, MALLET }
 
 class Projectile(
     val ownerId: Int,
@@ -178,6 +192,15 @@ class Projectile(
     var alive = true
     var age = 0f
     val hit = HashSet<Int>(2)
+}
+
+/**
+ * A rocket somebody planted (`AttackShape.PLANT`): it flies from where it was thrown to ([x], [y]) in [flight] seconds,
+ * sticks in the ground there, and waits for its owner to set it off.
+ */
+class Planted(val ownerId: Int, val team: Int, val fromX: Float, val fromY: Float, val x: Float, val y: Float, val flight: Float, val blast: Float) {
+    var age = 0f
+    val landed get() = age >= flight
 }
 
 /** A Power Cell lying on the ground. */
@@ -213,6 +236,10 @@ sealed interface GameEvent {
     data class Enthralled(val fighterId: Int, val targetId: Int) : GameEvent
     /** A thrown hammer came down: the ground quakes out to [radius] and stays cracked there. */
     data class Quake(val x: Float, val y: Float, val radius: Float) : GameEvent
+    /** A planted rocket stuck in the ground, ready to be set off. */
+    data class Armed(val fighterId: Int, val x: Float, val y: Float) : GameEvent
+    /** [fighterId] took [targetId] into a realm ([open]), or the realm they were in is over. */
+    data class Realm(val fighterId: Int, val targetId: Int, val open: Boolean) : GameEvent
     /** A rocket went off. */
     data class Burst(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A fighter fired a salvo of rockets into the sky. */

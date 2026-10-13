@@ -54,6 +54,12 @@ class MatchRenderer(
     /** A rocket lying along +X, one unit long: the body, and (drawn in a second colour) its nose cone, fins and nozzle. */
     private lateinit var rocketBody: Mesh
     private lateinit var rocketTrim: Mesh
+    /** The same rocket standing on its nose, leaning a little: one stuck in the ground, or coming straight down. */
+    private lateinit var rocketDownBody: Mesh
+    private lateinit var rocketDownTrim: Mesh
+    private lateinit var thinRing: Mesh
+    /** 0..1: how far the arena has gone over to the look of a realm (the player is in one). */
+    private var realmFade = 0f
     private lateinit var disc: Mesh
     private lateinit var ring: Mesh
     private lateinit var dashRing: Mesh
@@ -128,14 +134,19 @@ class MatchRenderer(
         sphere = MeshBuilder().apply { sphere(1f, 10, 14) }.build()
         octa = MeshBuilder().apply { ellipsoid(1f, 1f, 1f, 2, 4) }.build()
         bit = MeshBuilder().apply { box(1f, 1f, 1f) }.build()
-        rocketBody = MeshBuilder().apply { with { rotate(-90f, 0f, 0f, 1f); cylinder(0.14f, 0.56f, 12) } }.build()
-        rocketTrim = MeshBuilder().apply {
+        val body: MeshBuilder.() -> Unit = { with { rotate(-90f, 0f, 0f, 1f); cylinder(0.14f, 0.56f, 12) } }
+        val trim: MeshBuilder.() -> Unit = {
             with { translate(0.42f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); cylinder(0.14f, 0.28f, 12, topRadius = 0f) }
             with { translate(-0.33f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); cylinder(0.07f, 0.1f, 10, topRadius = 0.11f) }
             with { translate(0.05f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); cylinder(0.15f, 0.07f, 12) }
             with { translate(-0.2f, 0f, 0f); roundedBox(0.22f, 0.5f, 0.045f, 0.015f) }
             with { translate(-0.2f, 0f, 0f); roundedBox(0.22f, 0.045f, 0.5f, 0.015f) }
-        }.build()
+        }
+        rocketBody = MeshBuilder().apply(body).build()
+        rocketTrim = MeshBuilder().apply(trim).build()
+        rocketDownBody = MeshBuilder().apply { with { rotate(9f, 1f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); body() } }.build()
+        rocketDownTrim = MeshBuilder().apply { with { rotate(9f, 1f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); trim() } }.build()
+        thinRing = MeshBuilder().apply { ring(0.94f, 1f, 48) }.build()
         disc = MeshBuilder().apply { ring(0f, 1f, 40) }.build()
         ring = MeshBuilder().apply { ring(0.82f, 1f, 48) }.build()
         dashRing = MeshBuilder().apply { for (k in 0 until 8) ring(0.9f, 1f, 6, k * 45f, k * 45f + 28f) }.build()
@@ -273,11 +284,16 @@ class MatchRenderer(
         GLES30.glDisable(GLES30.GL_BLEND)
         GLES30.glDepthMask(true)
 
-        // Environment
+        // Environment. In a realm the whole arena goes dark and violet: only the fighters keep their colours.
+        val er = lerp(1f, 0.2f, realmFade)
+        val eg = lerp(1f, 0.15f, realmFade)
+        val eb = lerp(1f, 0.46f, realmFade)
         lit.f("uRim", 0.08f)
+        lit.v4("uTint", er, eg, eb, 1f)
         arena.ground.draw()
         lit.f("uRim", 0.25f)
         arena.solids.draw()
+        lit.v4("uTint", 1f, 1f, 1f, 1f)
         drawCrates(lit, shadowPass = false)
         drawCells()
 
@@ -338,7 +354,7 @@ class MatchRenderer(
         lit.f("uSway", 1f)
         lit.f("uRim", 0.2f)
         lit.mat4("uModel", identity)
-        lit.v4("uTint", 1f, 1f, 1f, 1f)
+        lit.v4("uTint", er, eg, eb, 1f)
         arena.grass.draw()
         lit.f("uRevealOn", 0f)
         lit.f("uSway", 0f)
@@ -486,6 +502,15 @@ class MatchRenderer(
 
     /** Smooth facing and movement amount once per frame (frame-rate independent). */
     private fun updateFighterAnims(dt: Float) {
+        val me = match.player
+        realmFade += ((if (me.inRealm && me.alive) 1f else 0f) - realmFade) * (1f - exp(-dt * 7f))
+        // Stars drift up all around while the player is in a realm.
+        if (realmFade > 0.3f) repeat(2) {
+            val a = rng.nextFloat() * 6.28f
+            val d = 1f + rng.nextFloat() * 11f
+            particles.spawn(me.x + cos(a) * d, 0.2f + rng.nextFloat() * 3f, me.y + sin(a) * d * 0.7f, 0f, 0.3f + rng.nextFloat() * 0.5f, 0f, 1.1f, 0.1f + rng.nextFloat() * 0.1f,
+                if (rng.nextFloat() < 0.5f) 0xFFFFFFFF.toInt() else if (rng.nextFloat() < 0.5f) 0xFF7CE8FF.toInt() else 0xFFFF9AE0.toInt(), 0.9f)
+        }
         val k = 1f - exp(-dt * 22f)
         val km = 1f - exp(-dt * 12f)
         for (f in world.fighters) {
@@ -497,7 +522,8 @@ class MatchRenderer(
             val speed = if (f.alive) (hypot(f.vx, f.vy) / f.def.moveSpeed).coerceIn(0f, 1f) else 0f
             shownMoving[i] += (speed - shownMoving[i]) * km
             // Appear quickly, slip away a little slower; a respawn starts solid.
-            val vis = f.alive && world.isVisibleTo(f, match.player.team)
+            // (Whoever is in a realm the player isn't in can't be seen from here, and the other way round.)
+            val vis = f.alive && f.realm == match.player.realm && world.isVisibleTo(f, match.player.team)
             shownVis[i] = if (!f.alive) 1f
                 else if (vis) min(1f, shownVis[i] + dt / VIS_FADE_IN) else max(0f, shownVis[i] - dt / VIS_FADE_OUT)
             if (f.isDashing && rng.nextFloat() < 0.8f) {
@@ -674,6 +700,43 @@ class MatchRenderer(
             setModel(h.x, 0.054f, h.y, h.radius, 1f, h.radius); ring.draw()
         }
 
+        // Rockets in the ground: a ring shows what each will reach when it goes off. Gold for the player's side, red for the other.
+        for (pl in world.planted) {
+            if (!pl.landed) continue
+            val mine = pl.team == p.team
+            val beat = 0.5f + 0.5f * sin(time * 6f + pl.x)
+            if (mine) lit.v4("uTint", 1f, 0.8f, 0.2f, 0.07f + 0.04f * beat) else lit.v4("uTint", 1f, 0.16f, 0.12f, 0.1f + 0.05f * beat)
+            setModel(pl.x, 0.046f, pl.y, pl.blast, 1f, pl.blast); sector(360f).draw()
+            if (mine) lit.v4("uTint", 1f, 0.85f, 0.3f, 0.55f + 0.3f * beat) else lit.v4("uTint", 1f, 0.3f, 0.16f, 0.6f + 0.3f * beat)
+            setModel(pl.x, 0.052f, pl.y, pl.blast, 1f, pl.blast); thinRing.draw()
+        }
+
+        // A realm seen from outside: a turning rift on the ground where each of the two in it stands.
+        for (f in world.fighters) {
+            if (!f.alive || !f.inRealm || f.realm == p.realm) continue
+            val r = f.radius * (1.5f + 0.2f * sin(time * 5f + f.id))
+            lit.v4("uTint", 0.1f, 0.05f, 0.3f, 0.55f)
+            setModel(f.x, 0.046f, f.y, r, 1f, r); sector(360f).draw()
+            lit.v4("uTint", 0.7f, 0.45f, 1f, 0.85f)
+            setModel(f.x, 0.052f, f.y, r, 1f, r, time * 140f); ring.draw()
+            lit.v4("uTint", 0.5f, 0.95f, 1f, 0.8f)
+            setModel(f.x, 0.056f, f.y, r * 0.6f, 1f, r * 0.6f, -time * 200f); thinRing.draw()
+            if (rng.nextFloat() < 0.25f) {
+                val a = rng.nextFloat() * 6.28f
+                particles.spawn(f.x + cos(a) * r, 0.1f, f.y + sin(a) * r, -cos(a) * 1.2f, 1.5f + rng.nextFloat() * 1.5f, -sin(a) * 1.2f, 0.5f, 0.14f, 0xFFB98CFF.toInt(), 0.9f)
+            }
+        }
+        // And from inside: rings of light run out from under the captive, across the dark floor.
+        if (p.inRealm) for (f in world.fighters) {
+            if (!f.alive || !f.captive || f.realm != p.realm) continue
+            for (j in 0 until 3) {
+                val u = (time * 0.5f + j / 3f) % 1f
+                val r = f.radius + 0.4f + u * 5f
+                lit.v4("uTint", 0.55f, 0.85f, 1f, 0.55f * (1f - u))
+                setModel(f.x, 0.05f, f.y, r, 1f, r); thinRing.draw()
+            }
+        }
+
         // Aim indicator
         val inp = runner.input
         if (p.alive && (inp.aimingAttack || inp.aimingSuper)) {
@@ -734,7 +797,7 @@ class MatchRenderer(
                             tint(2); setModel(tx, 0.056f, tz, s.radius, 1f, s.radius); ring.draw()
                         }
                         // The line he will leap along (over walls), and a mark on whoever he will come down on.
-                        SuperKind.CORRUPT -> {
+                        SuperKind.CORRUPT, SuperKind.REALM -> {
                             val t = world.corruptTarget(p, dx, dz)
                             val reach = if (t != null) (t.x - px) * dx + (t.y - pz) * dz else s.range
                             beam(reach.coerceAtLeast(0.3f), p.radius * 2f)
@@ -775,7 +838,19 @@ class MatchRenderer(
                     }
                 } else {
                     val at = p.def.attack
-                    if (at.shape == AttackShape.SPREAD) fan(at.range, at.spreadDegrees + 8f)
+                    if (at.shape == AttackShape.PLANT) {
+                        // Where the rocket will stick in the ground, and everything it will reach when it is set off.
+                        val reach = min(1f, len) * at.range
+                        val tx = px + dx * reach
+                        val tz = pz + dz * reach
+                        lit.v4("uTint", 1f, 1f, 1f, 0.2f + 0.1f * pulse)
+                        setModel(tx, 0.05f, tz, at.blast, 1f, at.blast); sector(360f).draw()
+                        tint(0); setModel(tx, 0.054f, tz, at.blast + 0.06f, 1f, at.blast + 0.06f); thinRing.draw()
+                        tint(1); setModel(tx, 0.056f, tz, at.blast, 1f, at.blast); thinRing.draw()
+                        tint(2); setModel(tx, 0.06f, tz, 0.2f, 1f, 0.2f); sector(360f).draw()
+                        tint(1); setModel(px, 0.05f, pz, reach, 1f, 0.08f, yaw); rect.draw()
+                    }
+                    else if (at.shape == AttackShape.SPREAD) fan(at.range, at.spreadDegrees + 8f)
                     else if (at.shape == AttackShape.ROCKETS) beam(clip(a, px, pz, dx, dz, at.range), io.github.projectwip.data.Balance.ROCKET_LANE * (at.projectiles - 1) + 0.4f)
                     else beam(clip(a, px, pz, dx, dz, at.range), if (at.shape == AttackShape.SMASH) 0.95f else if (at.shape == AttackShape.BURST || at.shape == AttackShape.PAWS) 0.55f else 0.34f)
                 }
@@ -937,6 +1012,20 @@ class MatchRenderer(
                     tint(skin.accent)
                     setModel(x - hx * 2.2f, y, z - hz * 2.2f, 0.13f, 0.22f, 0.22f, yaw); bit.draw()
                 }
+                ShotStyle.MALLET -> {
+                    // A throwing hammer, wheeling end over end as it flies: the shaft, and the head with its band.
+                    val k = pr.radius / 0.2f
+                    val spin = yaw + pr.age * 900f
+                    val rad = Math.toRadians(-spin.toDouble()).toFloat()
+                    val hx = cos(rad) * 0.3f * k
+                    val hz = sin(rad) * 0.3f * k
+                    tint(0xFF7A5A3A)
+                    setModel(x, 0.75f, z, 0.62f * k, 0.09f * k, 0.09f * k, spin); bit.draw()
+                    tint(0xFF8C95B4)
+                    setModel(x + hx, 0.75f, z + hz, 0.2f * k, 0.26f * k, 0.42f * k, spin); bit.draw()
+                    tint(skin.secondary)
+                    setModel(x + hx, 0.75f, z + hz, 0.08f * k, 0.29f * k, 0.45f * k, spin); bit.draw()
+                }
                 ShotStyle.PELLET -> {
                     tint(skin.secondary)
                     setModel(x, 0.7f, z, pr.radius * 1.1f, pr.radius * 1.1f, pr.radius * 1.1f); sphere.draw()
@@ -964,6 +1053,42 @@ class MatchRenderer(
                     setModel(x - dx * 0.68f * size, y, z - dz * 0.68f * size, flame * 1.6f, flame * 0.7f, flame * 0.7f, yaw); sphere.draw()
                 }
             }
+        }
+        // Planted rockets: lobbed over to their spot, then standing on their nose in the ground with a light blinking at the tail.
+        for (pl in world.planted) {
+            val owner = world.fighter(pl.ownerId) ?: continue
+            val skin = owner.def.skins[owner.skin]
+            if (!pl.landed) {
+                val u = (pl.age / pl.flight).coerceIn(0f, 1f)
+                val x = lerp(pl.fromX, pl.x, u)
+                val z = lerp(pl.fromY, pl.y, u)
+                val y = 0.95f + (1.5f + hypot(pl.x - pl.fromX, pl.y - pl.fromY) * 0.25f) * 4f * u * (1f - u) - 0.5f * u
+                val yaw = -Math.toDegrees(atan2(pl.y - pl.fromY, pl.x - pl.fromX).toDouble()).toFloat()
+                setModel(x, y, z, 1f, 1f, 1f, yaw)
+                // (Level on the way up, nose first on the way down.)
+                tint(skin.primary); (if (u < 0.55f) rocketBody else rocketDownBody).draw()
+                tint(skin.secondary); (if (u < 0.55f) rocketTrim else rocketDownTrim).draw()
+                if (rng.nextFloat() < 0.7f) particles.spawn(x, y, z, 0f, 0.2f, 0f, 0.3f, 0.2f, 0xFFFFB03A.toInt(), 0.8f)
+            } else {
+                setModel(pl.x, 0.4f, pl.y, 1.05f, 1.05f, 1.05f, pl.x * 97f + pl.y * 41f)
+                tint(skin.primary); rocketDownBody.draw()
+                tint(skin.secondary); rocketDownTrim.draw()
+                tint(if ((time * 5f + pl.x * 3f).toInt() % 2 == 0) skin.accent else 0xFFFFFFFFL)
+                setModel(pl.x, 0.86f, pl.y, 0.1f, 0.1f, 0.1f); sphere.draw()
+            }
+        }
+        // In a realm, a rocket of its own comes straight down on the captive every second.
+        for (f in world.fighters) {
+            if (f.realm != f.id || f.realm != match.player.realm) continue
+            val t = world.fighters.firstOrNull { it.realm == f.id && it !== f } ?: continue
+            val skin = f.def.skins[f.skin]
+            val u = (1f - f.realmTick / io.github.projectwip.data.Balance.REALM_ROCKET_SECONDS).coerceIn(0f, 1f)
+            val y = 1.1f * t.scale + 10f * (1f - u) * (1f - u)
+            setModel(t.x, y, t.y, 1.3f, 1.3f, 1.3f, time * 200f)
+            tint(skin.primary); rocketDownBody.draw()
+            tint(skin.secondary); rocketDownTrim.draw()
+            tint(0xFFFFE066L)
+            setModel(t.x, y + 0.6f, t.y, 0.16f, 0.4f, 0.16f); sphere.draw()
         }
         // What is about to land on the marked ground: a rocket dropping out of the sky, or a mine blinking where it lies.
         for (h in world.hazards) {
@@ -1202,6 +1327,24 @@ class MatchRenderer(
                     val sp = 1.5f + rng.nextFloat() * 3.5f
                     particles.spawn(e.x, 0.6f, e.y, cos(a) * sp, 1f + rng.nextFloat() * 3f, sin(a) * sp, 0.35f + rng.nextFloat() * 0.2f, 0.2f, 0xFFFF8A1F.toInt(), 0.9f)
                 }
+            }
+            is GameEvent.Armed -> repeat(5) {
+                val a = rng.nextFloat() * 6.28f
+                particles.spawn(e.x, 0.1f, e.y, cos(a) * 1.8f, 1.2f + rng.nextFloat(), sin(a) * 1.8f, 0.3f, 0.12f, 0xFFC9A46A.toInt(), 0.8f, grav = 9f)
+            }
+            // A realm opens (or lets go): a flash, a ring thrown outwards and a column of stars, on each of the two.
+            is GameEvent.Realm -> for (id in intArrayOf(e.fighterId, e.targetId)) world.fighter(id)?.let { f ->
+                val c = if (e.open) 0xFFB98CFF.toInt() else 0xFF7CE8FF.toInt()
+                particles.spawn(f.x, 0.8f, f.y, 0f, 0f, 0f, 0.4f, 4f * f.scale, c, 0.85f)
+                repeat(32) {
+                    val a = it * 0.196f
+                    particles.spawn(f.x, 0.3f, f.y, cos(a) * 5f, 0.5f, sin(a) * 5f, 0.45f, 0.24f, if (it % 2 == 0) c else 0xFFFFFFFF.toInt(), 0.95f)
+                }
+                repeat(20) {
+                    val a = rng.nextFloat() * 6.28f
+                    particles.spawn(f.x + cos(a) * 0.4f, 0.2f, f.y + sin(a) * 0.4f, 0f, 4f + rng.nextFloat() * 6f, 0f, 0.6f, 0.16f, 0xFFFFFFFF.toInt(), 0.9f)
+                }
+                if (f === match.player) shake = max(shake, 0.2f)
             }
             is GameEvent.Quake -> {
                 quakes += floatArrayOf(e.x, e.y, e.radius, time, e.x * 3.7f + e.y * 1.3f)

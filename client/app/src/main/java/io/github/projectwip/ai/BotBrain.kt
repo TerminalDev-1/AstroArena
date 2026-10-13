@@ -99,7 +99,7 @@ class BotBrain(
         if (target == null) idle += dt else idle = 0f
 
         target?.let { t ->
-            if (t.alive && world.isVisibleTo(t, me.team)) {
+            if (t.alive && t.realm == me.realm && world.isVisibleTo(t, me.team)) {
                 seenTime += dt
                 lastKnownX = t.x; lastKnownY = t.y; lastKnownAge = 0f
             } else {
@@ -134,7 +134,7 @@ class BotBrain(
         val crowded = st0 != null && world.aliveCount > 3
         val enemies = world.fighters.filter {
             val foughtBack = it.id == me.lastAttackerId && me.sinceDamaged < 3f
-            it.team != me.team && it.alive && world.isVisibleTo(it, me.team) &&
+            it.team != me.team && it.alive && it.realm == me.realm && world.isVisibleTo(it, me.team) &&
                 (dist(it) <= engageRadius || foughtBack) &&
                 // Free-for-all etiquette: two bots on one fighter is a fight, more is a mugging.
                 (!crowded || foughtBack || it === target || rivalsOn(it) < 2)
@@ -260,6 +260,7 @@ class BotBrain(
         AttackShape.SMASH -> 0.7f
         AttackShape.PAWS -> 0.7f
         AttackShape.HEX -> 0.75f
+        AttackShape.PLANT -> 0.6f
     }
 
     private fun chooseEngageGoal(t: Fighter) {
@@ -443,8 +444,9 @@ class BotBrain(
 
     private fun combat(dt: Float) {
         val t = target
+        if (me.def.attack.shape == AttackShape.PLANT) setOffRockets()
         if (t == null) { shootCrate(); return }
-        if (!t.alive || !world.isVisibleTo(t, me.team) || seenTime < profile.reactionTime) return
+        if (!t.alive || t.realm != me.realm || !world.isVisibleTo(t, me.team) || seenTime < profile.reactionTime) return
         val c = me.control
         val d = dist(t)
         val clear = arena.shotClear(me.x, me.y, t.x, t.y)
@@ -479,8 +481,31 @@ class BotBrain(
         // Skilled bots don't waste their last shots on long, low-odds pokes.
         if (profile.superSkill > 0.7f && me.ammo < 2f && d > range * 0.8f && t.hpFraction > 0.4f) return
         aimAt(t, me.def.attack.speed)
+        // A planted rocket is aimed at a spot, not along a line: where the target will be when it lands.
+        if (me.def.attack.shape == AttackShape.PLANT) {
+            val ahead = io.github.projectwip.data.Balance.PLANT_FLIGHT_SECONDS * profile.leadFactor
+            c.aimX = t.x + t.vx * ahead - me.x
+            c.aimY = t.y + t.vy * ahead - me.y
+        }
         c.attack = true
         fireTimer = 0.3f + rng.nextFloat() * profile.fireHesitation
+    }
+
+    /**
+     * Rockets in the ground are set off when an enemy it can see is well inside the blast of one, or, with nobody to
+     * fight, when one is sitting next to the Spark Crate it was planted for.
+     */
+    private fun setOffRockets() {
+        for (p in world.planted) {
+            if (p.ownerId != me.id || !p.landed) continue
+            val caught = world.fighters.any {
+                it.team != me.team && it.alive && it.realm == me.realm && world.isVisibleTo(it, me.team) && hypot(it.x - p.x, it.y - p.y) < p.blast * 0.8f + it.radius * 0.5f
+            }
+            val key = crateKey
+            val crate = target == null && key >= 0 && world.crateHp.containsKey(key) &&
+                hypot(key % arena.width + 0.5f - p.x, key / arena.width + 0.5f - p.y) < p.blast
+            if (caught || crate) { me.control.detonate = true; return }
+        }
     }
 
     private fun shootCrate() {
@@ -511,6 +536,8 @@ class BotBrain(
             SuperKind.BREW -> d <= s.range && (!smart || me.hpFraction < 0.75f || t.hp <= me.superDamage)
             // The leap goes over walls and follows whoever it was aimed at: all it needs is someone in reach.
             SuperKind.CORRUPT -> d <= s.range * 0.95f
+            // A realm goes through walls too, but nobody can be taken twice running.
+            SuperKind.REALM -> d <= s.range * 0.95f && t.realmRest <= 0f
             // The quake reaches past whatever the hammer hits, so it only has to get close.
             SuperKind.QUAKE -> clear && d <= s.range * 0.95f
             SuperKind.RAM -> d <= s.range * 0.85f && arena.walkClear(me.x, me.y, t.x, t.y, me.radius * 0.9f) &&

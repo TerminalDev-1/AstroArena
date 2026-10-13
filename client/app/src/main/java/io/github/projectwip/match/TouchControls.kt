@@ -19,6 +19,7 @@ import kotlin.math.min
  *    Quick tap = auto-aim at nearest visible enemy. Drag back into the centre before releasing = cancel.
  *  - Super stick: same gestures, only live when the super is charged.
  *  - Hyper button: a plain tap, only live when the hyper is charged. It sits above the attack stick and moves with it.
+ *  - Detonate button: a plain tap. Only there for a fighter who plants rockets; it sits beside the attack stick.
  *
  * Touch events arrive on the UI thread; the game thread reads via [poll]. All access is synchronized.
  */
@@ -51,6 +52,7 @@ class TouchControls(private val density: Float) {
         var superX = 0f
         var superY = 0f
         var hyper = false
+        var detonate = false
         var pause = false
     }
 
@@ -80,6 +82,9 @@ class TouchControls(private val density: Float) {
     var hyperRadius = 0f; private set
     var hyperCx = 0f; private set
     var hyperCy = 0f; private set
+    var detonateRadius = 0f; private set
+    var detonateCx = 0f; private set
+    var detonateCy = 0f; private set
     val pauseRect = RectF()
 
     private var settings = Settings()
@@ -92,12 +97,15 @@ class TouchControls(private val density: Float) {
     private var pendingSuperX = 0f
     private var pendingSuperY = 0f
     private var pendingHyper = false
+    private var pendingDetonate = false
     private var pendingPause = false
 
     /** Set by the game thread so the super stick knows whether to grab touches. */
     @Volatile var superReady = false
     /** Likewise for the hyper button. */
     @Volatile var hyperReady = false
+    /** How many rockets the player has in the ground, ready to be set off. -1: their fighter plants none, so there is no button. */
+    @Volatile var rocketsDown = -1
 
     private fun dp(v: Float) = v * density
 
@@ -112,6 +120,7 @@ class TouchControls(private val density: Float) {
         attackRadius = dp(60f) * k
         superRadius = dp(42f) * k
         hyperRadius = dp(32f) * k
+        detonateRadius = dp(34f) * k
         fixedMoveX = safeLeft + dp(44f) + moveRadius * 1.15f
         fixedMoveY = height - dp(36f) - moveRadius * 1.15f
         attackCx = width - safeRight - dp(48f) - attackRadius * 1.25f
@@ -126,6 +135,8 @@ class TouchControls(private val density: Float) {
         if (l.superX >= 0f) { superCx = l.superX * width; superCy = l.superY * height }
         hyperCx = attackCx - attackRadius * 0.55f
         hyperCy = (attackCy - attackRadius * 2.15f).coerceAtLeast(hyperRadius * 1.6f)
+        detonateCx = attackCx - attackRadius * 2.1f
+        detonateCy = (attackCy + attackRadius * 0.42f).coerceAtMost(height - detonateRadius * 1.25f)
         val ps = dp(46f)
         pauseRect.set(safeLeft + dp(16f), dp(14f), safeLeft + dp(16f) + ps, dp(14f) + ps)
     }
@@ -154,6 +165,7 @@ class TouchControls(private val density: Float) {
         if (pr.contains(x, y)) { pendingPause = true; return }
 
         if (hyperReady && hypot(x - hyperCx, y - hyperCy) < hyperRadius * 1.4f) { pendingHyper = true; return }
+        if (rocketsDown >= 0 && hypot(x - detonateCx, y - detonateCy) < detonateRadius * 1.3f) { pendingDetonate = true; return }
 
         // Aim sticks measure from where the thumb lands, so a tap anywhere on them is a clean
         // auto-aim tap and drags aim relative to the touch point (the stick is still drawn in place).
@@ -262,17 +274,19 @@ class TouchControls(private val density: Float) {
         out.attack = pendingAttack; out.attackX = pendingAttackX; out.attackY = pendingAttackY
         out.superFire = pendingSuper; out.superX = pendingSuperX; out.superY = pendingSuperY
         out.hyper = pendingHyper
+        out.detonate = pendingDetonate
         out.pause = pendingPause
         pendingAttack = FireMode.NONE
         pendingSuper = FireMode.NONE
         pendingHyper = false
+        pendingDetonate = false
         pendingPause = false
     }
 
     @Synchronized
     fun reset() {
         move.reset(); attack.reset(); superStick.reset()
-        pendingAttack = FireMode.NONE; pendingSuper = FireMode.NONE; pendingHyper = false; pendingPause = false
+        pendingAttack = FireMode.NONE; pendingSuper = FireMode.NONE; pendingHyper = false; pendingDetonate = false; pendingPause = false
     }
 
     // ------------------------------------------------------------------ drawing
@@ -440,6 +454,51 @@ class TouchControls(private val density: Float) {
             text.style = Paint.Style.FILL
             text.color = Color.argb(a, 255, 255, 255)
             c.drawText("HYPER", hyperCx, hyperCy + hr * 1.08f, text)
+        }
+
+        // ---- Detonate button: a plunger, and how many rockets are waiting in the ground
+        val down = rocketsDown
+        if (down >= 0) {
+            val dr = detonateRadius
+            val live = down > 0 && alive
+            val dPulse = if (live) 1f + 0.06f * kotlin.math.sin(time * 8f) else 1f
+            if (live) {
+                fill.color = Color.argb(a * 90 / 255, 255, 90, 70)
+                c.drawCircle(detonateCx, detonateCy, dr * 1.35f * dPulse, fill)
+            }
+            fill.color = if (live) Color.argb(a, 232, 52, 58) else Color.argb(a * 170 / 255, 40, 30, 70)
+            c.drawCircle(detonateCx, detonateCy, dr, fill)
+            line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(3.5f)
+            c.drawCircle(detonateCx, detonateCy, dr, line)
+            val ink = if (live) Color.argb(a, 255, 255, 255) else Color.argb(a * 150 / 255, 176, 164, 214)
+            // The box, the rod and the handle of a plunger.
+            fill.color = ink
+            c.drawRoundRect(detonateCx - dr * 0.42f, detonateCy + dr * 0.02f, detonateCx + dr * 0.42f, detonateCy + dr * 0.5f, dp(3f), dp(3f), fill)
+            line.color = ink; line.strokeWidth = dp(4f)
+            c.drawLine(detonateCx, detonateCy + dr * 0.02f, detonateCx, detonateCy - dr * 0.42f, line)
+            c.drawLine(detonateCx - dr * 0.36f, detonateCy - dr * 0.42f, detonateCx + dr * 0.36f, detonateCy - dr * 0.42f, line)
+            if (down > 0) {
+                // The count, on a badge at the corner.
+                val bx2 = detonateCx + dr * 0.78f
+                val by2 = detonateCy - dr * 0.78f
+                fill.color = Color.argb(a, 255, 205, 40)
+                c.drawCircle(bx2, by2, dr * 0.36f, fill)
+                line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(2.5f)
+                c.drawCircle(bx2, by2, dr * 0.36f, line)
+                text.textSize = dr * 0.5f
+                text.style = Paint.Style.FILL
+                text.color = Color.argb(a, 11, 6, 32)
+                c.drawText(down.toString(), bx2, by2 + dr * 0.18f, text)
+            }
+            if (live) {
+                text.textSize = dr * 0.42f
+                text.style = Paint.Style.STROKE; text.strokeWidth = dp(4f); text.strokeJoin = Paint.Join.ROUND
+                text.color = Color.argb(a, 11, 6, 32)
+                c.drawText("BOOM", detonateCx, detonateCy + dr * 1.12f, text)
+                text.style = Paint.Style.FILL
+                text.color = Color.argb(a, 255, 255, 255)
+                c.drawText("BOOM", detonateCx, detonateCy + dr * 1.12f, text)
+            }
         }
 
         // ---- Pause

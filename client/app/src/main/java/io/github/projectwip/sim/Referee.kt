@@ -85,7 +85,7 @@ object Referee {
                 val at = (tick - DUEL_DELAY) * DUEL_FRAME_BYTES
                 val flags = logs[side].get(at).toInt()
                 c.moveX = logs[side].getFloat(at + 1); c.moveY = logs[side].getFloat(at + 5); c.aimX = logs[side].getFloat(at + 9); c.aimY = logs[side].getFloat(at + 13)
-                c.aiming = flags and 1 != 0; c.attack = flags and 2 != 0; c.superAttack = flags and 4 != 0; c.hyper = flags and 8 != 0
+                c.aiming = flags and 1 != 0; c.attack = flags and 2 != 0; c.superAttack = flags and 4 != 0; c.hyper = flags and 8 != 0; c.detonate = flags and 16 != 0
             }
             match.step(Match.STEP)
             match.world.events.clear()
@@ -115,7 +115,7 @@ object Referee {
         val b = java.nio.ByteBuffer.wrap(log, index * DUEL_FRAME_BYTES, DUEL_FRAME_BYTES)
         val flags = b.get().toInt()
         c.moveX = b.getFloat(); c.moveY = b.getFloat(); c.aimX = b.getFloat(); c.aimY = b.getFloat()
-        c.aiming = flags and 1 != 0; c.attack = flags and 2 != 0; c.superAttack = flags and 4 != 0; c.hyper = flags and 8 != 0
+        c.aiming = flags and 1 != 0; c.attack = flags and 2 != 0; c.superAttack = flags and 4 != 0; c.hyper = flags and 8 != 0; c.detonate = flags and 16 != 0
     }
 
     /**
