@@ -106,6 +106,8 @@ class TouchControls(private val density: Float) {
     @Volatile var hyperReady = false
     /** How many rockets the player has in the ground, ready to be set off. -1: their fighter plants none, so there is no button. */
     @Volatile var rocketsDown = -1
+    /** How full the player's blade bar is (0..1; full, the next swing reaches further). -1: their fighter has none. */
+    @Volatile var edge = -1f
 
     private fun dp(v: Float) = v * density
 
@@ -344,6 +346,17 @@ class TouchControls(private val density: Float) {
                 line.color = if (f >= 1f) Color.argb(a, 255, 159, 28) else Color.argb(a * 200 / 255, 255, 220, 160)
                 c.drawArc(arc, start, sweep * f, false, line)
             }
+        }
+        // The blade's bar: an arc inside the ammo ring that fills with every swing, and glows when it is full.
+        val bar = edge
+        if (bar >= 0f) {
+            val full = bar >= 1f
+            arc.set(ax - attackRadius * 0.86f, ay - attackRadius * 0.86f, ax + attackRadius * 0.86f, ay + attackRadius * 0.86f)
+            line.strokeWidth = dp(if (full) 8f else 6f)
+            line.color = Color.argb(a * 120 / 255, 11, 6, 32)
+            c.drawArc(arc, 0f, 360f, false, line)
+            line.color = if (full) Color.argb((a * (0.75f + 0.25f * kotlin.math.sin(time * 9f))).toInt(), 140, 255, 240) else Color.argb(a, 60, 200, 255)
+            c.drawArc(arc, -90f, 360f * bar.coerceIn(0f, 1f), false, line)
         }
         val kx = ax + attack.knobX * attackRadius
         val ky = ay + attack.knobY * attackRadius

@@ -261,6 +261,7 @@ class BotBrain(
         AttackShape.PAWS -> 0.7f
         AttackShape.HEX -> 0.75f
         AttackShape.PLANT -> 0.6f
+        AttackShape.SLASH -> 0.7f
     }
 
     private fun chooseEngageGoal(t: Fighter) {
@@ -536,8 +537,8 @@ class BotBrain(
             SuperKind.BREW -> d <= s.range && (!smart || me.hpFraction < 0.75f || t.hp <= me.superDamage)
             // The leap goes over walls and follows whoever it was aimed at: all it needs is someone in reach.
             SuperKind.CORRUPT -> d <= s.range * 0.95f
-            // A realm goes through walls too, but nobody can be taken twice running.
-            SuperKind.REALM -> d <= s.range * 0.95f && t.realmRest <= 0f
+            // A realm goes through walls too.
+            SuperKind.REALM -> d <= s.range * 0.95f
             // The quake reaches past whatever the hammer hits, so it only has to get close.
             SuperKind.QUAKE -> clear && d <= s.range * 0.95f
             SuperKind.RAM -> d <= s.range * 0.85f && arena.walkClear(me.x, me.y, t.x, t.y, me.radius * 0.9f) &&

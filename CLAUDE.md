@@ -39,16 +39,23 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - The starter fighter is Rocket. The code, the server and the saves still call her `BYTE` (`FighterId.BYTE`,
   `STARTING_FIGHTER`), by the user's decision: Byte was removed for good and Rocket took her place, so whoever had
   Byte has Rocket at the same level, and nothing was renamed underneath. Don't bring Byte back. (Juno, the starter
-  before Byte, was removed too.) Rocket's kit is the user's design: four ammo, and each lobs a rocket that sticks in
-  the ground (`AttackShape.PLANT`, `World.planted`) and does nothing until she sets them all off with a button of her
-  own (`Control.detonate`, the BOOM button in `TouchControls`; flag 16 in the input log and on the wire). Her super
-  (`SuperKind.REALM`) is aimed like Buddy's: it takes the first enemy on the line, boss or not, into a realm for
-  `REALM_SECONDS` (12). In there the captive can do nothing (`Fighter.captive`), nobody outside can touch either of
-  them (`Fighter.realm`: damage only passes between fighters in the same realm), she reloads and charges her super
-  half as fast again, and a rocket of the realm's own hits the captive every second without costing ammo. Those
-  numbers are the user's. Two things are ours, to stop the realm following itself for ever: the realm's own rockets
-  charge nothing, and whoever comes out can't be taken again for `REALM_REST_SECONDS`. Her name, look and words are
-  ours and must stay so.
+  before Byte, was removed too.) Rocket's kit is the user's design: four ammo, each a plain aimed rocket that
+  bursts on the first enemy it meets (`AttackShape.ROCKETS`, one to an attack; 1,800 after the user asked for a buff).
+  For one build (84) her rockets stuck in the ground and waited for a BOOM button; the user had that taken out. The
+  planted rockets are still in the code with nobody using them (`AttackShape.PLANT`, `World.planted`,
+  `Control.detonate`, flag 16 in the input log and on the wire; the button only shows for a fighter who plants), and
+  `SimulationTest` keeps them tested with a stand-in. Her super (`SuperKind.REALM`) is aimed like Buddy's: it takes
+  the first enemy on the line, boss or not, into a realm for `REALM_SECONDS` (12). In there the captive can do
+  nothing (`Fighter.captive`), nobody outside can touch either of them (`Fighter.realm`: damage only passes between
+  fighters in the same realm), she reloads and charges her super half as fast again, and a rocket of the realm's own
+  hits the captive every second without costing ammo. Those numbers are the user's, and so is this: the realm is
+  chainable. Its own rockets charge her super and the same enemy can be taken straight back in; a rule against
+  that was added in build 84 and the user had it removed. Don't put one back. Her name, look and words are ours and
+  must stay so.
+- Supers can miss, by the user's decision: one that needs somebody on the line it is aimed along (Buddy's leap,
+  Rocket's realm) is spent all the same with nobody there (Buddy leaps to the end of his reach and lands on
+  nothing). They used to keep their charge. Bosses can miss too: every move of a `BossScript` is aimed up to
+  `BOSS_MISS_TILES` off its target.
 - Boss Mode bosses are their own things (`BossKind`, `Balance.bosses`), not giant fighters: each fights through
   moves of its own in `sim/Boss.kt` (telegraphed ground hazards, sweeps, rings, charges) and has its own model.
   Keep their names, looks and moves original.
@@ -66,7 +73,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   He is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, and a front
   leg is flung forward for each paw print: `FighterAnim.throwL/R`). His attack sound is a bark of his own (`Sound.BARK`). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its
   target has left (`AttackSpec.healthShare`), never less than the attack's own damage, and a fixed amount on a giant.
-- Kito's numbers are the user's: 8,000 health and 2,800 damage an attack (the damage was 2,200 until the user had every fighter's raised; a health raise to 10,000 was taken back). His attack is four thrown hammers of 700 in a wide fan (`AttackSpec.hammers`, `ShotStyle.MALLET`): the user had them replace his blades, with a wider spread, half as much range again (8.4 tiles) and no quake: a thrown hammer only hits what it touches. His super
+- Kito's numbers are the user's: 8,000 health and 2,800 damage an attack (the damage was 2,200 until the user had every fighter's raised; a health raise to 10,000 was taken back). His attack is a swing of his sword (`AttackShape.SLASH`, `World.slash`): he is a ninja, and the user asked for a blade at close-to-middling range in place of thrown ones (and of the hammers build 84 gave him). One swing does the whole 2,800 to everyone inside its arc. Swings fill a bar (`AttackSpec.swings`, `Fighter.edge`, drawn inside the attack stick): when it is full the next swing reaches a quarter further (`EDGE_REACH`) and empties it. His super
   (`SuperKind.QUAKE`) hurls a giant hammer; where it comes down the ground quakes in every direction
   (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match. He leaps as he throws, and the
   hammer flies straight at the enemy, head first (the user asked for that instead of a tumbling arc). The aiming reticle stops at the
@@ -98,7 +105,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   1,000 a second to none, because it was finishing bosses too soon): don't give it any back. It wears off after `POISON_SECONDS` (a boss after
   `POISON_GIANT_SECONDS`): the user took away the poison that never ended and cut the super's range by a quarter.
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
-  With nobody on the line the super isn't spent. His face is a hologram: a flat lit screen over a projector ring, no head.
+  With nobody on the line he leaps anyway and the super is spent: a miss. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
 - Every fighter has a hyper (`Control.hyper`, the `HYPER_*` numbers in `Balance.kt`): a third button that charges from
   main-attack hits. There are no shields: the user removed them (the two seconds of spawn protection, `Fighter.shield`,

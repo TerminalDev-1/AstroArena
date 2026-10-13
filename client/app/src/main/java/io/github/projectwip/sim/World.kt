@@ -190,7 +190,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm)
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge)
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -224,7 +224,6 @@ class World(
         f.hitFlash = (f.hitFlash - dt).coerceAtLeast(0f)
         f.shield = (f.shield - dt).coerceAtLeast(0f)
         f.attackCooldown = (f.attackCooldown - dt).coerceAtLeast(0f)
-        f.realmRest = (f.realmRest - dt).coerceAtLeast(0f)
 
         // --- movement
         if (f.latched) stepLatch(f)
@@ -284,6 +283,7 @@ class World(
                     f.pending += PendingShot(i * a.burstInterval, dx, dy, if (a.projectiles == 1) 0f else (0.5f - i % 2) * f.radius)
                 }
                 AttackShape.PLANT -> plant(f, dx, dy)
+                AttackShape.SLASH -> slash(f, dx, dy)
                 else -> f.pending += PendingShot(0f, dx, dy)
             }
             events += GameEvent.Shot(f.id, false, f.x, f.y, dx, dy)
@@ -308,10 +308,8 @@ class World(
         }
 
         // --- super
-        // (Malformed code needs someone to compile it into, and a realm someone to take: with nobody on the line it is
-        // aimed along, the charge is kept.)
-        if (c.superAttack && f.superReady && !f.isDashing && !f.isLeaping && !idle &&
-            ((f.def.superSpec.kind != SuperKind.CORRUPT && f.def.superSpec.kind != SuperKind.REALM) || aimDirection(f).let { (ax, ay) -> corruptTarget(f, ax, ay) } != null)) {
+        // (Any super can miss: one that needs somebody on the line it is aimed along is spent all the same with nobody there.)
+        if (c.superAttack && f.superReady && !f.isDashing && !f.isLeaping && !idle) {
             val (dx, dy) = aimDirection(f)
             f.facing = atan2(dy, dx)
             fireSuper(f, dx, dy)
@@ -353,8 +351,8 @@ class World(
         val realm = f.def.superSpec.kind == SuperKind.REALM
         for (o in fighters) {
             if (o.team == f.team || !isVisibleTo(o, f.team) || o.realm != f.realm) continue
-            // (Nobody is taken out of the air, or into a realm twice running.)
-            if (realm && (o.realmRest > 0f || o.isLeaping)) continue
+            // (Nobody is taken out of the air.)
+            if (realm && o.isLeaping) continue
             val ox = o.x - f.x
             val oy = o.y - f.y
             val on = ox * dx + oy * dy
@@ -469,6 +467,42 @@ class World(
         planted += Planted(f.id, f.team, f.x, f.y, spot.x, spot.y, Balance.PLANT_FLIGHT_SECONDS / hyperShotSpeed(f), a.blast)
     }
 
+    /**
+     * A swing of a blade: every enemy within reach, inside the arc and not behind a wall, is hit at once (and so is any
+     * Spark Crate). Swings fill the blade's bar; with it full this one reaches further, and empties it.
+     */
+    private fun slash(f: Fighter, dx: Float, dy: Float) {
+        val a = f.def.attack
+        val charged = f.edgeFull
+        val reach = a.range * (if (charged) Balance.EDGE_REACH else 1f)
+        if (a.swings > 0) f.edge = if (charged) 0 else f.edge + 1
+        events += GameEvent.Slash(f.id, f.x, f.y, dx, dy, reach, a.spreadDegrees, charged)
+        if (phase != Phase.PLAYING) return
+        val edge = cos(Math.toRadians(a.spreadDegrees / 2.0)).toFloat()
+        val hit = f.attackDamage
+        for (o in fighters) {
+            if (o.team == f.team || !o.alive || o.realm != f.realm) continue
+            val ox = o.x - f.x
+            val oy = o.y - f.y
+            val d = hypot(ox, oy)
+            if (d > reach + o.radius) continue
+            // (Whoever is right up against the blade is caught whichever way it is swung.)
+            if (d > f.radius + o.radius && (ox * dx + oy * dy) / d < edge) continue
+            if (!arena.shotClear(f.x, f.y, o.x, o.y)) continue
+            damage(o, f, hit, false, o.x, o.y)
+        }
+        val r = reach + 1f
+        for (ty in kotlin.math.floor(f.y - r).toInt()..kotlin.math.floor(f.y + r).toInt()) {
+            for (tx in kotlin.math.floor(f.x - r).toInt()..kotlin.math.floor(f.x + r).toInt()) {
+                if (tx < 0 || ty < 0 || tx >= arena.width || ty >= arena.height || !crateHp.containsKey(ty * arena.width + tx)) continue
+                val ox = tx + 0.5f - f.x
+                val oy = ty + 0.5f - f.y
+                val d = hypot(ox, oy)
+                if (d <= reach + 0.5f && (d < 1f || (ox * dx + oy * dy) / d >= edge)) damageCrate(tx, ty, hit)
+            }
+        }
+    }
+
     /** [f] sets off every rocket of its own that has landed. */
     private fun setOff(f: Fighter) {
         var any = false
@@ -531,18 +565,15 @@ class World(
         if (f.realmTick > 0f) return
         f.realmTick += Balance.REALM_ROCKET_SECONDS
         events += GameEvent.Burst(t.x, t.y, t.radius + 0.5f)
-        // (A hit of the super's: it charges nothing. A knockout closes the realm by itself.)
-        damage(t, f, f.superDamage, true, t.x, t.y)
+        // (It charges her super like a rocket of her own, so one realm can follow another. A knockout closes the realm by itself.)
+        damage(t, f, f.superDamage, false, t.x, t.y)
     }
 
     /** The realm [id] opened is over: everyone in it is back in the arena, where they stood. */
     private fun closeRealm(id: Int) {
         for (o in fighters) {
             if (o.realm != id) continue
-            if (o.captive) {
-                o.realmRest = Balance.REALM_REST_SECONDS
-                events += GameEvent.Realm(id, o.id, false)
-            }
+            if (o.captive) events += GameEvent.Realm(id, o.id, false)
             o.realm = -1
             o.realmLeft = 0f
         }
@@ -616,13 +647,14 @@ class World(
         val a = f.def.attack
         val style = when (a.shape) {
             AttackShape.BURST -> ShotStyle.SPARK
-            AttackShape.SPREAD -> if (a.hammers) ShotStyle.MALLET else if (a.bits) ShotStyle.BIT else ShotStyle.PELLET
+            AttackShape.SPREAD -> if (a.bits) ShotStyle.BIT else ShotStyle.PELLET
             AttackShape.LANCE -> ShotStyle.PRISM
             AttackShape.ROCKETS -> ShotStyle.ROCKET
             AttackShape.SMASH -> ShotStyle.COMPUTER
             AttackShape.PAWS -> ShotStyle.PAW
             AttackShape.HEX -> ShotStyle.HEX
             AttackShape.PLANT -> ShotStyle.ROCKET
+            AttackShape.SLASH -> ShotStyle.PELLET
         }
         val baseAng = atan2(dy, dx)
         val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
@@ -680,16 +712,24 @@ class World(
                 f.pending.clear()
                 events += GameEvent.Dash(f.id)
             }
+            // (With nobody on the line it takes nobody: a miss.)
             SuperKind.REALM -> corruptTarget(f, dx, dy)?.let { t -> openRealm(f, t) }
-            // Up and over, whatever is in the way: the code goes in when the leaper lands (see [stepLeap]).
-            SuperKind.CORRUPT -> corruptTarget(f, dx, dy)?.let { t ->
-                f.facing = atan2(t.y - f.y, t.x - f.x)
+            // Up and over, whatever is in the way: the code goes in when the leaper lands (see [stepLeap]). With nobody
+            // on the line he leaps all the same, as far as the super reaches, and comes down on nothing: a miss.
+            SuperKind.CORRUPT -> if (!f.rooted) {
+                val t = corruptTarget(f, dx, dy)
                 f.leapTotal = Balance.LEAP_SECONDS
                 f.leapTime = Balance.LEAP_SECONDS
                 f.leapFromX = f.x; f.leapFromY = f.y
-                f.leapTarget = t.id
+                f.leapTarget = t?.id ?: -1
                 f.pending.clear()
-                aimLeap(f, t)
+                if (t != null) {
+                    f.facing = atan2(t.y - f.y, t.x - f.x)
+                    aimLeap(f, t)
+                } else {
+                    val spot = arena.nearestOpen(f.x + dx * s.range, f.y + dy * s.range, f.radius)
+                    f.leapToX = spot.x; f.leapToY = spot.y
+                }
                 events += GameEvent.Leap(f.id)
             }
         }

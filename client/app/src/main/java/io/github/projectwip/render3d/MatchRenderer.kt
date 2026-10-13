@@ -58,6 +58,8 @@ class MatchRenderer(
     private lateinit var rocketDownBody: Mesh
     private lateinit var rocketDownTrim: Mesh
     private lateinit var thinRing: Mesh
+    /** Swings of a blade still fading: x, z, yaw in degrees, reach, arc in degrees, when, charged (1 or 0), colour. */
+    private val slashes = ArrayList<FloatArray>()
     /** 0..1: how far the arena has gone over to the look of a realm (the player is in one). */
     private var realmFade = 0f
     private lateinit var disc: Mesh
@@ -700,6 +702,21 @@ class MatchRenderer(
             setModel(h.x, 0.054f, h.y, h.radius, 1f, h.radius); ring.draw()
         }
 
+        // A blade's swing: the arc it cut, bright for a moment and gone.
+        var si = 0
+        while (si < slashes.size) {
+            val s = slashes[si]
+            val u = (time - s[5]) / 0.22f
+            if (u >= 1f) { slashes.removeAt(si); continue }
+            val c = s[7].toRawBits()
+            val grow = 0.75f + 0.25f * min(1f, u * 4f)
+            lit.v4("uTint", r(c), g(c), b(c), 0.55f * (1f - u))
+            setModel(s[0], 0.06f, s[1], s[3] * grow, 1f, s[3] * grow, s[2]); sector(s[4]).draw()
+            lit.v4("uTint", 1f, 1f, 1f, (if (s[6] > 0f) 0.95f else 0.7f) * (1f - u))
+            setModel(s[0], 0.064f, s[1], s[3] * grow, 1f, s[3] * grow, s[2] + s[4] * (0.5f - u)); sector(12f).draw()
+            si++
+        }
+
         // Rockets in the ground: a ring shows what each will reach when it goes off. Gold for the player's side, red for the other.
         for (pl in world.planted) {
             if (!pl.landed) continue
@@ -850,6 +867,7 @@ class MatchRenderer(
                         tint(2); setModel(tx, 0.06f, tz, 0.2f, 1f, 0.2f); sector(360f).draw()
                         tint(1); setModel(px, 0.05f, pz, reach, 1f, 0.08f, yaw); rect.draw()
                     }
+                    else if (at.shape == AttackShape.SLASH) fan(at.range * (if (p.edgeFull) io.github.projectwip.data.Balance.EDGE_REACH else 1f), at.spreadDegrees)
                     else if (at.shape == AttackShape.SPREAD) fan(at.range, at.spreadDegrees + 8f)
                     else if (at.shape == AttackShape.ROCKETS) beam(clip(a, px, pz, dx, dz, at.range), io.github.projectwip.data.Balance.ROCKET_LANE * (at.projectiles - 1) + 0.4f)
                     else beam(clip(a, px, pz, dx, dz, at.range), if (at.shape == AttackShape.SMASH) 0.95f else if (at.shape == AttackShape.BURST || at.shape == AttackShape.PAWS) 0.55f else 0.34f)
@@ -1011,20 +1029,6 @@ class MatchRenderer(
                     setModel(x + hx, y, z + hz, 0.22f, 0.68f, 1.16f, yaw); bit.draw()
                     tint(skin.accent)
                     setModel(x - hx * 2.2f, y, z - hz * 2.2f, 0.13f, 0.22f, 0.22f, yaw); bit.draw()
-                }
-                ShotStyle.MALLET -> {
-                    // A throwing hammer, wheeling end over end as it flies: the shaft, and the head with its band.
-                    val k = pr.radius / 0.2f
-                    val spin = yaw + pr.age * 900f
-                    val rad = Math.toRadians(-spin.toDouble()).toFloat()
-                    val hx = cos(rad) * 0.3f * k
-                    val hz = sin(rad) * 0.3f * k
-                    tint(0xFF7A5A3A)
-                    setModel(x, 0.75f, z, 0.62f * k, 0.09f * k, 0.09f * k, spin); bit.draw()
-                    tint(0xFF8C95B4)
-                    setModel(x + hx, 0.75f, z + hz, 0.2f * k, 0.26f * k, 0.42f * k, spin); bit.draw()
-                    tint(skin.secondary)
-                    setModel(x + hx, 0.75f, z + hz, 0.08f * k, 0.29f * k, 0.45f * k, spin); bit.draw()
                 }
                 ShotStyle.PELLET -> {
                     tint(skin.secondary)
@@ -1327,6 +1331,18 @@ class MatchRenderer(
                     val sp = 1.5f + rng.nextFloat() * 3.5f
                     particles.spawn(e.x, 0.6f, e.y, cos(a) * sp, 1f + rng.nextFloat() * 3f, sin(a) * sp, 0.35f + rng.nextFloat() * 0.2f, 0.2f, 0xFFFF8A1F.toInt(), 0.9f)
                 }
+            }
+            is GameEvent.Slash -> world.fighter(e.fighterId)?.let { f ->
+                val c = (if (e.charged) f.def.skins[f.skin].secondary else f.def.skins[f.skin].accent).toInt()
+                val mid = atan2(e.dirY, e.dirX)
+                slashes += floatArrayOf(e.x, e.y, -Math.toDegrees(mid.toDouble()).toFloat(), e.range, e.degrees, time, if (e.charged) 1f else 0f, Float.fromBits(c))
+                // Sparks thrown off the tip all along the arc.
+                val half = Math.toRadians(e.degrees / 2.0).toFloat()
+                repeat(if (e.charged) 16 else 9) {
+                    val a = mid - half + 2f * half * rng.nextFloat()
+                    particles.spawn(e.x + cos(a) * e.range * 0.95f, 0.75f, e.y + sin(a) * e.range * 0.95f, cos(a) * 2.5f, 0.6f + rng.nextFloat(), sin(a) * 2.5f, 0.25f, if (e.charged) 0.18f else 0.12f, c, 0.95f)
+                }
+                if (e.charged && f === match.player) shake = max(shake, 0.07f)
             }
             is GameEvent.Armed -> repeat(5) {
                 val a = rng.nextFloat() * 6.28f

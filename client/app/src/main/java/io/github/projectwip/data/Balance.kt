@@ -21,9 +21,11 @@ enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
  * of the health its target has left ([AttackSpec.healthShare]). [HEX] is one bolt that poisons whoever it hits
  * ([AttackSpec.hexSeconds]). [PLANT] lobs one rocket at a spot (the aim is how far as well as which way), over any wall:
  * it sticks in the ground there and does nothing at all until its owner sets it off (`Control.detonate`), and then it
- * hits every enemy within [AttackSpec.blast].
+ * hits every enemy within [AttackSpec.blast]. (Nobody plants rockets any more: it was Rocket's attack for one build.)
+ * [SLASH] is a swing of a blade: no shot at all, it hits every enemy within [AttackSpec.range] inside an arc of
+ * [AttackSpec.spreadDegrees] at once. Swings fill a bar ([AttackSpec.swings]), and a full bar makes the next one reach further.
  */
-enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT }
+enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
 enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
@@ -74,8 +76,11 @@ data class AttackSpec(
     val lanes: Int = 1,
     /** The shots are square bits of light rather than pellets (and so are the super's). */
     val bits: Boolean = false,
-    /** The shots are thrown hammers (drawn as such; they hit like any other shot). */
-    val hammers: Boolean = false,
+    /**
+     * A blade ([AttackShape.SLASH]): this many swings fill its bar. With the bar full, the next swing reaches
+     * [Balance.EDGE_REACH] times as far and empties it, and it has to be filled again. 0 = no bar.
+     */
+    val swings: Int = 0,
     /**
      * Each shot takes this share of the health its target has left, and never less than the attack's own damage.
      * Against a giant it does [Balance.SHARE_GIANT_HITS] times the attack's damage instead. 0 = plain damage.
@@ -261,13 +266,20 @@ object Balance {
 
     /** A [SuperKind.REALM] lasts this long (or until either of the two in it is knocked out). */
     const val REALM_SECONDS = 12f
-    /** In the realm a rocket of its own hits the captive this often, for the super's damage. It costs no ammo and charges nothing. */
+    /** In the realm a rocket of its own hits the captive this often, for the super's damage. It costs no ammo, and charges the super like one of her own. */
     const val REALM_ROCKET_SECONDS = 1f
     /** Whoever opened the realm reloads this many times as fast in it, and charges their super this many times as fast. */
     const val REALM_RELOAD = 1.5f
     const val REALM_CHARGE = 1.5f
-    /** Whoever comes out of a realm can't be taken into another for this long. */
-    const val REALM_REST_SECONDS = 10f
+
+    /** A blade with a full bar ([AttackSpec.swings]) reaches this many times as far. */
+    const val EDGE_REACH = 1.25f
+
+    /**
+     * A boss can miss: every move is aimed at a spot up to this many tiles off where its target really is (usually
+     * much less: the error is two random numbers added together).
+     */
+    const val BOSS_MISS_TILES = 1.8f
 
     /** A shot that takes a share of health ([AttackSpec.healthShare]) does this many times its own damage to a giant instead. */
     const val SHARE_GIANT_HITS = 2
@@ -321,17 +333,17 @@ object Balance {
             name = "Rocket",
             title = "Star Sapper",
             role = "Demolitionist",
-            lore = "Ran away from a fireworks barge with the whole stock strapped to her back. Nothing she plants goes off until she says so, and she likes to make people wait.",
-            attackName = "Ground Rockets",
+            lore = "Ran away from a fireworks barge with the whole stock strapped to her back. She has been letting it off ever since, one rocket at a time, at whoever is nearest.",
+            attackName = "Skyrocket",
             health = StatLine(6600, 330),
-            // One rocket, to every enemy in its blast when she sets it off.
-            attackDamage = StatLine(1500, 75),
+            // One rocket, to every enemy in its blast where it goes off. (It was 1,500, and had to be planted and set
+            // off with a button of its own, until the user asked for a plain rocket and a buff.)
+            attackDamage = StatLine(1800, 90),
             // One of the realm's own rockets: one a second for as long as it lasts.
             superDamage = StatLine(1500, 75),
             moveSpeed = 3.6f,
-            // (The speed is only what a tap leads its target by; the flight always takes [PLANT_FLIGHT_SECONDS].)
-            attack = AttackSpec(AttackShape.PLANT, projectiles = 1, spreadDegrees = 0f, range = 7f, speed = 15f, radius = 0.2f, burstInterval = 0f, blast = 1.6f),
-            superSpec = SuperSpec(SuperKind.REALM, "Star Vault", "Aim it at an enemy (or tap, and it picks the nearest): she takes them away into a realm of her own for 12 seconds. In there they can do nothing, bosses included, and nobody outside can touch either of them. She reloads and charges her super half as fast again, and a rocket of the realm's own hits them every second without costing her any ammo.", range = 7f, speed = 30f, radius = 0f),
+            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 14f, radius = 0.2f, burstInterval = 0f, blast = 1.5f),
+            superSpec = SuperSpec(SuperKind.REALM, "Star Vault", "Aim it at an enemy (or tap, and it picks the nearest): she takes the first one on the line away into a realm of her own for 12 seconds. In there they can do nothing, bosses included, and nobody outside can touch either of them. She reloads and charges her super half as fast again, and a rocket of the realm's own hits them every second without costing her any ammo. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f),
             ammoMax = 4,
             reloadSeconds = 1.5f,
             superChargePerHit = 0.2f,
@@ -340,7 +352,7 @@ object Balance {
                 Skin("Midnight Fuse", 0xFF27324F, 0xFF3CFF9E, 0xFFEAFBFF, 20),
                 Skin("Solar Flare", 0xFFFF7A3D, 0xFF7B4DFF, 0xFFFFE066, 20),
             ),
-            hyper = HyperSpec("Afterburner", "Lasts 8 seconds. Her rockets reach their spot half as fast again.", seconds = 8f, shotSpeed = 1.5f),
+            hyper = HyperSpec("Afterburner", "Lasts 8 seconds. Her rockets fly half as fast again.", seconds = 8f, shotSpeed = 1.5f),
         ),
         FighterDef(
             id = FighterId.BRAKK,
@@ -401,22 +413,24 @@ object Balance {
             rarity = Rarity.MYTHIC,
             name = "Kito",
             title = "Arc Blade",
-            role = "Assassin",
-            lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. He juggles hammers now, and the big one is hard to miss.",
-            attackName = "Hammer Fan",
+            role = "Ninja",
+            lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming, and the hammer is hard to miss.",
+            attackName = "Arc Slash",
             health = StatLine(8000, 400),
-            // Four hammers thrown in a wide fan: 2,800 when they all land. (They were blades in a narrower fan of 24
-            // degrees, reaching 5.6 tiles, until the user asked for hammers, a wider spread and half as much range again.
-            // A thrown hammer only hits what it touches: the quake is the super's.)
-            attackDamage = StatLine(700, 35),
+            // One swing of his sword: 2,800 to everyone it catches. (It was four thrown blades of 700, then for one
+            // build four hammers, until the user asked for a sword: he is a ninja.)
+            attackDamage = StatLine(2800, 140),
             superDamage = StatLine(3000, 150),
             moveSpeed = 4.05f,
-            attack = AttackSpec(AttackShape.SPREAD, projectiles = 4, spreadDegrees = 40f, range = 8.4f, speed = 19f, radius = 0.2f, burstInterval = 0f, hammers = true),
+            // A swing reaches 3.2 tiles across an arc of 100 degrees. Three swings fill his bar, and the swing after
+            // that reaches a quarter further. (The speed is only what bots and taps lead a target by: a swing lands at once.)
+            attack = AttackSpec(AttackShape.SLASH, projectiles = 1, spreadDegrees = 100f, range = 3.2f, speed = 40f, radius = 0f, burstInterval = 0f, swings = 3),
             // The radius is how far the quake reaches from where the hammer comes down.
             superSpec = SuperSpec(SuperKind.QUAKE, "Faultline", "Hurls a giant hammer. Where it comes down the ground quakes in every direction, hitting everyone nearby, and stays cracked.", range = 6.5f, speed = 13f, radius = 2.6f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
-            superChargePerHit = 0.064f,
+            // (One hit a swing now, where four blades each charged 0.064.)
+            superChargePerHit = 0.25f,
             radius = 0.4f,
             skins = listOf(
                 Skin("Nightfall", 0xFF1F7A8C, 0xFFFF3D7F, 0xFF9BFFF0, 0),
@@ -441,7 +455,7 @@ object Balance {
             superDamage = StatLine(0, 0),
             moveSpeed = 3.75f,
             attack = AttackSpec(AttackShape.SMASH, projectiles = 3, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.36f, burstInterval = 0.13f),
-            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Aim it at an enemy (or tap, and it picks the nearest): he leaps high along the line, latches onto the back of the first one on it and compiles malformed code into them for 6 seconds. It does no damage, but they cannot heal, and afterwards they are corrupted: for 21 seconds they follow him around and stand in front of him, out of their mind. Bosses too.", range = 6.75f, speed = 30f, radius = 0f),
+            superSpec = SuperSpec(SuperKind.CORRUPT, "Malformed Build", "Aim it at an enemy (or tap, and it picks the nearest; aimed at nobody, he leaps and misses): he leaps high along the line, latches onto the back of the first one on it and compiles malformed code into them for 6 seconds. It does no damage, but they cannot heal, and afterwards they are corrupted: for 21 seconds they follow him around and stand in front of him, out of their mind. Bosses too.", range = 6.75f, speed = 30f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
             // (More computers in every attack, each charging less: the super comes as often as it did with two.)

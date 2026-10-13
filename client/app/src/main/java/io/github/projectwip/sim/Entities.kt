@@ -130,11 +130,13 @@ class Fighter(
     var realm = -1
     var realmLeft = 0f
     var realmTick = 0f
-    /** Seconds until this fighter can be taken into a realm again. */
-    var realmRest = 0f
     val inRealm get() = realm >= 0
     /** Taken into somebody else's realm: it can do nothing until it is over. */
     val captive get() = realm >= 0 && realm != id
+
+    /** The bar of a blade (`AttackSpec.swings`): how many swings have gone into it. Full, the next swing reaches further and empties it. */
+    var edge = 0
+    val edgeFull get() = def.attack.swings > 0 && edge >= def.attack.swings
 
     var lastAttackerId = -1
     var spawnIndex = 0
@@ -162,8 +164,7 @@ class Fighter(
 /** One hex on a fighter: who did it, what each bite does, the time to the next bite, and how long it has left. */
 class Hex(val by: Int, val damage: Int, var tick: Float, var left: Float)
 
-/** [MALLET] is one of the small hammers of a main attack; [HAMMER] is the giant one that makes the ground quake. */
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, MALLET }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX }
 
 class Projectile(
     val ownerId: Int,
@@ -236,6 +237,8 @@ sealed interface GameEvent {
     data class Enthralled(val fighterId: Int, val targetId: Int) : GameEvent
     /** A thrown hammer came down: the ground quakes out to [radius] and stays cracked there. */
     data class Quake(val x: Float, val y: Float, val radius: Float) : GameEvent
+    /** A blade was swung from ([x], [y]) along ([dirX], [dirY]): it reached [range] tiles across [degrees]. [charged]: with its bar full. */
+    data class Slash(val fighterId: Int, val x: Float, val y: Float, val dirX: Float, val dirY: Float, val range: Float, val degrees: Float, val charged: Boolean) : GameEvent
     /** A planted rocket stuck in the ground, ready to be set off. */
     data class Armed(val fighterId: Int, val x: Float, val y: Float) : GameEvent
     /** [fighterId] took [targetId] into a realm ([open]), or the realm they were in is over. */

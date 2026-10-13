@@ -635,10 +635,6 @@ class SimulationTest {
         val (w, buddy, others) = buddyAndTargets(2)
         val (near, far) = others
         buddy.superCharge = 1f
-        // Aimed away from everyone, nothing happens and the charge is kept.
-        buddy.control.aimX = -1f; buddy.control.aimY = 0f; buddy.control.superAttack = true
-        w.step(Match.STEP)
-        assertTrue(!buddy.isLeaping && buddy.superCharge == 1f)
         // Aimed along the line they stand on, he goes for the first one on it.
         buddy.control.aimX = 1f; buddy.control.aimY = 0f; buddy.control.superAttack = true
         w.step(Match.STEP)
@@ -765,38 +761,75 @@ class SimulationTest {
 
     private fun seconds(w: World, s: Float, each: () -> Unit = {}) = repeat((s / Match.STEP).toInt()) { w.step(Match.STEP); each() }
 
-    @Test fun kitoThrowsAWideFanOfHammersThatDoNotQuake() {
+    @Test fun kitoSwingsASwordThatReachesFurtherOnceItsBarIsFull() {
         val kito = Fighter(7, Balance.fighter(FighterId.KITO), 1, 0, 0, "K", false)
         val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
         val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
         val w = onOpenGround(kito, near, far)
         val a = kito.def.attack
-        assertEquals("half as far again as the 5.6 tiles his blades reached", 8.4f, a.range, 0.001f)
-        assertTrue("in a wider fan than their 24 degrees", a.spreadDegrees > 24f && a.hammers)
-        assertEquals("the damage is what the user set: four of 700", 4 to 700, a.projectiles to kito.def.attackDamage.base)
-        kito.control.aimX = 1f; kito.control.aimY = 0f; kito.control.attack = true
-        w.step(Match.STEP)
-        assertEquals("four hammers leave at once", List(4) { io.github.projectwip.sim.ShotStyle.MALLET }, w.projectiles.map { it.style })
-        val dirs = w.projectiles.map { kotlin.math.atan2(it.vy, it.vx) }
-        assertEquals(Math.toRadians(a.spreadDegrees.toDouble()).toFloat(), dirs.max() - dirs.min(), 0.001f)
-        var quakes = 0
-        var hits = 0
-        seconds(w, 1f) {
-            quakes += w.events.count { it is io.github.projectwip.sim.GameEvent.Quake }
-            hits += w.events.count { it is io.github.projectwip.sim.GameEvent.Hit }
+        assertEquals(io.github.projectwip.data.AttackShape.SLASH, a.shape)
+        assertEquals("the damage is what the user set", 2800, kito.attackDamage)
+        // One stands just past a plain swing's reach, inside a charged one's; the other is well out of both.
+        near.x = kito.x + a.range + near.radius + 0.3f
+        assertTrue(a.range * Balance.EDGE_REACH + near.radius > near.x - kito.x)
+        fun swing(dx: Float = 1f): List<io.github.projectwip.sim.GameEvent> {
+            kito.ammo = 3f
+            kito.control.aimX = dx; kito.control.aimY = 0f; kito.control.attack = true
+            w.step(Match.STEP)
+            val seen = w.events.toList()
             w.events.clear()
+            seconds(w, 0.4f)
+            w.events.clear()
+            return seen
         }
-        assertEquals("a thrown hammer makes no earthquake", 0, quakes)
-        assertTrue("it only hurts whoever it touches", hits in 1..4 && near.hp == near.maxHp - hits * kito.attackDamage && far.hp == far.maxHp)
+        repeat(a.swings) {
+            assertFalse("the bar is not full yet", kito.edgeFull)
+            val e = swing().filterIsInstance<io.github.projectwip.sim.GameEvent.Slash>().single()
+            assertTrue(!e.charged && e.range == a.range)
+        }
+        assertEquals("out of a plain swing's reach, they are untouched", near.maxHp, near.hp)
+        assertTrue("no shot leaves him: it is a blade", w.projectiles.isEmpty())
+        assertTrue("three swings fill the bar", kito.edgeFull)
+        val charged = swing().filterIsInstance<io.github.projectwip.sim.GameEvent.Slash>().single()
+        assertTrue("and the next reaches a quarter further", charged.charged && charged.range == a.range * 1.25f)
+        assertEquals("far enough to hit them", near.maxHp - kito.attackDamage, near.hp)
+        assertEquals("but not everyone", far.maxHp, far.hp)
+        assertTrue("which empties the bar: it has to be swung full again", kito.edge == 0 && !kito.edgeFull)
+        // A swing the wrong way is a miss.
+        near.x = kito.x + 1.5f
+        val before = near.hp
+        swing(-1f)
+        assertEquals(before, near.hp)
+        swing()
+        assertEquals(before - kito.attackDamage, near.hp)
     }
 
-    @Test fun rocketPlantsRocketsThatDoNothingUntilSheSetsThemOff() {
+    @Test fun rocketFiresARocketThatBurstsOnWhatItHits() {
         val rocket = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "R", false)
         val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
         val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
         val w = onOpenGround(rocket, near, far)
         assertEquals("Rocket", rocket.def.name)
         assertEquals("four ammo", 4, rocket.def.ammoMax)
+        rocket.control.aimX = 1f; rocket.control.aimY = 0f; rocket.control.attack = true
+        w.step(Match.STEP)
+        assertEquals("one rocket leaves her, with nothing to set off", 1 to 0, w.projectiles.size to w.planted.size)
+        seconds(w, 1f)
+        assertEquals("it goes off on the first enemy it meets", near.maxHp - rocket.attackDamage, near.hp)
+        assertEquals(1800, rocket.attackDamage)
+        assertEquals("and only reaches those in its blast", far.maxHp, far.hp)
+        assertTrue(rocket.ammo < 4f)
+    }
+
+    @Test fun plantedRocketsDoNothingUntilTheyAreSetOff() {
+        // (Nobody plants rockets any more: a stand-in keeps them tested.)
+        val sapper = Balance.fighter(FighterId.BYTE).copy(
+            attackDamage = io.github.projectwip.data.StatLine(1500, 75), ammoMax = 4,
+            attack = io.github.projectwip.data.AttackSpec(io.github.projectwip.data.AttackShape.PLANT, projectiles = 1, spreadDegrees = 0f, range = 7f, speed = 15f, radius = 0.2f, burstInterval = 0f, blast = 1.6f))
+        val rocket = Fighter(7, sapper, 1, 0, 0, "R", false)
+        val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
+        val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
+        val w = onOpenGround(rocket, near, far)
         // One rocket at each of them: the aim is the spot, in tiles.
         for (t in listOf(near, far)) {
             rocket.control.aimX = t.x - rocket.x; rocket.control.aimY = 0f; rocket.control.attack = true
@@ -815,13 +848,12 @@ class SimulationTest {
         near.control.detonate = true
         w.step(Match.STEP)
         assertEquals(2, w.planted.size)
-        // Hers sets them all off at once.
+        // Its owner's sets them all off at once.
         rocket.control.detonate = true
         w.step(Match.STEP)
         assertTrue(w.planted.isEmpty())
         assertEquals(near.maxHp - rocket.attackDamage, near.hp)
         assertEquals(far.maxHp - rocket.attackDamage, far.hp)
-        assertEquals("each one that hits charges her super", rocket.def.superChargePerHit * 2, rocket.superCharge, 0.001f)
         // No more than a handful in the ground: one too many sets the oldest off by itself.
         repeat(Balance.PLANT_MAX + 1) {
             rocket.ammo = 4f
@@ -829,24 +861,25 @@ class SimulationTest {
             seconds(w, 0.6f)
         }
         assertEquals(Balance.PLANT_MAX, w.planted.size)
-        // And they go with her when she is knocked out.
+        // And they go with their owner.
         rocket.hp = 1
         near.control.aimX = -1f; near.control.aimY = 0f; near.control.attack = true
         seconds(w, 1f)
         assertTrue(!rocket.alive && w.planted.isEmpty())
     }
 
-    @Test fun rocketsRealmHoldsOneEnemyWhileItsOwnRocketsHitThem() {
+    @Test fun rocketsRealmHoldsOneEnemyWhileItsOwnRocketsHitThemAndCanFollowItself() {
         val tough = Balance.fighter(FighterId.BRAKK).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
         val rocket = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "R", false)
         val near = Fighter(1, tough, 1, 0, 1, "N", true)
         val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
         val w = onOpenGround(rocket, near, far)
+        // Aimed away from everyone, it misses: nobody is taken, and the charge is gone.
         rocket.superCharge = 1f
-        // Aimed away from everyone, nothing happens and the charge is kept.
         rocket.control.aimX = -1f; rocket.control.aimY = 0f; rocket.control.superAttack = true
         w.step(Match.STEP)
-        assertTrue(!rocket.inRealm && rocket.superCharge == 1f)
+        assertTrue(!rocket.inRealm && !near.inRealm && rocket.superCharge == 0f)
+        rocket.superCharge = 1f
         rocket.control.aimX = 1f; rocket.control.aimY = 0f; rocket.control.superAttack = true
         w.step(Match.STEP)
         assertTrue("the first enemy on the line is taken, and nobody else", near.captive && rocket.realm == rocket.id && !far.inRealm)
@@ -856,40 +889,28 @@ class SimulationTest {
         rocket.ammo = 0f
         w.events.clear()
         var auto = 0
+        fun count() {
+            auto += w.events.count { it is io.github.projectwip.sim.GameEvent.Hit && it.targetId == near.id && it.sourceId == rocket.id && it.damage == rocket.superDamage }
+            w.events.clear()
+        }
         seconds(w, 1.05f) {
             near.control.moveX = 1f; near.control.aimX = -1f; near.control.aimY = 0f; near.control.attack = true
             far.control.aimX = -1f; far.control.aimY = 0f; far.control.attack = true
-            auto += w.events.count { it is io.github.projectwip.sim.GameEvent.Hit && it.targetId == near.id && it.isSuper && it.damage == rocket.superDamage }
-            w.events.clear()
+            count()
         }
         assertTrue("held where it stood", near.x == nx && near.y == ny && w.projectiles.none { it.ownerId == near.id })
         near.control.moveX = 0f
         assertEquals("nothing from outside reaches her", rocket.maxHp, rocket.hp)
         assertEquals("one rocket a second, by itself", 1, auto)
         assertEquals("which costs her no ammo: she has reloaded one in a second, not in a second and a half", 1.05f, rocket.ammo, 0.05f)
-        assertEquals("and charges nothing", 0f, rocket.superCharge, 0f)
-        // Her own rockets charge her super half as fast again in there.
-        rocket.control.aimX = near.x - rocket.x; rocket.control.aimY = 0f; rocket.control.attack = true
-        seconds(w, 0.6f)
-        rocket.control.detonate = true
-        w.step(Match.STEP)
-        assertEquals(rocket.def.superChargePerHit * Balance.REALM_CHARGE, rocket.superCharge, 0.001f)
+        assertEquals("and charges her super half as fast again", rocket.def.superChargePerHit * Balance.REALM_CHARGE, rocket.superCharge, 0.001f)
         // Twelve seconds of it, twelve rockets, and then both are back.
-        auto += w.events.count { it is io.github.projectwip.sim.GameEvent.Hit && it.targetId == near.id && it.isSuper }
-        w.events.clear()
-        seconds(w, Balance.REALM_SECONDS) {
-            auto += w.events.count { it is io.github.projectwip.sim.GameEvent.Hit && it.targetId == near.id && it.isSuper }
-            w.events.clear()
-        }
+        seconds(w, Balance.REALM_SECONDS) { count() }
         assertEquals(Balance.REALM_SECONDS.toInt(), auto)
         assertTrue("it is over", !near.inRealm && !rocket.inRealm)
-        // Nobody is taken twice running.
+        // It can follow itself: the realm's rockets charged the next one, and the same enemy can be taken straight back.
+        assertEquals(1f, rocket.superCharge, 0f)
         far.y += 3f
-        rocket.superCharge = 1f
-        rocket.control.aimX = 1f; rocket.control.aimY = 0f; rocket.control.superAttack = true
-        w.step(Match.STEP)
-        assertTrue(!near.inRealm && rocket.superCharge == 1f)
-        seconds(w, Balance.REALM_REST_SECONDS + 0.2f)
         rocket.control.aimX = 1f; rocket.control.aimY = 0f; rocket.control.superAttack = true
         w.step(Match.STEP)
         assertTrue(near.captive)
@@ -933,17 +954,18 @@ class SimulationTest {
         assertTrue("a bot playing Rocket plants rockets and sets them off", m.player.damageDealt > 0)
     }
 
-    @Test fun buddyKeepsHisSuperWhenThereIsNobodyToPoison() {
+    @Test fun buddyMissesWhenThereIsNobodyOnTheLine() {
         val (w, buddy, others) = buddyAndTargets(1)
         buddy.superCharge = 1f
-        // Out of reach: move the target right away.
-        others[0].x = (buddy.x + 30f).coerceAtMost(w.arena.width - 2f); others[0].y = (buddy.y + 30f).coerceAtMost(w.arena.height - 2f)
-        if (kotlin.math.hypot(others[0].x - buddy.x, others[0].y - buddy.y) > buddy.def.superSpec.range) {
-            buddy.control.superAttack = true
-            w.step(Match.STEP)
-            assertEquals("the charge is kept", 1f, buddy.superCharge, 0f)
-            assertFalse(others[0].poisoned)
-        }
+        val (x0, y0) = buddy.x to buddy.y
+        // Aimed away from the only enemy: he leaps all the same, comes down on nothing, and the charge is gone.
+        buddy.control.aimX = 0f; buddy.control.aimY = 1f; buddy.control.superAttack = true
+        w.step(Match.STEP)
+        assertTrue("he leaves the ground", buddy.isLeaping)
+        assertEquals("the super is spent", 0f, buddy.superCharge, 0f)
+        repeat(((Balance.LEAP_SECONDS + 0.2f) / Match.STEP).toInt()) { w.step(Match.STEP) }
+        assertTrue("and lands somewhere else, on nobody", !buddy.isLeaping && !buddy.latched && (buddy.x != x0 || buddy.y != y0))
+        assertFalse(others[0].poisoned)
     }
 
     @Test fun aBossShrugsThePoisonOffAfterAWhile() {

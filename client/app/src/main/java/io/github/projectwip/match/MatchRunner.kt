@@ -91,6 +91,7 @@ class MatchRunner(
         val p = match.player
         controls.superReady = p.superReady && p.alive
         controls.hyperReady = p.hyperReady && p.alive
+        controls.edge = if (p.def.attack.swings > 0) p.edge.toFloat() / p.def.attack.swings else -1f
         controls.rocketsDown = if (p.def.attack.shape == AttackShape.PLANT) match.world.planted.count { it.ownerId == p.id && it.landed } else -1
         controls.poll(input)
         if (input.pause) onPause()
@@ -316,7 +317,8 @@ class MatchRunner(
                     AttackShape.PAWS -> Sound.BARK
                     AttackShape.HEX -> Sound.HEX
                     AttackShape.PLANT -> Sound.WHOOSH
-                }, gain, 0.95f + (e.x % 0.1f))
+                    AttackShape.SLASH -> Sound.WHOOSH
+                }, gain, (if (f.def.attack.shape == AttackShape.SLASH) 1.5f else 0.95f) + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }
             is GameEvent.Hit -> {

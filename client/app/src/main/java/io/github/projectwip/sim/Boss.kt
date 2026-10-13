@@ -40,19 +40,27 @@ internal class BossScript(private val w: World, private val me: Fighter) {
     /** Where the target was last seen: a boss fires at that when its target is hidden. */
     private var seenX = w.arena.width / 2f
     private var seenY = w.arena.height / 2f
+    /** How far off its target this move is aimed. */
+    private var missX = 0f
+    private var missY = 0f
 
     val enraged get() = me.hp < me.maxHp / 2
 
     fun step(dt: Float) {
         clock += dt
         val target = w.fighters.filter { it.team != me.team && it.alive }.minByOrNull { hypot(it.x - me.x, it.y - me.y) }
-        if (target != null && w.isVisibleTo(target, me.team)) { seenX = target.x; seenY = target.y }
+        if (target != null && w.isVisibleTo(target, me.team)) { seenX = target.x + missX; seenY = target.y + missY }
         var i = 0
         while (i < queue.size) {
             if (queue[i].at <= clock) queue.removeAt(i).run() else i++
         }
         if (me.isDashing || clock < nextMove) return
         if (target == null) { nextMove = clock + 0.5f; return }
+        // A boss can miss: each move is aimed a little off, now and then a long way off.
+        val off = (w.rng.nextFloat() + w.rng.nextFloat() - 1f) * io.github.projectwip.data.Balance.BOSS_MISS_TILES
+        val round = w.rng.nextFloat() * 6.283f
+        seenX += cos(round) * off - missX; seenY += sin(round) * off - missY
+        missX = cos(round) * off; missY = sin(round) * off
         val pace = when (me.def.boss) {
             BossKind.BARRAGE -> barrage(target)
             BossKind.SWEEPER -> sweeper()

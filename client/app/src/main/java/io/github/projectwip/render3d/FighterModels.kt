@@ -254,7 +254,7 @@ class FighterModels {
         return a.build(rig)
     }
 
-    // ------------------------------------------------------------------ Kito — a stage magician who throws hammers
+    // ------------------------------------------------------------------ Kito — a ninja with a sword, and a hammer for his super
 
     private fun buildKito(): FighterModel {
         val a = Assembler()
@@ -277,11 +277,10 @@ class FighterModels {
         for (z in listOf(0.2f, -0.2f)) {
             a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.12f, 0.5f, z) { rotate(if (z > 0f) 20f else -20f, 1f, 0f, 0f); cylinder(0.055f, 0.3f, 6, topRadius = 0f) } }
         }
-        // A throwing hammer: a dark shaft and a heavy head, banded, with a lit face.
-        a.add(Bone.WEAPON, Slot.DARK) { at(0.3f, 0f, 0f) { alongX { cylinder(0.04f, 0.62f, 8) } } }
-        a.add(Bone.WEAPON, Slot.METAL) { at(0.62f, 0f, 0f) { roundedBox(0.2f, 0.36f, 0.22f, 0.05f) } }
-        a.add(Bone.WEAPON, Slot.SECONDARY) { at(0.62f, 0f, 0f) { roundedBox(0.08f, 0.38f, 0.24f, 0.03f) } }
-        a.add(Bone.WEAPON, Slot.ACCENT, emissive = true) { at(0.62f, 0.2f, 0f) { roundedBox(0.14f, 0.03f, 0.16f, 0.012f) } }
+        // His sword: hilt, guard and a long glowing edge.
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.06f, 0f, 0f) { alongX { cylinder(0.05f, 0.2f, 8) } } }
+        a.add(Bone.WEAPON, Slot.SECONDARY) { at(0.18f, 0f, 0f) { roundedBox(0.06f, 0.2f, 0.12f, 0.02f) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, emissive = true) { at(0.68f, 0f, 0f) { roundedBox(0.94f, 0.12f, 0.035f, 0.015f) } }
         a.add(Bone.WEAPON, Slot.DARK) { at(0.02f, 0f, 0f) { sphere(0.09f, 8, 10) } }
         a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.11f, 0f) { capsule(0.08f, 0.14f) } }
         a.add(Bone.ARM, Slot.DARK) { at(0f, -0.28f, 0f) { sphere(0.085f, 8, 10) } }
