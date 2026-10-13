@@ -48,6 +48,8 @@ class FighterAnim {
     var throwR = 0f
     /** 0..1: the weapon arm swung up and over, for an overhead throw. */
     var swing = 0f
+    /** 0..1 through a swing of a blade: the weapon sweeps flat across the front, from one side to the other. Below 0: none. */
+    var slash = -1f
 }
 
 enum class Pass { SHADOW, COLOR, OUTLINE, SILHOUETTE }
@@ -474,7 +476,9 @@ class FighterModels {
                 Bone.WEAPON -> {
                     System.arraycopy(body, 0, bone, 0, 16)
                     Matrix.translateM(bone, 0, rig.shoulder[0] - anim.recoil * 0.16f, rig.shoulder[1] + sin(anim.walk) * 0.025f * mv, rig.shoulder[2])
-                    Matrix.rotateM(bone, 0, anim.recoil * 14f + sin(anim.swing * 3.1416f) * 110f, 0f, 0f, 1f)
+                    // (A blade is swept across flat, a little raised, and comes to rest pointing forward again.)
+                    if (anim.slash >= 0f) Matrix.rotateM(bone, 0, (0.5f - anim.slash) * 190f * (1f - anim.slash * anim.slash * anim.slash), 0f, 1f, 0f)
+                    Matrix.rotateM(bone, 0, anim.recoil * 14f + sin(anim.swing * 3.1416f) * 110f + (if (anim.slash >= 0f) sin(anim.slash * 3.1416f) * 12f else 0f), 0f, 0f, 1f)
                 }
                 Bone.ARM -> {
                     System.arraycopy(body, 0, bone, 0, 16)

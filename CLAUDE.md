@@ -76,11 +76,11 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Kito is a ninja, and his kit is the user's design. His numbers are the user's: 8,000 health and 2,800 damage an
   attack. The attack is a swing of his sword (`AttackShape.SLASH`, `World.slash`): one swing does the whole 2,800 to
   everyone inside its arc, at close-to-middling range. He has a bar apart from his ammo (`AttackSpec.edgeSeconds`,
-  `Fighter.edge`, drawn inside the attack stick) that fills by itself in six seconds, whether he attacks or not: full,
+  `Fighter.edge`; drawn over his head between the health bar and the ammo, as the user asked, and inside the attack stick) that fills by itself in six seconds, whether he attacks or not: full,
   the next swing reaches a quarter further (`EDGE_REACH`) and empties it. The user modelled the bar on a familiar
   dashing brawler's; the name, look and numbers are ours. (For one build it filled by swings: that was a misreading.)
   His super (`SuperKind.BLINK`) is aimed along a line: he vanishes and is beside the first enemy on it at once,
-  through walls, with his ammo and his bar full, and does no damage of its own. He doesn't latch on. With nobody on
+  through walls, cuts them for the super's damage as he arrives (the user asked for that hit), and has his ammo and his bar full. He doesn't latch on. A swing is animated: the blade sweeps flat across his front (`FighterAnim.slash`). With nobody on
   the line he goes to the end of its reach for nothing. It replaced a thrown hammer that made the ground quake
   (`SuperKind.QUAKE`, `GameEvent.Quake`, the cracked ground in the renderer), which is still in the code with nobody
   using it and kept tested with a stand-in; before the sword he threw four blades, and for one build hammers.

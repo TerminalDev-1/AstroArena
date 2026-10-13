@@ -830,10 +830,11 @@ class SimulationTest {
         assertTrue("he is right beside them at once", kotlin.math.hypot(kito.x - far.x, kito.y - far.y) < kito.radius + far.radius + 0.6f)
         assertFalse("not on their back: he stands on his own feet, and they are free", kito.latched || far.poisoned)
         assertTrue("with his ammo and his bar full", kito.ammo == 3f && kito.edgeFull)
-        assertEquals("the super itself does no damage", far.maxHp, far.hp)
+        assertEquals("he cuts them as he arrives", far.maxHp - kito.superDamage, far.hp)
+        assertEquals(2000, kito.superDamage)
         kito.control.aimX = far.x - kito.x; kito.control.aimY = far.y - kito.y; kito.control.attack = true
         w.step(Match.STEP)
-        assertEquals("his sword does", far.maxHp - kito.attackDamage, far.hp)
+        assertEquals("and his sword follows", far.maxHp - kito.superDamage - kito.attackDamage, far.hp)
         // Aimed at nobody it is a miss: he goes as far as it reaches, and gets nothing for it.
         kito.x = x0; kito.y = y0
         kito.superCharge = 1f; kito.ammo = 0f; kito.edge = 0f

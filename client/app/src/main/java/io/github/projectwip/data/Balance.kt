@@ -59,7 +59,7 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
  */
 /**
  * [BLINK] is aimed along a line like [CORRUPT]: the fighter is at once beside the first enemy on it, through anything
- * in between, with its ammo and its blade's bar full. With nobody on the line it goes to the end of its reach, for nothing.
+ * in between, hits them for the super's damage as it arrives, and has its ammo and its blade's bar full. With nobody on the line it goes to the end of its reach, for nothing.
  */
 enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE, BREW, REALM, BLINK }
 
@@ -425,8 +425,8 @@ object Balance {
             // One swing of his sword: 2,800 to everyone it catches. (It was four thrown blades of 700, then for one
             // build four hammers, until the user asked for a sword: he is a ninja.)
             attackDamage = StatLine(2800, 140),
-            // (His super does no damage of its own: it puts him where his sword can.)
-            superDamage = StatLine(0, 0),
+            // What he does to whoever he arrives beside, on arrival. (The user asked for a hit there: for one build it did none.)
+            superDamage = StatLine(2000, 100),
             moveSpeed = 4.05f,
             // A swing reaches 3.2 tiles across an arc of 100 degrees. His bar fills by itself in six seconds, apart from
             // his ammo, and the swing after that reaches a quarter further. (The speed is only what bots and taps lead
@@ -434,7 +434,7 @@ object Balance {
             attack = AttackSpec(AttackShape.SLASH, projectiles = 1, spreadDegrees = 100f, range = 3.2f, speed = 40f, radius = 0f, burstInterval = 0f, edgeSeconds = 6f),
             // (It was a thrown hammer that made the ground quake, until the user asked for this: a ninja has to be able
             // to get close.)
-            superSpec = SuperSpec(SuperKind.BLINK, "Vanishing Act", "Aim it at an enemy (or tap, and it picks the nearest): he vanishes and is beside the first one on the line at once, through any wall, with his ammo and his bar full. Aimed at nobody, he goes as far as it reaches for nothing.", range = 7.5f, speed = 40f, radius = 0f),
+            superSpec = SuperSpec(SuperKind.BLINK, "Vanishing Act", "Aim it at an enemy (or tap, and it picks the nearest): he vanishes and is beside the first one on the line at once, through any wall, cutting them as he arrives, with his ammo and his bar full. Aimed at nobody, he goes as far as it reaches for nothing.", range = 7.5f, speed = 40f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
             // (One hit a swing now, where four blades each charged 0.064.)

@@ -25,6 +25,8 @@ class HudSnapshot {
     var respawnTimer = 0f
     var ammo = 0f
     var ammoMax = 3
+    /** The player's blade bar, 0..1 (full, the next swing reaches further). -1: their fighter has none. */
+    var edge = -1f
     var superCharge = 0f
     var hyperCharge = 0f
     /** The share (0..1) of the player's running hyper still to go; 0 when none is running. */
@@ -74,7 +76,7 @@ class HudSnapshot {
         System.arraycopy(o.viewProj, 0, viewProj, 0, 16)
         phase = o.phase; phaseTime = o.phaseTime; countdownSeconds = o.countdownSeconds; timeLeft = o.timeLeft
         myScore = o.myScore; theirScore = o.theirScore; koTarget = o.koTarget; winningTeam = o.winningTeam; playerTeam = o.playerTeam
-        playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; ammo = o.ammo; ammoMax = o.ammoMax; superCharge = o.superCharge
+        playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; ammo = o.ammo; ammoMax = o.ammoMax; edge = o.edge; superCharge = o.superCharge
         hyperCharge = o.hyperCharge; hyperLeft = o.hyperLeft; duelNotice = o.duelNotice
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
         bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName

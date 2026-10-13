@@ -141,8 +141,20 @@ class HudView(
             text.textSize = bh * 0.95f
             outlined(c, s.hp[i].toString(), x, rect.bottom - bh * 0.15f, Color.WHITE, dp(2.5f))
             if (s.relation[i] == 0) {
+                var below = rect.bottom + dp(5f)
+                if (s.edge >= 0f) {
+                    // The blade's bar, between the health and the ammo: it fills by itself, and glows when it is full.
+                    val full = s.edge >= 1f
+                    fill.color = INK
+                    c.drawRoundRect(rect.left - dp(1.5f), below - dp(1.5f), rect.right + dp(1.5f), below + dp(7.5f), dp(3f), dp(3f), fill)
+                    fill.color = if (full) Color.rgb(150, 255, 240) else Color.rgb(60, 190, 255)
+                    if (full) fill.alpha = (200 + 55 * sin(time * 9f)).toInt()
+                    c.drawRoundRect(rect.left, below, rect.left + bw * s.edge.coerceIn(0f, 1f), below + dp(6f), dp(2f), dp(2f), fill)
+                    fill.alpha = 255
+                    below += dp(11f)
+                }
                 val segW = (bw - dp(4f)) / s.ammoMax
-                val ay = rect.bottom + dp(5f)
+                val ay = below
                 for (k in 0 until s.ammoMax) {
                     val l = rect.left + k * (segW + dp(2f))
                     fill.color = INK

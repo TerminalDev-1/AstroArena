@@ -733,6 +733,8 @@ class World(
                     if (f.def.attack.edgeSeconds > 0f) f.edge = 1f
                 }
                 events += GameEvent.Blink(f.id, fromX, fromY, f.x, f.y)
+                // (He cuts them as he arrives.)
+                if (t != null) damage(t, f, f.superDamage, true, t.x, t.y)
             }
             // (With nobody on the line it takes nobody: a miss.)
             SuperKind.REALM -> corruptTarget(f, dx, dy)?.let { t -> openRealm(f, t) }

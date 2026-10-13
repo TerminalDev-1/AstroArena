@@ -430,7 +430,15 @@ class MatchRenderer(
         anim.flash = (f.hitFlash / 0.12f).coerceIn(0f, 1f) * 0.8f
         anim.time = time + i * 0.7f
         anim.jump = if (f.isDashing) 0.12f else 0f
-        anim.spin = 0f; anim.swing = 0f; anim.throwL = 0f; anim.throwR = 0f
+        anim.spin = 0f; anim.swing = 0f; anim.throwL = 0f; anim.throwR = 0f; anim.slash = -1f
+        // A sword swing: the blade sweeps across, and he turns into it and steps up off the ground a little.
+        if (f.def.attack.shape == AttackShape.SLASH && f.sinceAttack < SLASH_SECONDS) {
+            val u = f.sinceAttack / SLASH_SECONDS
+            anim.slash = u
+            anim.recoil = 0f
+            anim.spin = (0.5f - u) * 50f * (1f - u)
+            anim.jump = sin(u * 3.1416f) * 0.1f
+        }
         // Paw prints: one front leg is flung forward for each, left then right.
         if (f.def.attack.shape == AttackShape.PAWS) {
             val gap = f.def.attack.burstInterval
@@ -1493,6 +1501,7 @@ class MatchRenderer(
         s.koTarget = w.rules.koTarget
         s.winningTeam = w.winningTeam; s.playerTeam = p.team
         s.playerAlive = p.alive; s.respawnTimer = p.respawnTimer; s.ammo = p.ammo; s.ammoMax = p.def.ammoMax; s.superCharge = p.superCharge
+        s.edge = if (p.def.attack.edgeSeconds > 0f) p.edge else -1f
         s.hyperCharge = p.hyperCharge; s.hyperLeft = p.hyperTime / p.hyperSeconds
         s.autoTargetId = runner.autoTarget?.id ?: -1
         s.matchesPlayed = matchesPlayed
@@ -1548,5 +1557,7 @@ class MatchRenderer(
         val INK = Toon.INK
         /** How long a hammer thrower is off the ground. */
         const val HAMMER_LEAP = 0.5f
+        /** How long a sword swing takes to draw. */
+        const val SLASH_SECONDS = 0.26f
     }
 }
