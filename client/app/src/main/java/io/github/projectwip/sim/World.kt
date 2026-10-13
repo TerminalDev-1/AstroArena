@@ -190,7 +190,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge)
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits())
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -224,6 +224,8 @@ class World(
         f.hitFlash = (f.hitFlash - dt).coerceAtLeast(0f)
         f.shield = (f.shield - dt).coerceAtLeast(0f)
         f.attackCooldown = (f.attackCooldown - dt).coerceAtLeast(0f)
+        // (A blade's bar fills by itself, whatever its owner is doing.)
+        if (f.def.attack.edgeSeconds > 0f && f.edge < 1f) f.edge = (f.edge + dt / f.def.attack.edgeSeconds).coerceAtMost(1f)
 
         // --- movement
         if (f.latched) stepLatch(f)
@@ -469,13 +471,13 @@ class World(
 
     /**
      * A swing of a blade: every enemy within reach, inside the arc and not behind a wall, is hit at once (and so is any
-     * Spark Crate). Swings fill the blade's bar; with it full this one reaches further, and empties it.
+     * Spark Crate). With the blade's bar full this one reaches further, and empties it.
      */
     private fun slash(f: Fighter, dx: Float, dy: Float) {
         val a = f.def.attack
         val charged = f.edgeFull
         val reach = a.range * (if (charged) Balance.EDGE_REACH else 1f)
-        if (a.swings > 0) f.edge = if (charged) 0 else f.edge + 1
+        if (charged) f.edge = 0f
         events += GameEvent.Slash(f.id, f.x, f.y, dx, dy, reach, a.spreadDegrees, charged)
         if (phase != Phase.PLAYING) return
         val edge = cos(Math.toRadians(a.spreadDegrees / 2.0)).toFloat()
@@ -711,6 +713,26 @@ class World(
                 f.dashHits.clear()
                 f.pending.clear()
                 events += GameEvent.Dash(f.id)
+            }
+            // Gone, and there: beside the first enemy on the line (behind them, facing them), with everything ready. With
+            // nobody on the line it is the end of the super's reach, and nothing is ready that wasn't.
+            SuperKind.BLINK -> if (!f.rooted) {
+                val t = corruptTarget(f, dx, dy)
+                val fromX = f.x
+                val fromY = f.y
+                val spot = if (t != null) {
+                    val reach = t.radius + f.radius + 0.1f
+                    arena.nearestOpen(t.x - cos(t.facing) * reach, t.y - sin(t.facing) * reach, f.radius)
+                } else arena.nearestOpen(f.x + dx * s.range, f.y + dy * s.range, f.radius)
+                f.x = spot.x; f.y = spot.y
+                f.prevX = f.x; f.prevY = f.y
+                f.pending.clear()
+                if (t != null) {
+                    f.facing = atan2(t.y - f.y, t.x - f.x)
+                    f.ammo = f.def.ammoMax.toFloat()
+                    if (f.def.attack.edgeSeconds > 0f) f.edge = 1f
+                }
+                events += GameEvent.Blink(f.id, fromX, fromY, f.x, f.y)
             }
             // (With nobody on the line it takes nobody: a miss.)
             SuperKind.REALM -> corruptTarget(f, dx, dy)?.let { t -> openRealm(f, t) }

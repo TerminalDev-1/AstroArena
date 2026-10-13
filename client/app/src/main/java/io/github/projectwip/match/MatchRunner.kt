@@ -91,7 +91,7 @@ class MatchRunner(
         val p = match.player
         controls.superReady = p.superReady && p.alive
         controls.hyperReady = p.hyperReady && p.alive
-        controls.edge = if (p.def.attack.swings > 0) p.edge.toFloat() / p.def.attack.swings else -1f
+        controls.edge = if (p.def.attack.edgeSeconds > 0f) p.edge else -1f
         controls.rocketsDown = if (p.def.attack.shape == AttackShape.PLANT) match.world.planted.count { it.ownerId == p.id && it.landed } else -1
         controls.poll(input)
         if (input.pause) onPause()
@@ -393,6 +393,11 @@ class MatchRunner(
             is GameEvent.Burst -> {
                 val p = match.player
                 sfx.play(Sound.ROCKET_BOOM, 0.5f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f), 1.15f + (e.x % 0.2f))
+            }
+            is GameEvent.Blink -> {
+                val p = match.player
+                sfx.play(Sound.WHOOSH, (if (e.fighterId == pid) 1f else 0.6f) / (1f + hypot(e.x - p.x, e.y - p.y) * 0.15f), 1.7f)
+                if (e.fighterId == pid) sfx.buzz(40, 200)
             }
             // A planted rocket clicks as it arms.
             is GameEvent.Armed -> {

@@ -23,7 +23,7 @@ enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
  * it sticks in the ground there and does nothing at all until its owner sets it off (`Control.detonate`), and then it
  * hits every enemy within [AttackSpec.blast]. (Nobody plants rockets any more: it was Rocket's attack for one build.)
  * [SLASH] is a swing of a blade: no shot at all, it hits every enemy within [AttackSpec.range] inside an arc of
- * [AttackSpec.spreadDegrees] at once. Swings fill a bar ([AttackSpec.swings]), and a full bar makes the next one reach further.
+ * [AttackSpec.spreadDegrees] at once. A bar fills by itself ([AttackSpec.edgeSeconds]), and a full bar makes the next swing reach further.
  */
 enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH }
 
@@ -57,7 +57,11 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
  * for [Balance.REALM_SECONDS]. In there the enemy can do nothing, nobody outside can touch either of them, and the
  * fighter reloads and charges faster while a rocket of the realm's own hits the enemy every second.
  */
-enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE, BREW, REALM }
+/**
+ * [BLINK] is aimed along a line like [CORRUPT]: the fighter is at once beside the first enemy on it, through anything
+ * in between, with its ammo and its blade's bar full. With nobody on the line it goes to the end of its reach, for nothing.
+ */
+enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE, BREW, REALM, BLINK }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
 data class AttackSpec(
@@ -77,10 +81,11 @@ data class AttackSpec(
     /** The shots are square bits of light rather than pellets (and so are the super's). */
     val bits: Boolean = false,
     /**
-     * A blade ([AttackShape.SLASH]): this many swings fill its bar. With the bar full, the next swing reaches
-     * [Balance.EDGE_REACH] times as far and empties it, and it has to be filled again. 0 = no bar.
+     * A blade ([AttackShape.SLASH]) has a bar apart from its ammo, which fills by itself in this many seconds whether
+     * or not the fighter attacks. With the bar full, the next swing reaches [Balance.EDGE_REACH] times as far and
+     * empties it, and it fills again. 0 = no bar.
      */
-    val swings: Int = 0,
+    val edgeSeconds: Float = 0f,
     /**
      * Each shot takes this share of the health its target has left, and never less than the attack's own damage.
      * Against a giant it does [Balance.SHARE_GIANT_HITS] times the attack's damage instead. 0 = plain damage.
@@ -272,7 +277,7 @@ object Balance {
     const val REALM_RELOAD = 1.5f
     const val REALM_CHARGE = 1.5f
 
-    /** A blade with a full bar ([AttackSpec.swings]) reaches this many times as far. */
+    /** A blade with a full bar ([AttackSpec.edgeSeconds]) reaches this many times as far. */
     const val EDGE_REACH = 1.25f
 
     /**
@@ -414,19 +419,22 @@ object Balance {
             name = "Kito",
             title = "Arc Blade",
             role = "Ninja",
-            lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming, and the hammer is hard to miss.",
+            lore = "Was a stage magician until the trick with the vanishing sword worked a little too well. Now nobody sees the sword coming, or him.",
             attackName = "Arc Slash",
             health = StatLine(8000, 400),
             // One swing of his sword: 2,800 to everyone it catches. (It was four thrown blades of 700, then for one
             // build four hammers, until the user asked for a sword: he is a ninja.)
             attackDamage = StatLine(2800, 140),
-            superDamage = StatLine(3000, 150),
+            // (His super does no damage of its own: it puts him where his sword can.)
+            superDamage = StatLine(0, 0),
             moveSpeed = 4.05f,
-            // A swing reaches 3.2 tiles across an arc of 100 degrees. Three swings fill his bar, and the swing after
-            // that reaches a quarter further. (The speed is only what bots and taps lead a target by: a swing lands at once.)
-            attack = AttackSpec(AttackShape.SLASH, projectiles = 1, spreadDegrees = 100f, range = 3.2f, speed = 40f, radius = 0f, burstInterval = 0f, swings = 3),
-            // The radius is how far the quake reaches from where the hammer comes down.
-            superSpec = SuperSpec(SuperKind.QUAKE, "Faultline", "Hurls a giant hammer. Where it comes down the ground quakes in every direction, hitting everyone nearby, and stays cracked.", range = 6.5f, speed = 13f, radius = 2.6f),
+            // A swing reaches 3.2 tiles across an arc of 100 degrees. His bar fills by itself in six seconds, apart from
+            // his ammo, and the swing after that reaches a quarter further. (The speed is only what bots and taps lead
+            // a target by: a swing lands at once.)
+            attack = AttackSpec(AttackShape.SLASH, projectiles = 1, spreadDegrees = 100f, range = 3.2f, speed = 40f, radius = 0f, burstInterval = 0f, edgeSeconds = 6f),
+            // (It was a thrown hammer that made the ground quake, until the user asked for this: a ninja has to be able
+            // to get close.)
+            superSpec = SuperSpec(SuperKind.BLINK, "Vanishing Act", "Aim it at an enemy (or tap, and it picks the nearest): he vanishes and is beside the first one on the line at once, through any wall, with his ammo and his bar full. Aimed at nobody, he goes as far as it reaches for nothing.", range = 7.5f, speed = 40f, radius = 0f),
             ammoMax = 3,
             reloadSeconds = 1.35f,
             // (One hit a swing now, where four blades each charged 0.064.)
@@ -529,8 +537,10 @@ object Balance {
 
     /** The sentry: a long-range gun on an island of coolant. Slow to reload, so its shots can be dodged. */
     val sentry: FighterDef = fighter(FighterId.BYTE).let {
-        it.copy(name = "Sentry", title = "Turret", health = StatLine(8000, 0), attackDamage = StatLine(1500, 0),
-            superDamage = StatLine(1920, 0), reloadSeconds = 2.4f, superChargePerHit = 0f, hyper = null,
+        // (One shot of 1,000 every five seconds. It had three shots of 1,500 and a 2.4 second reload until the user
+        // found it too much.)
+        it.copy(name = "Sentry", title = "Turret", health = StatLine(8000, 0), attackDamage = StatLine(1000, 0),
+            superDamage = StatLine(1920, 0), ammoMax = 1, reloadSeconds = 5f, superChargePerHit = 0f, hyper = null,
             attack = AttackSpec(AttackShape.LANCE, projectiles = 1, spreadDegrees = 0f, range = 10f, speed = 22f, radius = 0.18f, burstInterval = 0f))
     }
 

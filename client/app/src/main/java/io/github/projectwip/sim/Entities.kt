@@ -134,9 +134,9 @@ class Fighter(
     /** Taken into somebody else's realm: it can do nothing until it is over. */
     val captive get() = realm >= 0 && realm != id
 
-    /** The bar of a blade (`AttackSpec.swings`): how many swings have gone into it. Full, the next swing reaches further and empties it. */
-    var edge = 0
-    val edgeFull get() = def.attack.swings > 0 && edge >= def.attack.swings
+    /** The bar of a blade (`AttackSpec.edgeSeconds`), 0..1: it fills by itself. Full, the next swing reaches further and empties it. */
+    var edge = 0f
+    val edgeFull get() = def.attack.edgeSeconds > 0f && edge >= 1f
 
     var lastAttackerId = -1
     var spawnIndex = 0
@@ -239,6 +239,8 @@ sealed interface GameEvent {
     data class Quake(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A blade was swung from ([x], [y]) along ([dirX], [dirY]): it reached [range] tiles across [degrees]. [charged]: with its bar full. */
     data class Slash(val fighterId: Int, val x: Float, val y: Float, val dirX: Float, val dirY: Float, val range: Float, val degrees: Float, val charged: Boolean) : GameEvent
+    /** A fighter vanished from ([fromX], [fromY]) and is at ([x], [y]). */
+    data class Blink(val fighterId: Int, val fromX: Float, val fromY: Float, val x: Float, val y: Float) : GameEvent
     /** A planted rocket stuck in the ground, ready to be set off. */
     data class Armed(val fighterId: Int, val x: Float, val y: Float) : GameEvent
     /** [fighterId] took [targetId] into a realm ([open]), or the realm they were in is over. */

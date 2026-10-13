@@ -73,11 +73,18 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   He is an actual dog, by the user's decision (four legs: `Bone.FORE_L/R`; his head is on the weapon bone, and a front
   leg is flung forward for each paw print: `FighterAnim.throwL/R`). His attack sound is a bark of his own (`Sound.BARK`). He throws paw prints a long way (`AttackShape.PAWS`): each takes a share of the health its
   target has left (`AttackSpec.healthShare`), never less than the attack's own damage, and a fixed amount on a giant.
-- Kito's numbers are the user's: 8,000 health and 2,800 damage an attack (the damage was 2,200 until the user had every fighter's raised; a health raise to 10,000 was taken back). His attack is a swing of his sword (`AttackShape.SLASH`, `World.slash`): he is a ninja, and the user asked for a blade at close-to-middling range in place of thrown ones (and of the hammers build 84 gave him). One swing does the whole 2,800 to everyone inside its arc. Swings fill a bar (`AttackSpec.swings`, `Fighter.edge`, drawn inside the attack stick): when it is full the next swing reaches a quarter further (`EDGE_REACH`) and empties it. His super
-  (`SuperKind.QUAKE`) hurls a giant hammer; where it comes down the ground quakes in every direction
-  (`GameEvent.Quake`) and the renderer leaves it cracked for the rest of the match. He leaps as he throws, and the
-  hammer flies straight at the enemy, head first (the user asked for that instead of a tumbling arc). The aiming reticle stops at the
-  first enemy in the way, because that is where it comes down.
+- Kito is a ninja, and his kit is the user's design. His numbers are the user's: 8,000 health and 2,800 damage an
+  attack. The attack is a swing of his sword (`AttackShape.SLASH`, `World.slash`): one swing does the whole 2,800 to
+  everyone inside its arc, at close-to-middling range. He has a bar apart from his ammo (`AttackSpec.edgeSeconds`,
+  `Fighter.edge`, drawn inside the attack stick) that fills by itself in six seconds, whether he attacks or not: full,
+  the next swing reaches a quarter further (`EDGE_REACH`) and empties it. The user modelled the bar on a familiar
+  dashing brawler's; the name, look and numbers are ours. (For one build it filled by swings: that was a misreading.)
+  His super (`SuperKind.BLINK`) is aimed along a line: he vanishes and is beside the first enemy on it at once,
+  through walls, with his ammo and his bar full, and does no damage of its own. He doesn't latch on. With nobody on
+  the line he goes to the end of its reach for nothing. It replaced a thrown hammer that made the ground quake
+  (`SuperKind.QUAKE`, `GameEvent.Quake`, the cracked ground in the renderer), which is still in the code with nobody
+  using it and kept tested with a stand-in; before the sword he threw four blades, and for one build hammers.
+- The Training Area's sentry fires one shot of 1,000 every five seconds: the user found three of 1,500 too much.
 - Every voice sounds different (`VoiceStyle`: accent, pitch, pace); Buddy, the only fighter with a
   voice now, has the machine one.
   Don't give two speakers the same one. Arena Boxes have no voice: the user had an announcer added and then removed.

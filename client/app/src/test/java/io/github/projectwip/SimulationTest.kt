@@ -727,7 +727,10 @@ class SimulationTest {
         val (w, _, others) = buddyAndTargets(2)
         val (hit, beside) = others
         val x = hit.x; val y = hit.y
-        val kito = Fighter(7, Balance.fighter(FighterId.KITO), 1, 0, 0, "K", false)
+        // (Nobody throws the hammer any more: a stand-in keeps it tested.)
+        val thrower = Balance.fighter(FighterId.KITO).copy(superDamage = io.github.projectwip.data.StatLine(3000, 150),
+            superSpec = io.github.projectwip.data.SuperSpec(io.github.projectwip.data.SuperKind.QUAKE, "Faultline", "", range = 6.5f, speed = 13f, radius = 2.6f))
+        val kito = Fighter(7, thrower, 1, 0, 0, "K", false)
         val w2 = World(w.arena, listOf(kito, hit, beside), io.github.projectwip.sim.MatchRules.lastSpark())
         repeat((3.1f / Match.STEP).toInt()) { w2.step(Match.STEP) }
         kito.x = x - 3f; kito.y = y; hit.x = x; hit.y = y
@@ -761,7 +764,7 @@ class SimulationTest {
 
     private fun seconds(w: World, s: Float, each: () -> Unit = {}) = repeat((s / Match.STEP).toInt()) { w.step(Match.STEP); each() }
 
-    @Test fun kitoSwingsASwordThatReachesFurtherOnceItsBarIsFull() {
+    @Test fun kitoSwingsASwordThatReachesFurtherOnceItsBarHasFilled() {
         val kito = Fighter(7, Balance.fighter(FighterId.KITO), 1, 0, 0, "K", false)
         val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
         val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
@@ -769,39 +772,75 @@ class SimulationTest {
         val a = kito.def.attack
         assertEquals(io.github.projectwip.data.AttackShape.SLASH, a.shape)
         assertEquals("the damage is what the user set", 2800, kito.attackDamage)
+        assertEquals("and so is the six seconds his bar takes", 6f, a.edgeSeconds, 0f)
         // One stands just past a plain swing's reach, inside a charged one's; the other is well out of both.
         near.x = kito.x + a.range + near.radius + 0.3f
         assertTrue(a.range * Balance.EDGE_REACH + near.radius > near.x - kito.x)
-        fun swing(dx: Float = 1f): List<io.github.projectwip.sim.GameEvent> {
+        fun swing(dx: Float = 1f): io.github.projectwip.sim.GameEvent.Slash {
             kito.ammo = 3f
             kito.control.aimX = dx; kito.control.aimY = 0f; kito.control.attack = true
             w.step(Match.STEP)
-            val seen = w.events.toList()
-            w.events.clear()
-            seconds(w, 0.4f)
+            val seen = w.events.filterIsInstance<io.github.projectwip.sim.GameEvent.Slash>().single()
             w.events.clear()
             return seen
         }
-        repeat(a.swings) {
-            assertFalse("the bar is not full yet", kito.edgeFull)
-            val e = swing().filterIsInstance<io.github.projectwip.sim.GameEvent.Slash>().single()
-            assertTrue(!e.charged && e.range == a.range)
-        }
+        kito.edge = 0f
+        val plain = swing()
+        assertTrue(!plain.charged && plain.range == a.range)
         assertEquals("out of a plain swing's reach, they are untouched", near.maxHp, near.hp)
         assertTrue("no shot leaves him: it is a blade", w.projectiles.isEmpty())
-        assertTrue("three swings fill the bar", kito.edgeFull)
-        val charged = swing().filterIsInstance<io.github.projectwip.sim.GameEvent.Slash>().single()
-        assertTrue("and the next reaches a quarter further", charged.charged && charged.range == a.range * 1.25f)
+        // The bar fills by itself, whether or not he swings, and apart from his ammo.
+        seconds(w, 3f)
+        assertEquals(0.5f, kito.edge, 0.03f)
+        assertFalse(swing().charged)
+        assertTrue("a swing that isn't charged leaves the bar alone", kito.edge > 0.5f)
+        kito.ammo = 0f
+        seconds(w, 3.1f)
+        assertTrue("six seconds fill it", kito.edgeFull)
+        seconds(w, 2f)
+        assertEquals("and it waits, full, for the next swing", 1f, kito.edge, 0f)
+        val charged = swing()
+        assertTrue("which reaches a quarter further", charged.charged && charged.range == a.range * 1.25f)
         assertEquals("far enough to hit them", near.maxHp - kito.attackDamage, near.hp)
         assertEquals("but not everyone", far.maxHp, far.hp)
-        assertTrue("which empties the bar: it has to be swung full again", kito.edge == 0 && !kito.edgeFull)
+        assertTrue("and empties the bar: it has to fill again", kito.edge < 0.05f && !kito.edgeFull)
         // A swing the wrong way is a miss.
+        seconds(w, 0.4f)
         near.x = kito.x + 1.5f
         val before = near.hp
         swing(-1f)
         assertEquals(before, near.hp)
+        seconds(w, 0.4f)
         swing()
         assertEquals(before - kito.attackDamage, near.hp)
+    }
+
+    @Test fun kitoVanishesAndIsBesideTheFirstEnemyOnTheLine() {
+        val kito = Fighter(7, Balance.fighter(FighterId.KITO), 1, 0, 0, "K", false)
+        val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
+        val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
+        val w = onOpenGround(kito, near, far)
+        val (x0, y0) = kito.x to kito.y
+        // Only the far one is left on the line: six tiles off, well out of his sword's reach.
+        near.alive = false; near.eliminated = true
+        kito.superCharge = 1f; kito.ammo = 0f; kito.edge = 0f
+        kito.control.aimX = 1f; kito.control.aimY = 0f; kito.control.superAttack = true
+        w.step(Match.STEP)
+        assertEquals(0f, kito.superCharge, 0f)
+        assertTrue("he is right beside them at once", kotlin.math.hypot(kito.x - far.x, kito.y - far.y) < kito.radius + far.radius + 0.6f)
+        assertFalse("not on their back: he stands on his own feet, and they are free", kito.latched || far.poisoned)
+        assertTrue("with his ammo and his bar full", kito.ammo == 3f && kito.edgeFull)
+        assertEquals("the super itself does no damage", far.maxHp, far.hp)
+        kito.control.aimX = far.x - kito.x; kito.control.aimY = far.y - kito.y; kito.control.attack = true
+        w.step(Match.STEP)
+        assertEquals("his sword does", far.maxHp - kito.attackDamage, far.hp)
+        // Aimed at nobody it is a miss: he goes as far as it reaches, and gets nothing for it.
+        kito.x = x0; kito.y = y0
+        kito.superCharge = 1f; kito.ammo = 0f; kito.edge = 0f
+        kito.control.aimX = -1f; kito.control.aimY = 0f; kito.control.superAttack = true
+        w.step(Match.STEP)
+        assertTrue("he has gone somewhere", kito.superCharge == 0f && (kito.x != x0 || kito.y != y0))
+        assertTrue("for nothing", kito.ammo < 1f && !kito.edgeFull)
     }
 
     @Test fun rocketFiresARocketThatBurstsOnWhatItHits() {

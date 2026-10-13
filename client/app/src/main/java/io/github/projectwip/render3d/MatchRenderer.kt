@@ -814,7 +814,7 @@ class MatchRenderer(
                             tint(2); setModel(tx, 0.056f, tz, s.radius, 1f, s.radius); ring.draw()
                         }
                         // The line he will leap along (over walls), and a mark on whoever he will come down on.
-                        SuperKind.CORRUPT, SuperKind.REALM -> {
+                        SuperKind.CORRUPT, SuperKind.REALM, SuperKind.BLINK -> {
                             val t = world.corruptTarget(p, dx, dz)
                             val reach = if (t != null) (t.x - px) * dx + (t.y - pz) * dz else s.range
                             beam(reach.coerceAtLeast(0.3f), p.radius * 2f)
@@ -1343,6 +1343,24 @@ class MatchRenderer(
                     particles.spawn(e.x + cos(a) * e.range * 0.95f, 0.75f, e.y + sin(a) * e.range * 0.95f, cos(a) * 2.5f, 0.6f + rng.nextFloat(), sin(a) * 2.5f, 0.25f, if (e.charged) 0.18f else 0.12f, c, 0.95f)
                 }
                 if (e.charged && f === match.player) shake = max(shake, 0.07f)
+            }
+            // Gone in a puff where he stood, a streak of light along the way, and a flash where he is now.
+            is GameEvent.Blink -> world.fighter(e.fighterId)?.let { f ->
+                val c = f.def.skins[f.skin].accent.toInt()
+                repeat(14) {
+                    val a = rng.nextFloat() * 6.28f
+                    particles.spawn(e.fromX + cos(a) * 0.3f, 0.3f + rng.nextFloat(), e.fromY + sin(a) * 0.3f, cos(a), 0.8f + rng.nextFloat(), sin(a), 0.6f, 0.4f, 0xFF3C3250.toInt(), 0.55f, growth = 0.8f, add = false)
+                }
+                val steps = (hypot(e.x - e.fromX, e.y - e.fromY) * 3f).toInt().coerceIn(1, 40)
+                for (i in 0..steps) {
+                    val u = i / steps.toFloat()
+                    particles.spawn(lerp(e.fromX, e.x, u), 0.8f, lerp(e.fromY, e.y, u), 0f, 0.3f, 0f, 0.25f + 0.2f * u, 0.22f, c, 0.9f)
+                }
+                particles.spawn(e.x, 0.8f, e.y, 0f, 0f, 0f, 0.25f, 3f, c, 0.85f)
+                repeat(18) {
+                    val a = it * 0.349f
+                    particles.spawn(e.x, 0.3f, e.y, cos(a) * 4f, 0.5f, sin(a) * 4f, 0.3f, 0.18f, c, 0.95f)
+                }
             }
             is GameEvent.Armed -> repeat(5) {
                 val a = rng.nextFloat() * 6.28f
