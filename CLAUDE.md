@@ -41,11 +41,13 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   decision (build 89) and Spark took hers, each time keeping the id, so whoever had Rocket has Spark at the same level
   (nothing was paid back for her, by the user's decision). Don't bring Byte or Juno back, or Rocket unless the user asks. Spark is the user's
   idea and part of the lore: the Spark Drop that would not go away, a puffy five-pointed star (the drops' shape,
-  `render3d/StarMesh.kt`). Since build 92 he looks like an innocent Spark Drop, by the user's decision (build 91's fat
-  red villain with fangs looked creepy): chromatic blue and glossy (`Part.gloss`, the lit shader's `uGloss`: small hard
-  highlights and a cyan-to-violet sheen at the edges), with a soft face (two tall shiny eyes and a small smile), round
-  feet and white mitts. The star still leans back 65 degrees with its face turned up to the camera (stood upright it
-  was a thin sliver from above), with a lit seam (`FighterModels.buildSpark`). Whenever he is on screen in the menus
+  `render3d/StarMesh.kt`). Since build 92 he is chromatic blue and glossy, by the user's decision (build 91's fat
+  red villain with fangs looked creepy; `Part.gloss`, the lit shader's `uGloss`: small hard highlights and a
+  cyan-to-violet sheen at the edges), with round feet and white mitts. Since build 93 he stands upright (leaning back
+  only 10 degrees), as the user asked: the 65-degree lean of builds 91 and 92 had him staring at the sky and looking
+  like a baby. He reads from above by the star's bulk instead (a fat `puff`, front and back). His face is confident and
+  cheeky, not babyish and not villainous: narrow angled eyes with small glints under two low brows, one cocked higher,
+  and a lopsided smirk. The star has a lit seam (`FighterModels.buildSpark`). Whenever he is on screen in the menus
   (the lobby showing him, or the loading screen's spotlight) the screen takes on his blue and glitches
   (`ui/SparkGlitch.kt`; red until build 92), but only as a hint, by the user's decision (build 89's took the UI over):
   it is drawn over the 3D lobby (or the loading backdrop) and under the menus, a faint blue light with deeper blue
@@ -58,9 +60,11 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   `Fighter.slowLeft`). A straight shot with `slowSeconds` (`ShotStyle.STAR`) still slows whoever it hits, with nobody using it. His super, Shadow Realm, is
   Rocket's realm (`SuperKind.REALM`) with four shadows of his (`SuperSpec.shadows`): they stand round the captive
   and take turns to strike, each once a second, in place of the realm's own rocket (drawn as dark copies of him in
-  `MatchRenderer.forEachRealmShadow`). The shadows' strikes charge his super by only `REALM_SHADOW_CHARGE` (2.5%) of
-  a hit, as the user asked (at full rate four strikes a second gave the super back in under a second): a whole realm
-  of them is about a third of a super. The realm stays chainable. His name, look and words are ours.
+  `MatchRenderer.forEachRealmShadow`). His realm lasts `SPARK_REALM_SECONDS` (6 seconds, `SuperSpec.realmSeconds`;
+  Rocket's kept realm is still `REALM_SECONDS`, 12), as the user asked: 12 felt endless. The shadows' strikes charge
+  his super by only `REALM_SHADOW_CHARGE` (2.5%) of a hit, as the user asked (at full rate four strikes a second gave
+  the super back in under a second): a whole six-second realm of them is about a sixth of a super. The realm stays
+  chainable. His name, look and words are ours.
 - Rocket's code is kept for reuse, by the user's decision: her plain aimed rockets (`AttackShape.ROCKETS`), her realm
   (`SuperKind.REALM`, `REALM_SECONDS`, `Fighter.captive`, `Fighter.realm`, the realm's own rocket each second) and
   her model (`buildRocket`, unregistered), with nobody using them; `SimulationTest` keeps them tested with a stand-in
@@ -135,6 +139,10 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   main-attack hits. There are no shields: the user removed them (the two seconds of spawn protection, `Fighter.shield`,
   are a different thing). Healing only starts after `REGEN_DELAY_SECONDS` without attacking or being hit.
 - The menus are steel blue, not purple, by the user's decision (`Palette`; panels are slabs with a visible side).
+  They must not look flat (the user's complaint before build 93): every plate (`plate()` in `ui/Components.kt`) has a
+  curved gloss, soft light from the top left, a bevel, a crisp line of rim light (`Palette.Rim`, `ButtonStyle.rim`) and
+  light coming back up off its bottom edge; buttons glow faintly in their rim colour and have an inset second frame,
+  and glass plates a hatched corner. The Shop icon is a shopping bag, the Fighters icon two busts (`ui/Icons.kt`).
 - The home screen has no Cup Track tile (removed in build 92, as the user asked): the Cups panel in the top bar opens
   the Cup Track and carries its badge.
 - All balance numbers live in `data/Balance.kt` and `data/Catalog.kt`; progression is pure functions in `Progression`.
