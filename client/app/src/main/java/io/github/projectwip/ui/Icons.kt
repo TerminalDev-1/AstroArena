@@ -19,7 +19,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE, CREDIT, HEART }
+enum class IconKind { SPARK, CUP, BOLT, PRISM, GEAR, SHOP, FIGHTERS, TRACK, LOCK, CHECK, STAR, BACK, PLAY, GIFT, SWORDS, SKULL, PLUS, CAPSULE, CREDIT, HEART, RANK, NEWS }
 
 /** Original vector icon set. Each icon is drawn in a 0..1 unit square with an ink outline. */
 @Composable
@@ -219,19 +219,79 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             drawPath(tag, Color.White); outline(tag, 0.035f)
         }
         IconKind.FIGHTERS -> {
-            // Two fighters, shoulder to shoulder: one stepping up in front, a teammate behind.
-            fun bust(hx: Float, hy: Float, hr: Float, left: Float, right: Float, top: Float, bottom: Float, brush: Brush) {
-                val body = Path().apply {
-                    moveTo(left, bottom); cubicTo(left, top - 0.04f, right, top - 0.04f, right, bottom); close()
-                }
-                drawPath(body, brush); outline(body)
-                drawCircle(INK, hr + W / 2f, Offset(hx, hy))
-                drawCircle(brush, hr - W / 2f, Offset(hx, hy))
-                drawArc(Color.White.copy(alpha = 0.45f), 200f, 70f, false, Offset(hx - hr * 0.62f, hy - hr * 0.62f), Size(hr * 1.24f, hr * 1.24f), style = Stroke(0.035f, cap = StrokeCap.Round))
+            // An arena fighter's helmet, face on: a crest fin, a steel shell, a lit visor across the eyes, a vented
+            // chin guard, and a little five-pointed star (Spark's shape) on the brow.
+            val crestColor = tint ?: Palette.Orange
+            val crest = poly(0.44f, 0.2f, 0.5f, 0.03f, 0.56f, 0.2f)
+            drawPath(crest, Brush.verticalGradient(listOf(lerp(crestColor, Color.White, 0.4f), crestColor), 0.03f, 0.2f)); outline(crest, 0.05f)
+            val shell = Path().apply {
+                moveTo(0.14f, 0.74f)
+                cubicTo(0.08f, 0.32f, 0.26f, 0.14f, 0.5f, 0.14f)
+                cubicTo(0.74f, 0.14f, 0.92f, 0.32f, 0.86f, 0.74f)
+                lineTo(0.74f, 0.92f); lineTo(0.26f, 0.92f); close()
             }
-            bust(0.67f, 0.3f, 0.14f, 0.44f, 0.92f, 0.56f, 0.8f, Brush.verticalGradient(listOf(Color(0xFF8FE0FF), Palette.Cyan, Palette.CyanDeep), 0.15f, 0.8f))
-            val front = tint ?: Palette.Orange
-            bust(0.38f, 0.38f, 0.17f, 0.08f, 0.68f, 0.66f, 0.94f, Brush.verticalGradient(listOf(lerp(front, Color.White, 0.45f), front, lerp(front, Color.Black, 0.3f)), 0.2f, 0.94f))
+            drawPath(shell, Brush.linearGradient(listOf(Color(0xFFE6F4FF), Color(0xFF8FB8DA), Color(0xFF3F6E98)), Offset(0.2f, 0.12f), Offset(0.8f, 0.92f)))
+            // The shell's highlight, up on the dome.
+            drawArc(Color.White.copy(alpha = 0.7f), 205f, 55f, false, Offset(0.22f, 0.2f), Size(0.56f, 0.5f), style = Stroke(0.04f, cap = StrokeCap.Round))
+            // Chin guard: a darker plate with three vents.
+            val chin = poly(0.3f, 0.66f, 0.7f, 0.66f, 0.66f, 0.86f, 0.34f, 0.86f)
+            drawPath(chin, Color(0xFF2A4C6E)); outline(chin, 0.04f)
+            for (x in floatArrayOf(0.42f, 0.5f, 0.58f)) drawLine(Color(0xFF8FD6FF).copy(alpha = 0.7f), Offset(x, 0.72f), Offset(x, 0.8f), 0.03f, cap = StrokeCap.Round)
+            outline(shell)
+            // The visor: a wide wedge across the eyes, lit from inside.
+            val visor = Path().apply {
+                moveTo(0.16f, 0.44f); quadraticTo(0.5f, 0.36f, 0.84f, 0.44f)
+                lineTo(0.8f, 0.6f); quadraticTo(0.5f, 0.68f, 0.2f, 0.6f); close()
+            }
+            drawPath(visor, Brush.verticalGradient(listOf(Color(0xFFB8F4FF), Palette.Cyan, Color(0xFF0B5FB8)), 0.38f, 0.66f))
+            drawLine(Color.White.copy(alpha = 0.85f), Offset(0.26f, 0.47f), Offset(0.4f, 0.445f), 0.035f, cap = StrokeCap.Round)
+            outline(visor, 0.055f)
+            // The star on the brow.
+            val star = Path()
+            for (i in 0 until 10) {
+                val a = -PI / 2 + i * PI / 5
+                val r = if (i % 2 == 0) 0.075f else 0.034f
+                val x = 0.5f + (cos(a) * r).toFloat(); val y = 0.29f + (sin(a) * r).toFloat()
+                if (i == 0) star.moveTo(x, y) else star.lineTo(x, y)
+            }
+            star.close()
+            drawPath(star, Palette.Gold); outline(star, 0.03f)
+        }
+        IconKind.RANK -> {
+            // A podium: three steps, the middle one tallest with a star over it.
+            val steps = listOf(
+                Triple(0.06f, 0.56f, Color(0xFF9FC4E4)), Triple(0.36f, 0.36f, Palette.Gold), Triple(0.66f, 0.66f, Color(0xFFE59A5C)),
+            )
+            for ((x, top, c) in steps) {
+                val step = poly(x, top, x + 0.28f, top, x + 0.28f, 0.92f, x, 0.92f)
+                drawPath(step, Brush.verticalGradient(listOf(lerp(c, Color.White, 0.35f), c, lerp(c, Color.Black, 0.25f)), top, 0.92f))
+                drawRect(Color.White.copy(alpha = 0.4f), Offset(x + 0.03f, top + 0.03f), Size(0.22f, 0.04f))
+                outline(step, 0.055f)
+            }
+            val star = Path()
+            for (i in 0 until 10) {
+                val a = -PI / 2 + i * PI / 5
+                val r = if (i % 2 == 0) 0.15f else 0.065f
+                val x = 0.5f + (cos(a) * r).toFloat(); val y = 0.19f + (sin(a) * r).toFloat()
+                if (i == 0) star.moveTo(x, y) else star.lineTo(x, y)
+            }
+            star.close()
+            drawPath(star, Color.White); outline(star, 0.045f)
+        }
+        IconKind.NEWS -> {
+            // A megaphone calling out, with sound lines.
+            val cone = poly(0.14f, 0.4f, 0.62f, 0.16f, 0.62f, 0.84f, 0.14f, 0.6f)
+            drawPath(cone, Brush.verticalGradient(listOf(Color(0xFFB8F4FF), tint ?: Palette.Cyan, Palette.CyanDeep), 0.16f, 0.84f))
+            drawPath(poly(0.2f, 0.42f, 0.56f, 0.24f, 0.56f, 0.34f, 0.2f, 0.48f), Color.White.copy(alpha = 0.45f))
+            outline(cone)
+            val handle = poly(0.24f, 0.58f, 0.36f, 0.62f, 0.32f, 0.86f, 0.2f, 0.82f)
+            drawPath(handle, Color(0xFF2A4C6E)); outline(handle, 0.05f)
+            drawRoundRect(INK, Offset(0.06f, 0.36f), Size(0.12f, 0.28f), androidx.compose.ui.geometry.CornerRadius(0.04f))
+            drawRoundRect(Palette.Orange, Offset(0.085f, 0.385f), Size(0.07f, 0.23f), androidx.compose.ui.geometry.CornerRadius(0.025f))
+            for ((k, r) in floatArrayOf(0.14f, 0.26f).withIndex()) {
+                drawArc(INK, -40f, 80f, false, Offset(0.62f - r, 0.5f - r), Size(r * 2, r * 2), style = Stroke(0.1f, cap = StrokeCap.Round))
+                drawArc(if (k == 0) Palette.Gold else Color.White, -40f, 80f, false, Offset(0.62f - r, 0.5f - r), Size(r * 2, r * 2), style = Stroke(0.05f, cap = StrokeCap.Round))
+            }
         }
         IconKind.TRACK -> {
             val road = Path().apply { moveTo(0.1f, 0.85f); cubicTo(0.3f, 0.5f, 0.6f, 0.9f, 0.85f, 0.3f) }
