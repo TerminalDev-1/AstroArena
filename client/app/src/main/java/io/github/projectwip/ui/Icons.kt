@@ -200,30 +200,38 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             drawCircle(Palette.PanelLight, 0.1f, c)
         }
         IconKind.SHOP -> {
-            val body = poly(0.14f, 0.42f, 0.86f, 0.42f, 0.86f, 0.9f, 0.14f, 0.9f)
-            drawPath(body, Color(0xFFFFF4D6)); outline(body)
-            val door = poly(0.4f, 0.6f, 0.6f, 0.6f, 0.6f, 0.9f, 0.4f, 0.9f)
-            drawPath(door, Palette.CyanDeep); outline(door, 0.05f)
-            // striped awning
-            for (i in 0 until 4) {
-                val x = 0.08f + i * 0.21f
-                val s = poly(x, 0.18f, x + 0.21f, 0.18f, x + 0.21f, 0.42f, x, 0.42f)
-                drawPath(s, if (i % 2 == 0) Palette.OrangeDeep else Color.White)
+            // A shopping bag: a looped handle, a folded top band, a sheen down one side and a sparkle tag on the front.
+            val handle = Path().apply { moveTo(0.34f, 0.44f); cubicTo(0.34f, 0.06f, 0.66f, 0.06f, 0.66f, 0.44f) }
+            drawPath(handle, INK, style = Stroke(0.15f, cap = StrokeCap.Round))
+            drawPath(handle, Color(0xFFFFE7B0), style = Stroke(0.065f, cap = StrokeCap.Round))
+            val bag = Path().apply {
+                moveTo(0.2f, 0.33f); lineTo(0.8f, 0.33f); lineTo(0.88f, 0.84f)
+                quadraticTo(0.89f, 0.93f, 0.8f, 0.93f); lineTo(0.2f, 0.93f)
+                quadraticTo(0.11f, 0.93f, 0.12f, 0.84f); close()
             }
-            val aw = Path().apply {
-                moveTo(0.08f, 0.18f); lineTo(0.92f, 0.18f); lineTo(0.92f, 0.42f)
-                for (i in 3 downTo 0) { val x = 0.08f + i * 0.21f; quadraticTo(x + 0.105f, 0.54f, x, 0.42f) }
-                close()
-            }
-            outline(aw)
+            drawPath(bag, Brush.verticalGradient(listOf(Color(0xFFFFD08A), tint ?: Palette.Orange, Palette.OrangeDeep), 0.33f, 0.93f))
+            val band = poly(0.2f, 0.33f, 0.8f, 0.33f, 0.815f, 0.43f, 0.185f, 0.43f)
+            drawPath(band, Palette.OrangeDeep.copy(alpha = 0.85f))
+            drawPath(poly(0.24f, 0.46f, 0.32f, 0.46f, 0.27f, 0.88f, 0.19f, 0.88f), Color.White.copy(alpha = 0.32f))
+            outline(bag)
+            for (x in floatArrayOf(0.34f, 0.66f)) { drawCircle(INK, 0.045f, Offset(x, 0.39f)); drawCircle(Color(0xFF5A2600), 0.022f, Offset(x, 0.39f)) }
+            val tag = poly(0.6f, 0.5f, 0.635f, 0.625f, 0.76f, 0.66f, 0.635f, 0.695f, 0.6f, 0.82f, 0.565f, 0.695f, 0.44f, 0.66f, 0.565f, 0.625f)
+            drawPath(tag, Color.White); outline(tag, 0.035f)
         }
         IconKind.FIGHTERS -> {
-            // Helmet with visor
-            val helmet = Path().apply { moveTo(0.14f, 0.62f); cubicTo(0.1f, 0.05f, 0.9f, 0.05f, 0.86f, 0.62f); lineTo(0.86f, 0.82f); lineTo(0.14f, 0.82f); close() }
-            drawPath(helmet, tint ?: Palette.Orange); outline(helmet)
-            val visor = poly(0.22f, 0.45f, 0.78f, 0.45f, 0.72f, 0.64f, 0.28f, 0.64f)
-            drawPath(visor, Palette.Cyan); outline(visor, 0.05f)
-            drawLine(Color.White, Offset(0.3f, 0.5f), Offset(0.42f, 0.5f), 0.05f, cap = StrokeCap.Round)
+            // Two fighters, shoulder to shoulder: one stepping up in front, a teammate behind.
+            fun bust(hx: Float, hy: Float, hr: Float, left: Float, right: Float, top: Float, bottom: Float, brush: Brush) {
+                val body = Path().apply {
+                    moveTo(left, bottom); cubicTo(left, top - 0.04f, right, top - 0.04f, right, bottom); close()
+                }
+                drawPath(body, brush); outline(body)
+                drawCircle(INK, hr + W / 2f, Offset(hx, hy))
+                drawCircle(brush, hr - W / 2f, Offset(hx, hy))
+                drawArc(Color.White.copy(alpha = 0.45f), 200f, 70f, false, Offset(hx - hr * 0.62f, hy - hr * 0.62f), Size(hr * 1.24f, hr * 1.24f), style = Stroke(0.035f, cap = StrokeCap.Round))
+            }
+            bust(0.67f, 0.3f, 0.14f, 0.44f, 0.92f, 0.56f, 0.8f, Brush.verticalGradient(listOf(Color(0xFF8FE0FF), Palette.Cyan, Palette.CyanDeep), 0.15f, 0.8f))
+            val front = tint ?: Palette.Orange
+            bust(0.38f, 0.38f, 0.17f, 0.08f, 0.68f, 0.66f, 0.94f, Brush.verticalGradient(listOf(lerp(front, Color.White, 0.45f), front, lerp(front, Color.Black, 0.3f)), 0.2f, 0.94f))
         }
         IconKind.TRACK -> {
             val road = Path().apply { moveTo(0.1f, 0.85f); cubicTo(0.3f, 0.5f, 0.6f, 0.9f, 0.85f, 0.3f) }

@@ -117,16 +117,17 @@ fun PlainText(text: String, style: TextStyle, modifier: Modifier = Modifier, col
 fun plateShape(big: Dp = 12.dp, small: Dp = 5.dp): Shape =
     CutCornerShape(topStart = big, topEnd = small, bottomEnd = big, bottomStart = small)
 
-enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val text: Color = Color.White) {
-    ORANGE(Palette.Orange, Palette.OrangeDeep, Palette.OrangeLip),
-    CYAN(Palette.Cyan, Palette.CyanDeep, Palette.CyanLip),
-    GREEN(Palette.Green, Palette.GreenDeep, Palette.GreenLip),
-    GREY(Palette.Grey, Palette.GreyDeep, Palette.GreyLip),
-    RED(Palette.Red, Palette.RedDeep, Palette.RedLip),
-    PURPLE(Palette.PanelLight, Palette.Panel, Palette.PanelDark),
-    GOLD(Color(0xFFFFE066), Palette.Gold, Color(0xFFA8650A)),
-    /** Translucent plate that lets the 3D lobby show through. */
-    GLASS(Color(0xD834628C), Color(0xE0173550), Color(0xFF0B1A28)),
+/** [rim] is the light that catches the plate's edges (and glows round it). */
+enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val rim: Color, val text: Color = Color.White) {
+    ORANGE(Palette.Orange, Palette.OrangeDeep, Palette.OrangeLip, Color(0xFFFFE2A8)),
+    CYAN(Palette.Cyan, Palette.CyanDeep, Palette.CyanLip, Color(0xFFC8F6FF)),
+    GREEN(Palette.Green, Palette.GreenDeep, Palette.GreenLip, Color(0xFFD2FFE0)),
+    GREY(Palette.Grey, Palette.GreyDeep, Palette.GreyLip, Color(0xFFDDE6EE)),
+    RED(Palette.Red, Palette.RedDeep, Palette.RedLip, Color(0xFFFFC7CE)),
+    PURPLE(Palette.PanelLight, Palette.Panel, Palette.PanelDark, Palette.Rim),
+    GOLD(Color(0xFFFFE066), Palette.Gold, Color(0xFFA8650A), Color(0xFFFFF6C8)),
+    /** Translucent steel plate that lets the 3D lobby show through. */
+    GLASS(Color(0xE8357DC6), Color(0xF20A1C31), Color(0xFF060F1A), Palette.Rim),
 }
 
 /** Soft drop shadow under a plate, so it reads as sitting above the scene. */
@@ -141,26 +142,42 @@ private fun DrawScope.plateShadow(path: Path, depth: Float) {
  * A plate with depth: gradient body, a curved gloss on the upper half, shade gathering at the bottom,
  * and a bevel (lit top edge, dark bottom edge) just inside the ink outline.
  */
-private fun DrawScope.plate(shape: Shape, size: Size, brush: Brush, ink: Color, inkWidth: Float, gloss: Boolean) {
+private fun DrawScope.plate(shape: Shape, size: Size, brush: Brush, ink: Color, inkWidth: Float, gloss: Boolean, rim: Color = Palette.Rim) {
     val outline = shape.createOutline(size, layoutDirection, this)
     val path = Path().apply { addOutline(outline) }
     drawPath(path, brush)
     clipPath(path) {
+        // Shade gathers low, and then a little of the rim's light comes back up off the bottom edge.
+        drawRect(Brush.verticalGradient(0.45f to Color.Transparent, 0.88f to Color.Black.copy(alpha = 0.3f), 1f to Color.Black.copy(alpha = 0.18f), startY = 0f, endY = size.height), size = size)
+        drawRect(Brush.verticalGradient(0.74f to Color.Transparent, 1f to rim.copy(alpha = 0.2f), startY = 0f, endY = size.height), size = size)
         if (gloss) {
-            drawRect(
-                Brush.verticalGradient(0f to Color.White.copy(alpha = 0.46f), 0.46f to Color.White.copy(alpha = 0.1f), 0.5f to Color.Transparent, startY = 0f, endY = size.height),
-                size = size,
+            // A curved gloss: an oval across the top whose lower edge bows down through the middle.
+            drawOval(
+                Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.03f)), 0f, size.height * 0.5f),
+                Offset(-size.width * 0.2f, -size.height * 0.52f), Size(size.width * 1.4f, size.height * 1.02f),
             )
         }
-        drawRect(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.3f), startY = 0f, endY = size.height), size = size)
+        // Soft light from the top left, falling off across the face.
+        drawRect(Brush.linearGradient(0f to Color.White.copy(alpha = 0.13f), 0.4f to Color.Transparent, start = Offset.Zero, end = Offset(size.width * 0.55f, size.height * 1.2f)), size = size)
         // Bevel: the stroke is centred on the edge, so the clip leaves only its inner half.
         drawPath(
             path,
-            Brush.verticalGradient(0f to Color.White.copy(alpha = 0.6f), 0.5f to Color.White.copy(alpha = 0.06f), 1f to Color.Black.copy(alpha = 0.4f), startY = 0f, endY = size.height),
-            style = Stroke(inkWidth * 3.2f, join = StrokeJoin.Round),
+            Brush.verticalGradient(0f to Color.White.copy(alpha = 0.7f), 0.16f to Color.White.copy(alpha = 0.1f), 0.7f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.5f), startY = 0f, endY = size.height),
+            style = Stroke(inkWidth * 2.6f, join = StrokeJoin.Round),
+        )
+        // A crisp line of rim light just under the top edge, fading out at both ends.
+        val y = inkWidth * 1.9f
+        drawLine(
+            Brush.horizontalGradient(0f to Color.Transparent, 0.18f to rim.copy(alpha = 0.8f), 0.82f to rim.copy(alpha = 0.8f), 1f to Color.Transparent, startX = 0f, endX = size.width),
+            Offset(0f, y), Offset(size.width, y), 1.2.dp.toPx(),
         )
     }
     drawPath(path, ink, style = Stroke(inkWidth, join = StrokeJoin.Round))
+}
+
+/** A soft glow in [color] round [path], drawn behind it. */
+private fun DrawScope.glow(path: Path, color: Color, strength: Float = 1f) {
+    for (k in 1..3) drawPath(path, color.copy(alpha = 0.07f * strength), style = Stroke(k * 5.dp.toPx(), join = StrokeJoin.Round))
 }
 
 /**
@@ -198,12 +215,32 @@ fun ChunkyButton(
                 val ink = 2.5.dp.toPx()
                 val pressPx = lipPx * press
                 val whole = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
+                if (enabled) glow(whole, s.rim, if (s == ButtonStyle.GLASS) 0.7f else 1f + press)
                 plateShadow(whole, lipPx * (1.1f - 0.6f * press))
                 drawPath(whole, Brush.verticalGradient(listOf(s.lip, lerp(s.lip, Color.Black, 0.35f))))
                 drawPath(whole, Palette.Ink, style = Stroke(ink, join = StrokeJoin.Round))
                 translate(top = pressPx) {
                     val face = Size(size.width, size.height - lipPx)
-                    plate(shape, face, Brush.verticalGradient(listOf(lerp(s.top, Color.White, 0.18f), s.top, s.bottom)), Palette.Ink, ink, gloss = true)
+                    // The lip's top edge catches the light where it meets the face.
+                    drawLine(s.rim.copy(alpha = 0.35f), Offset(ink * 2f, face.height + ink * 0.6f), Offset(size.width - ink * 2f, face.height + ink * 0.6f), 1.dp.toPx())
+                    val glass = s == ButtonStyle.GLASS
+                    plate(shape, face, Brush.verticalGradient(listOf(lerp(s.top, Color.White, if (glass) 0.06f else 0.18f), s.top, s.bottom)), Palette.Ink, ink, gloss = true, rim = s.rim)
+                    // A second, inset frame, so the face reads as layered rather than one flat fill.
+                    val inset = 4.dp.toPx()
+                    if (face.width > inset * 6 && face.height > inset * 6) translate(inset, inset) {
+                        val inner = Size(face.width - inset * 2, face.height - inset * 2)
+                        val c = (cut - 3.dp).coerceAtLeast(2.dp)
+                        val o = plateShape(c, (c * 0.4f).coerceAtLeast(1.dp)).createOutline(inner, layoutDirection, this)
+                        drawPath(Path().apply { addOutline(o) }, Brush.verticalGradient(listOf(s.rim.copy(alpha = 0.3f), s.rim.copy(alpha = 0.04f), Color.Black.copy(alpha = 0.18f))), style = Stroke(1.dp.toPx()))
+                    }
+                    if (glass && face.height > 40.dp.toPx()) clipPath(Path().apply { addOutline(shape.createOutline(face, layoutDirection, this@drawBehind)) }) {
+                        // A hatched corner, bottom right.
+                        val gap = 5.dp.toPx()
+                        for (i in 0 until 4) {
+                            val x = face.width - inset * 2.5f - i * gap
+                            drawLine(s.rim.copy(alpha = 0.16f), Offset(x, face.height - inset), Offset(x + gap * 2.2f, face.height - inset - gap * 2.2f), 1.5.dp.toPx())
+                        }
+                    }
                     if (time != null) {
                         // A band of light sweeps across every few seconds.
                         val t = (time.value % 3.2f) / 0.7f
@@ -230,6 +267,7 @@ fun Panel(
     color: Color = Palette.Panel,
     colorBottom: Color = Palette.PanelDark,
     cut: Dp = 16.dp,
+    rim: Color = Palette.Rim,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = remember(cut) { plateShape(cut, cut * 0.35f) }
@@ -244,7 +282,7 @@ fun Panel(
                 drawPath(path, Brush.verticalGradient(listOf(lerp(colorBottom, Color.Black, 0.25f), lerp(colorBottom, Color.Black, 0.6f))))
                 drawPath(path, Palette.Ink, style = Stroke(ink, join = StrokeJoin.Round))
             }
-            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.26f), color, colorBottom)), Palette.Ink, ink, gloss = false)
+            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.26f), color, colorBottom)), Palette.Ink, ink, gloss = false, rim = rim)
             clipPath(path) {
                 // Faint diagonal brushing, and a sheen across the top, so large panels aren't a flat fill.
                 val step = 22.dp.toPx()
@@ -253,9 +291,11 @@ fun Panel(
                     drawLine(Color.White.copy(alpha = 0.035f), Offset(x, size.height), Offset(x + size.height, 0f), step * 0.45f)
                     x += step
                 }
-                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.2f), Color.Transparent), 0f, minOf(size.height * 0.4f, 110.dp.toPx())), size = size)
-                // A warm light catches the top edge.
-                drawLine(Palette.Orange.copy(alpha = 0.55f), Offset(0f, ink * 1.4f), Offset(size.width, ink * 1.4f), 2.dp.toPx())
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.12f), Color.Transparent), 0f, minOf(size.height * 0.4f, 110.dp.toPx())), size = size)
+                // A cool pool of light in the top corner, as if a lamp hung over it.
+                val lamp = Offset(size.width * 0.18f, 0f)
+                val reach = minOf(size.maxDimension * 0.6f, 260.dp.toPx())
+                drawRect(Brush.radialGradient(listOf(rim.copy(alpha = 0.16f), Color.Transparent), lamp, reach), size = size)
             }
             // inner rim highlight
             val inset = 5.dp.toPx()
@@ -277,10 +317,9 @@ fun Badge(text: String, modifier: Modifier = Modifier, color: Color = Palette.Re
             .drawBehind {
                 val o = plateShape(6.dp, 2.dp).createOutline(size, layoutDirection, this)
                 val p = Path().apply { addOutline(o) }
+                glow(p, color, 0.8f)
                 plateShadow(p, 2.5.dp.toPx())
-                drawPath(p, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.3f), color, lerp(color, Color.Black, 0.25f))))
-                clipPath(p) { drawRect(Color.White.copy(alpha = 0.25f), size = Size(size.width, size.height * 0.42f)) }
-                drawPath(p, Palette.Ink, style = Stroke(2.dp.toPx()))
+                plate(plateShape(6.dp, 2.dp), size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.3f), color, lerp(color, Color.Black, 0.25f))), Palette.Ink, 2.dp.toPx(), gloss = true, rim = lerp(color, Color.White, 0.7f))
             }
             .padding(horizontal = 8.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center,
@@ -330,10 +369,15 @@ fun CurrencyPill(icon: IconKind, value: Int, modifier: Modifier = Modifier, onCl
                     val o = plateShape(8.dp, 3.dp).createOutline(size, layoutDirection, this)
                     val p = Path().apply { addOutline(o) }
                     plateShadow(p, 3.dp.toPx())
-                    drawPath(p, Brush.verticalGradient(listOf(Color(0xFF091928), Palette.PanelInset, Color(0xFF23476A))))
+                    drawPath(p, Brush.verticalGradient(listOf(Color(0xFF071523), Palette.PanelInset, Color(0xFF1E4264))))
                     clipPath(p) {
-                        drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent), 0f, size.height * 0.4f), size = size)
-                        drawLine(Color.White.copy(alpha = 0.22f), Offset(0f, size.height - 2.dp.toPx()), Offset(size.width, size.height - 2.dp.toPx()), 2.dp.toPx())
+                        // A recessed well: shadow under its top lip, glass on its face, and rim light along its floor.
+                        drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent), 0f, size.height * 0.4f), size = size)
+                        drawRect(Brush.linearGradient(0f to Color.Transparent, 0.45f to Color.White.copy(alpha = 0.07f), 0.55f to Color.Transparent, start = Offset(0f, size.height), end = Offset(size.width, 0f)), size = size)
+                        drawLine(
+                            Brush.horizontalGradient(0f to Color.Transparent, 0.25f to Palette.Rim.copy(alpha = 0.5f), 0.9f to Palette.Rim.copy(alpha = 0.5f), 1f to Color.Transparent, startX = 0f, endX = size.width),
+                            Offset(0f, size.height - 2.dp.toPx()), Offset(size.width, size.height - 2.dp.toPx()), 1.5.dp.toPx(),
+                        )
                     }
                     drawPath(p, Palette.Ink, style = Stroke(2.5.dp.toPx()))
                 }

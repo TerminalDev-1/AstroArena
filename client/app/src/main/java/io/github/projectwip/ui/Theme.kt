@@ -22,6 +22,8 @@ object Palette {
     val PanelLight = Color(0xFF3B6F9F)
     val PanelDark = Color(0xFF183652)
     val PanelInset = Color(0xFF122C44)
+    /** The cool light that catches the edges of plates and panels. */
+    val Rim = Color(0xFF8FD6FF)
 
     val Orange = Color(0xFFFF9F1C)
     val OrangeDeep = Color(0xFFFF6A00)

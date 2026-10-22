@@ -10,6 +10,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -222,9 +224,14 @@ private fun NavTile(label: String, icon: IconKind, badge: String?, badgeColor: C
     Box {
         ChunkyButton(onClick, Modifier.size(w, h), ButtonStyle.GLASS) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                GameIcon(icon, Modifier.size(if (ui.roomy) 46.dp else 36.dp))
-                Spacer(Modifier.height(4.dp))
-                GameText(label, Type.Label, outline = 2.5.dp)
+                // The icon sits in a pool of light, so it reads as lit from inside the tile.
+                Box(contentAlignment = Alignment.Center) {
+                    Canvas(Modifier.size(if (ui.roomy) 64.dp else 50.dp)) {
+                        drawCircle(Brush.radialGradient(listOf(Palette.Rim.copy(alpha = 0.5f), Palette.Rim.copy(alpha = 0.14f), Color.Transparent)))
+                    }
+                    GameIcon(icon, Modifier.size(if (ui.roomy) 46.dp else 36.dp))
+                }
+                GameText(label, Type.Label.copy(letterSpacing = 1.2.sp), outline = 2.5.dp)
             }
         }
         if (badge != null) {
@@ -240,7 +247,7 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
     val p = save.progress(save.selectedFighter)
     val canUp = Progression.canUpgrade(save, def.id)
     Box(Modifier.clickable(remember { MutableInteractionSource() }, null, onClick = onClick)) {
-        Panel(color = Color(0xD834628C), colorBottom = Color(0xE0173550), cut = 14.dp) {
+        Panel(color = Color(0xE8357DC6), colorBottom = Color(0xF20A1C31), cut = 14.dp) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
                     Canvas(Modifier.fillMaxSize()) {
