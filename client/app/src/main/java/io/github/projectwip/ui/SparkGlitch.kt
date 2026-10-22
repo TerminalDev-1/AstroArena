@@ -20,7 +20,7 @@ import kotlin.math.floor
 import kotlin.math.sin
 
 /**
- * Spark's hold on the screen: whenever he is on it, the scene behind the menus goes red and now and then glitches
+ * Spark's hold on the screen: whenever he is on it, the scene behind the menus takes on his chromatic blue and now and then glitches
  * (part of his lore: he is the Spark Drop that woke up and won't go). It is a hint, not a takeover: it is drawn under
  * the menus, so buttons, text and currencies keep their colours. [strength] eases in and out with him.
  */
@@ -70,7 +70,7 @@ fun rememberSparkGlitch(active: () -> Boolean): SparkGlitch {
     return g
 }
 
-/** Draws [g] over the scene under it: a faint red light, red at the edges, and a few torn bars while a burst is on. */
+/** Draws [g] over the scene under it: a faint blue light, deeper blue at the edges, and a few torn bars while a burst is on. */
 @Composable
 fun SparkGlitchOverlay(g: SparkGlitch, modifier: Modifier = Modifier) {
     if (g.strength <= 0f) return
@@ -78,11 +78,11 @@ fun SparkGlitchOverlay(g: SparkGlitch, modifier: Modifier = Modifier) {
         val s = g.strength
         val t = g.time
         val b = g.burst
-        // A red light over the scene, a little stronger at the edges, breathing slowly.
-        drawRect(Color(0xFFFF1A2E), alpha = (0.09f + 0.025f * sin(t * 2f) + 0.06f * b) * s)
+        // A blue light over the scene, a little stronger at the edges, breathing slowly.
+        drawRect(Color(0xFF2E8BFF), alpha = (0.09f + 0.025f * sin(t * 2f) + 0.06f * b) * s)
         drawRect(
             androidx.compose.ui.graphics.Brush.radialGradient(
-                0.5f to Color.Transparent, 1f to Color(0xFFB00018),
+                0.5f to Color.Transparent, 1f to Color(0xFF1838C0),
                 center = center, radius = size.maxDimension * 0.62f,
             ),
             alpha = 0.45f * s,
@@ -94,7 +94,7 @@ fun SparkGlitchOverlay(g: SparkGlitch, modifier: Modifier = Modifier) {
             drawRect(Color.Black, Offset(0f, y), Size(size.width, 1.dp.toPx()), alpha = 0.06f * s)
             y += gap
         }
-        // A burst: a few thin bars torn sideways, red one way and cyan the other.
+        // A burst: a few thin bars torn sideways, cyan one way and violet the other.
         if (b > 0f) {
             val seed = floor(t * 24f)
             val bars = 2 + (hash(seed) * 3f).toInt()
@@ -102,8 +102,8 @@ fun SparkGlitchOverlay(g: SparkGlitch, modifier: Modifier = Modifier) {
                 val by = hash(seed + i * 3.1f) * size.height
                 val bh = (3f + hash(seed + i * 5.7f) * 14f).dp.toPx()
                 val dx = (hash(seed + i * 9.3f) - 0.5f) * 60.dp.toPx() * b
-                drawRect(Color(0xFFFF2040), Offset(dx, by), Size(size.width, bh), alpha = 0.22f * b)
-                drawRect(Color(0xFF30F0FF), Offset(-dx * 0.6f, by + bh * 0.35f), Size(size.width, bh * 0.3f), alpha = 0.14f * b)
+                drawRect(Color(0xFF30E8FF), Offset(dx, by), Size(size.width, bh), alpha = 0.22f * b)
+                drawRect(Color(0xFFB070FF), Offset(-dx * 0.6f, by + bh * 0.35f), Size(size.width, bh * 0.3f), alpha = 0.14f * b)
             }
         }
     }

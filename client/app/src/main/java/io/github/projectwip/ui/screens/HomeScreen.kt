@@ -128,7 +128,7 @@ fun HomeScreen(
                         Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)) {
                             NavTile("SHOP", IconKind.SHOP, if (giftReady) "FREE" else null, Palette.Green) { go(Screen.Shop) }
                             NavTile("FIGHTERS", IconKind.FIGHTERS, if (canUpgradeAny) "UP" else null, Palette.Green) { go(Screen.Fighters()) }
-                            NavTile("CUP TRACK", IconKind.TRACK, if (claimable > 0) claimable.toString() else null, Palette.Red) { go(Screen.CupTrack) }
+                            // The Cup Track has no tile: the Cups panel in the top bar opens it and carries its badge.
                         }
 
                         // ---------------- hero (the 3D fighter stands here; this column is see-through)
@@ -207,7 +207,10 @@ private fun ProfileAndCups(save: SaveData, claimable: Int, onCups: () -> Unit) {
             }
         }
         GameIcon(IconKind.CUP, Modifier.size(66.dp).offset(x = (-6).dp, y = (-4).dp))
-        if (claimable > 0) Badge(claimable.toString(), Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-6).dp))
+        if (claimable > 0) {
+            val pulse by rememberInfiniteTransition(label = "cupBadge").animateFloat(1f, 1.15f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
+            Badge(claimable.toString(), Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-6).dp).graphicsLayer { scaleX = pulse; scaleY = pulse }, color = Palette.Red)
+        }
     }
 }
 

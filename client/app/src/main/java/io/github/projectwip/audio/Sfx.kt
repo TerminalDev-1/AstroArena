@@ -124,6 +124,6 @@ class Sfx(private val context: Context) {
     }
 
     private companion object {
-        const val CACHE = "sfx-v18"
+        const val CACHE = "sfx-v19"
     }
 }

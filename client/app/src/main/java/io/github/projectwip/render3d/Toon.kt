@@ -74,6 +74,7 @@ object Toon {
         p.f("uFlash", 0f)
         p.f("uEmissive", 0f)
         p.f("uRim", 0.35f)
+        p.f("uGloss", 0f)
         p.f("uShadowOn", if (shadow != null) 1f else 0f)
         p.f("uShadowTexel", 1f / (shadow?.size ?: 1024))
         p.f("uRevealOn", 0f)

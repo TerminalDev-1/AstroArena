@@ -41,13 +41,16 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   decision (build 89) and Spark took hers, each time keeping the id, so whoever had Rocket has Spark at the same level
   (nothing was paid back for her, by the user's decision). Don't bring Byte or Juno back, or Rocket unless the user asks. Spark is the user's
   idea and part of the lore: the Spark Drop that would not go away, a puffy five-pointed star (the drops' shape,
-  `render3d/StarMesh.kt`) with a villain's face. Since build 91 the star leans back 65 degrees with its face turned up
-  to the camera (stood upright it was a thin red sliver from above), fatter, with a lit seam, glowing tips, stout legs
-  and stubby gloved arms (`FighterModels.buildSpark`). Whenever he is on screen in the menus (the lobby showing him, or the
-  loading screen's spotlight) the screen goes red and glitches (`ui/SparkGlitch.kt`), but only as a hint, by the
-  user's decision (build 89's took the UI over): it is drawn over the 3D lobby (or the loading backdrop) and under the
-  menus, a faint red light with red edges, faint scanlines and a short burst of torn bars every few seconds; buttons,
-  text and currencies keep their colours, and nothing jitters. His attack, Spite Star (`AttackShape.STAR`,
+  `render3d/StarMesh.kt`). Since build 92 he looks like an innocent Spark Drop, by the user's decision (build 91's fat
+  red villain with fangs looked creepy): chromatic blue and glossy (`Part.gloss`, the lit shader's `uGloss`: small hard
+  highlights and a cyan-to-violet sheen at the edges), with a soft face (two tall shiny eyes and a small smile), round
+  feet and white mitts. The star still leans back 65 degrees with its face turned up to the camera (stood upright it
+  was a thin sliver from above), with a lit seam (`FighterModels.buildSpark`). Whenever he is on screen in the menus
+  (the lobby showing him, or the loading screen's spotlight) the screen takes on his blue and glitches
+  (`ui/SparkGlitch.kt`; red until build 92), but only as a hint, by the user's decision (build 89's took the UI over):
+  it is drawn over the 3D lobby (or the loading backdrop) and under the menus, a faint blue light with deeper blue
+  edges, faint scanlines and a short burst of cyan and violet torn bars every few seconds; buttons, text and
+  currencies keep their colours, and nothing jitters. His attack, Spite Star (`AttackShape.STAR`,
   `Sound.STAR`: a swish and a whistle that climbs and sinks with the lob; the burst has its own `Sound.STAR_BURST`), is lobbed like dynamite, as the user asked: aimed at a spot like the planted rockets (how far the stick
   is pushed is how far it goes; `aimPlant`), it flies over walls in an arc (`World.lobs`, `Lob`) for
   `STAR_FLIGHT_SECONDS` and bursts where it lands (`GameEvent.StarBurst`), hitting every enemy within its
@@ -132,6 +135,8 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   main-attack hits. There are no shields: the user removed them (the two seconds of spawn protection, `Fighter.shield`,
   are a different thing). Healing only starts after `REGEN_DELAY_SECONDS` without attacking or being hit.
 - The menus are steel blue, not purple, by the user's decision (`Palette`; panels are slabs with a visible side).
+- The home screen has no Cup Track tile (removed in build 92, as the user asked): the Cups panel in the top bar opens
+  the Cup Track and carries its badge.
 - All balance numbers live in `data/Balance.kt` and `data/Catalog.kt`; progression is pure functions in `Progression`.
 - New save field: update both `toJson` and `fromJson` in `SaveStore`, with an `opt*` default.
 - Changed a sound: bump `CACHE` in `audio/Sfx.kt`, or devices keep the old WAVs.

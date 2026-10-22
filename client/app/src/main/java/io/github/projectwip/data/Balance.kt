@@ -376,7 +376,7 @@ object Balance {
             reloadSeconds = 1.4f,
             superChargePerHit = 0.2f,
             skins = listOf(
-                Skin("Overload", 0xFFE8283C, 0xFF2A0B16, 0xFFFFE04A, 0),
+                Skin("Overload", 0xFF2F86FF, 0xFF1A3C9C, 0xFF9CF2FF, 0),
                 Skin("Void Spark", 0xFF2C2350, 0xFF0C0A1C, 0xFF3CF2FF, 20),
                 Skin("Solar Spite", 0xFFFFB627, 0xFF4A1206, 0xFFFF3B3B, 20),
             ),

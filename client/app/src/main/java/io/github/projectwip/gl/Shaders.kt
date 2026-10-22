@@ -101,6 +101,7 @@ uniform vec3 uSun;
 uniform float uFlash;
 uniform float uEmissive;
 uniform float uRim;
+uniform float uGloss;
 uniform float uShadowOn;
 uniform float uShadowTexel;
 uniform int uMode;
@@ -140,6 +141,16 @@ void main() {
     vec3 v = normalize(uCamPos - vWorld);
     float rim = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 3.0) * uRim;
     col += rim * mix(vec3(1.0), base, 0.3);
+    if (uGloss > 0.0) {
+        // Gloss (Spark's shell): a hard-edged toon highlight from the sun and a softer one from above the camera,
+        // and a chromatic sheen whose hue slides from cyan to violet as the surface turns away from the eye.
+        float fres = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 2.0);
+        float sun = smoothstep(0.6, 0.68, pow(max(dot(n, normalize(-uLightDir + v)), 0.0), 120.0)) * mix(0.5, 1.0, sh);
+        float key = smoothstep(0.65, 0.75, pow(max(dot(n, normalize(v + vec3(-0.6, 0.8, 0.5))), 0.0), 90.0));
+        vec3 irid = mix(vec3(0.3, 0.95, 1.0), vec3(0.72, 0.45, 1.0), 0.5 + 0.5 * sin(fres * 7.0 + n.y * 2.5 + n.x * 1.5));
+        col = mix(col, col * (0.75 + 0.5 * irid), uGloss * 0.7);
+        col += uGloss * (irid * fres * 0.55 + vec3(1.0) * (sun * 0.85 + key * 0.45));
+    }
     col = mix(col, base * 1.35 + 0.08, uEmissive);
     col = mix(col, vec3(1.0), uFlash);
     float alpha = vColor.a * uTint.a;
