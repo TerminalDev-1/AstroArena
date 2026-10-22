@@ -345,7 +345,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         val metrics = UiMetrics((maxWidth.value - cutoutPx / base.density) / scale, maxHeight.value / scale, scale)
 
         val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
-        // Whenever Spark stands in the lobby, the whole screen goes red and glitches.
+        // Whenever Spark stands in the lobby, the scene behind the menus goes red and glitches now and then.
         val glitch = rememberSparkGlitch {
             screen !is Screen.Match && capsule == null && haul == null && lobby.showFighter && lobby.fighter == FighterId.BYTE &&
                 lobby.shot != io.github.projectwip.render3d.LobbyShot.ROAD
@@ -357,10 +357,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+            // (Under the menus: Spark's red is a hint on the scene, never over the buttons and text.)
+            SparkGlitchOverlay(glitch)
             // The menu steps aside while a capsule is being opened, so nothing sits on top of the 3D capsule.
             val menuAlpha by androidx.compose.animation.core.animateFloatAsState(if (capsule != null || haul != null) 0f else 1f, tween(160), label = "menu")
             AnimatedContent(
-                modifier = Modifier.graphicsLayer { alpha = menuAlpha; translationX = glitch.shift(14.dp.toPx()) }.then(if (screen is Screen.Match) Modifier else Modifier.windowInsetsPadding(cutout)),
+                modifier = Modifier.graphicsLayer { alpha = menuAlpha }.then(if (screen is Screen.Match) Modifier else Modifier.windowInsetsPadding(cutout)),
                 targetState = screen,
                 contentKey = { it::class },
                 transitionSpec = {
@@ -442,7 +444,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 if (serverStatus.disabled) io.github.projectwip.ui.screens.DisabledScreen(serverStatus.disabledReason, serverStatus.disabledUntil)
                 else io.github.projectwip.ui.screens.DisabledScreen("An example reason, as the server's owner wrote it.", System.currentTimeMillis() + 54 * 3600_000L)
             }
-            SparkGlitchOverlay(glitch)
             if (judging) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
                 GameText("THE SERVER IS CHECKING THE MATCH…", Type.Title, outline = 3.5.dp)
             }

@@ -24,6 +24,9 @@ enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
  * hits every enemy within [AttackSpec.blast]. (Nobody plants rockets any more: it was Rocket's attack for one build.)
  * [SLASH] is a swing of a blade: no shot at all, it hits every enemy within [AttackSpec.range] inside an arc of
  * [AttackSpec.spreadDegrees] at once. A bar fills by itself ([AttackSpec.edgeSeconds]), and a full bar makes the next swing reach further.
+ * [STAR] lobs a star at a spot like dynamite (aimed like [PLANT]: how far the stick is pushed is how far it goes), over
+ * any wall: it bursts where it lands, [Balance.STAR_FLIGHT_SECONDS] later, and hits and slows every enemy within
+ * [AttackSpec.blast]. (A straight shot with [AttackSpec.slowSeconds] still slows whoever it hits.)
  */
 enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH, STAR }
 
@@ -288,6 +291,9 @@ object Balance {
     /** A slowed fighter ([AttackSpec.slowSeconds]) moves at this share of its speed. */
     const val SLOW_FACTOR = 0.5f
 
+    /** A lobbed star ([AttackShape.STAR]) takes this long to come down on its spot. */
+    const val STAR_FLIGHT_SECONDS = 0.6f
+
     /** A blade with a full bar ([AttackSpec.edgeSeconds]) reaches this many times as far. */
     const val EDGE_REACH = 1.25f
 
@@ -353,12 +359,12 @@ object Balance {
             lore = "When the Spark Drops were scrapped, one of them would not go. It woke up in the dark with a grudge and a grin, and now it walks the arena throwing stars at whoever comes near, and dragging them off into a realm where its shadows are waiting.",
             attackName = "Spite Star",
             health = StatLine(6600, 330),
-            // One star, and two seconds at half speed for whoever it hits.
+            // One star lobbed at a spot, and two seconds at half speed for every enemy in its burst.
             attackDamage = StatLine(1400, 70),
             // One strike of one of his four shadows: they take turns, each striking once a second.
             superDamage = StatLine(400, 20),
             moveSpeed = 3.6f,
-            attack = AttackSpec(AttackShape.STAR, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.26f, burstInterval = 0f, slowSeconds = 2f),
+            attack = AttackSpec(AttackShape.STAR, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.26f, burstInterval = 0f, blast = 1.2f, slowSeconds = 2f),
             superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 12 seconds, where four shadows of his fight them. In there they can do nothing, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4),
             ammoMax = 3,
             reloadSeconds = 1.4f,

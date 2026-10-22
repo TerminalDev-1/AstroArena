@@ -102,7 +102,7 @@ class MatchRunner(
         c.aiming = input.aimingAttack || input.aimingSuper
         if (c.aiming) { c.aimX = input.aimX; c.aimY = input.aimY }
         if (input.attack != TouchControls.FireMode.NONE) {
-            if (p.def.attack.shape == AttackShape.PLANT) aimPlant(input.attack, input.attackX, input.attackY, p.def.attack.range)
+            if (p.def.attack.shape == AttackShape.PLANT || p.def.attack.shape == AttackShape.STAR) aimPlant(input.attack, input.attackX, input.attackY, p.def.attack.range)
             else setAim(input.attack, input.attackX, input.attackY, p.def.attack.range, p.def.attack.speed)
             c.attack = true
         }
@@ -235,7 +235,7 @@ class MatchRunner(
     }
 
     /**
-     * Aims a planted rocket: like a rain of rockets, the aim is the spot it lands on. Dragged, that is where the stick
+     * Aims a planted rocket or a lobbed star: like a rain of rockets, the aim is the spot it lands on. Dragged, that is where the stick
      * points. Tapped, it is where the nearest enemy in sight will be when it lands, then a Spark Crate, then a spot ahead.
      */
     private fun aimPlant(mode: TouchControls.FireMode, ax: Float, ay: Float, range: Float) {
@@ -246,7 +246,7 @@ class MatchRunner(
         val t = w.nearestVisibleEnemy(p, range + 0.5f)
         val crate = if (t == null) w.nearestHittableCrate(p, range + 0.4f) else -1
         if (t != null) {
-            val ahead = io.github.projectwip.data.Balance.PLANT_FLIGHT_SECONDS
+            val ahead = if (p.def.attack.shape == AttackShape.STAR) io.github.projectwip.data.Balance.STAR_FLIGHT_SECONDS else io.github.projectwip.data.Balance.PLANT_FLIGHT_SECONDS
             c.aimX = t.x + t.vx * ahead - p.x; c.aimY = t.y + t.vy * ahead - p.y
         } else if (crate >= 0) {
             c.aimX = crate % w.arena.width + 0.5f - p.x; c.aimY = crate / w.arena.width + 0.5f - p.y
@@ -390,6 +390,11 @@ class MatchRunner(
                 val near = 1f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)
                 sfx.play(Sound.CRATE_BREAK, near, 0.55f); sfx.play(Sound.ROCKET_BOOM, near, 0.6f)
                 if (near > 0.5f) sfx.buzz(60, 200)
+            }
+            is GameEvent.StarBurst -> {
+                val p = match.player
+                val near = (if (e.ownerId == pid) 0.8f else 0.5f) / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)
+                sfx.play(Sound.STAR, near, 0.7f); sfx.play(Sound.GLASS, near * 0.5f, 1.6f)
             }
             is GameEvent.Burst -> {
                 val p = match.player

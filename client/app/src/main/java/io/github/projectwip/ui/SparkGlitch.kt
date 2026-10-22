@@ -20,9 +20,9 @@ import kotlin.math.floor
 import kotlin.math.sin
 
 /**
- * Spark's hold on the screen: whenever he is on it, the whole screen goes red and glitches (part of his lore: he is
- * the Spark Drop that woke up and won't go). [strength] eases in and out with him; [shift] is how far the screen is
- * torn sideways right now, for whatever sits under the overlay to follow.
+ * Spark's hold on the screen: whenever he is on it, the scene behind the menus goes red and now and then glitches
+ * (part of his lore: he is the Spark Drop that woke up and won't go). It is a hint, not a takeover: it is drawn under
+ * the menus, so buttons, text and currencies keep their colours. [strength] eases in and out with him.
  */
 class SparkGlitch {
     var strength by mutableFloatStateOf(0f)
@@ -30,15 +30,18 @@ class SparkGlitch {
     var time by mutableFloatStateOf(0f)
         internal set
 
-    /** 0..1: how hard a burst of glitching is hitting at the moment (most of the time, none). */
+    /** 0..1: how hard a burst of glitching is hitting at the moment. A short one every few seconds, none in between. */
     val burst: Float get() {
-        val beat = floor(time * 6f)
-        if (hash(beat) > 0.24f) return 0f
-        return (1f - (time * 6f - beat)) * strength
+        val beat = floor(time / BURST_EVERY)
+        val into = time - beat * BURST_EVERY - hash(beat) * (BURST_EVERY - BURST_LENGTH)
+        if (into < 0f || into > BURST_LENGTH) return 0f
+        return (1f - into / BURST_LENGTH) * strength
     }
 
-    /** Sideways tear in pixels, at full strength. */
-    fun shift(px: Float): Float = burst * px * (hash(floor(time * 30f) + 7f) - 0.5f) * 2f
+    private companion object {
+        const val BURST_EVERY = 3.5f
+        const val BURST_LENGTH = 0.22f
+    }
 }
 
 internal fun hash(x: Float): Float {
@@ -67,7 +70,7 @@ fun rememberSparkGlitch(active: () -> Boolean): SparkGlitch {
     return g
 }
 
-/** Draws [g] over everything under it: a red wash, scanlines, and bars of torn colour while a burst is on. */
+/** Draws [g] over the scene under it: a faint red light, red at the edges, and a few torn bars while a burst is on. */
 @Composable
 fun SparkGlitchOverlay(g: SparkGlitch, modifier: Modifier = Modifier) {
     if (g.strength <= 0f) return
@@ -75,34 +78,32 @@ fun SparkGlitchOverlay(g: SparkGlitch, modifier: Modifier = Modifier) {
         val s = g.strength
         val t = g.time
         val b = g.burst
-        // Everything goes red: what is under it is multiplied down to its red, and a red glow laid on top.
-        drawRect(Color(1f, 0.22f + 0.08f * sin(t * 3f), 0.26f), blendMode = BlendMode.Multiply, alpha = 0.75f * s)
-        drawRect(Color(0xFFFF1A2E), alpha = (0.1f + 0.12f * b + 0.03f * sin(t * 9f)) * s)
-        // Scanlines, rolling slowly down.
-        val gap = 4.dp.toPx()
-        var y = (t * 18f) % gap
+        // A red light over the scene, a little stronger at the edges, breathing slowly.
+        drawRect(Color(0xFFFF1A2E), alpha = (0.09f + 0.025f * sin(t * 2f) + 0.06f * b) * s)
+        drawRect(
+            androidx.compose.ui.graphics.Brush.radialGradient(
+                0.5f to Color.Transparent, 1f to Color(0xFFB00018),
+                center = center, radius = size.maxDimension * 0.62f,
+            ),
+            alpha = 0.45f * s,
+        )
+        // Faint scanlines, rolling slowly down.
+        val gap = 5.dp.toPx()
+        var y = (t * 14f) % gap
         while (y < size.height) {
-            drawRect(Color.Black, Offset(0f, y), Size(size.width, 1.dp.toPx()), alpha = 0.16f * s)
+            drawRect(Color.Black, Offset(0f, y), Size(size.width, 1.dp.toPx()), alpha = 0.06f * s)
             y += gap
         }
-        // A burst: bars torn sideways, red one way and cyan the other, and a strip of static.
+        // A burst: a few thin bars torn sideways, red one way and cyan the other.
         if (b > 0f) {
-            val seed = floor(t * 30f)
-            val bars = 3 + (hash(seed) * 5f).toInt()
+            val seed = floor(t * 24f)
+            val bars = 2 + (hash(seed) * 3f).toInt()
             for (i in 0 until bars) {
                 val by = hash(seed + i * 3.1f) * size.height
-                val bh = (4f + hash(seed + i * 5.7f) * 34f).dp.toPx()
-                val dx = (hash(seed + i * 9.3f) - 0.5f) * 90.dp.toPx() * b
-                drawRect(Color(0xFFFF2040), Offset(dx, by), Size(size.width, bh), alpha = 0.42f * b)
-                drawRect(Color(0xFF30F0FF), Offset(-dx * 0.6f, by + bh * 0.35f), Size(size.width, bh * 0.3f), alpha = 0.3f * b)
-            }
-            val sy = hash(seed + 41f) * size.height
-            val cell = 6.dp.toPx()
-            var x = 0f
-            var k = 0
-            while (x < size.width) {
-                drawRect(Color.White, Offset(x, sy), Size(cell, cell * 1.4f), alpha = hash(seed + k * 0.37f) * 0.5f * b)
-                x += cell; k++
+                val bh = (3f + hash(seed + i * 5.7f) * 14f).dp.toPx()
+                val dx = (hash(seed + i * 9.3f) - 0.5f) * 60.dp.toPx() * b
+                drawRect(Color(0xFFFF2040), Offset(dx, by), Size(size.width, bh), alpha = 0.22f * b)
+                drawRect(Color(0xFF30F0FF), Offset(-dx * 0.6f, by + bh * 0.35f), Size(size.width, bh * 0.3f), alpha = 0.14f * b)
             }
         }
     }

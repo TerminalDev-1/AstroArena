@@ -82,6 +82,8 @@ class World(
     val hazards = ArrayList<Hazard>()
     /** Rockets stuck in the ground (or on their way there), waiting for whoever planted them to set them off. */
     val planted = ArrayList<Planted>()
+    /** Stars in the air (`AttackShape.STAR`), each on its way to burst where it was thrown. */
+    val lobs = ArrayList<Lob>()
     private val bossScripts = HashMap<Int, BossScript>()
     /** Remaining health of each crate, keyed by tile index (y * width + x). */
     val crateHp = HashMap<Int, Int>()
@@ -160,6 +162,7 @@ class World(
         stepConcealment(dt)
         stepProjectiles(dt)
         stepPlanted(dt)
+        stepLobs(dt)
         stepHazards(dt)
         stepPickups(dt)
         storm?.let { stepStorm(it, dt) }
@@ -193,7 +196,7 @@ class World(
             mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits()); mix(f.slowLeft.toRawBits())
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
-        mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
+        mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(lobs.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
         return h
     }
 
@@ -286,6 +289,7 @@ class World(
                     f.pending += PendingShot(i * a.burstInterval, dx, dy, if (a.projectiles == 1) 0f else (0.5f - i % 2) * f.radius)
                 }
                 AttackShape.PLANT -> plant(f, dx, dy)
+                AttackShape.STAR -> lob(f, dx, dy)
                 AttackShape.SLASH -> slash(f, dx, dy)
                 else -> f.pending += PendingShot(0f, dx, dy)
             }
@@ -533,6 +537,49 @@ class World(
             for (tx in kotlin.math.floor(p.x - p.blast).toInt()..kotlin.math.floor(p.x + p.blast).toInt()) {
                 if (tx < 0 || ty < 0 || tx >= arena.width || ty >= arena.height || !crateHp.containsKey(ty * arena.width + tx)) continue
                 if (hypot(tx + 0.5f - p.x, ty + 0.5f - p.y) < p.blast + 0.3f) damageCrate(tx, ty, hit)
+            }
+        }
+    }
+
+    /**
+     * Lobs a star at the spot [f] aimed at, like [plant]: the aim is how far away as well as which way, and it goes over
+     * walls. It bursts where it comes down.
+     */
+    private fun lob(f: Fighter, dx: Float, dy: Float) {
+        val a = f.def.attack
+        val reach = hypot(f.control.aimX, f.control.aimY).coerceAtMost(a.range)
+        val d = if (reach > 1e-3f) reach else a.range * 0.6f
+        val spot = arena.nearestOpen(f.x + dx * d, f.y + dy * d, 0.2f)
+        lobs += Lob(f.id, f.team, f.x, f.y, spot.x, spot.y, Balance.STAR_FLIGHT_SECONDS / hyperShotSpeed(f), a.blast, a.slowSeconds)
+    }
+
+    private fun stepLobs(dt: Float) {
+        var i = 0
+        while (i < lobs.size) {
+            val l = lobs[i]
+            l.age += dt
+            if (l.age < l.flight) { i++; continue }
+            lobs.removeAt(i)
+            val owner = fighter(l.ownerId) ?: continue
+            starBurst(l, owner)
+        }
+    }
+
+    /** A lobbed star comes down: every enemy in its burst is hit for its owner's attack and slowed, and so is any Spark Crate hit. */
+    private fun starBurst(l: Lob, owner: Fighter) {
+        events += GameEvent.StarBurst(l.ownerId, l.x, l.y, l.blast)
+        if (phase != Phase.PLAYING) return
+        val hit = owner.attackDamage
+        for (f in fighters) {
+            if (f.team == l.team || !f.alive || f.realm != owner.realm) continue
+            if (hypot(f.x - l.x, f.y - l.y) >= l.blast + f.radius * 0.5f) continue
+            damage(f, owner, hit, false, f.x, f.y)
+            if (l.slow > 0f && f.alive && f.shield <= 0f && !f.isLeaping) f.slowLeft = maxOf(f.slowLeft, l.slow)
+        }
+        for (ty in kotlin.math.floor(l.y - l.blast).toInt()..kotlin.math.floor(l.y + l.blast).toInt()) {
+            for (tx in kotlin.math.floor(l.x - l.blast).toInt()..kotlin.math.floor(l.x + l.blast).toInt()) {
+                if (tx < 0 || ty < 0 || tx >= arena.width || ty >= arena.height || !crateHp.containsKey(ty * arena.width + tx)) continue
+                if (hypot(tx + 0.5f - l.x, ty + 0.5f - l.y) < l.blast + 0.3f) damageCrate(tx, ty, hit)
             }
         }
     }

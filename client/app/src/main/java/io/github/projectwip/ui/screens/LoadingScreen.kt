@@ -84,6 +84,9 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
         val slot = floor(time / SPOT_SECONDS).toInt()
         val featured = fighters[slot % fighters.size]
         val phase = (time / SPOT_SECONDS) - slot
+        // Spark in the spotlight turns the night red and glitches it now and then (over the backdrop, under the rest).
+        val glitch = io.github.projectwip.ui.rememberSparkGlitch { featured.id == io.github.projectwip.data.FighterId.BYTE }
+        io.github.projectwip.ui.SparkGlitchOverlay(glitch)
         val fighterSize = min(h.value * 0.66f, w.value * 0.38f).dp
         Column(
             Modifier.width(w * 0.46f).fillMaxHeight().padding(top = h * 0.04f, bottom = h * 0.05f),
@@ -131,10 +134,6 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
             Spacer(Modifier.height(if (roomy) 22.dp else 10.dp))
             TipCard(time, roomy)
         }
-
-        // Spark in the spotlight takes the whole screen over: it goes red and glitches.
-        val glitch = io.github.projectwip.ui.rememberSparkGlitch { featured.id == io.github.projectwip.data.FighterId.BYTE }
-        io.github.projectwip.ui.SparkGlitchOverlay(glitch)
 
         if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
             GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)

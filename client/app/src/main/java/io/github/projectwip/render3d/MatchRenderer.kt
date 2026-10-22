@@ -772,6 +772,17 @@ class MatchRenderer(
             setModel(pl.x, 0.052f, pl.y, pl.blast, 1f, pl.blast); thinRing.draw()
         }
 
+        // Stars in the air: where each will burst, a ring that tightens as it comes down. Gold for the player's side, red for the other.
+        for (l in world.lobs) {
+            val u = (l.age / l.flight).coerceIn(0f, 1f)
+            val mine = l.team == p.team
+            if (mine) lit.v4("uTint", 1f, 0.8f, 0.2f, 0.08f + 0.12f * u) else lit.v4("uTint", 1f, 0.16f, 0.12f, 0.1f + 0.14f * u)
+            setModel(l.x, 0.046f, l.y, l.blast, 1f, l.blast); sector(360f).draw()
+            val r = l.blast * (1.6f - 0.6f * u)
+            if (mine) lit.v4("uTint", 1f, 0.85f, 0.3f, 0.7f) else lit.v4("uTint", 1f, 0.3f, 0.16f, 0.75f)
+            setModel(l.x, 0.052f, l.y, r, 1f, r); thinRing.draw()
+        }
+
         // A realm seen from outside: a turning rift on the ground where each of the two in it stands.
         for (f in world.fighters) {
             if (!f.alive || !f.inRealm || f.realm == p.realm) continue
@@ -899,7 +910,7 @@ class MatchRenderer(
                     }
                 } else {
                     val at = p.def.attack
-                    if (at.shape == AttackShape.PLANT) {
+                    if (at.shape == AttackShape.PLANT || at.shape == AttackShape.STAR) {
                         // Where the rocket will stick in the ground, and everything it will reach when it is set off.
                         val reach = min(1f, len) * at.range
                         val tx = px + dx * reach
@@ -1122,6 +1133,20 @@ class MatchRenderer(
                     setModel(x - dx * 0.68f * size, y, z - dz * 0.68f * size, flame * 1.6f, flame * 0.7f, flame * 0.7f, yaw); sphere.draw()
                 }
             }
+        }
+        // Lobbed stars: spinning end over end along their arc, with their trail.
+        for (l in world.lobs) {
+            val owner = world.fighter(l.ownerId) ?: continue
+            val skin = owner.def.skins[owner.skin]
+            val u = (l.age / l.flight).coerceIn(0f, 1f)
+            val x = lerp(l.fromX, l.x, u)
+            val z = lerp(l.fromY, l.y, u)
+            val y = 0.95f + (1.6f + hypot(l.x - l.fromX, l.y - l.fromY) * 0.3f) * 4f * u * (1f - u) - 0.75f * u
+            val yaw = -Math.toDegrees(atan2(l.y - l.fromY, l.x - l.fromX).toDouble()).toFloat()
+            val k = 0.42f
+            tint(skin.accent)
+            setModel(x, y, z, k, k, k, yaw + 90f + l.age * 900f); starShot.draw()
+            if (rng.nextFloat() < 0.6f) particles.spawn(x, y, z, 0f, 0.2f, 0f, 0.3f, 0.16f, skin.accent.toInt(), 0.8f)
         }
         // Planted rockets: lobbed over to their spot, then standing on their nose in the ground with a light blinking at the tail.
         for (pl in world.planted) {
@@ -1387,6 +1412,15 @@ class MatchRenderer(
                 repeat(10) {
                     val a = rng.nextFloat() * 6.28f
                     particles.spawn(f.x, 0.5f, f.y, cos(a) * 2f, 1f, sin(a) * 2f, 0.7f, 0.5f, 0xFFD8D2E6.toInt(), 0.4f)
+                }
+            }
+            is GameEvent.StarBurst -> world.fighter(e.ownerId)?.let { f ->
+                val skin = f.def.skins[f.skin]
+                particles.spawn(e.x, 0.6f, e.y, 0f, 0f, 0f, 0.25f, e.radius * 2.2f, skin.accent.toInt(), 0.6f)
+                repeat(12) {
+                    val a = it * 0.5236f + rng.nextFloat() * 0.3f
+                    val sp = 2.5f + rng.nextFloat() * 2.5f
+                    particles.spawn(e.x, 0.5f, e.y, cos(a) * sp, 1f + rng.nextFloat() * 2f, sin(a) * sp, 0.35f + rng.nextFloat() * 0.2f, 0.16f, if (it % 2 == 0) skin.accent.toInt() else skin.primary.toInt(), 0.9f)
                 }
             }
             is GameEvent.Burst -> {

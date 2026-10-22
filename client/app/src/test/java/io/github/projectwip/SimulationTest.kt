@@ -857,20 +857,26 @@ class SimulationTest {
         ammoMax = 4, reloadSeconds = 1.5f, superChargePerHit = 0.2f,
     )
 
-    @Test fun sparkThrowsAStarThatSlowsWhoeverItHitsForTwoSeconds() {
+    @Test fun sparkLobsAStarThatBurstsWhereItLandsAndSlowsEveryoneInItForTwoSeconds() {
         val spark = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "S", false)
         val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
-        val w = onOpenGround(spark, near)
+        val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
+        val w = onOpenGround(spark, near, far)
         assertEquals("Spark", spark.def.name)
         assertEquals(io.github.projectwip.data.AttackShape.STAR, spark.def.attack.shape)
-        spark.control.aimX = 1f; spark.control.aimY = 0f; spark.control.attack = true
+        // The aim is the spot: right on top of the near one.
+        spark.control.aimX = near.x - spark.x; spark.control.aimY = near.y - spark.y; spark.control.attack = true
         w.step(Match.STEP)
-        assertEquals(io.github.projectwip.sim.ShotStyle.STAR, w.projectiles.single().style)
-        var hitAt = -1f
-        var t = 0f
-        while (t < 1.5f && hitAt < 0f) { w.step(Match.STEP); t += Match.STEP; if (near.hp < near.maxHp) hitAt = t }
+        assertEquals("no shot along the ground, one star in the air", 0 to 1, w.projectiles.size to w.lobs.size)
+        seconds(w, Balance.STAR_FLIGHT_SECONDS * 0.8f)
+        assertEquals("nothing until it comes down", near.maxHp, near.hp)
+        seconds(w, Balance.STAR_FLIGHT_SECONDS * 0.4f)
+        assertTrue("then it has burst", w.lobs.isEmpty())
         assertEquals(near.maxHp - spark.attackDamage, near.hp)
+        assertEquals(1400, spark.attackDamage)
         assertTrue("and it is slowed", near.slowed)
+        assertEquals("only those in the burst", far.maxHp, far.hp)
+        assertFalse(far.slowed)
         // Slowed, it covers half the ground it would.
         val x0 = near.x
         near.control.moveX = 1f
@@ -883,6 +889,19 @@ class SimulationTest {
         near.control.moveX = 1f
         seconds(w, 0.5f)
         assertEquals(Balance.SLOW_FACTOR, slowedRun / (near.x - x1), 0.02f)
+    }
+
+    @Test fun aStraightShotThatSlowsStillSlowsWhoeverItHits() {
+        val def = Balance.fighter(FighterId.BYTE).let { it.copy(attack = it.attack.copy(shape = io.github.projectwip.data.AttackShape.LANCE, blast = 0f)) }
+        val shooter = Fighter(7, def, 1, 0, 0, "S", false)
+        val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
+        val w = onOpenGround(shooter, near)
+        shooter.control.aimX = near.x - shooter.x; shooter.control.aimY = near.y - shooter.y; shooter.control.attack = true
+        w.step(Match.STEP)
+        assertEquals(1, w.projectiles.size)
+        seconds(w, 1.5f)
+        assertEquals(near.maxHp - shooter.attackDamage, near.hp)
+        assertTrue("and it is slowed", near.slowed)
     }
 
     @Test fun sparksRealmHasFourShadowsThatStrikeInTurnEachOnceASecond() {

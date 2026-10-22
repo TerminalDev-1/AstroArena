@@ -478,14 +478,16 @@ class BotBrain(
         val range = me.def.attack.range
         val inRange = if (profile.shotDiscipline) d <= range * 0.92f else d <= range * 1.15f
         if (!inRange) return
-        if (profile.shotDiscipline && (!clear || t.shield > 0f)) return
+        // (A lob goes over walls: it needs no clear line.)
+        val lobbed = me.def.attack.shape == AttackShape.PLANT || me.def.attack.shape == AttackShape.STAR
+        if (profile.shotDiscipline && ((!clear && !lobbed) || t.shield > 0f)) return
         if (fireTimer > 0f || me.ammo < 1f || me.pending.isNotEmpty()) return
         // Skilled bots don't waste their last shots on long, low-odds pokes.
         if (profile.superSkill > 0.7f && me.ammo < 2f && d > range * 0.8f && t.hpFraction > 0.4f) return
         aimAt(t, me.def.attack.speed)
-        // A planted rocket is aimed at a spot, not along a line: where the target will be when it lands.
-        if (me.def.attack.shape == AttackShape.PLANT) {
-            val ahead = io.github.projectwip.data.Balance.PLANT_FLIGHT_SECONDS * profile.leadFactor
+        // A planted rocket or a lobbed star is aimed at a spot, not along a line: where the target will be when it lands.
+        if (me.def.attack.shape == AttackShape.PLANT || me.def.attack.shape == AttackShape.STAR) {
+            val ahead = (if (me.def.attack.shape == AttackShape.STAR) io.github.projectwip.data.Balance.STAR_FLIGHT_SECONDS else io.github.projectwip.data.Balance.PLANT_FLIGHT_SECONDS) * profile.leadFactor
             c.aimX = t.x + t.vx * ahead - me.x
             c.aimY = t.y + t.vy * ahead - me.y
         }

@@ -211,6 +211,14 @@ class Planted(val ownerId: Int, val team: Int, val fromX: Float, val fromY: Floa
     val landed get() = age >= flight
 }
 
+/**
+ * A star somebody lobbed (`AttackShape.STAR`): it flies in an arc from where it was thrown to ([x], [y]) in [flight]
+ * seconds, over anything in the way, and bursts there, hitting every enemy within [blast] and slowing them for [slow] seconds.
+ */
+class Lob(val ownerId: Int, val team: Int, val fromX: Float, val fromY: Float, val x: Float, val y: Float, val flight: Float, val blast: Float, val slow: Float) {
+    var age = 0f
+}
+
 /** A Power Cell lying on the ground. */
 class Pickup(val x: Float, val y: Float) {
     var alive = true
@@ -254,6 +262,8 @@ sealed interface GameEvent {
     data class Realm(val fighterId: Int, val targetId: Int, val open: Boolean) : GameEvent
     /** A rocket went off. */
     data class Burst(val x: Float, val y: Float, val radius: Float) : GameEvent
+    /** A lobbed star came down and burst. */
+    data class StarBurst(val ownerId: Int, val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A fighter fired a salvo of rockets into the sky. */
     data class Launch(val fighterId: Int, val count: Int) : GameEvent
     /** A marked patch of ground went off. */
