@@ -6,18 +6,25 @@
   2D ground plane; presentation is stylised 3D (tilted perspective camera, toon lighting, real-time shadows,
   inked outlines). A purpose-built renderer keeps the APK tiny, needs no engine export pipeline or asset
   store, and gives full control over timing and touch latency. All meshes are generated in code.
-* **Jetpack Compose for menus**, fully re-skinned (no Material components). Compose makes chunky animated
-  game UI (pressable plates, counting numbers, bursts) cheap to build and adapts well to phones vs tablets.
+* **Jetpack Compose for menus**, fully re-skinned (no Material components): notched steel-glass slabs, a
+  navigation rail and section tabs, all drawn in `ui/Components.kt`. Compose makes animated game UI (pressable
+  slabs, counting numbers, bursts, staggered entrances) cheap to build and adapts well to phones vs tablets.
 * **A pure-Kotlin simulation** (`sim/`, `ai/`, `data/` minus `SaveStore`) with no Android imports. It runs in
-  JVM unit tests — including full bot-vs-bot matches — and could later run on a server.
+  JVM unit tests (including full bot-vs-bot matches) and on the game server as the **referee**
+  (`client/referee`, built into `server/referee/referee.jar`), which replays every match from the player's
+  recorded inputs. So nothing in it may depend on wall-clock time, unseeded randomness or object identity.
 
 ## Layout
 
 ```
-data/     Balance (all numbers), Catalog (Cup Track, Shop), SaveData, Progression (pure rules),
+data/     Balance (all numbers), Catalog (Cup Track, Spark Road, Arena Boxes, Shop), SaveData,
+          Progression (pure rules), Economy (the server's rules, run on the device for the offline profile),
           SaveStore (JSON + AtomicFile), GameRepository (StateFlow the UI observes)
 sim/      Arena (tiles, collision, raycasts), Entities (Fighter, Projectile, Control, events),
-          World (fixed-step simulation + match rules), Match (world + bots + report)
+          World (fixed-step simulation + match rules), Boss (boss moves), Match (world + bots + report),
+          InputLog (the player's Control on every tick), Referee (replays a match from its input log)
+net/      GameServer (the HTTP API), LocalGame (the same requests answered on the device, offline),
+          DuelLink / TeamLink (lockstep 1v1 and team matches), Updater (GitHub release check)
 ai/       BotProfile (difficulty knobs), BotBrain (perception → intent → path/steer → dodge → aim),
           Pathfinder (A* + smoothing)
 gl/       Mesh/MeshBuilder (procedural primitives), Shaders (toon lit, depth, water, sprites), GlThread/Egl
@@ -25,7 +32,7 @@ render3d/ FighterModels (rigged 3D fighters), ArenaModel (3D arena + surrounding
           Stage (menu 3D stage, offscreen portraits), Toon (shadow map + shared lighting), Effects (particles)
 match/    MatchView (SurfaceView + HUD), MatchRunner (fixed-step sim, input, aim assist, feedback),
           HudView/HudSnapshot (2D overlay fed by the render thread), TouchControls (twin-stick input)
-audio/    Sfx (runtime-synthesised effects + haptics)
+audio/    SfxSynth (the synth: every effect and piece of music), Sfx (effects + haptics), Music (looping tracks)
 ui/       Theme, Components, Icons, App (navigation), screens/*
 ```
 
@@ -49,12 +56,18 @@ props — plus the selected fighter on a pedestal. Screens describe what they wa
 between shots and uses a lens shift so the fighter lands exactly in the layout's hero column. The lobby is
 removed during matches. `Portraits` renders every fighter/skin once offscreen (MSAA FBO → bitmap) for cards.
 
-## Shop & Offer Creator
+## Server, offline profile and the shop
 
-Fixed catalog items live in `data/Catalog.kt`. Player-made offers are `CustomOffer`s stored in the save:
-contents (Bolts, Prisms, a fighter, a colourway — bundled as `Reward.Bundle`), price currency (free/Bolts/
-Prisms), optional "was" price shown as a discount, expiry, purchase limit and colour theme. Purchases go
-through `Progression.buyOffer`; already-owned items in a bundle are compensated rather than wasted.
+The server owns every account: Cups, Arena Boxes, Upgrade Credits, CPU Chips (`drops`, `bolts` and `prisms` in
+the code), fighters and claims. The client's online save is a copy of what it sends (`Progression.syncAccount`),
+and menus never change it themselves: they ask through `LocalServerCall`, written against `GameActions`, which
+both `GameServer` and `LocalGame` implement. While the server can't be reached, `LocalGame` answers the same
+requests from the offline profile (`files/offline.json`) with the same rules (`data/Economy.kt`, which must match
+`server/astro/economy.py` and `rules.py`).
+
+The shop is the daily gift, the day's offers (`server/shop.cfg`) and deals that developers make in the in-game
+Offer Creator and the server stores; prices are the server's. Fixed catalog items shown by the client live in
+`data/Catalog.kt` as display copies.
 
 Humans and bots drive fighters through the **same `Control` struct** — move vector, aim vector, one-shot
 attack/super triggers — so bots can't cheat on stats or speed, and visibility (thickets) is enforced for
@@ -101,7 +114,8 @@ beats Easy with identical stats, so difficulty truly comes from behaviour.
 
 `Progression` is a set of pure functions `(SaveData, …) -> SaveData`. `GameRepository` applies them and
 persists every change on a background thread. Cup Track rewards unlock against **best** Cups so losing Cups
-never takes away a reached reward; owned duplicates are compensated (`CupTrack.duplicateCompensation`).
+never takes away a reached reward.
+Credits go straight onto the **Spark Road** toward the next fighter, who unlocks the moment they cover the cost.
 
 ## Responsive UI
 
