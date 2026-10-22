@@ -75,18 +75,19 @@ object SfxSynth {
         Sound.CREDIT_LAND -> creditLand().finish(0.66f)
     }
 
-    const val LOBBY_BPM = 112f
+    const val LOBBY_BPM = 128f
     const val LOBBY_BARS = 16
 
     /**
-     * The lobby music (third edition, written from scratch): sixteen bars of bright, bouncy synth-pop at 112 BPM in
+     * The lobby music (fourth edition: the third, given drive): sixteen bars of punchy synth-pop at 128 BPM in
      * F major over Fmaj7 - Am7 - Dm7 - Bbmaj7. Four four-bar sections:
-     *  1. groove: a soft four-on-the-floor, claps, a shaker, an octave-bouncing bass and electric-piano stabs;
-     *  2. the same with a round square-wave lead singing the tune;
+     *  1. groove: a hard four-on-the-floor, a snare with claps on two and four, open hats on the off-beats, a rolling
+     *     sixteenth-note bass, electric-piano stabs and a quiet arpeggio already running;
+     *  2. the same with a bright square-and-saw lead singing the tune;
      *  3. breakdown: the kick drops out, glassy sixteenth-note arpeggios climb over a swelling pad, and a snare roll
      *     and a rising hiss build into
      *  4. everything back in with a cymbal, the tune again with a harmony a third under it.
-     * Tails are folded back onto the start, so the returned samples loop without a seam.
+     * The pad pumps hard against the kick. Tails are folded back onto the start, so the samples loop without a seam.
      */
     fun renderLobbyMusic(): FloatArray {
         val beat = 60f / LOBBY_BPM
@@ -109,21 +110,31 @@ object SfxSynth {
             if (!breakdown) {
                 for (b in 0 until 4) {
                     val at = t0 + b * beat
-                    drums.osc(Wave.SINE, at, 0.35f, { glide(it, 0.06f, 160f, 46f) }, { perc(it, 0.001f, 0.11f) * 1.0f })
-                    drums.noise(3000 + bar * 4 + b, at, 0.01f, Band.HIGH, { 4000f }, 0.7f, { perc(it, 0.0003f, 0.003f) * 0.22f })
+                    drums.osc(Wave.SINE, at, 0.35f, { glide(it, 0.045f, 190f, 44f) }, { perc(it, 0.001f, 0.12f) * 1.15f })
+                    drums.noise(3000 + bar * 4 + b, at, 0.012f, Band.HIGH, { 4500f }, 0.7f, { perc(it, 0.0003f, 0.004f) * 0.32f })
+                    // An open hat on the off-beat.
+                    drums.noise(3200 + bar * 4 + b, at + beat / 2, 0.16f, Band.HIGH, { 7500f }, 0.7f, { perc(it, 0.001f, 0.05f) * 0.14f })
                 }
-                // Claps on two and four: three quick bursts and a tail.
-                for (b in intArrayOf(1, 3)) for ((k, off) in floatArrayOf(0f, 0.011f, 0.022f).withIndex()) {
-                    drums.noise(3100 + bar * 8 + b * 3 + k, t0 + b * beat + off, if (k == 2) 0.2f else 0.02f, Band.BAND, { 1400f }, 0.8f,
-                        { perc(it, 0.0005f, if (k == 2) 0.06f else 0.006f) * 0.4f })
+                // Snare and claps on two and four: a tuned body, a burst of noise, and three quick claps with a tail.
+                for (b in intArrayOf(1, 3)) {
+                    val at = t0 + b * beat
+                    drums.osc(Wave.SINE, at, 0.15f, { glide(it, 0.03f, 260f, 180f) }, { perc(it, 0.001f, 0.05f) * 0.42f })
+                    drums.noise(3150 + bar * 4 + b, at, 0.2f, Band.BAND, { 2600f }, 0.6f, { perc(it, 0.001f, 0.075f) * 0.38f })
+                    for ((k, off) in floatArrayOf(0f, 0.011f, 0.022f).withIndex()) {
+                        drums.noise(3100 + bar * 8 + b * 3 + k, at + off, if (k == 2) 0.2f else 0.02f, Band.BAND, { 1400f }, 0.8f,
+                            { perc(it, 0.0005f, if (k == 2) 0.06f else 0.006f) * 0.34f })
+                    }
                 }
-                // Bass: root and octave, bouncing in eighths, the last one of the bar leaning on the fifth.
-                for (k in 0 until 8) {
-                    val n = root + (if (k % 2 == 1) 12 else 0) + (if (k == 7) 7 - 12 else 0)
-                    val at = t0 + k * beat / 2
-                    bass.osc(Wave.SAW, at, beat * 0.45f, { hz(n) }, { perc(it, 0.003f, 0.09f) * 0.42f })
-                    bass.osc(Wave.SINE, at, beat * 0.45f, { hz(n) }, { hold(it, 0.003f, beat * 0.32f, 0.03f) * 0.5f })
+                // Bass: rolling sixteenths that step round the kick, the octave on the off-beat, the fifth at the bar's end.
+                for (k in 0 until 16) {
+                    if (k % 4 == 0) continue
+                    val n = root + (if (k % 4 == 2) 12 else 0) + (if (k >= 14) 7 else 0)
+                    val at = t0 + k * beat / 4
+                    bass.osc(Wave.SAW, at, beat * 0.24f, { hz(n) }, { perc(it, 0.002f, 0.06f) * 0.46f })
+                    bass.osc(Wave.SINE, at, beat * 0.24f, { hz(n) }, { hold(it, 0.002f, beat * 0.17f, 0.02f) * 0.5f })
                 }
+                // A quiet arpeggio keeps things moving under everything else.
+                for (k in 0 until 16) arp.bell(t0 + k * beat / 4, ch[intArrayOf(0, 2, 1, 3)[k % 4]] + 24, 0.035f, 0.05f)
                 // Electric-piano stabs on the off-beats, with a push into beat three.
                 for (at in floatArrayOf(0.5f, 1.5f, 2.25f, 2.5f, 3.5f)) for (n in ch) {
                     keys.fm(t0 + at * beat, 0.5f, { hz(n + 12) }, 1f, { 1.6f * exp(-it / 0.08f) }, { perc(it, 0.002f, 0.16f) * 0.06f })
@@ -144,8 +155,8 @@ object SfxSynth {
             // Pad: warm detuned saws on the chord, swelling in the breakdown and ducked by the kick elsewhere.
             for (n in ch) for (det in floatArrayOf(0.996f, 1.004f)) {
                 pad.osc(Wave.SAW, t0, 4 * beat + 0.3f, { hz(n) * det }, { t ->
-                    val duck = if (breakdown) 0.5f + 0.5f * (bar - 8 + t / (4 * beat)) / 4f else 0.3f + 0.7f * min(1f, (t % beat) / (beat * 0.6f))
-                    hold(t, 0.12f, 4 * beat - 0.1f, 0.2f) * 0.04f * duck
+                    val duck = if (breakdown) 0.5f + 0.5f * (bar - 8 + t / (4 * beat)) / 4f else 0.08f + 0.92f * min(1f, (t % beat) / (beat * 0.55f)).pow(1.6f)
+                    hold(t, 0.12f, 4 * beat - 0.1f, 0.2f) * 0.05f * duck
                 })
             }
         }
@@ -168,8 +179,9 @@ object SfxSynth {
         fun thirdUnder(n: Int): Int { val i = scale.indexOf(n % 12); val m = scale[(i + 5) % 7]; return n - ((n % 12 - m + 12) % 12) }
         fun sing(n: Int, start: Float, dur: Float, gain: Float) {
             val vib = { t: Float -> 1f + 0.005f * sin(TAU * 5.2f * t) * min(1f, t / 0.25f) }
-            lead.osc(Wave.SQUARE, start, dur + 0.12f, { hz(n) * vib(it) }, { hold(it, 0.008f, dur - 0.03f, 0.05f) * 0.07f * gain })
-            lead.osc(Wave.TRI, start, dur + 0.12f, { hz(n) * 1.003f * vib(it) }, { hold(it, 0.008f, dur - 0.03f, 0.05f) * 0.14f * gain })
+            lead.osc(Wave.SQUARE, start, dur + 0.12f, { hz(n) * vib(it) }, { hold(it, 0.005f, dur - 0.03f, 0.05f) * 0.08f * gain })
+            lead.osc(Wave.SAW, start, dur + 0.12f, { hz(n) * 0.996f * vib(it) }, { hold(it, 0.005f, dur - 0.03f, 0.05f) * 0.05f * gain })
+            lead.osc(Wave.TRI, start, dur + 0.12f, { hz(n) * 1.003f * vib(it) }, { hold(it, 0.005f, dur - 0.03f, 0.05f) * 0.12f * gain })
         }
         for (section in intArrayOf(1, 3)) for ((at, n, len) in tune) {
             val start = (section * 16 + at) * beat
@@ -180,15 +192,15 @@ object SfxSynth {
         bass.drive(1.8f)
         keys.filter(Band.LOW, 0.8f) { 4200f }
         pad.filter(Band.LOW, 0.8f) { 1800f }
-        lead.filter(Band.LOW, 1f) { 4800f }
-        lead.echo(beat * 0.75f, 0.3f, 0.22f)
+        lead.filter(Band.LOW, 1.1f) { 6000f }
+        lead.echo(beat * 0.75f, 0.3f, 0.2f)
         arp.echo(beat * 0.5f, 0.3f, 0.25f)
         keys.echo(beat * 0.5f, 0.2f, 0.15f)
 
         val c = Clip(total)
         c.mix(drums).mix(bass).mix(keys).mix(pad).mix(lead).mix(arp)
-        c.drive(1.3f)
-        c.reverb(0.16f, 0.7f)
+        c.drive(1.5f)
+        c.reverb(0.12f, 0.6f)
         return loopOut(c, ((bars * 4 * beat) * RATE).toInt(), 0.85f)
     }
 
@@ -202,13 +214,13 @@ object SfxSynth {
     }
 
     /**
-     * Victory theme (result screen, second edition): eight soaring bars at 132 BPM in D major over
-     * D - Bm - G - A - D - F#m - G - A. A brass hit held by strings on each bar, a driving kick and claps, an octave
-     * bass, timpani rolling into each half, glittering sixteenth-note bells and a brass tune doubled by bells an octave
+     * Victory theme (result screen, third edition: the second, faster and harder): eight soaring bars at 148 BPM in D major over
+     * D - Bm - G - A - D - F#m - G - A. A brass hit held by strings on each bar, a driving kick, a snare and claps, open hats, a
+     * rolling sixteenth-note bass, timpani rolling into each half, glittering sixteenth-note bells and a brass tune doubled by bells an octave
      * up, which climbs to its peak in the second half. Its own piece, not the lobby loop.
      */
     fun renderVictoryMusic(): FloatArray {
-        val beat = 60f / 132f
+        val beat = 60f / 148f
         val bars = 8
         val total = bars * 4 * beat + 3f
         val chords = listOf(
@@ -227,7 +239,12 @@ object SfxSynth {
             val t0 = bar * 4 * beat
             for (b in 0 until 4) {
                 val at = t0 + b * beat
-                drums.osc(Wave.SINE, at, 0.32f, { glide(it, 0.06f, 170f, 48f) }, { perc(it, 0.001f, 0.1f) * 0.95f })
+                drums.osc(Wave.SINE, at, 0.32f, { glide(it, 0.045f, 200f, 46f) }, { perc(it, 0.001f, 0.11f) * 1.1f })
+                drums.noise(4600 + bar * 4 + b, at + beat / 2, 0.15f, Band.HIGH, { 7500f }, 0.7f, { perc(it, 0.001f, 0.045f) * 0.13f })
+                if (b % 2 == 1) {
+                    drums.osc(Wave.SINE, at, 0.15f, { glide(it, 0.03f, 270f, 185f) }, { perc(it, 0.001f, 0.05f) * 0.4f })
+                    drums.noise(4700 + bar * 4 + b, at, 0.2f, Band.BAND, { 2600f }, 0.6f, { perc(it, 0.001f, 0.07f) * 0.36f })
+                }
                 if (b % 2 == 1) for ((k, off) in floatArrayOf(0f, 0.012f, 0.024f).withIndex()) {
                     drums.noise(4000 + bar * 8 + b * 3 + k, at + off, if (k == 2) 0.2f else 0.02f, Band.BAND, { 1500f }, 0.8f,
                         { perc(it, 0.0005f, if (k == 2) 0.07f else 0.006f) * 0.42f })
@@ -238,11 +255,11 @@ object SfxSynth {
                 // Glittering bells on the chord, rising and falling.
                 bells.bell(t0 + k * beat / 4, ch[intArrayOf(0, 1, 2, 1)[k % 4]] + 24 + (if (k >= 8 && k % 2 == 1) 12 else 0), 0.05f, 0.05f)
             }
-            // Octave bass in eighths.
-            for (k in 0 until 8) {
+            // Rolling bass in sixteenths, the octave on every other one.
+            for (k in 0 until 16) {
                 val n = root + if (k % 2 == 1) 12 else 0
-                bass.osc(Wave.SAW, t0 + k * beat / 2, beat * 0.45f, { hz(n) }, { perc(it, 0.003f, 0.1f) * 0.4f })
-                bass.osc(Wave.SINE, t0 + k * beat / 2, beat * 0.45f, { hz(n) }, { hold(it, 0.003f, beat * 0.34f, 0.03f) * 0.5f })
+                bass.osc(Wave.SAW, t0 + k * beat / 4, beat * 0.22f, { hz(n) }, { perc(it, 0.002f, 0.055f) * 0.42f })
+                bass.osc(Wave.SINE, t0 + k * beat / 4, beat * 0.22f, { hz(n) }, { hold(it, 0.002f, beat * 0.16f, 0.02f) * 0.48f })
             }
             // The chord: a brass hit on one, held by strings for the bar.
             for (n in ch) {
@@ -282,8 +299,8 @@ object SfxSynth {
 
         val c = Clip(total)
         c.mix(drums).mix(bass).mix(horn).mix(strings).mix(bells)
-        c.drive(1.25f)
-        c.reverb(0.2f, 0.72f)
+        c.drive(1.45f)
+        c.reverb(0.15f, 0.62f)
         return loopOut(c, ((bars * 4 * beat) * RATE).toInt(), 0.82f)
     }
 
