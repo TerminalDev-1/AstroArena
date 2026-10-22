@@ -327,7 +327,7 @@ fun DropHaulOverlay(results: List<BoxItem>, boltsNow: Int, prismsNow: Int, roadN
                         if (prisms > 0) Total(IconKind.PRISM, "+%,d".format(prisms))
                         if (credits > 0) Total(IconKind.CREDIT, "+%,d".format(credits))
                         if (unlocks > 0) Total(IconKind.FIGHTERS, "$unlocks NEW")
-                        ChunkyButton(onDone, Modifier.size(190.dp, 60.dp), ButtonStyle.GREEN) { GameText("AWESOME", Type.Heading) }
+                        ChunkyButton(onDone, Modifier.size(190.dp, 60.dp), ButtonStyle.GREEN) { GameText("AWESOME", Type.Label, outline = 2.dp) }
                     }
                 }
             }

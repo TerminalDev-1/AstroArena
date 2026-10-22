@@ -350,7 +350,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             screen !is Screen.Match && capsule == null && haul == null && lobby.showFighter && lobby.fighter == FighterId.BYTE &&
                 lobby.shot != io.github.projectwip.render3d.LobbyShot.ROAD
         }
-        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalCutout provides cutoutSides, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalOfflineGame provides local, LocalOfflineMode provides offline, LocalDev provides dev, LocalServerCall provides ask) {
+        CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalCutout provides cutoutSides, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalOfflineGame provides local, LocalOfflineMode provides offline, LocalDev provides dev, LocalServerCall provides ask, LocalNav provides go) {
             if (screen !is Screen.Match) {
                 androidx.compose.ui.viewinterop.AndroidView(
                     factory = { ctx -> io.github.projectwip.render3d.LobbyView(ctx, lobby) },
@@ -371,13 +371,17 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     (if (targetState is Screen.Match || initialState is Screen.Match) {
                         fadeIn(tween(250)) togetherWith fadeOut(tween(200))
                     } else {
-                        (slideInHorizontally(tween(260)) { w -> if (forward) w / 4 else -w / 4 } + fadeIn(tween(220))) togetherWith
-                            (slideOutHorizontally(tween(220)) { w -> if (forward) -w / 6 else w / 6 } + fadeOut(tween(180)))
+                        // Forward, the new screen rises out of the scene and the old one recedes; back, the reverse.
+                        val ease = androidx.compose.animation.core.FastOutSlowInEasing
+                        (slideInHorizontally(tween(320, easing = ease)) { w -> if (forward) w / 10 else -w / 10 } +
+                            androidx.compose.animation.scaleIn(tween(320, easing = ease), if (forward) 0.94f else 1.04f) + fadeIn(tween(240, 40))) togetherWith
+                            (slideOutHorizontally(tween(220, easing = ease)) { w -> if (forward) -w / 14 else w / 14 } +
+                                androidx.compose.animation.scaleOut(tween(220, easing = ease), if (forward) 1.03f else 0.95f) + fadeOut(tween(180)))
                     }) using androidx.compose.animation.SizeTransform(clip = false)
                 },
                 label = "screens",
             ) { s ->
-                when (s) {
+                CompositionLocalProvider(LocalScreen provides s) { when (s) {
                     Screen.Home -> HomeScreen(save, repo, go, showReward, openCapsule)
                     is Screen.Fighters -> FightersScreen(save, repo, s.focus, go)
                     Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
@@ -417,7 +421,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                             }
                         })
                     is Screen.Result -> ResultScreen(s.summary, s.rewards, save, go)
-                }
+                } }
             }
 
             AnimatedVisibility(reveal != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
@@ -426,16 +430,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             // On top of everything: the loading screen, then (if a newer release exists) the update screen.
             // Server status in the corner. (Its notice is part of the home screen.)
             // (Not over Settings: its tabs run down that corner, and Settings > Modes says the same.)
-            if (screen !is Screen.Match && screen !is Screen.Settings && capsule == null && haul == null && reveal == null) {
-                PlainText(
-                    if (serverStatus.online && !offline) "● ONLINE" else "● OFFLINE · CHAOS MODE · your offline profile, kept on this device", Type.Small,
-                    if (screen is Screen.Home) Modifier.align(Alignment.TopStart).windowInsetsPadding(cutout).padding(start = 22.dp, top = 68.dp)
-                    // On a phone the bottom corner is under a panel on most screens; the top edge is clear on all of them.
-                    else if (!metrics.roomy) Modifier.align(Alignment.TopCenter).padding(top = 3.dp)
-                    else Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 12.dp),
-                    color = if (serverStatus.online) Palette.Positive else Palette.TextDim,
-                )
-            }
+            // (Online or offline: sub-screens say it in their header, the home screen under its top bar.)
             if (!booting) update?.let { io.github.projectwip.ui.screens.UpdateScreen(it) { update = null } }
             if (!booting && update == null && !serverStatus.supported && !unsupportedSkipped) {
                 io.github.projectwip.ui.screens.UnsupportedScreen(serverStatus.message, REPO_RELEASES) { unsupportedSkipped = true }

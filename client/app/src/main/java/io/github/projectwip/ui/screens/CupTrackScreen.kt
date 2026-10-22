@@ -79,11 +79,11 @@ fun CupTrackScreen(save: SaveData, @Suppress("UNUSED_PARAMETER") repo: GameRepos
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("CUP TRACK", { go(Screen.Home) }, save.bolts, save.prisms) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    GameIcon(IconKind.CUP, Modifier.size(46.dp))
-                    Spacer(Modifier.width(6.dp))
+                    GameIcon(IconKind.CUP, Modifier.size(36.dp))
+                    Spacer(Modifier.width(4.dp))
                     Column {
-                        GameText("%,d".format(save.cups), Type.Title, color = Palette.Gold, outline = 3.dp)
-                        PlainText("Best: %,d".format(save.bestCups), Type.Small)
+                        GameText("%,d".format(save.cups), Type.Heading, color = Palette.Gold, outline = 2.dp)
+                        PlainText("BEST %,d".format(save.bestCups), Type.Eyebrow, maxLines = 1)
                     }
                 }
             }

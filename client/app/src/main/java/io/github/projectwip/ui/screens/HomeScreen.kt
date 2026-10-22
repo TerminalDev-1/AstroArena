@@ -2,6 +2,10 @@ package io.github.projectwip.ui.screens
 
 import io.github.projectwip.ui.bleed
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.drawBehind
+import io.github.projectwip.ui.enterFrom
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -88,91 +92,97 @@ fun HomeScreen(
     val canUpgradeAny = Balance.fighters.any { Progression.canUpgrade(save, it.id) }
     val claimable = Progression.claimable(save).size
     val giftReady = Progression.dailyGiftAvailable(save, repo.today)
+    // The player's place among the real accounts on the server; unknown while offline.
+    val rank = serverStatus?.account?.takeIf { serverStatus.online }?.rank
     var picking by remember { mutableStateOf(false) }
 
     LobbyShotEffect(LobbyShot.HOME, save.selectedFighter, prog.skin)
 
     Box(Modifier.fillMaxSize()) {
         LobbyVignette()
-        Column(Modifier.fillMaxSize()) {
-            // ---------------- top bar
-            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                // The profile plate takes whatever room the fixed buttons leave, so none of them is ever squeezed.
-                Box(Modifier.weight(1f)) { ProfileAndCups(save, claimable) { go(Screen.CupTrack) } }
-                Spacer(Modifier.width(10.dp))
-                // The player's place among the real accounts on the server; unknown while offline.
-                val status = io.github.projectwip.ui.LocalServer.current?.status?.collectAsState()?.value
-                val rank = status?.account?.takeIf { status.online }?.rank?.toString() ?: "?"
-                ChunkyButton({ go(Screen.Leaderboard) }, Modifier.size(104.dp, 58.dp), ButtonStyle.GLASS, lip = 4.dp) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        GameText("#$rank", Type.Heading, color = Palette.Gold, outline = 2.5.dp)
-                        PlainText("LEADERBOARD", Type.Small, color = Color.White, maxLines = 1)
-                    }
-                }
-                Spacer(Modifier.width(6.dp))
-                ChunkyButton({ go(Screen.News) }, Modifier.size(58.dp, 58.dp), ButtonStyle.GLASS, lip = 4.dp) {
-                    GameText("NEWS", Type.Label, color = Palette.Cyan, outline = 2.dp)
-                }
-                Spacer(Modifier.width(10.dp))
-                CurrencyPill(IconKind.BOLT, save.bolts)
-                Spacer(Modifier.width(10.dp))
-                CurrencyPill(IconKind.PRISM, save.prisms, onClick = { go(Screen.Shop) })
-                Spacer(Modifier.width(12.dp))
-                ChunkyButton({ go(Screen.Settings) }, Modifier.size(52.dp, 50.dp), ButtonStyle.GLASS) {
-                    GameIcon(IconKind.GEAR, Modifier.size(28.dp))
-                }
+        Row(Modifier.fillMaxSize()) {
+            // ---------------- the rail: every place to go, down the left edge
+            NavRail {
+                Spacer(Modifier.weight(0.4f))
+                RailItem("SHOP", IconKind.SHOP, if (giftReady) "FREE" else null, Palette.GreenDeep, 0) { go(Screen.Shop) }
+                RailItem("FIGHTERS", IconKind.FIGHTERS, if (canUpgradeAny) "UP" else null, Palette.GreenDeep, 1) { go(Screen.Fighters()) }
+                RailItem("RANKS", IconKind.RANK, rank?.let { "#$it" }, Palette.CyanDeep, 2) { go(Screen.Leaderboard) }
+                RailItem("NEWS", IconKind.NEWS, null, Palette.Red, 3) { go(Screen.News) }
+                Spacer(Modifier.weight(1f))
+                RailItem("SETTINGS", IconKind.GEAR, null, Palette.Red, 4) { go(Screen.Settings) }
             }
 
-            Row(Modifier.weight(1f).fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 16.dp)) {
-                Column(Modifier.weight(1f).fillMaxHeight()) {
-                    Row(Modifier.weight(1f).fillMaxWidth()) {
-                        // ---------------- left rail
-                        Column(Modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)) {
-                            NavTile("SHOP", IconKind.SHOP, if (giftReady) "FREE" else null, Palette.Green) { go(Screen.Shop) }
-                            NavTile("FIGHTERS", IconKind.FIGHTERS, if (canUpgradeAny) "UP" else null, Palette.Green) { go(Screen.Fighters()) }
-                            // The Cup Track has no tile: the Cups panel in the top bar opens it and carries its badge.
-                        }
-
-                        // ---------------- hero (the 3D fighter stands here; this column is see-through)
-                        Box(Modifier.weight(1f).fillMaxHeight().lobbyAnchor(), contentAlignment = Alignment.BottomCenter) {
-                            NamePlate(save) { go(Screen.Fighters(save.selectedFighter)) }
-                        }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    // ---------------- bottom left: the Spark Road
-                    RoadButton(save, Modifier.width(if (ui.wide) 220.dp else 190.dp)) { go(Screen.Road) }
-                }
-                Spacer(Modifier.width(12.dp))
-
-                // ---------------- mode + play
-                Column(
-                    Modifier.width(if (ui.wide) 330.dp else 280.dp).fillMaxHeight(),
-                    verticalArrangement = Arrangement.Bottom,
-                    horizontalAlignment = Alignment.End,
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                // ---------------- top bar: Cups and the Cup Track on the left, the wallet on the right
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp).enterFrom(60, dy = (-12).dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val dropsOnly = save.settings.glitchDropsOnly
-                    // Boss Mode or 3v3 with one or two real players, by team code.
-                    if (!dropsOnly && !io.github.projectwip.ui.LocalOfflineMode.current) ChunkyButton({ go(Screen.Team) }, Modifier.fillMaxWidth().height(50.dp), ButtonStyle.GLASS, lip = 4.dp) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            GameIcon(IconKind.FIGHTERS, Modifier.size(24.dp))
-                            Spacer(Modifier.width(8.dp))
-                            GameText("TEAM UP", Type.Heading, color = Palette.Positive, outline = 2.5.dp)
-                            PlainText("  ·  play with friends", Type.Small, color = Color.White, maxLines = 1)
+                    // The Cups panel takes whatever room the wallet leaves, so nothing is ever squeezed.
+                    Box(Modifier.weight(1f)) { ProfileAndCups(save, claimable) { go(Screen.CupTrack) } }
+                    Spacer(Modifier.width(12.dp))
+                    CurrencyPill(IconKind.BOLT, save.bolts)
+                    Spacer(Modifier.width(10.dp))
+                    CurrencyPill(IconKind.PRISM, save.prisms, onClick = { go(Screen.Shop) })
+                }
+
+                Row(Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 18.dp, bottom = 14.dp)) {
+                    Column(Modifier.weight(1f).fillMaxHeight()) {
+                        // ---------------- hero (the 3D fighter stands here; this space is see-through)
+                        Box(Modifier.weight(1f).fillMaxWidth().lobbyAnchor(), contentAlignment = Alignment.BottomCenter) {
+                            NamePlate(save, Modifier.enterFrom(200)) { go(Screen.Fighters(save.selectedFighter)) }
                         }
-                    }
-                    if (!dropsOnly) Spacer(Modifier.height(10.dp))
-                    CapsuleButton(if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today), online || io.github.projectwip.ui.LocalOfflineMode.current, dropsOnly, openCapsule)
-                    // Arena Boxes only: no fights, just drops.
-                    if (!dropsOnly) {
                         Spacer(Modifier.height(10.dp))
-                        ModeChip(save.selectedMode, save.settings.botDifficulty) { picking = true }
-                        Spacer(Modifier.height(12.dp))
-                        PlayButton { go(Screen.Match(startMatchConfig(save))) }
+                        // ---------------- bottom left: the Spark Road
+                        RoadButton(save, Modifier.width(if (ui.wide) 240.dp else 200.dp).enterFrom(260, dx = (-16).dp, dy = 0.dp)) { go(Screen.Road) }
+                    }
+                    Spacer(Modifier.width(12.dp))
+
+                    // ---------------- mode + play
+                    Column(
+                        Modifier.width(if (ui.wide) 330.dp else 280.dp).fillMaxHeight(),
+                        verticalArrangement = Arrangement.Bottom,
+                        horizontalAlignment = Alignment.End,
+                    ) {
+                        val dropsOnly = save.settings.glitchDropsOnly
+                        // Boss Mode or 3v3 with one or two real players, by team code.
+                        if (!dropsOnly && !io.github.projectwip.ui.LocalOfflineMode.current) {
+                            ChunkyButton({ go(Screen.Team) }, Modifier.fillMaxWidth().height(48.dp).enterFrom(120, dx = 24.dp, dy = 0.dp), ButtonStyle.GLASS, lip = 4.dp, cut = 10.dp) {
+                                Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    GameIcon(IconKind.FIGHTERS, Modifier.size(26.dp))
+                                    Spacer(Modifier.width(10.dp))
+                                    GameText("TEAM UP", Type.Heading, color = Palette.Positive, outline = 2.dp)
+                                    Spacer(Modifier.weight(1f))
+                                    PlainText("PLAY WITH FRIENDS", Type.Eyebrow, color = Palette.TextDim, maxLines = 1)
+                                }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        CapsuleButton(
+                            if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today),
+                            online || io.github.projectwip.ui.LocalOfflineMode.current, dropsOnly, Modifier.enterFrom(170, dx = 24.dp, dy = 0.dp), openCapsule,
+                        )
+                        // Arena Boxes only: no fights, just drops.
+                        if (!dropsOnly) {
+                            Spacer(Modifier.height(10.dp))
+                            ModeChip(save.selectedMode, save.settings.botDifficulty, Modifier.enterFrom(220, dx = 24.dp, dy = 0.dp)) { picking = true }
+                            Spacer(Modifier.height(12.dp))
+                            PlayButton(Modifier.enterFrom(280, dx = 24.dp, dy = 0.dp)) { go(Screen.Match(startMatchConfig(save))) }
+                        }
                     }
                 }
             }
         }
 
+        // Online, or the offline profile: under the Cups panel. It steps aside for the mode picker.
+        if (!picking) {
+            val offline = !online || io.github.projectwip.ui.LocalOfflineMode.current
+            PlainText(
+                if (!offline) "● ONLINE" else "● OFFLINE · CHAOS MODE · your offline profile, kept on this device", Type.Small,
+                Modifier.align(Alignment.TopStart).padding(start = if (ui.roomy) 108.dp else 92.dp, top = 70.dp),
+                color = if (!offline) Palette.Positive else Palette.TextDim, maxLines = 1,
+            )
+        }
         // The server's notice, across the top. It steps aside for the mode picker.
         val notice = serverStatus?.notice.orEmpty()
         if (online && notice.isNotBlank() && !picking) {
@@ -186,6 +196,61 @@ fun HomeScreen(
     }
 }
 
+// ---------------------------------------------------------------------------------------------- rail
+
+/** A strip of dark glass down the left edge holding the [RailItem]s, with a hairline of rim light along its edge. */
+@Composable
+private fun NavRail(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    val ui = LocalUi.current
+    Column(
+        Modifier.fillMaxHeight().width(if (ui.roomy) 92.dp else 78.dp)
+            .drawBehind {
+                drawRect(Brush.horizontalGradient(listOf(Color(0xFA050E18), Color(0xF00B1C2E))))
+                drawRect(Brush.verticalGradient(listOf(Palette.Rim.copy(alpha = 0.15f), Color.Transparent), 0f, size.height * 0.35f))
+                drawLine(Brush.verticalGradient(listOf(Color.Transparent, Palette.Rim.copy(alpha = 0.6f), Color.Transparent)), Offset(size.width - 1f, 0f), Offset(size.width - 1f, size.height), 1.5.dp.toPx())
+            }
+            .padding(vertical = if (ui.roomy) 14.dp else 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(if (ui.roomy) 6.dp else 2.dp),
+        content = content,
+    )
+}
+
+/** One place on the rail: its icon in a pool of light over a tracked label, with a [badge] at the corner. */
+@Composable
+private fun RailItem(label: String, icon: IconKind, badge: String?, badgeColor: Color, order: Int, onClick: () -> Unit) {
+    val ui = LocalUi.current
+    val sfx = io.github.projectwip.ui.LocalSfx.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val press by animateFloatAsState(if (pressed) 1f else 0f, tween(80), label = "rail")
+    Box(Modifier.enterFrom(order * 50, dx = (-18).dp, dy = 0.dp)) {
+        Column(
+            Modifier.width(if (ui.roomy) 80.dp else 70.dp).height(if (ui.roomy) 78.dp else 62.dp)
+                .graphicsLayer { val k = 1f - 0.06f * press; scaleX = k; scaleY = k }
+                .clickable(interaction, null) { sfx?.play(Sound.TAP); onClick() }
+                .drawBehind {
+                    if (press > 0f) drawRoundRect(Palette.Rim.copy(alpha = 0.16f * press), cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()))
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Canvas(Modifier.size(if (ui.roomy) 52.dp else 42.dp)) {
+                    drawCircle(Brush.radialGradient(listOf(Palette.Rim.copy(alpha = 0.3f), Palette.Rim.copy(alpha = 0.06f), Color.Transparent)))
+                }
+                GameIcon(icon, Modifier.size(if (ui.roomy) 40.dp else 32.dp))
+            }
+            Spacer(Modifier.height(2.dp))
+            PlainText(label, Type.Eyebrow.copy(letterSpacing = 1.2.sp), color = Color.White, maxLines = 1)
+        }
+        if (badge != null) {
+            val pulse by rememberInfiniteTransition(label = "badge").animateFloat(1f, 1.12f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
+            Badge(badge, Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = 0.dp).graphicsLayer { scaleX = pulse; scaleY = pulse }, color = badgeColor, small = true)
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------------- top bar
 
 @Composable
@@ -194,21 +259,24 @@ private fun ProfileAndCups(save: SaveData, claimable: Int, onCups: () -> Unit) {
     val prev = CupTrack.previousMilestoneCups(save.bestCups)
     val frac = if (next == null) 1f else (save.bestCups - prev).toFloat() / (next.cups - prev)
     Box {
-        ChunkyButton(onCups, Modifier.height(58.dp).widthIn(max = 340.dp).fillMaxWidth(), ButtonStyle.GLASS, lip = 4.dp) {
-            Row(Modifier.padding(start = 66.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.width(110.dp)) {
+        ChunkyButton(onCups, Modifier.height(56.dp).widthIn(max = 360.dp).fillMaxWidth(), ButtonStyle.GLASS, lip = 4.dp, cut = 12.dp) {
+            Row(Modifier.padding(start = 62.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.width(104.dp)) {
                     GameText(save.settings.playerName, Type.Label, outline = 2.dp)
-                    PlainText("${save.victories} wins", Type.Small)
+                    PlainText("${save.victories} WINS", Type.Eyebrow, color = Palette.TextDim, maxLines = 1)
                 }
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    GameText("%,d".format(save.cups), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
-                    ProgressBar(frac, Modifier.fillMaxWidth().height(9.dp))
-                    PlainText(next?.let { "Next reward: ${it.cups}" } ?: "Track complete!", Type.Small)
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        GameText("%,d".format(save.cups), Type.Heading, color = Palette.Gold, outline = 2.dp)
+                        Spacer(Modifier.width(6.dp))
+                        PlainText(next?.let { "NEXT ${it.cups}" } ?: "TRACK DONE", Type.Eyebrow, color = Palette.TextDim, maxLines = 1, modifier = Modifier.padding(bottom = 3.dp))
+                    }
+                    ProgressBar(frac, Modifier.fillMaxWidth().height(8.dp))
                 }
             }
         }
-        GameIcon(IconKind.CUP, Modifier.size(66.dp).offset(x = (-6).dp, y = (-4).dp))
+        GameIcon(IconKind.CUP, Modifier.size(60.dp).offset(x = (-4).dp, y = (-3).dp))
         if (claimable > 0) {
             val pulse by rememberInfiniteTransition(label = "cupBadge").animateFloat(1f, 1.15f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
             Badge(claimable.toString(), Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-6).dp).graphicsLayer { scaleX = pulse; scaleY = pulse }, color = Palette.Red)
@@ -216,61 +284,49 @@ private fun ProfileAndCups(save: SaveData, claimable: Int, onCups: () -> Unit) {
     }
 }
 
+/** The fighter on show, under their feet: level, name and what they are, on a line of light. */
 @Composable
-private fun NavTile(label: String, icon: IconKind, badge: String?, badgeColor: Color, onClick: () -> Unit) {
-    val ui = LocalUi.current
-    val w = if (ui.roomy) 118.dp else 100.dp
-    val h = if (ui.roomy) 100.dp else 80.dp
-    Box {
-        ChunkyButton(onClick, Modifier.size(w, h), ButtonStyle.GLASS) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // The icon sits in a pool of light, so it reads as lit from inside the tile.
-                Box(contentAlignment = Alignment.Center) {
-                    Canvas(Modifier.size(if (ui.roomy) 64.dp else 50.dp)) {
-                        drawCircle(Brush.radialGradient(listOf(Palette.Rim.copy(alpha = 0.5f), Palette.Rim.copy(alpha = 0.14f), Color.Transparent)))
-                    }
-                    GameIcon(icon, Modifier.size(if (ui.roomy) 46.dp else 36.dp))
-                }
-                GameText(label, Type.Label.copy(letterSpacing = 1.2.sp), outline = 2.5.dp)
-            }
-        }
-        if (badge != null) {
-            val pulse by rememberInfiniteTransition(label = "badge").animateFloat(1f, 1.15f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
-            Badge(badge, Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).graphicsLayer { scaleX = pulse; scaleY = pulse }, color = badgeColor)
-        }
-    }
-}
-
-@Composable
-private fun NamePlate(save: SaveData, onClick: () -> Unit) {
+private fun NamePlate(save: SaveData, modifier: Modifier, onClick: () -> Unit) {
     val def = Balance.fighter(save.selectedFighter)
     val p = save.progress(save.selectedFighter)
     val canUp = Progression.canUpgrade(save, def.id)
-    Box(Modifier.clickable(remember { MutableInteractionSource() }, null, onClick = onClick)) {
-        Panel(color = Color(0xE8357DC6), colorBottom = Color(0xF20A1C31), cut = 14.dp) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
-                    Canvas(Modifier.fillMaxSize()) {
-                        drawCircle(Palette.Ink)
-                        drawCircle(Palette.Orange, size.minDimension / 2 - 3.dp.toPx())
+    Column(
+        modifier.clickable(remember { MutableInteractionSource() }, null, onClick = onClick).padding(bottom = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // The level, in a hexagon.
+            Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.fillMaxSize()) {
+                    fun hex(r: Float) = androidx.compose.ui.graphics.Path().apply {
+                        for (i in 0 until 6) {
+                            val a = Math.PI / 6 + i * Math.PI / 3
+                            val x = center.x + (Math.cos(a) * r).toFloat(); val y = center.y + (Math.sin(a) * r).toFloat()
+                            if (i == 0) moveTo(x, y) else lineTo(x, y)
+                        }
+                        close()
                     }
-                    GameText(p.level.toString(), Type.Title, outline = 2.5.dp)
+                    drawPath(hex(size.minDimension / 2), Palette.Ink)
+                    drawPath(hex(size.minDimension / 2 - 2.dp.toPx()), Brush.verticalGradient(listOf(Palette.Orange, Palette.OrangeDeep)))
+                    drawPath(hex(size.minDimension / 2 - 4.dp.toPx()), Color.White.copy(alpha = 0.35f), style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
                 }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    GameText(def.name.uppercase(), Type.Title, outline = 3.dp)
-                    PlainText("${def.title} · ${def.role}", Type.Small)
-                }
-                if (canUp) {
-                    Spacer(Modifier.width(12.dp))
-                    Badge("UPGRADE!", color = Palette.GreenDeep)
-                }
+                GameText(p.level.toString(), Type.Heading, outline = 2.dp)
+            }
+            Spacer(Modifier.width(10.dp))
+            GameText(def.name.uppercase(), Type.Display.copy(letterSpacing = 3.sp), outline = 3.dp)
+            if (canUp) {
+                Spacer(Modifier.width(10.dp))
+                Badge("UPGRADE", color = Palette.GreenDeep)
             }
         }
+        Canvas(Modifier.size(260.dp, 2.dp)) {
+            drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Palette.Rim, Color.Transparent)))
+        }
+        Spacer(Modifier.height(3.dp))
+        PlainText("${def.title} · ${def.role}".uppercase(), Type.Eyebrow, color = Palette.TextDim, maxLines = 1)
     }
 }
 
-/** Spark Capsules waiting to be opened, or how to earn the next one. The server earns and opens them, so offline they wait. */
 /**
  * The way onto the Spark Road: the fighter the Credits are filling (still a silhouette) and how far along it is. The
  * moment the bar is full the fighter is unlocked. With every fighter unlocked it says the road is finished.
@@ -279,19 +335,19 @@ private fun NamePlate(save: SaveData, onClick: () -> Unit) {
 private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) {
     val next = io.github.projectwip.data.SparkRoad.next(save)
     Box(modifier) {
-        ChunkyButton(onClick, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.GLASS, cut = 14.dp, lip = 4.dp, sound = Sound.UI_OPEN) {
-            Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        ChunkyButton(onClick, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.GLASS, cut = 12.dp, lip = 4.dp, sound = Sound.UI_OPEN) {
+            Row(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (next != null) io.github.projectwip.ui.FighterView(Balance.fighter(next.fighter), 0, Modifier.size(42.dp), pedestal = false, locked = true)
-                else GameIcon(IconKind.CHECK, Modifier.size(38.dp))
+                else GameIcon(IconKind.CHECK, Modifier.size(36.dp))
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    GameText("SPARK ROAD", Type.Label, color = Palette.Green, outline = 2.dp)
+                    PlainText("SPARK ROAD", Type.Eyebrow, color = Palette.Green, maxLines = 1)
                     if (next != null) {
                         PlainText("${Balance.fighter(next.fighter).name} · ${"%,d".format(minOf(save.credits, next.cost))} / ${"%,d".format(next.cost)}", Type.Small, color = Color.White, maxLines = 1)
-                        ProgressBar(save.credits.toFloat() / next.cost, Modifier.fillMaxWidth(), Palette.Green, 9.dp)
+                        ProgressBar(save.credits.toFloat() / next.cost, Modifier.fillMaxWidth().height(7.dp), Palette.Green, Palette.GreenDeep)
                     } else {
                         PlainText("Every fighter unlocked", Type.Small, color = Color.White, maxLines = 1)
-                        ProgressBar(1f, Modifier.fillMaxWidth(), Palette.Gold, 9.dp)
+                        ProgressBar(1f, Modifier.fillMaxWidth().height(7.dp))
                     }
                 }
             }
@@ -299,18 +355,18 @@ private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) 
     }
 }
 
+/** Arena Boxes waiting to be opened, or how to earn the next one. [canOpen]: the server is there to open them, or the game is on its offline profile, which opens its own. */
 @Composable
-/** [canOpen]: the server is there to open them, or the game is on its offline profile, which opens its own. */
-private fun CapsuleButton(count: Int, leftToday: Int, canOpen: Boolean, big: Boolean, onOpen: () -> Unit) {
-    Box {
-        ChunkyButton(onOpen, Modifier.fillMaxWidth().height(if (big) 150.dp else 62.dp), ButtonStyle.CYAN, enabled = count > 0, cut = 14.dp, lip = 4.dp) {
+private fun CapsuleButton(count: Int, leftToday: Int, canOpen: Boolean, big: Boolean, modifier: Modifier, onOpen: () -> Unit) {
+    Box(modifier) {
+        ChunkyButton(onOpen, Modifier.fillMaxWidth().height(if (big) 150.dp else 62.dp), ButtonStyle.CYAN, enabled = count > 0, cut = 12.dp, lip = 4.dp) {
             Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 // A drop waiting to be opened glitches, like the real thing does when it is.
                 if (count > 0) io.github.projectwip.ui.GlitchIcon(IconKind.CAPSULE, Modifier.size(if (big) 84.dp else 44.dp), tint = Palette.Gold)
                 else GameIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = Palette.Grey)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    GameText(if (count > 0) "OPEN BOX" else "ARENA BOXES", Type.Heading, outline = 2.5.dp)
+                    GameText(if (count > 0) "OPEN BOX" else "ARENA BOXES", Type.Heading, outline = 2.dp)
                     PlainText(
                         when {
                             !canOpen -> if (count > 0) "Opens when you're back online" else "Earned and opened online"
@@ -337,21 +393,31 @@ fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; Ga
 fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.BOSS -> Arenas.provingGround(); GameMode.TRAINING -> Arenas.trainingArea(); GameMode.DUEL -> Arenas.provingGround() }
 
 @Composable
-private fun ModeChip(mode: GameMode, d: BotDifficulty?, onClick: () -> Unit) {
-    ChunkyButton(onClick, Modifier.fillMaxWidth().height(84.dp), ButtonStyle.GLASS, cut = 16.dp, sound = Sound.UI_OPEN) {
-        Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            GameIcon(modeIcon(mode), Modifier.size(42.dp))
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
-                PlainText(mode.tagline, Type.Small, maxLines = 1)
-                if (mode == GameMode.DUEL) PlainText("Against a real player", Type.Small, color = Palette.Positive)
-                else if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
-                    PlainText("Bots: ", Type.Small)
-                    PlainText(d.label, Type.Label, color = difficultyColor(d))
+private fun ModeChip(mode: GameMode, d: BotDifficulty?, modifier: Modifier, onClick: () -> Unit) {
+    ChunkyButton(onClick, modifier.fillMaxWidth().height(84.dp), ButtonStyle.GLASS, cut = 14.dp, sound = Sound.UI_OPEN) {
+        Row(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // The mode's icon on a tile of its own.
+            Box(Modifier.size(54.dp), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val r = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx())
+                    drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF2E6A9E), Color(0xFF102A44))), cornerRadius = r)
+                    drawRoundRect(Palette.Gold.copy(alpha = 0.7f), cornerRadius = r, style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx()))
+                    drawCircle(Brush.radialGradient(listOf(Palette.Gold.copy(alpha = 0.3f), Color.Transparent)), size.minDimension * 0.5f)
                 }
+                GameIcon(modeIcon(mode), Modifier.size(36.dp))
             }
-            GameText("›", Type.Display, outline = 3.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                PlainText("GAME MODE", Type.Eyebrow, maxLines = 1)
+                GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.dp)
+                if (mode == GameMode.DUEL) PlainText("Against a real player", Type.Small, color = Palette.Positive, maxLines = 1)
+                else if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                    PlainText("${mode.tagline.substringBefore(" ·")} · Bots ", Type.Small, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    PlainText(d.label, Type.Label, color = difficultyColor(d), maxLines = 1)
+                }
+                else PlainText(mode.tagline, Type.Small, maxLines = 1)
+            }
+            GameIcon(IconKind.BACK, Modifier.size(20.dp).graphicsLayer { rotationZ = 180f; alpha = 0.8f })
         }
     }
 }
@@ -429,11 +495,12 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
     ChunkyButton(onClick, modifier.height(if (!showMap) 190.dp else if (short) 268.dp else 330.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, cut = 18.dp, sound = Sound.UI_SELECT) {
         Column(Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                GameIcon(modeIcon(m), Modifier.size(26.dp))
-                Spacer(Modifier.width(6.dp))
-                GameText(m.title.uppercase(), Type.Label, outline = 2.5.dp)
+                GameIcon(modeIcon(m), Modifier.size(22.dp))
+                Spacer(Modifier.width(5.dp))
+                GameText(m.title.uppercase(), Type.Label.copy(letterSpacing = 0.sp), outline = 2.dp)
             }
-            PlainText(m.tagline, Type.Label, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center)
+            Spacer(Modifier.height(2.dp))
+            PlainText(m.tagline, Type.Body, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center)
             Spacer(Modifier.height(6.dp))
             if (showMap) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -464,17 +531,32 @@ fun difficultyColor(d: BotDifficulty): Color = when (d) {
 }
 
 @Composable
-private fun PlayButton(onClick: () -> Unit) {
-    val glow by rememberInfiniteTransition(label = "play").animateFloat(0f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "g")
-    Box(contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(300.dp, 110.dp)) {
-            drawOval(Palette.Orange.copy(alpha = 0.18f + glow * 0.2f), Offset(0f, 0f), Size(size.width, size.height))
+private fun PlayButton(modifier: Modifier, onClick: () -> Unit) {
+    val t by rememberInfiniteTransition(label = "play").animateFloat(0f, 1f, infiniteRepeatable(tween(1200)), label = "g")
+    Box(modifier, contentAlignment = Alignment.Center) {
+        // A soft orange light pulsing under the button.
+        Canvas(Modifier.matchParentSize()) {
+            val k = (kotlin.math.sin(t * 2 * Math.PI).toFloat() + 1f) / 2f
+            drawRect(Brush.radialGradient(listOf(Palette.Orange.copy(alpha = 0.22f + 0.16f * k), Color.Transparent), center, size.width * 0.62f), Offset(-size.width * 0.1f, -size.height * 0.3f), Size(size.width * 1.2f, size.height * 1.6f))
         }
-        ChunkyButton(onClick, Modifier.fillMaxWidth().height(90.dp), ButtonStyle.ORANGE, cut = 20.dp, lip = 7.dp, sheen = true) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                GameIcon(IconKind.PLAY, Modifier.size(36.dp))
-                Spacer(Modifier.width(10.dp))
-                GameText("PLAY", Type.Display.copy(fontSize = Type.Display.fontSize * 1.2f), outline = 4.dp)
+        ChunkyButton(onClick, Modifier.fillMaxWidth().height(88.dp), ButtonStyle.ORANGE, cut = 18.dp, lip = 7.dp, sheen = true) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+                GameText("PLAY", Type.Display.copy(fontSize = Type.Display.fontSize * 1.3f, letterSpacing = 6.sp), outline = 3.dp)
+                Spacer(Modifier.weight(1f))
+                // Three chevrons, lighting up one after another towards the arena.
+                Canvas(Modifier.size(54.dp, 30.dp)) {
+                    for (i in 0 until 3) {
+                        val lit = ((t * 3f - i) % 3f + 3f) % 3f
+                        val a = 0.35f + 0.65f * (1f - (lit.coerceIn(0f, 1f)))
+                        val x = i * size.width / 3.2f
+                        val p = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(x, 0f); lineTo(x + size.width * 0.18f, 0f); lineTo(x + size.width * 0.38f, size.height / 2)
+                            lineTo(x + size.width * 0.18f, size.height); lineTo(x, size.height); lineTo(x + size.width * 0.2f, size.height / 2); close()
+                        }
+                        drawPath(p, Color.White.copy(alpha = a))
+                        drawPath(p, Palette.Ink.copy(alpha = 0.6f), style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
+                    }
+                }
             }
         }
     }

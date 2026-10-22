@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
 import io.github.projectwip.data.CupTrack
@@ -523,10 +524,9 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
             // One wide button: what it does on the left, what it costs on the right.
             ChunkyButton(onUpgrade, Modifier.weight(1f).height(tall), ButtonStyle.GREEN, enabled = afford, sound = Sound.UPGRADE) {
                 Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    GameText("UPGRADE", Type.Title, outline = 3.dp)
-                    Spacer(Modifier.weight(1f))
-                    GameIcon(IconKind.BOLT, Modifier.size(30.dp))
-                    GameText(" %,d".format(cost), Type.Title, color = if (afford) Color.White else Palette.Red, outline = 3.dp)
+                    GameText("UPGRADE", Type.Heading, Modifier.weight(1f), outline = 3.dp)
+                    GameIcon(IconKind.BOLT, Modifier.size(26.dp))
+                    GameText(" %,d".format(cost), Type.Heading, color = if (afford) Color.White else Palette.Red, outline = 3.dp)
                 }
             }
         }

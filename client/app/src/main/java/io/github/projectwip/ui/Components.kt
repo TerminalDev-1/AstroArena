@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.FighterDef
 import io.github.projectwip.render3d.FighterStageView
@@ -82,7 +84,10 @@ import kotlin.math.sin
 
 // ---------------------------------------------------------------------------------------------- text
 
-/** Display text with a thick ink outline and drop shadow — the game's signature type treatment. */
+/**
+ * Display text: a thin ink edge and a soft shadow under it, so it reads over the 3D lobby without the heavy
+ * cartoon outline. [outline] is the old outline weight; the edge drawn is a fraction of it.
+ */
 @Composable
 fun GameText(
     text: String,
@@ -93,14 +98,14 @@ fun GameText(
     align: TextAlign = TextAlign.Start,
     maxLines: Int = 1,
 ) {
-    val px = with(LocalDensity.current) { outline.toPx() }
+    val px = with(LocalDensity.current) { outline.toPx() } * 0.42f
     Box(modifier) {
         BasicText(
             text, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
             style = style.copy(
-                color = Palette.Ink, textAlign = align,
+                color = Palette.Ink.copy(alpha = 0.9f), textAlign = align,
                 drawStyle = Stroke(width = px * 2, join = StrokeJoin.Round),
-                shadow = Shadow(Palette.Ink, Offset(0f, px * 1.1f), 0f),
+                shadow = Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, px * 2.4f), px * 3.5f),
             ),
         )
         BasicText(text, maxLines = maxLines, overflow = TextOverflow.Ellipsis, style = style.copy(color = color, textAlign = align))
@@ -114,8 +119,31 @@ fun PlainText(text: String, style: TextStyle, modifier: Modifier = Modifier, col
 
 // ---------------------------------------------------------------------------------------------- plates & buttons
 
-fun plateShape(big: Dp = 12.dp, small: Dp = 5.dp): Shape =
-    CutCornerShape(topStart = big, topEnd = small, bottomEnd = big, bottomStart = small)
+/**
+ * The game's one shape: rounded corners with a diagonal notch cut out of the top right (and a small one bottom left),
+ * like a panel off a console.
+ */
+class NotchShape(private val cut: Dp, private val radius: Dp) : Shape {
+    override fun createOutline(size: Size, layoutDirection: androidx.compose.ui.unit.LayoutDirection, density: androidx.compose.ui.unit.Density): androidx.compose.ui.graphics.Outline {
+        val half = minOf(size.width, size.height) * 0.5f
+        val c = with(density) { cut.toPx() }.coerceIn(0f, half)
+        val r = with(density) { radius.toPx() }.coerceIn(0f, half)
+        val s = (c * 0.45f).coerceAtMost(half)
+        val w = size.width
+        val h = size.height
+        val p = Path().apply {
+            moveTo(r, 0f)
+            lineTo(w - c, 0f); lineTo(w, c)
+            lineTo(w, h - r); quadraticTo(w, h, w - r, h)
+            lineTo(s, h); lineTo(0f, h - s)
+            lineTo(0f, r); quadraticTo(0f, 0f, r, 0f)
+            close()
+        }
+        return androidx.compose.ui.graphics.Outline.Generic(p)
+    }
+}
+
+fun plateShape(big: Dp = 12.dp, small: Dp = 5.dp): Shape = NotchShape(big, (small * 1.3f).coerceAtLeast(3.dp))
 
 /** [rim] is the light that catches the plate's edges (and glows round it). */
 enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val rim: Color, val text: Color = Color.White) {
@@ -124,52 +152,40 @@ enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val ri
     GREEN(Palette.Green, Palette.GreenDeep, Palette.GreenLip, Color(0xFFD2FFE0)),
     GREY(Palette.Grey, Palette.GreyDeep, Palette.GreyLip, Color(0xFFDDE6EE)),
     RED(Palette.Red, Palette.RedDeep, Palette.RedLip, Color(0xFFFFC7CE)),
-    PURPLE(Palette.PanelLight, Palette.Panel, Palette.PanelDark, Palette.Rim),
-    GOLD(Color(0xFFFFE066), Palette.Gold, Color(0xFFA8650A), Color(0xFFFFF6C8)),
-    /** Translucent steel plate that lets the 3D lobby show through. */
-    GLASS(Color(0xE8357DC6), Color(0xF20A1C31), Color(0xFF060F1A), Palette.Rim),
+    /** Solid steel blue, for secondary choices. */
+    PURPLE(Palette.PanelLight, Color(0xFF1E4468), Color(0xFF0B1C2E), Palette.Rim),
+    GOLD(Color(0xFFFFE066), Palette.Gold, Color(0xFF9A5A06), Color(0xFFFFF6C8)),
+    /** Dark steel glass that lets the 3D lobby show through, with an accent edge down its left side. */
+    GLASS(Color(0xD8234A72), Color(0xE80B1D30), Color(0xFF050D16), Palette.Rim),
 }
 
 /** Soft drop shadow under a plate, so it reads as sitting above the scene. */
 private fun DrawScope.plateShadow(path: Path, depth: Float) {
     translate(top = depth) {
-        drawPath(path, Color.Black.copy(alpha = 0.2f), style = Stroke(depth * 1.8f, join = StrokeJoin.Round))
-        drawPath(path, Color.Black.copy(alpha = 0.42f))
+        drawPath(path, Color.Black.copy(alpha = 0.16f), style = Stroke(depth * 2.2f, join = StrokeJoin.Round))
+        drawPath(path, Color.Black.copy(alpha = 0.34f))
     }
 }
 
 /**
- * A plate with depth: gradient body, a curved gloss on the upper half, shade gathering at the bottom,
- * and a bevel (lit top edge, dark bottom edge) just inside the ink outline.
+ * A plate's face: its fill, shade gathering low, a crisp split highlight across the top half ([gloss]), a bright
+ * line of [rim] light along the top edge, a hairline of it all round just inside, and a thin ink edge outside.
  */
 private fun DrawScope.plate(shape: Shape, size: Size, brush: Brush, ink: Color, inkWidth: Float, gloss: Boolean, rim: Color = Palette.Rim) {
     val outline = shape.createOutline(size, layoutDirection, this)
     val path = Path().apply { addOutline(outline) }
     drawPath(path, brush)
     clipPath(path) {
-        // Shade gathers low, and then a little of the rim's light comes back up off the bottom edge.
-        drawRect(Brush.verticalGradient(0.45f to Color.Transparent, 0.88f to Color.Black.copy(alpha = 0.3f), 1f to Color.Black.copy(alpha = 0.18f), startY = 0f, endY = size.height), size = size)
-        drawRect(Brush.verticalGradient(0.74f to Color.Transparent, 1f to rim.copy(alpha = 0.2f), startY = 0f, endY = size.height), size = size)
-        if (gloss) {
-            // A curved gloss: an oval across the top whose lower edge bows down through the middle.
-            drawOval(
-                Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.03f)), 0f, size.height * 0.5f),
-                Offset(-size.width * 0.2f, -size.height * 0.52f), Size(size.width * 1.4f, size.height * 1.02f),
-            )
-        }
-        // Soft light from the top left, falling off across the face.
-        drawRect(Brush.linearGradient(0f to Color.White.copy(alpha = 0.13f), 0.4f to Color.Transparent, start = Offset.Zero, end = Offset(size.width * 0.55f, size.height * 1.2f)), size = size)
-        // Bevel: the stroke is centred on the edge, so the clip leaves only its inner half.
-        drawPath(
-            path,
-            Brush.verticalGradient(0f to Color.White.copy(alpha = 0.7f), 0.16f to Color.White.copy(alpha = 0.1f), 0.7f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.5f), startY = 0f, endY = size.height),
-            style = Stroke(inkWidth * 2.6f, join = StrokeJoin.Round),
+        drawRect(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.24f), startY = 0f, endY = size.height), size = size)
+        if (gloss) drawRect(
+            Brush.verticalGradient(0f to Color.White.copy(alpha = 0.2f), 0.48f to Color.White.copy(alpha = 0.06f), 0.48f to Color.Transparent, startY = 0f, endY = size.height),
+            size = size,
         )
-        // A crisp line of rim light just under the top edge, fading out at both ends.
-        val y = inkWidth * 1.9f
+        // A hairline of rim light just inside the edge (the stroke is centred on it, so the clip keeps the inner half).
+        drawPath(path, Brush.verticalGradient(0f to rim.copy(alpha = 0.55f), 0.5f to rim.copy(alpha = 0.18f), 1f to rim.copy(alpha = 0.08f), startY = 0f, endY = size.height), style = Stroke(1.5.dp.toPx() * 2))
         drawLine(
-            Brush.horizontalGradient(0f to Color.Transparent, 0.18f to rim.copy(alpha = 0.8f), 0.82f to rim.copy(alpha = 0.8f), 1f to Color.Transparent, startX = 0f, endX = size.width),
-            Offset(0f, y), Offset(size.width, y), 1.2.dp.toPx(),
+            Brush.horizontalGradient(0f to rim.copy(alpha = 0.95f), 0.6f to rim.copy(alpha = 0.5f), 1f to Color.Transparent, startX = 0f, endX = size.width),
+            Offset(0f, 0.75.dp.toPx()), Offset(size.width, 0.75.dp.toPx()), 1.5.dp.toPx(),
         )
     }
     drawPath(path, ink, style = Stroke(inkWidth, join = StrokeJoin.Round))
@@ -177,11 +193,11 @@ private fun DrawScope.plate(shape: Shape, size: Size, brush: Brush, ink: Color, 
 
 /** A soft glow in [color] round [path], drawn behind it. */
 private fun DrawScope.glow(path: Path, color: Color, strength: Float = 1f) {
-    for (k in 1..3) drawPath(path, color.copy(alpha = 0.07f * strength), style = Stroke(k * 5.dp.toPx(), join = StrokeJoin.Round))
+    for (k in 1..3) drawPath(path, color.copy(alpha = 0.06f * strength), style = Stroke(k * 5.dp.toPx(), join = StrokeJoin.Round))
 }
 
 /**
- * The main button: a chamfered plate with a 3D lip that physically presses down.
+ * The main button: a notched slab whose face sits on a visible side and presses down onto it.
  * Plays a tap sound; never looks like a stock Android button.
  */
 @Composable
@@ -204,6 +220,7 @@ fun ChunkyButton(
     val s = if (enabled) style else ButtonStyle.GREY
     val shape = remember(cut) { plateShape(cut, cut * 0.4f) }
     val time = if (sheen && enabled) rememberAnimTime() else null
+    val glass = s == ButtonStyle.GLASS || s == ButtonStyle.PURPLE
     Box(
         modifier
             .graphicsLayer { val k = 1f - 0.03f * press; scaleX = k; scaleY = k }
@@ -211,56 +228,44 @@ fun ChunkyButton(
                 if (enabled) { sfx?.play(sound); onClick() } else sfx?.play(Sound.DENIED, 0.6f)
             }
             .drawBehind {
-                val lipPx = lip.toPx()
-                val ink = 2.5.dp.toPx()
+                val lipPx = lip.toPx() * 0.8f
+                val ink = 1.5.dp.toPx()
                 val pressPx = lipPx * press
                 val whole = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
-                if (enabled) glow(whole, s.rim, if (s == ButtonStyle.GLASS) 0.7f else 1f + press)
-                plateShadow(whole, lipPx * (1.1f - 0.6f * press))
-                drawPath(whole, Brush.verticalGradient(listOf(s.lip, lerp(s.lip, Color.Black, 0.35f))))
+                if (enabled && !glass) glow(whole, s.rim, 0.8f + press)
+                plateShadow(whole, lipPx * (1.2f - 0.6f * press))
+                // The side of the slab.
+                drawPath(whole, Brush.verticalGradient(listOf(lerp(s.lip, s.bottom, 0.25f), lerp(s.lip, Color.Black, 0.3f))))
                 drawPath(whole, Palette.Ink, style = Stroke(ink, join = StrokeJoin.Round))
                 translate(top = pressPx) {
                     val face = Size(size.width, size.height - lipPx)
-                    // The lip's top edge catches the light where it meets the face.
-                    drawLine(s.rim.copy(alpha = 0.35f), Offset(ink * 2f, face.height + ink * 0.6f), Offset(size.width - ink * 2f, face.height + ink * 0.6f), 1.dp.toPx())
-                    val glass = s == ButtonStyle.GLASS
-                    plate(shape, face, Brush.verticalGradient(listOf(lerp(s.top, Color.White, if (glass) 0.06f else 0.18f), s.top, s.bottom)), Palette.Ink, ink, gloss = true, rim = s.rim)
-                    // A second, inset frame, so the face reads as layered rather than one flat fill.
-                    val inset = 4.dp.toPx()
-                    if (face.width > inset * 6 && face.height > inset * 6) translate(inset, inset) {
-                        val inner = Size(face.width - inset * 2, face.height - inset * 2)
-                        val c = (cut - 3.dp).coerceAtLeast(2.dp)
-                        val o = plateShape(c, (c * 0.4f).coerceAtLeast(1.dp)).createOutline(inner, layoutDirection, this)
-                        drawPath(Path().apply { addOutline(o) }, Brush.verticalGradient(listOf(s.rim.copy(alpha = 0.3f), s.rim.copy(alpha = 0.04f), Color.Black.copy(alpha = 0.18f))), style = Stroke(1.dp.toPx()))
-                    }
-                    if (glass && face.height > 40.dp.toPx()) clipPath(Path().apply { addOutline(shape.createOutline(face, layoutDirection, this@drawBehind)) }) {
-                        // A hatched corner, bottom right.
-                        val gap = 5.dp.toPx()
-                        for (i in 0 until 4) {
-                            val x = face.width - inset * 2.5f - i * gap
-                            drawLine(s.rim.copy(alpha = 0.16f), Offset(x, face.height - inset), Offset(x + gap * 2.2f, face.height - inset - gap * 2.2f), 1.5.dp.toPx())
-                        }
+                    val faceShape = Path().apply { addOutline(shape.createOutline(face, layoutDirection, this@drawBehind)) }
+                    plate(shape, face, Brush.verticalGradient(listOf(lerp(s.top, Color.White, if (glass) 0.04f else 0.14f), s.top, s.bottom)), Palette.Ink, ink, gloss = !glass, rim = s.rim)
+                    if (glass) clipPath(faceShape) {
+                        // The accent edge down the left side, and a cool wash of light from it.
+                        drawRect(Brush.verticalGradient(listOf(s.rim, s.rim.copy(alpha = 0.35f))), Offset.Zero, Size(3.dp.toPx(), face.height))
+                        drawRect(Brush.horizontalGradient(listOf(s.rim.copy(alpha = 0.14f), Color.Transparent), 0f, minOf(face.width * 0.5f, 120.dp.toPx())), size = face)
                     }
                     if (time != null) {
                         // A band of light sweeps across every few seconds.
                         val t = (time.value % 3.2f) / 0.7f
-                        if (t < 1f) clipPath(Path().apply { addOutline(shape.createOutline(face, layoutDirection, this@drawBehind)) }) {
+                        if (t < 1f) clipPath(faceShape) {
                             val x = -face.height + (face.width + face.height * 2) * t
                             val band = Path().apply {
                                 moveTo(x, face.height); lineTo(x + face.height * 0.7f, 0f); lineTo(x + face.height * 1.15f, 0f); lineTo(x + face.height * 0.45f, face.height); close()
                             }
-                            drawPath(band, Color.White.copy(alpha = 0.3f))
+                            drawPath(band, Color.White.copy(alpha = 0.26f))
                         }
                     }
                 }
             }
-            .padding(top = lip * press, bottom = lip * (1f - press)),
+            .padding(top = lip * 0.8f * press, bottom = lip * 0.8f * (1f - press)),
         contentAlignment = Alignment.Center,
         content = content,
     )
 }
 
-/** A raised panel plate. */
+/** A raised panel: a slab of dark steel glass with its side showing, a faint grid, and an accent along its top. */
 @Composable
 fun Panel(
     modifier: Modifier = Modifier,
@@ -273,57 +278,55 @@ fun Panel(
     val shape = remember(cut) { plateShape(cut, cut * 0.35f) }
     Box(
         modifier.drawBehind {
-            val ink = 3.dp.toPx()
+            val ink = 1.5.dp.toPx()
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
             // A panel is a slab: its side shows under the face, and it throws a shadow past that.
-            val slab = 5.dp.toPx()
-            plateShadow(path, slab + 6.dp.toPx())
+            val slab = 4.dp.toPx()
+            plateShadow(path, slab + 5.dp.toPx())
             translate(top = slab) {
-                drawPath(path, Brush.verticalGradient(listOf(lerp(colorBottom, Color.Black, 0.25f), lerp(colorBottom, Color.Black, 0.6f))))
+                drawPath(path, Brush.verticalGradient(listOf(lerp(colorBottom, Color.Black, 0.3f), lerp(colorBottom, Color.Black, 0.65f))))
                 drawPath(path, Palette.Ink, style = Stroke(ink, join = StrokeJoin.Round))
             }
-            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.26f), color, colorBottom)), Palette.Ink, ink, gloss = false, rim = rim)
+            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.08f), color, colorBottom)), Palette.Ink, ink, gloss = false, rim = rim)
             clipPath(path) {
-                // Faint diagonal brushing, and a sheen across the top, so large panels aren't a flat fill.
-                val step = 22.dp.toPx()
-                var x = -size.height
-                while (x < size.width) {
-                    drawLine(Color.White.copy(alpha = 0.035f), Offset(x, size.height), Offset(x + size.height, 0f), step * 0.45f)
-                    x += step
-                }
-                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.12f), Color.Transparent), 0f, minOf(size.height * 0.4f, 110.dp.toPx())), size = size)
+                // A faint grid, so large panels aren't a flat fill.
+                val step = 24.dp.toPx()
+                var x = step
+                while (x < size.width) { drawLine(Color.White.copy(alpha = 0.025f), Offset(x, 0f), Offset(x, size.height), 1f); x += step }
+                var y = step
+                while (y < size.height) { drawLine(Color.White.copy(alpha = 0.025f), Offset(0f, y), Offset(size.width, y), 1f); y += step }
                 // A cool pool of light in the top corner, as if a lamp hung over it.
-                val lamp = Offset(size.width * 0.18f, 0f)
                 val reach = minOf(size.maxDimension * 0.6f, 260.dp.toPx())
-                drawRect(Brush.radialGradient(listOf(rim.copy(alpha = 0.16f), Color.Transparent), lamp, reach), size = size)
-            }
-            // inner rim highlight
-            val inset = 5.dp.toPx()
-            translate(inset, inset) {
-                val inner = Size(size.width - inset * 2, size.height - inset * 2)
-                val o = plateShape(cut - 2.dp, (cut * 0.35f - 1.dp).coerceAtLeast(1.dp)).createOutline(inner, layoutDirection, this)
-                drawPath(Path().apply { addOutline(o) }, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.03f))), style = Stroke(1.5.dp.toPx()))
+                drawRect(Brush.radialGradient(listOf(rim.copy(alpha = 0.12f), Color.Transparent), Offset(size.width * 0.15f, 0f), reach), size = size)
+                // The accent: a short bright bar along the top edge.
+                val bar = minOf(size.width * 0.3f, 110.dp.toPx())
+                val from = cut.toPx() * 0.4f
+                drawRect(Brush.horizontalGradient(listOf(rim, rim.copy(alpha = 0f)), from, from + bar), Offset(from, 0f), Size(bar, 3.dp.toPx()))
             }
         },
         content = content,
     )
 }
 
-/** Small tag/badge, e.g. "LV 5", "NEW", "!" */
+/** Small tag/badge, e.g. "LV 5", "NEW", "!": a lit pill. */
 @Composable
-fun Badge(text: String, modifier: Modifier = Modifier, color: Color = Palette.Red, textColor: Color = Color.White) {
+fun Badge(text: String, modifier: Modifier = Modifier, color: Color = Palette.Red, textColor: Color = Color.White, small: Boolean = false) {
     Box(
         modifier
             .drawBehind {
-                val o = plateShape(6.dp, 2.dp).createOutline(size, layoutDirection, this)
-                val p = Path().apply { addOutline(o) }
-                glow(p, color, 0.8f)
-                plateShadow(p, 2.5.dp.toPx())
-                plate(plateShape(6.dp, 2.dp), size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.3f), color, lerp(color, Color.Black, 0.25f))), Palette.Ink, 2.dp.toPx(), gloss = true, rim = lerp(color, Color.White, 0.7f))
+                val r = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
+                for (k in 1..2) {
+                    val g = k * 2.dp.toPx()
+                    drawRoundRect(color.copy(alpha = 0.12f), Offset(-g, -g), Size(size.width + g * 2, size.height + g * 2), androidx.compose.ui.geometry.CornerRadius(size.height / 2 + g))
+                }
+                drawRoundRect(Color.Black.copy(alpha = 0.35f), Offset(0f, 2.dp.toPx()), size, r)
+                drawRoundRect(Brush.verticalGradient(listOf(lerp(color, Color.White, 0.25f), color, lerp(color, Color.Black, 0.2f))), cornerRadius = r)
+                drawRoundRect(Color.White.copy(alpha = 0.18f), Offset(size.height * 0.3f, 1.5.dp.toPx()), Size((size.width - size.height * 0.6f).coerceAtLeast(0f), size.height * 0.3f), r)
+                drawRoundRect(Palette.Ink, cornerRadius = r, style = Stroke(1.5.dp.toPx()))
             }
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .padding(horizontal = if (small) 6.dp else 9.dp, vertical = if (small) 1.dp else 2.dp),
         contentAlignment = Alignment.Center,
-    ) { GameText(text, Type.Label, color = textColor, outline = 2.dp) }
+    ) { GameText(text, if (small) Type.Eyebrow.copy(color = Color.White, letterSpacing = 1.sp) else Type.Label, color = textColor, outline = 1.5.dp) }
 }
 
 // ---------------------------------------------------------------------------------------------- currency
@@ -336,6 +339,14 @@ fun compactNumber(n: Int): String = when {
     else -> "%.1fB".format(Math.floor(n / 100_000_000.0) / 10)
 }
 
+/** A recessed capsule of dark glass for a figure, with rim light along its floor. */
+private fun DrawScope.wellCapsule() {
+    val r = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
+    drawRoundRect(Color.Black.copy(alpha = 0.3f), Offset(0f, 2.dp.toPx()), size, r)
+    drawRoundRect(Brush.verticalGradient(listOf(Color(0xF2050E18), Color(0xE60E2338))), cornerRadius = r)
+    drawRoundRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.4f), Palette.Rim.copy(alpha = 0.55f))), cornerRadius = r, style = Stroke(1.2.dp.toPx()))
+}
+
 /**
  * Where Credits go. They are not held in a wallet: this shows how far along the Spark Road the fighter being
  * unlocked is ([value] of [goal]).
@@ -343,11 +354,10 @@ fun compactNumber(n: Int): String = when {
 @Composable
 fun RoadMeter(value: Int, goal: Int, modifier: Modifier = Modifier) {
     val shown by animateIntAsState(value, tween(500), label = "road")
-    val shape = plateShape(8.dp, 3.dp)
     Box(modifier.height(40.dp), contentAlignment = Alignment.CenterStart) {
         Box(
-            Modifier.padding(start = 16.dp).widthIn(min = 96.dp).height(32.dp)
-                .background(Palette.PanelInset, shape).border(2.5.dp, Palette.Ink, shape).padding(start = 30.dp, end = 12.dp),
+            Modifier.padding(start = 16.dp).widthIn(min = 96.dp).height(30.dp)
+                .drawBehind { wellCapsule() }.padding(start = 30.dp, end = 14.dp),
             contentAlignment = Alignment.CenterEnd,
         ) {
             GameText(if (goal > 0) "${"%,d".format(shown)} / ${"%,d".format(goal)}" else compactNumber(shown), Type.Label, outline = 2.dp)
@@ -356,35 +366,34 @@ fun RoadMeter(value: Int, goal: Int, modifier: Modifier = Modifier) {
     }
 }
 
+/** A currency total in a glass capsule, its icon over the left end; with [onClick], a "+" at the right end. */
 @Composable
 fun CurrencyPill(icon: IconKind, value: Int, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val shown by animateIntAsState(value, tween(700), label = "currency")
     Box(modifier.height(40.dp), contentAlignment = Alignment.CenterStart) {
-        Box(
+        Row(
             Modifier
                 .padding(start = 16.dp)
                 .widthIn(min = 92.dp)
-                .height(32.dp)
-                .drawBehind {
-                    val o = plateShape(8.dp, 3.dp).createOutline(size, layoutDirection, this)
-                    val p = Path().apply { addOutline(o) }
-                    plateShadow(p, 3.dp.toPx())
-                    drawPath(p, Brush.verticalGradient(listOf(Color(0xFF071523), Palette.PanelInset, Color(0xFF1E4264))))
-                    clipPath(p) {
-                        // A recessed well: shadow under its top lip, glass on its face, and rim light along its floor.
-                        drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent), 0f, size.height * 0.4f), size = size)
-                        drawRect(Brush.linearGradient(0f to Color.Transparent, 0.45f to Color.White.copy(alpha = 0.07f), 0.55f to Color.Transparent, start = Offset(0f, size.height), end = Offset(size.width, 0f)), size = size)
-                        drawLine(
-                            Brush.horizontalGradient(0f to Color.Transparent, 0.25f to Palette.Rim.copy(alpha = 0.5f), 0.9f to Palette.Rim.copy(alpha = 0.5f), 1f to Color.Transparent, startX = 0f, endX = size.width),
-                            Offset(0f, size.height - 2.dp.toPx()), Offset(size.width, size.height - 2.dp.toPx()), 1.5.dp.toPx(),
-                        )
-                    }
-                    drawPath(p, Palette.Ink, style = Stroke(2.5.dp.toPx()))
-                }
+                .height(30.dp)
+                .drawBehind { wellCapsule() }
                 .then(if (onClick != null) Modifier.clickable(remember { MutableInteractionSource() }, null) { onClick() } else Modifier)
-                .padding(start = 28.dp, end = 12.dp),
-            contentAlignment = Alignment.CenterEnd,
-        ) { GameText(compactNumber(shown), Type.Heading, outline = 2.5.dp) }
+                .padding(start = 28.dp, end = if (onClick != null) 3.dp else 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
+        ) {
+            GameText(compactNumber(shown), Type.Heading, outline = 2.dp)
+            if (onClick != null) {
+                Spacer(Modifier.width(6.dp))
+                Box(Modifier.size(24.dp).drawBehind {
+                    drawCircle(Brush.verticalGradient(listOf(Palette.Green, Palette.GreenDeep)))
+                    drawCircle(Palette.Ink, style = Stroke(1.2.dp.toPx()))
+                    val a = size.width * 0.27f
+                    drawLine(Color.White, Offset(center.x - a, center.y), Offset(center.x + a, center.y), 2.6.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawLine(Color.White, Offset(center.x, center.y - a), Offset(center.x, center.y + a), 2.6.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                })
+            }
+        }
         GameIcon(icon, Modifier.size(40.dp))
     }
 }
@@ -397,34 +406,19 @@ fun rememberAnimTime(): State<Float> = produceState(0f) {
     while (true) withFrameNanos { value = (it - start) / 1e9f }
 }
 
-/** Animated backdrop: deep gradient, slow diagonal stripes and a hex-dot field. */
+/** Animated backdrop: deep steel gradient, a slow-drifting grid, and a cool light from above. */
 @Composable
 fun GameBackground(modifier: Modifier = Modifier, tint: Color = Palette.BgTop) {
     val time by rememberAnimTime()
     Canvas(modifier.fillMaxSize()) {
         drawRect(Brush.verticalGradient(listOf(tint, Palette.BgBottom)))
-        val stripe = 46.dp.toPx()
-        val shift = (time * 14.dp.toPx()) % (stripe * 2)
-        rotate(-28f) {
-            var x = -size.maxDimension + shift
-            while (x < size.maxDimension * 2) {
-                drawRect(Color.White.copy(alpha = 0.035f), Offset(x, -size.maxDimension), Size(stripe, size.maxDimension * 3))
-                x += stripe * 2
-            }
-        }
-        val step = 34.dp.toPx()
-        val r = 2.dp.toPx()
-        var row = 0
-        var y = 0f
-        while (y < size.height + step) {
-            var x = if (row % 2 == 0) 0f else step / 2
-            while (x < size.width + step) {
-                val wave = (sin(time * 1.2f + x * 0.004f + y * 0.006f) + 1f) / 2f
-                drawCircle(Color.White.copy(alpha = 0.03f + 0.05f * wave), r, Offset(x, y))
-                x += step
-            }
-            y += step * 0.87f; row++
-        }
+        drawRect(Brush.radialGradient(listOf(Palette.Rim.copy(alpha = 0.16f), Color.Transparent), Offset(size.width * 0.5f, -size.height * 0.1f), size.maxDimension * 0.6f))
+        val step = 40.dp.toPx()
+        val shift = (time * 6.dp.toPx()) % step
+        var x = -step + shift
+        while (x < size.width + step) { drawLine(Color.White.copy(alpha = 0.035f), Offset(x, 0f), Offset(x, size.height), 1f); x += step }
+        var y = -step + shift
+        while (y < size.height + step) { drawLine(Color.White.copy(alpha = 0.035f), Offset(0f, y), Offset(size.width, y), 1f); y += step }
         drawRect(Brush.radialGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f)), center = center, radius = size.maxDimension * 0.75f))
     }
 }
@@ -504,32 +498,129 @@ fun ProgressBar(
 ) {
     val f by animateFloatAsState(fraction.coerceIn(0f, 1f), tween(if (animate) 900 else 0), label = "bar")
     Canvas(modifier) {
-        val r = size.height / 2
-        drawRoundRect(Palette.Ink, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r))
-        val inset = 2.5.dp.toPx()
+        val r = androidx.compose.ui.geometry.CornerRadius(size.height / 2, size.height / 2)
+        drawRoundRect(Color(0xE6050E18), cornerRadius = r)
+        drawRoundRect(Palette.Rim.copy(alpha = 0.3f), cornerRadius = r, style = Stroke(1.dp.toPx()))
+        val inset = 1.5.dp.toPx()
         val inner = Size(size.width - inset * 2, size.height - inset * 2)
-        drawRoundRect(Palette.PanelInset, Offset(inset, inset), inner, androidx.compose.ui.geometry.CornerRadius(r, r))
         if (f > 0f) {
-            drawRoundRect(Brush.verticalGradient(listOf(fill, fillDeep)), Offset(inset, inset), Size(inner.width * f, inner.height), androidx.compose.ui.geometry.CornerRadius(r, r))
-            drawRoundRect(Color.White.copy(alpha = 0.3f), Offset(inset + 3, inset + 2), Size((inner.width * f - 6).coerceAtLeast(0f), inner.height * 0.3f), androidx.compose.ui.geometry.CornerRadius(r, r))
+            val w = (inner.width * f).coerceAtLeast(inner.height)
+            drawRoundRect(Brush.horizontalGradient(listOf(fillDeep, fill), inset, inset + w), Offset(inset, inset), Size(w, inner.height), r)
+            drawRoundRect(Color.White.copy(alpha = 0.32f), Offset(inset + inner.height * 0.4f, inset + 1f), Size((w - inner.height * 0.8f).coerceAtLeast(0f), inner.height * 0.28f), r)
+            // A bright tip where the fill ends.
+            if (f < 1f) drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.8f), fill.copy(alpha = 0f)), Offset(inset + w - inner.height / 2, size.height / 2), inner.height), inner.height, Offset(inset + w - inner.height / 2, size.height / 2))
         }
     }
 }
 
-/** Header row used by every sub-screen: back button, title, and wallet. */
+/** One of the sections a sub-screen's header can jump straight to. */
+private data class Section(val icon: IconKind, val label: String, val screen: () -> Screen, val isHere: (Screen) -> Boolean)
+
+private val SECTIONS = listOf(
+    Section(IconKind.SHOP, "SHOP", { Screen.Shop }, { it is Screen.Shop }),
+    Section(IconKind.FIGHTERS, "FIGHTERS", { Screen.Fighters() }, { it is Screen.Fighters }),
+    Section(IconKind.TRACK, "ROAD", { Screen.Road }, { it is Screen.Road }),
+    Section(IconKind.CUP, "CUPS", { Screen.CupTrack }, { it is Screen.CupTrack }),
+    Section(IconKind.RANK, "RANKS", { Screen.Leaderboard }, { it is Screen.Leaderboard }),
+    Section(IconKind.NEWS, "NEWS", { Screen.News }, { it is Screen.News }),
+)
+
+/**
+ * The section switcher in a sub-screen's header: a glass strip of icons, the current one lit with its name.
+ * Shown only on the screens it lists.
+ */
+@Composable
+private fun SectionTabs() {
+    val here = LocalScreen.current ?: return
+    val go = LocalNav.current ?: return
+    if (SECTIONS.none { it.isHere(here) }) return
+    val sfx = LocalSfx.current
+    val ui = LocalUi.current
+    Row(
+        Modifier.height(44.dp).drawBehind {
+            val r = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx())
+            drawRoundRect(Color(0xCC07121F), cornerRadius = r)
+            drawRoundRect(Palette.Hairline, cornerRadius = r, style = Stroke(1.dp.toPx()))
+        }.padding(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        for (s in SECTIONS) {
+            val on = s.isHere(here)
+            val lit by animateFloatAsState(if (on) 1f else 0f, tween(220), label = "tab")
+            Row(
+                Modifier.height(38.dp)
+                    .drawBehind {
+                        if (lit > 0f) {
+                            val r = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx())
+                            drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF3A79B0), Color(0xFF1C4670))), alpha = lit, cornerRadius = r)
+                            drawRoundRect(Palette.Rim.copy(alpha = 0.6f * lit), cornerRadius = r, style = Stroke(1.dp.toPx()))
+                            drawRect(Palette.Rim.copy(alpha = lit), Offset(size.width * 0.25f, size.height - 2.5.dp.toPx()), Size(size.width * 0.5f, 2.dp.toPx()))
+                        }
+                    }
+                    .clickable(remember { MutableInteractionSource() }, null) { if (!on) { sfx?.play(Sound.TAP); go(s.screen()) } }
+                    .padding(horizontal = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                GameIcon(s.icon, Modifier.size(27.dp).graphicsLayer { alpha = 0.6f + 0.4f * lit })
+                if (on && ui.wide) {
+                    Spacer(Modifier.width(6.dp))
+                    GameText(s.label, Type.Label, outline = 2.dp)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Header row used by every sub-screen: a back key, the title over an accent bar, the section switcher, and the
+ * wallet.
+ */
 @Composable
 fun ScreenHeader(title: String, onBack: () -> Unit, bolts: Int?, prisms: Int?, modifier: Modifier = Modifier, extra: @Composable () -> Unit = {}) {
-    Row(modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        ChunkyButton(onBack, Modifier.size(52.dp, 50.dp), ButtonStyle.PURPLE, sound = Sound.UI_BACK) { GameIcon(IconKind.BACK, Modifier.size(26.dp)) }
+    Row(modifier.padding(horizontal = 16.dp, vertical = 8.dp).enterFrom(0, dy = (-10).dp), verticalAlignment = Alignment.CenterVertically) {
+        ChunkyButton(onBack, Modifier.size(50.dp, 48.dp), ButtonStyle.GLASS, lip = 4.dp, cut = 10.dp, sound = Sound.UI_BACK) { GameIcon(IconKind.BACK, Modifier.size(24.dp)) }
         Spacer(Modifier.width(14.dp))
-        GameText(title, Type.Title, outline = 3.5.dp)
-        Spacer(Modifier.width(14.dp))
+        Column {
+            GameText(title, Type.Title, outline = 3.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Canvas(Modifier.size(44.dp, 3.dp)) {
+                    drawRect(Brush.horizontalGradient(listOf(Palette.Orange, Palette.Orange.copy(alpha = 0f))))
+                }
+                // Whether the server is there: online, or the offline profile (Chaos Mode).
+                val status = LocalServer.current?.status?.collectAsState()?.value
+                val online = status?.online == true && !LocalOfflineMode.current
+                Spacer(Modifier.width(6.dp))
+                PlainText(if (online) "● ONLINE" else "● OFFLINE", Type.Eyebrow.copy(letterSpacing = 1.sp), color = if (online) Palette.Positive else Palette.TextDim, maxLines = 1)
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        SectionTabs()
+        Spacer(Modifier.width(12.dp))
         extra()
         Spacer(Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (bolts != null) CurrencyPill(IconKind.BOLT, bolts)
             if (prisms != null) CurrencyPill(IconKind.PRISM, prisms)
         }
+    }
+}
+
+/**
+ * Slides and fades its content in when it first appears, [delayMs] after the screen does, from [dx], [dy] away.
+ * Screens stagger their parts with it so they arrive in order rather than all at once.
+ */
+@Composable
+fun Modifier.enterFrom(delayMs: Int = 0, dx: Dp = 0.dp, dy: Dp = 14.dp): Modifier {
+    val a = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(delayMs.toLong())
+        a.animateTo(1f, tween(360, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+    }
+    return this.graphicsLayer {
+        val k = 1f - a.value
+        translationX = dx.toPx() * k
+        translationY = dy.toPx() * k
+        alpha = a.value
     }
 }
 
@@ -574,12 +665,13 @@ fun Modifier.lobbyAnchor(): Modifier {
 /** Translucent wash over the 3D lobby for content-heavy screens. */
 val SCRIM = Color(0xB00E1E2E)
 
-/** Top/bottom darkening so UI over the 3D lobby stays readable. */
+/** Darkening at the top, the bottom and the left edge, so UI over the 3D lobby stays readable. */
 @Composable
 fun LobbyVignette(strength: Float = 1f) {
     Canvas(Modifier.bleed().fillMaxSize()) {
-        drawRect(Brush.verticalGradient(listOf(Color(0xCC091520).copy(alpha = 0.8f * strength), Color.Transparent), 0f, size.height * 0.22f))
-        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC091520).copy(alpha = 0.85f * strength)), size.height * 0.7f, size.height))
+        drawRect(Brush.verticalGradient(listOf(Color(0xE6050E18).copy(alpha = 0.85f * strength), Color.Transparent), 0f, size.height * 0.24f))
+        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6050E18).copy(alpha = 0.9f * strength)), size.height * 0.66f, size.height))
+        drawRect(Brush.horizontalGradient(listOf(Color(0xE6050E18).copy(alpha = 0.7f * strength), Color.Transparent), 0f, size.width * 0.22f))
     }
 }
 
