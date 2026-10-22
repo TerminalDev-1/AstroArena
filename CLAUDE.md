@@ -138,11 +138,19 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Every fighter has a hyper (`Control.hyper`, the `HYPER_*` numbers in `Balance.kt`): a third button that charges from
   main-attack hits. There are no shields: the user removed them (the two seconds of spawn protection, `Fighter.shield`,
   are a different thing). Healing only starts after `REGEN_DELAY_SECONDS` without attacking or being hit.
-- The menus are steel blue, not purple, by the user's decision (`Palette`; panels are slabs with a visible side).
-  They must not look flat (the user's complaint before build 93): every plate (`plate()` in `ui/Components.kt`) has a
-  curved gloss, soft light from the top left, a bevel, a crisp line of rim light (`Palette.Rim`, `ButtonStyle.rim`) and
-  light coming back up off its bottom edge; buttons glow faintly in their rim colour and have an inset second frame,
-  and glass plates a hatched corner. The Shop icon is a shopping bag, the Fighters icon two busts (`ui/Icons.kt`).
+- The menus are steel blue, not purple, by the user's decision (`Palette`). Since build 94 they are the user-approved
+  "arena console" redesign (build 93's glossy, rim-lit restyle of the old plates was not what they meant): one notched
+  shape (`NotchShape`/`plateShape()` in `ui/Components.kt`: rounded corners with a diagonal notch top right), dark
+  steel-glass slabs that keep a visible side (the user wants slabs), hairline rim light and a bright accent edge
+  (`ButtonStyle.GLASS`), thin-edged condensed upright type (`Type`: the device sans drawn narrower with
+  `TextGeometricTransform`, because MIUI has no condensed face; `Type.Eyebrow` for tracked capitals), pill badges and
+  capsule currency counters. The home screen has a navigation rail down the left (Shop, Fighters, Ranks, News,
+  Settings); sub-screens share `ScreenHeader`, whose section tabs (`LocalScreen`, `LocalNav`) jump between Shop,
+  Fighters, Road, Cups, Ranks and News, and which says online/offline under the title. Parts arrive staggered
+  (`Modifier.enterFrom`). The Shop icon is a shopping bag; the Fighters icon is a fighter's helmet with a lit visor
+  (the user rejected two busts as not saying what it is).
+- The music is upbeat by the user's decision ("too calm" before build 94): the lobby loop is 128 BPM and the victory
+  theme 148, both with a snare, open hats and a rolling sixteenth-note bass.
 - The home screen has no Cup Track tile (removed in build 92, as the user asked): the Cups panel in the top bar opens
   the Cup Track and carries its badge.
 - All balance numbers live in `data/Balance.kt` and `data/Catalog.kt`; progression is pure functions in `Progression`.
