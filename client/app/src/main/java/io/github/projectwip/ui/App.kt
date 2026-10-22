@@ -205,6 +205,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             }
             val done = settled && checked.get() && sfx.progress >= 1f && music.ready
             // Stay up long enough to be read; once the server question is settled, never hang on anything else.
+            // Debug: `--es screen loading` keeps the loading screen up, to look at it.
+            if (startScreen == "loading") { delay(40); continue }
             if ((done && waited > 1200 && bootProgress > 0.985f) || (settled && waited > 15000)) break
             delay(40)
         }

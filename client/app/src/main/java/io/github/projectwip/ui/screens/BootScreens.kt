@@ -42,57 +42,6 @@ import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.rememberAnimTime
 import kotlin.math.sin
 
-/**
- * Shown while the game gets ready: it connects to the game server, checks GitHub for a newer release and builds
- * its sounds and music. [progress] is real (0..1 of that work), and [status] says which part is happening.
- * [onSkip], when given, offers a way to stop waiting for the server.
- */
-@Composable
-fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null) {
-    val time by rememberAnimTime()
-    val roomy = io.github.projectwip.ui.LocalUi.current.roomy
-    Box(
-        // Swallows touches so nothing underneath can be pressed while loading.
-        Modifier.fillMaxSize().background(Color(0xF0091520)).clickable(remember { MutableInteractionSource() }, null) { },
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // The roster, bobbing out of step with each other.
-            Row(horizontalArrangement = Arrangement.spacedBy(if (roomy) (-70).dp else (-50).dp), verticalAlignment = Alignment.Bottom) {
-                io.github.projectwip.data.Balance.fighters.forEachIndexed { i, def ->
-                    io.github.projectwip.ui.FighterView(def, 0, Modifier.size((if (i == 1 || i == 2) 230.dp else 200.dp) * if (roomy) 1f else 0.72f)
-                        .graphicsLayer { translationY = 7.dp.toPx() * sin(time * 2.6f + i * 1.3f) }, pedestal = false)
-                }
-            }
-            GameText("ASTROARENA", Type.Display.copy(fontSize = Type.Display.fontSize * 1.5f), color = Palette.Gold, outline = 5.dp)
-            Spacer(Modifier.height(18.dp))
-            // One, two, three dots, repeating.
-            // While the server is being reached that is what it says; after that it is plain loading.
-            val connecting = status.startsWith("Connecting")
-            GameText((if (connecting) "CONNECTING TO SERVER" else "LOADING") + ".".repeat(1 + (time * 2.5f).toInt() % 3), Type.Title, outline = 3.5.dp,
-                modifier = Modifier.width(if (connecting) 430.dp else 190.dp))
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ProgressBar(progress, Modifier.width(360.dp).height(22.dp), animate = false)
-                Spacer(Modifier.width(12.dp))
-                GameText("${(progress * 100).toInt()}%", Type.Title, color = Palette.Gold, outline = 3.5.dp, modifier = Modifier.width(80.dp))
-            }
-            Spacer(Modifier.height(8.dp))
-            PlainText(status, Type.Label, color = Palette.TextDim)
-            // On a phone the tip sits under the status line: at the bottom of the screen the two ran into each other.
-            if (!roomy) {
-                Spacer(Modifier.height(6.dp))
-                PlainText(TIPS[(time / 4f).toInt() % TIPS.size], Type.Body, color = Color.White, align = TextAlign.Center)
-            }
-        }
-        if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
-            GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
-        }
-        if (roomy) PlainText(TIPS[(time / 4f).toInt() % TIPS.size], Type.Body, Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp), color = Color.White, align = TextAlign.Center)
-        PlainText(BuildConfig.VERSION_NAME, Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp))
-    }
-}
-
 /** Shown one at a time on the loading and matchmaking screens. */
 val TIPS = listOf(
     "Tip: tap the attack stick to fire at the nearest enemy.",
