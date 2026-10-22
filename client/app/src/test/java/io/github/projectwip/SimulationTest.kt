@@ -925,9 +925,13 @@ class SimulationTest {
         assertEquals("and nothing comes down out of the sky: the shadows are the realm's hits", near.maxHp - 8 * spark.superDamage, near.hp)
         val perStrike = spark.def.superChargePerHit * Balance.REALM_CHARGE * Balance.REALM_SHADOW_CHARGE
         assertEquals("a shadow's strike charges his super by only a small share of a hit", 8 * perStrike, spark.superCharge, 0.0001f)
-        seconds(w, 9.9f)
-        assertEquals("a whole realm of shadow strikes is not a super back", 48, spark.realmStrikes)
-        assertTrue("about a third of one", spark.superCharge in 0.3f..0.4f)
+        assertEquals("his realm lasts six seconds", Balance.SPARK_REALM_SECONDS, spark.def.superSpec.realmSeconds)
+        seconds(w, 3.9f)
+        assertTrue("still going just before the six seconds are up", near.captive)
+        assertEquals("a whole realm of shadow strikes is not a super back", 24, spark.realmStrikes)
+        assertTrue("about a sixth of one", spark.superCharge in 0.15f..0.2f)
+        seconds(w, 0.2f)
+        assertTrue("and then it is over", !near.inRealm && !spark.inRealm)
     }
 
     @Test fun rocketFiresARocketThatBurstsOnWhatItHits() {

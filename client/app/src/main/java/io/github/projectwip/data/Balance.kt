@@ -121,6 +121,8 @@ data class SuperSpec(
      * each striking once every [Balance.REALM_ROCKET_SECONDS] for the super's damage, in turn. 0 = the rocket.
      */
     val shadows: Int = 0,
+    /** A realm ([SuperKind.REALM]): how long it lasts, in seconds. 0 = [Balance.REALM_SECONDS]. */
+    val realmSeconds: Float = 0f,
 )
 
 /** A colourway. Index 0 is the default and always owned. */
@@ -282,6 +284,8 @@ object Balance {
 
     /** A [SuperKind.REALM] lasts this long (or until either of the two in it is knocked out). */
     const val REALM_SECONDS = 12f
+    /** Spark's Shadow Realm is short: six seconds and it is over (12 felt endless with his shadows at work). */
+    const val SPARK_REALM_SECONDS = 6f
     /** In the realm a rocket of its own hits the captive this often, for the super's damage. It costs no ammo, and charges the super like one of her own. */
     const val REALM_ROCKET_SECONDS = 1f
     /** Whoever opened the realm reloads this many times as fast in it, and charges their super this many times as fast. */
@@ -290,7 +294,7 @@ object Balance {
     /**
      * A strike of a realm's shadows ([SuperSpec.shadows]) charges the super (and the hyper) by this share of a normal
      * hit: they strike four times a second, so at full rate the super came back in under a second. At 2.5% a whole
-     * realm of shadow strikes gives back about a third of a super; the realm stays chainable.
+     * six-second realm of shadow strikes gives back about a sixth of a super; the realm stays chainable.
      */
     const val REALM_SHADOW_CHARGE = 0.025f
 
@@ -371,7 +375,7 @@ object Balance {
             superDamage = StatLine(400, 20),
             moveSpeed = 3.6f,
             attack = AttackSpec(AttackShape.STAR, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.26f, burstInterval = 0f, blast = 1.2f, slowSeconds = 2f),
-            superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 12 seconds, where four shadows of his fight them. In there they can do nothing, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again, though his shadows' strikes barely charge it. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4),
+            superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 6 seconds, where four shadows of his fight them. In there they can do nothing, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again, though his shadows' strikes barely charge it. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4, realmSeconds = SPARK_REALM_SECONDS),
             ammoMax = 3,
             reloadSeconds = 1.4f,
             superChargePerHit = 0.2f,

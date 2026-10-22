@@ -595,7 +595,7 @@ class World(
     /** [f] takes [t] away into a realm of its own. Nobody outside can touch either of them until it is over. */
     private fun openRealm(f: Fighter, t: Fighter) {
         f.realm = f.id
-        f.realmLeft = Balance.REALM_SECONDS
+        f.realmLeft = f.def.superSpec.realmSeconds.takeIf { it > 0f } ?: Balance.REALM_SECONDS
         // (The first comes down half a beat in, so a whole realm sees one for every second of it.)
         f.realmTick = realmBeat(f) / 2f
         f.realmStrikes = 0
