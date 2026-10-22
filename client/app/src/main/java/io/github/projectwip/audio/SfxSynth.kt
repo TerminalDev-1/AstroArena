@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX, STAR,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -35,6 +35,7 @@ object SfxSynth {
         Sound.GLASS -> glass().finish(0.75f)
         Sound.EMPTY -> empty().finish(0.5f)
         Sound.HEX -> hex().finish(0.7f)
+        Sound.STAR -> star().finish(0.7f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -489,6 +490,20 @@ object SfxSynth {
         fm(0.01f, 0.35f, { 311f }, 1.41f, { 2.2f * perc(it, 0.001f, 0.09f) }, { perc(it, 0.002f, 0.12f) * 0.2f })
         filter(Band.LOW, 0.8f) { 4200f }
         echo(0.09f, 0.22f, 0.14f)
+    }
+
+    /** Spark throwing a star: a bright rising glint over a hiss of air, with a crackle of static and a low sneer under it. */
+    private fun star() = Clip(0.45f).apply {
+        for (k in 0 until 4) {
+            val at = k * 0.035f
+            val top = 1180f + k * 260f
+            osc(Wave.SINE, at, 0.12f, { glide(it, 0.08f, top * 0.6f, top) }, { perc(it, 0.003f, 0.05f) * (0.42f - k * 0.06f) })
+        }
+        noise(77, 0f, 0.28f, Band.HIGH, { glide(it, 0.25f, 3000f, 7600f) }, 0.8f, { perc(it, 0.03f, 0.14f) * 0.3f })
+        noise(78, 0.01f, 0.08f, Band.BAND, { 2400f }, 3f, { perc(it, 0.001f, 0.02f) * 0.28f })
+        osc(Wave.SAW, 0f, 0.22f, { glide(it, 0.2f, 120f, 82f) }, { perc(it, 0.01f, 0.1f) * 0.18f })
+        filter(Band.LOW, 0.8f) { 6200f }
+        echo(0.07f, 0.2f, 0.12f)
     }
 
     /** Out of ammo: two soft, hollow clicks, like an empty chamber. Nothing has gone wrong, so it doesn't scold. */

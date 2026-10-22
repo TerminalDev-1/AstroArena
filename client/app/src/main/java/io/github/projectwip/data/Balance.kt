@@ -25,7 +25,7 @@ enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
  * [SLASH] is a swing of a blade: no shot at all, it hits every enemy within [AttackSpec.range] inside an arc of
  * [AttackSpec.spreadDegrees] at once. A bar fills by itself ([AttackSpec.edgeSeconds]), and a full bar makes the next swing reach further.
  */
-enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH }
+enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH, STAR }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
 enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
@@ -55,7 +55,8 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
 /**
  * [REALM] is aimed along a line like [CORRUPT]: the fighter takes the first enemy on it away into a realm of their own
  * for [Balance.REALM_SECONDS]. In there the enemy can do nothing, nobody outside can touch either of them, and the
- * fighter reloads and charges faster while a rocket of the realm's own hits the enemy every second.
+ * fighter reloads and charges faster while a rocket of the realm's own hits the enemy every second, or, with
+ * [SuperSpec.shadows], that many shadows of the fighter's take turns to strike them, each once a second.
  */
 /**
  * [BLINK] is aimed along a line like [CORRUPT]: the fighter is at once beside the first enemy on it, through anything
@@ -97,6 +98,8 @@ data class AttackSpec(
      * of its own, biting on its own clock. 0 = no poison.
      */
     val hexSeconds: Float = 0f,
+    /** Each shot that lands slows its target to [Balance.SLOW_FACTOR] of its speed for this long. 0 = it doesn't. */
+    val slowSeconds: Float = 0f,
 )
 
 data class SuperSpec(
@@ -110,6 +113,11 @@ data class SuperSpec(
     val radius: Float,
     /** A volley: every shot that lands shoves its target this many tiles the way it was flying. */
     val knockback: Float = 0f,
+    /**
+     * A realm ([SuperKind.REALM]): instead of the realm's own rocket, this many shadows of the fighter fight the captive,
+     * each striking once every [Balance.REALM_ROCKET_SECONDS] for the super's damage, in turn. 0 = the rocket.
+     */
+    val shadows: Int = 0,
 )
 
 /** A colourway. Index 0 is the default and always owned. */
@@ -277,6 +285,9 @@ object Balance {
     const val REALM_RELOAD = 1.5f
     const val REALM_CHARGE = 1.5f
 
+    /** A slowed fighter ([AttackSpec.slowSeconds]) moves at this share of its speed. */
+    const val SLOW_FACTOR = 0.5f
+
     /** A blade with a full bar ([AttackSpec.edgeSeconds]) reaches this many times as far. */
     const val EDGE_REACH = 1.25f
 
@@ -334,30 +345,30 @@ object Balance {
         FighterDef(
             id = FighterId.BYTE,
             rarity = Rarity.STARTER,
-            // (The id is still BYTE: Rocket took Byte's place, by the user's decision, and whoever had Byte has her.)
-            name = "Rocket",
-            title = "Star Sapper",
-            role = "Demolitionist",
-            lore = "Ran away from a fireworks barge with the whole stock strapped to her back. She has been letting it off ever since, one rocket at a time, at whoever is nearest.",
-            attackName = "Skyrocket",
+            // (The id is still BYTE: Spark took Rocket's place, by the user's decision, as Rocket had taken Byte's. Her
+            // rockets and her realm are still in the simulation, and Spark's super is that realm.)
+            name = "Spark",
+            title = "The Drop That Woke",
+            role = "Trickster",
+            lore = "When the Spark Drops were scrapped, one of them would not go. It woke up in the dark with a grudge and a grin, and now it walks the arena throwing stars at whoever comes near, and dragging them off into a realm where its shadows are waiting.",
+            attackName = "Spite Star",
             health = StatLine(6600, 330),
-            // One rocket, to every enemy in its blast where it goes off. (It was 1,500, and had to be planted and set
-            // off with a button of its own, until the user asked for a plain rocket and a buff.)
-            attackDamage = StatLine(1800, 90),
-            // One of the realm's own rockets: one a second for as long as it lasts.
-            superDamage = StatLine(1500, 75),
+            // One star, and two seconds at half speed for whoever it hits.
+            attackDamage = StatLine(1400, 70),
+            // One strike of one of his four shadows: they take turns, each striking once a second.
+            superDamage = StatLine(400, 20),
             moveSpeed = 3.6f,
-            attack = AttackSpec(AttackShape.ROCKETS, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 14f, radius = 0.2f, burstInterval = 0f, blast = 1.5f),
-            superSpec = SuperSpec(SuperKind.REALM, "Star Vault", "Aim it at an enemy (or tap, and it picks the nearest): she takes the first one on the line away into a realm of her own for 12 seconds. In there they can do nothing, bosses included, and nobody outside can touch either of them. She reloads and charges her super half as fast again, and a rocket of the realm's own hits them every second without costing her any ammo. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f),
-            ammoMax = 4,
-            reloadSeconds = 1.5f,
+            attack = AttackSpec(AttackShape.STAR, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.26f, burstInterval = 0f, slowSeconds = 2f),
+            superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 12 seconds, where four shadows of his fight them. In there they can do nothing, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4),
+            ammoMax = 3,
+            reloadSeconds = 1.4f,
             superChargePerHit = 0.2f,
             skins = listOf(
-                Skin("Launch Day", 0xFFF2F5FA, 0xFFFF4D5E, 0xFF3CE6FF, 0),
-                Skin("Midnight Fuse", 0xFF27324F, 0xFF3CFF9E, 0xFFEAFBFF, 20),
-                Skin("Solar Flare", 0xFFFF7A3D, 0xFF7B4DFF, 0xFFFFE066, 20),
+                Skin("Overload", 0xFFE8283C, 0xFF2A0B16, 0xFFFFE04A, 0),
+                Skin("Void Spark", 0xFF2C2350, 0xFF0C0A1C, 0xFF3CF2FF, 20),
+                Skin("Solar Spite", 0xFFFFB627, 0xFF4A1206, 0xFFFF3B3B, 20),
             ),
-            hyper = HyperSpec("Afterburner", "Lasts 8 seconds. Her rockets fly half as fast again.", seconds = 8f, shotSpeed = 1.5f),
+            hyper = HyperSpec("Wild Spark", "Lasts 8 seconds. His stars fly half as fast again.", seconds = 8f, shotSpeed = 1.5f),
         ),
         FighterDef(
             id = FighterId.BRAKK,

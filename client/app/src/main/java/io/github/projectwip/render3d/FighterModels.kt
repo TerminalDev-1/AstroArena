@@ -62,7 +62,8 @@ class FighterModels {
     private val bossModels = HashMap<io.github.projectwip.data.BossKind, FighterModel>()
 
     init {
-        models[FighterId.BYTE] = buildRocket()
+        // (Spark took Rocket's place, and her model is kept in case she comes back.)
+        models[FighterId.BYTE] = buildSpark()
         models[FighterId.BRAKK] = buildBrakk()
         models[FighterId.KIRA] = buildKira()
         models[FighterId.KITO] = buildKito()
@@ -95,6 +96,50 @@ class FighterModels {
     private fun MeshBuilder.alongX(block: MeshBuilder.() -> Unit) = with { rotate(-90f, 0f, 0f, 1f); block() }
     private fun MeshBuilder.alongZ(block: MeshBuilder.() -> Unit) = with { rotate(90f, 1f, 0f, 0f); block() }
     private fun MeshBuilder.octa(rx: Float, ry: Float, rz: Float) = ellipsoid(rx, ry, rz, 2, 4)
+
+    // ------------------------------------------------------------------ Spark — the Spark Drop that woke up with a grudge
+
+    private fun buildSpark(): FighterModel {
+        val a = Assembler()
+        val cy = 0.98f
+        val r = 0.58f
+        val rig = Rig(headY = 1.5f, hipY = 0.48f, hipZ = 0.16f, shoulder = floatArrayOf(0f, cy + 0.18f, 0.62f), shoulderL = floatArrayOf(0f, cy + 0.18f, -0.62f), floatY = 1.85f)
+        // Two short dark legs in pointed boots under the lower points.
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.DARK) { at(0f, -0.17f, 0f) { capsule(0.075f, 0.2f) } }
+            a.add(bone, Slot.SECONDARY) { at(0.06f, -0.42f, 0f) { roundedBox(0.28f, 0.1f, 0.17f, 0.045f) } }
+            a.add(bone, Slot.ACCENT, outline = false, emissive = true) { at(0.2f, -0.42f, 0f) { octa(0.05f, 0.03f, 0.05f) } }
+        }
+        // The body is the drop itself: a puffy five-pointed star standing on end, its face to the front, with a
+        // darker star set in behind it and a lit seam where the two halves meet.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, cy, 0f) { rotate(90f, 0f, 1f, 0f); puffyStar(r, 0.26f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(-0.06f, cy, 0f) { rotate(90f, 0f, 1f, 0f); puffyStar(r * 0.86f, 0.22f) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0f, cy, 0f) { rotate(90f, 0f, 1f, 0f); puffyStar(r * 1.015f, 0.03f) } }
+        // A villain's face: glowing eyes that slant down to the middle with a slit in each, heavy brows dug in over
+        // them, and a wide grin full of fangs.
+        for (z in floatArrayOf(0.12f, -0.12f)) {
+            val tilt = if (z > 0f) -24f else 24f
+            a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.225f, cy + 0.07f, z) { rotate(tilt, 1f, 0f, 0f); ellipsoid(0.055f, 0.05f, 0.09f, 6, 10) } }
+            a.add(Bone.BODY, Slot.INK, outline = false) { at(0.275f, cy + 0.065f, z * 0.92f) { roundedBox(0.02f, 0.065f, 0.025f, 0.008f) } }
+            a.add(Bone.BODY, Slot.INK, outline = false) { at(0.2f, cy + 0.165f, z * 1.05f) { rotate(tilt * 1.4f, 1f, 0f, 0f); roundedBox(0.06f, 0.04f, 0.18f, 0.015f) } }
+        }
+        a.add(Bone.BODY, Slot.INK, outline = false) { at(0.225f, cy - 0.11f, 0f) { ellipsoid(0.045f, 0.06f, 0.16f, 6, 12) } }
+        a.add(Bone.BODY, Slot.INK, outline = false) {
+            for (z in floatArrayOf(0.14f, -0.14f)) at(0.215f, cy - 0.075f, z) { rotate(if (z > 0f) 30f else -30f, 1f, 0f, 0f); roundedBox(0.04f, 0.025f, 0.07f, 0.01f) }
+        }
+        a.add(Bone.BODY, Slot.WHITE, outline = false) {
+            for (z in floatArrayOf(-0.09f, -0.03f, 0.03f, 0.09f)) at(0.262f, cy - 0.075f, z) { rotate(180f, 1f, 0f, 0f); cylinder(0.02f, 0.05f, 5, topRadius = 0f) }
+            for (z in floatArrayOf(-0.06f, 0.06f)) at(0.262f, cy - 0.15f, z) { cylinder(0.017f, 0.04f, 5, topRadius = 0f) }
+        }
+        // Stray sparks crackling round the top point.
+        a.add(Bone.FLOAT, Slot.ACCENT, outline = false, emissive = true) {
+            for (k in 0 until 3) { val t = k * 2.094f; at(kotlin.math.cos(t) * 0.42f, (k - 1) * 0.08f, sin(t) * 0.42f) { octa(0.05f, 0.07f, 0.05f) } }
+        }
+        // What he throws: a little star of his own, lit, held out on the end of a point.
+        a.add(Bone.WEAPON, Slot.PRIMARY) { at(0.02f, 0f, 0f) { sphere(0.06f, 8, 10) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.1f, 0.05f, 0.04f) { rotate(90f, 0f, 1f, 0f); puffyStar(0.13f, 0.065f) } }
+        return a.build(rig)
+    }
 
     // ------------------------------------------------------------------ Rocket — ran away from a fireworks barge with the whole stock on her back
 
@@ -443,7 +488,8 @@ class FighterModels {
      * Draws a fighter standing at (x, z) on the ground, facing [facing] radians (sim convention:
      * 0 = +X, π/2 = +Z). The caller has already bound [prog] and set camera/light uniforms.
      */
-    fun draw(prog: Program, def: FighterDef, skinIndex: Int, x: Float, z: Float, facing: Float, anim: FighterAnim, pass: Pass, ink: FloatArray = INK) {
+    /** [shade]: draw the fighter as a shadow of this colour, with whatever glows on it glowing red. */
+    fun draw(prog: Program, def: FighterDef, skinIndex: Int, x: Float, z: Float, facing: Float, anim: FighterAnim, pass: Pass, ink: FloatArray = INK, shade: Long = 0L) {
         val model = model(def)
         val rig = model.rig
         val skin = def.skins[skinIndex.coerceIn(0, def.skins.lastIndex)]
@@ -507,10 +553,11 @@ class FighterModels {
             prog.mat4("uModel", bone)
             when (pass) {
                 Pass.COLOR -> {
-                    val c = slotColor(p.slot, skin.primary, skin.secondary, skin.accent)
+                    val c = if (shade != 0L) slotColor(Slot.ACCENT, shade, shade, if (p.emissive) SHADOW_GLOW else shade)
+                        else slotColor(p.slot, skin.primary, skin.secondary, skin.accent)
                     prog.v4("uTint", c[0], c[1], c[2], 1f)
                     prog.f("uFlash", anim.flash)
-                    prog.f("uEmissive", if (p.emissive) 0.75f else 0f)
+                    prog.f("uEmissive", if (p.emissive) (if (shade != 0L) 1f else 0.75f) else 0f)
                 }
                 Pass.OUTLINE -> prog.v4("uTint", ink[0], ink[1], ink[2], ink[3])
                 Pass.SILHOUETTE, Pass.SHADOW -> Unit
@@ -539,6 +586,8 @@ class FighterModels {
 
     companion object {
         val INK = floatArrayOf(0.078f, 0.141f, 0.208f, 1f)
+        /** What glows on a shadow (see [draw]). */
+        const val SHADOW_GLOW = 0xFFFF2A3AL
         /** Outline thickness in model units. */
         const val OUTLINE = 0.035f
 

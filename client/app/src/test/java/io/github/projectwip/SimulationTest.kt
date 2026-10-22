@@ -844,8 +844,70 @@ class SimulationTest {
         assertTrue("for nothing", kito.ammo < 1f && !kito.edgeFull)
     }
 
+    /**
+     * Rocket was retired by the user's decision (Spark took her place), but her rockets and her realm are still in the
+     * simulation, kept for reuse: this stand-in, with the numbers she left with, keeps them tested.
+     */
+    private val rocketStandIn = Balance.fighter(FighterId.BYTE).copy(
+        name = "Rocket",
+        attackDamage = io.github.projectwip.data.StatLine(1800, 90),
+        superDamage = io.github.projectwip.data.StatLine(1500, 75),
+        attack = io.github.projectwip.data.AttackSpec(io.github.projectwip.data.AttackShape.ROCKETS, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 14f, radius = 0.2f, burstInterval = 0f, blast = 1.5f),
+        superSpec = io.github.projectwip.data.SuperSpec(io.github.projectwip.data.SuperKind.REALM, "Star Vault", "", range = 7f, speed = 30f, radius = 0f),
+        ammoMax = 4, reloadSeconds = 1.5f, superChargePerHit = 0.2f,
+    )
+
+    @Test fun sparkThrowsAStarThatSlowsWhoeverItHitsForTwoSeconds() {
+        val spark = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "S", false)
+        val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
+        val w = onOpenGround(spark, near)
+        assertEquals("Spark", spark.def.name)
+        assertEquals(io.github.projectwip.data.AttackShape.STAR, spark.def.attack.shape)
+        spark.control.aimX = 1f; spark.control.aimY = 0f; spark.control.attack = true
+        w.step(Match.STEP)
+        assertEquals(io.github.projectwip.sim.ShotStyle.STAR, w.projectiles.single().style)
+        var hitAt = -1f
+        var t = 0f
+        while (t < 1.5f && hitAt < 0f) { w.step(Match.STEP); t += Match.STEP; if (near.hp < near.maxHp) hitAt = t }
+        assertEquals(near.maxHp - spark.attackDamage, near.hp)
+        assertTrue("and it is slowed", near.slowed)
+        // Slowed, it covers half the ground it would.
+        val x0 = near.x
+        near.control.moveX = 1f
+        seconds(w, 0.5f)
+        val slowedRun = near.x - x0
+        near.control.moveX = 0f
+        seconds(w, 1.55f)
+        assertFalse("for two seconds", near.slowed)
+        val x1 = near.x
+        near.control.moveX = 1f
+        seconds(w, 0.5f)
+        assertEquals(Balance.SLOW_FACTOR, slowedRun / (near.x - x1), 0.02f)
+    }
+
+    @Test fun sparksRealmHasFourShadowsThatStrikeInTurnEachOnceASecond() {
+        val tough = Balance.fighter(FighterId.BRAKK).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
+        val spark = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "S", false)
+        val near = Fighter(1, tough, 1, 0, 1, "N", true)
+        val w = onOpenGround(spark, near)
+        assertEquals(4, spark.def.superSpec.shadows)
+        spark.superCharge = 1f
+        spark.control.aimX = 1f; spark.control.aimY = 0f; spark.control.superAttack = true
+        w.step(Match.STEP)
+        assertTrue("he takes them into his realm", near.captive && spark.realm == spark.id)
+        w.events.clear()
+        var strikes = 0
+        seconds(w, 2f) {
+            strikes += w.events.count { it is io.github.projectwip.sim.GameEvent.Hit && it.targetId == near.id && it.sourceId == spark.id && it.damage == spark.superDamage }
+            w.events.clear()
+        }
+        assertEquals("four shadows, a strike each every second", 8, strikes)
+        assertEquals(8, spark.realmStrikes)
+        assertEquals("and nothing comes down out of the sky: the shadows are the realm's hits", near.maxHp - 8 * spark.superDamage, near.hp)
+    }
+
     @Test fun rocketFiresARocketThatBurstsOnWhatItHits() {
-        val rocket = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "R", false)
+        val rocket = Fighter(7, rocketStandIn, 1, 0, 0, "R", false)
         val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
         val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
         val w = onOpenGround(rocket, near, far)
@@ -910,7 +972,7 @@ class SimulationTest {
 
     @Test fun rocketsRealmHoldsOneEnemyWhileItsOwnRocketsHitThemAndCanFollowItself() {
         val tough = Balance.fighter(FighterId.BRAKK).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
-        val rocket = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "R", false)
+        val rocket = Fighter(7, rocketStandIn, 1, 0, 0, "R", false)
         val near = Fighter(1, tough, 1, 0, 1, "N", true)
         val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
         val w = onOpenGround(rocket, near, far)
@@ -962,7 +1024,7 @@ class SimulationTest {
 
     @Test fun aBossCanDoNothingInTheRealm() {
         val a = Arenas.provingGround()
-        val rocket = Fighter(0, Balance.fighter(FighterId.BYTE), 1, 0, 0, "R", false)
+        val rocket = Fighter(0, rocketStandIn, 1, 0, 0, "R", false)
         val boss = Fighter(1, Balance.bosses[0], 1, 0, 1, "Boss", true)
         val w = World(a, listOf(rocket, boss), io.github.projectwip.sim.MatchRules.bossMode())
         repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
@@ -981,7 +1043,7 @@ class SimulationTest {
         assertEquals("while the realm's rockets land", boss.maxHp - 11 * rocket.superDamage, boss.hp)
     }
 
-    @Test fun botsCanPlayRocketThroughAWholeMatch() {
+    @Test fun botsCanPlaySparkThroughAWholeMatch() {
         val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 33L))
         var t = 0f
         var realms = 0
@@ -990,8 +1052,8 @@ class SimulationTest {
             realms += m.world.events.count { it is io.github.projectwip.sim.GameEvent.Realm && it.open }
             m.world.events.clear()
         }
-        println("Rocket bot: ${m.player.kos} KOs, ${m.player.deaths} deaths, ${m.player.damageDealt} damage, $realms realms")
-        assertTrue("a bot playing Rocket plants rockets and sets them off", m.player.damageDealt > 0)
+        println("Spark bot: ${m.player.kos} KOs, ${m.player.deaths} deaths, ${m.player.damageDealt} damage, $realms realms")
+        assertTrue("a bot playing Spark throws stars and opens realms", m.player.damageDealt > 0 && realms > 0)
     }
 
     @Test fun buddyMissesWhenThereIsNobodyOnTheLine() {

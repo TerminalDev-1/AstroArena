@@ -318,6 +318,7 @@ class MatchRunner(
                     AttackShape.HEX -> Sound.HEX
                     AttackShape.PLANT -> Sound.WHOOSH
                     AttackShape.SLASH -> Sound.WHOOSH
+                    AttackShape.STAR -> Sound.STAR
                 }, gain, (if (f.def.attack.shape == AttackShape.SLASH) 1.5f else 0.95f) + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }

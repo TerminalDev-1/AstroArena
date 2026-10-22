@@ -190,7 +190,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits())
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits()); mix(f.slowLeft.toRawBits())
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -224,6 +224,7 @@ class World(
         f.hitFlash = (f.hitFlash - dt).coerceAtLeast(0f)
         f.shield = (f.shield - dt).coerceAtLeast(0f)
         f.attackCooldown = (f.attackCooldown - dt).coerceAtLeast(0f)
+        f.slowLeft = (f.slowLeft - dt).coerceAtLeast(0f)
         // (A blade's bar fills by itself, whatever its owner is doing.)
         if (f.def.attack.edgeSeconds > 0f && f.edge < 1f) f.edge = (f.edge + dt / f.def.attack.edgeSeconds).coerceAtMost(1f)
 
@@ -244,7 +245,7 @@ class World(
             var my = if (f.rooted) 0f else c.moveY
             val len = hypot(mx, my)
             if (len > 1f) { mx /= len; my /= len }
-            val speed = f.def.moveSpeed
+            val speed = f.def.moveSpeed * (if (f.slowed) Balance.SLOW_FACTOR else 1f)
             val blocked = arena.moveCircle(f.x, f.y, f.radius, mx * speed * dt, my * speed * dt, tmp)
             f.x = tmp[0]; f.y = tmp[1]
             if (len > 0.05f) f.walkCycle += hypot(f.x - f.prevX, f.y - f.prevY) * 3.2f
@@ -549,7 +550,8 @@ class World(
         f.realm = f.id
         f.realmLeft = Balance.REALM_SECONDS
         // (The first comes down half a beat in, so a whole realm sees one for every second of it.)
-        f.realmTick = Balance.REALM_ROCKET_SECONDS / 2f
+        f.realmTick = realmBeat(f) / 2f
+        f.realmStrikes = 0
         if (t.latched) unlatch(t)
         t.realm = f.id
         t.dashTime = 0f
@@ -558,15 +560,22 @@ class World(
         events += GameEvent.Realm(f.id, t.id, true)
     }
 
-    /** The realm [f] opened: its own rocket hits the captive every [Balance.REALM_ROCKET_SECONDS], until the time is up. */
+    /**
+     * Time between two hits in the realm [f] opens: one rocket every [Balance.REALM_ROCKET_SECONDS], or, with shadows
+     * ([io.github.projectwip.data.SuperSpec.shadows]), each shadow strikes that often, in turn.
+     */
+    private fun realmBeat(f: Fighter): Float = Balance.REALM_ROCKET_SECONDS / maxOf(1, f.def.superSpec.shadows)
+
+    /** The realm [f] opened: its own rocket (or its shadows) hits the captive every [realmBeat], until the time is up. */
     private fun stepRealm(f: Fighter, dt: Float) {
         val t = fighters.firstOrNull { it.realm == f.id && it !== f }
         f.realmLeft -= dt
         if (t == null || !t.alive || f.realmLeft <= 0f) { closeRealm(f.id); return }
         f.realmTick -= dt
         if (f.realmTick > 0f) return
-        f.realmTick += Balance.REALM_ROCKET_SECONDS
-        events += GameEvent.Burst(t.x, t.y, t.radius + 0.5f)
+        f.realmTick += realmBeat(f)
+        f.realmStrikes++
+        events += GameEvent.Burst(t.x, t.y, t.radius + if (f.def.superSpec.shadows > 0) 0.2f else 0.5f)
         // (It charges her super like a rocket of her own, so one realm can follow another. A knockout closes the realm by itself.)
         damage(t, f, f.superDamage, false, t.x, t.y)
     }
@@ -657,13 +666,14 @@ class World(
             AttackShape.HEX -> ShotStyle.HEX
             AttackShape.PLANT -> ShotStyle.ROCKET
             AttackShape.SLASH -> ShotStyle.PELLET
+            AttackShape.STAR -> ShotStyle.STAR
         }
         val baseAng = atan2(dy, dx)
         val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
         val spread = Math.toRadians(a.spreadDegrees.toDouble()).toFloat()
         for (i in 0 until n) {
             val ang = if (n == 1) baseAng else baseAng - spread / 2 + spread * i / (n - 1)
-            spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast, share = a.healthShare * f.damageMultiplier, hex = a.hexSeconds)
+            spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast, share = a.healthShare * f.damageMultiplier, hex = a.hexSeconds, slow = a.slowSeconds)
         }
     }
 
@@ -761,7 +771,7 @@ class World(
 
     private fun spawnProjectile(
         f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float,
-        pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f, knock: Float = 0f, share: Float = 0f, hex: Float = 0f,
+        pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f, knock: Float = 0f, share: Float = 0f, hex: Float = 0f, slow: Float = 0f,
     ) {
         val dx = cos(ang)
         val dy = sin(ang)
@@ -769,7 +779,7 @@ class World(
         val off = f.radius * 0.6f
         val sx = f.x + dx * off - dy * side
         val sy = f.y + dy * off + dx * side
-        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock, share, hex)
+        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock, share, hex, slow)
         if (arena.tileAt(sx, sy).blocksShots) {
             events += GameEvent.WallHit(sx, sy, style)
             return
@@ -925,6 +935,7 @@ class World(
                         if (p.hex > 0f && f.alive && f.shield <= 0f && !f.isLeaping) {
                             f.hexes += Hex(p.ownerId, p.damage, Balance.HEX_TICK_SECONDS, p.hex - Balance.HEX_TICK_SECONDS / 2f)
                         }
+                        if (p.slow > 0f && f.alive && f.shield <= 0f && !f.isLeaping) f.slowLeft = maxOf(f.slowLeft, p.slow)
                         if (p.knock > 0f && f.alive && !f.rooted && speed > 0f) {
                             arena.moveCircle(f.x, f.y, f.radius, p.vx / speed * p.knock, p.vy / speed * p.knock, tmp)
                             f.x = tmp[0]; f.y = tmp[1]
@@ -993,6 +1004,7 @@ class World(
         victim.dashTime = 0f
         victim.leapTime = 0f
         victim.hexes.clear()
+        victim.slowLeft = 0f
         planted.removeAll { it.ownerId == victim.id }
         if (victim.inRealm) closeRealm(victim.realm)
         victim.latchedTo = -1

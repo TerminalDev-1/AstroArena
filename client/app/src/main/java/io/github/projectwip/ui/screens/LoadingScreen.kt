@@ -132,6 +132,10 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
             TipCard(time, roomy)
         }
 
+        // Spark in the spotlight takes the whole screen over: it goes red and glitches.
+        val glitch = io.github.projectwip.ui.rememberSparkGlitch { featured.id == io.github.projectwip.data.FighterId.BYTE }
+        io.github.projectwip.ui.SparkGlitchOverlay(glitch)
+
         if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
             GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
         }
@@ -282,7 +286,7 @@ private fun Logo(time: Float, roomy: Boolean) {
                 Offset(x - 40.dp.toPx(), 0f), Size(80.dp.toPx(), size.height))
         }
         Spacer(Modifier.height(4.dp))
-        PlainText("ARENA BRAWLER", Type.Label.copy(letterSpacing = Type.Label.fontSize * 0.45f), color = Palette.TextDim, maxLines = 1)
+        PlainText("BETA", Type.Label.copy(letterSpacing = Type.Label.fontSize * 0.45f), color = Palette.TextDim, maxLines = 1)
     }
 }
 

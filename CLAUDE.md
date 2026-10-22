@@ -25,7 +25,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `roster` is the fighter grid with every model shown unlocked, `tryrocket` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
+  (`match|boss|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `roster` is the fighter grid with every model shown unlocked, `tryspark` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - UI changes must be checked with a screenshot (`adb exec-out screencap -p`) and `adb logcat -b crash -d`.
 - The tablet is the user's everyday device. Before every `input tap` or `am start`, confirm
   `dumpsys window | grep mCurrentFocus` shows `io.github.projectwip` or the home screen (`com.miui.home`): on
@@ -36,24 +36,28 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - `sim/`, `ai/`, `data/` and `audio/SfxSynth.kt` are pure Kotlin (no Android imports); they run in JVM tests.
 - Humans and bots drive fighters through the same `Control`. Visibility goes through `World.isVisibleTo`.
-- The starter fighter is Rocket. The code, the server and the saves still call her `BYTE` (`FighterId.BYTE`,
-  `STARTING_FIGHTER`), by the user's decision: Byte was removed for good and Rocket took her place, so whoever had
-  Byte has Rocket at the same level, and nothing was renamed underneath. Don't bring Byte back. (Juno, the starter
-  before Byte, was removed too.) Rocket's kit is the user's design: four ammo, each a plain aimed rocket that
-  bursts on the first enemy it meets (`AttackShape.ROCKETS`, one to an attack; 1,800 after the user asked for a buff).
-  For one build (84) her rockets stuck in the ground and waited for a BOOM button; the user had that taken out. The
-  planted rockets are still in the code with nobody using them (`AttackShape.PLANT`, `World.planted`,
-  `Control.detonate`, flag 16 in the input log and on the wire; the button only shows for a fighter who plants), and
-  `SimulationTest` keeps them tested with a stand-in. Her super (`SuperKind.REALM`) is aimed like Buddy's: it takes
-  the first enemy on the line, boss or not, into a realm for `REALM_SECONDS` (12). In there the captive can do
-  nothing (`Fighter.captive`), nobody outside can touch either of them (`Fighter.realm`: damage only passes between
-  fighters in the same realm), she reloads and charges her super half as fast again, and a rocket of the realm's own
-  hits the captive every second without costing ammo. Those numbers are the user's, and so is this: the realm is
-  chainable. Its own rockets charge her super and the same enemy can be taken straight back in; a rule against
-  that was added in build 84 and the user had it removed. Don't put one back. Her name, look and words are ours and
-  must stay so.
+- The starter fighter is Spark. The code, the server and the saves still call him `BYTE` (`FighterId.BYTE`,
+  `STARTING_FIGHTER`): Byte was removed, then Rocket took her place, and then Rocket was retired by the user's
+  decision (build 89) and Spark took hers, each time keeping the id, so whoever had Rocket has Spark at the same level
+  (nothing was paid back for her, by the user's decision). Don't bring Byte or Juno back, or Rocket unless the user asks. Spark is the user's
+  idea and part of the lore: the Spark Drop that would not go away, a puffy five-pointed star (the drops' shape,
+  `render3d/StarMesh.kt`) with a villain's face. Whenever he is on screen in the menus (the lobby showing him, or the
+  loading screen's spotlight) the whole screen goes red and glitches (`ui/SparkGlitch.kt`). His attack, Spite Star
+  (`AttackShape.STAR`, `ShotStyle.STAR`, `Sound.STAR`), is a thrown star that slows whoever it hits to `SLOW_FACTOR`
+  of their speed for two seconds (`AttackSpec.slowSeconds`, `Fighter.slowLeft`). His super, Shadow Realm, is
+  Rocket's realm (`SuperKind.REALM`) with four shadows of his (`SuperSpec.shadows`): they stand round the captive
+  and take turns to strike, each once a second, in place of the realm's own rocket (drawn as dark copies of him in
+  `MatchRenderer.forEachRealmShadow`). His name, look and words are ours.
+- Rocket's code is kept for reuse, by the user's decision: her plain aimed rockets (`AttackShape.ROCKETS`), her realm
+  (`SuperKind.REALM`, `REALM_SECONDS`, `Fighter.captive`, `Fighter.realm`, the realm's own rocket each second) and
+  her model (`buildRocket`, unregistered), with nobody using them; `SimulationTest` keeps them tested with a stand-in
+  carrying her last numbers (`rocketStandIn`). The realm's rules are the user's: in there the captive can do nothing,
+  nobody outside can touch either of them, its owner reloads and charges half as fast again, and it is chainable (its
+  hits charge the super and the same enemy can be taken straight back in; don't add a rule against that). The
+  planted rockets from build 84 are still in the code too, unused (`AttackShape.PLANT`, `World.planted`,
+  `Control.detonate`, flag 16 in the input log and on the wire), and tested with a stand-in.
 - Supers can miss, by the user's decision: one that needs somebody on the line it is aimed along (Buddy's leap,
-  Rocket's realm) is spent all the same with nobody there (Buddy leaps to the end of his reach and lands on
+  Spark's realm) is spent all the same with nobody there (Buddy leaps to the end of his reach and lands on
   nothing). They used to keep their charge. Bosses can miss too: every move of a `BossScript` is aimed up to
   `BOSS_MISS_TILES` off its target.
 - Boss Mode bosses are their own things (`BossKind`, `Balance.bosses`), not giant fighters: each fights through

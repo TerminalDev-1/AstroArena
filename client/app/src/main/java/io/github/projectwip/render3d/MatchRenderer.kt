@@ -51,6 +51,8 @@ class MatchRenderer(
     private lateinit var sphere: Mesh
     private lateinit var octa: Mesh
     private lateinit var bit: Mesh
+    /** A puffy star: what Spark throws. */
+    private lateinit var starShot: Mesh
     /** A rocket lying along +X, one unit long: the body, and (drawn in a second colour) its nose cone, fins and nozzle. */
     private lateinit var rocketBody: Mesh
     private lateinit var rocketTrim: Mesh
@@ -136,6 +138,7 @@ class MatchRenderer(
         sphere = MeshBuilder().apply { sphere(1f, 10, 14) }.build()
         octa = MeshBuilder().apply { ellipsoid(1f, 1f, 1f, 2, 4) }.build()
         bit = MeshBuilder().apply { box(1f, 1f, 1f) }.build()
+        starShot = MeshBuilder().apply { puffyStar(1f, 0.5f) }.build()
         val body: MeshBuilder.() -> Unit = { with { rotate(-90f, 0f, 0f, 1f); cylinder(0.14f, 0.56f, 12) } }
         val trim: MeshBuilder.() -> Unit = {
             with { translate(0.42f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); cylinder(0.14f, 0.28f, 12, topRadius = 0f) }
@@ -318,6 +321,7 @@ class MatchRenderer(
         // Fighters
         lit.f("uRim", 0.45f)
         forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR) }
+        forEachRealmShadow(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR, shade = SHADOW_SHADE) }
         lit.f("uFlash", 0f)
         lit.f("uEmissive", 0f)
 
@@ -332,6 +336,7 @@ class MatchRenderer(
         drawCrates(lit, shadowPass = false, outline = true)
         lit.f("uOutline", FighterModels.OUTLINE)
         forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
+        forEachRealmShadow(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
         lit.f("uOutline", 0f)
         lit.i("uMode", 0)
         GLES30.glDisable(GLES30.GL_CULL_FACE)
@@ -410,6 +415,37 @@ class MatchRenderer(
             if (!f.alive || shownVis[f.id] < 0.999f || !inView(f.x, f.y)) continue
             poseFor(f)
             block(f, lerp(f.prevX, f.x, alpha), lerp(f.prevY, f.y, alpha), shownFacing[f.id])
+        }
+    }
+
+    /**
+     * The shadows of a realm that has them (`SuperSpec.shadows`), seen from inside it: they stand in a ring round the
+     * captive, turning slowly, and each lunges in as it strikes (they take turns, see `World.stepRealm`).
+     */
+    private inline fun forEachRealmShadow(alpha: Float, block: (Fighter, Float, Float, Float) -> Unit) {
+        for (f in world.fighters) {
+            val n = f.def.superSpec.shadows
+            if (n <= 0 || f.realm != f.id || !f.alive || f.realm != match.player.realm) continue
+            val t = world.fighters.firstOrNull { it.realm == f.id && it !== f && it.alive } ?: continue
+            val beat = io.github.projectwip.data.Balance.REALM_ROCKET_SECONDS / n
+            val since = beat - f.realmTick
+            val last = ((f.realmStrikes - 1) % n + n) % n
+            val tx = lerp(t.prevX, t.x, alpha); val tz = lerp(t.prevY, t.y, alpha)
+            for (k in 0 until n) {
+                val lunge = if (f.realmStrikes > 0 && k == last && since < SHADOW_LUNGE) sin(since / SHADOW_LUNGE * 3.1416f) else 0f
+                val a = k * 6.2832f / n + time * 0.5f
+                val d = (1.55f - 0.8f * lunge) * t.scale.coerceAtLeast(1f)
+                val x = tx + cos(a) * d; val z = tz + sin(a) * d
+                poseFor(f)
+                anim.scale = FIGHTER_SCALE * 0.85f
+                anim.moving = 0.3f
+                anim.walk = time * 4f + k
+                anim.recoil = lunge
+                anim.jump = lunge * 0.25f
+                anim.flash = 0f
+                anim.time = time + k * 1.3f
+                block(f, x, z, atan2(tz - z, tx - x))
+            }
         }
     }
 
@@ -942,6 +978,12 @@ class MatchRenderer(
             val c = world.fighter(f.hexes.last().by)?.let { it.def.skins[it.skin].secondary.toInt() } ?: 0xFF7CFF4F.toInt()
             particles.spawn(f.x + cos(a) * 0.35f, 0.3f + rng.nextFloat() * 0.9f, f.y + sin(a) * 0.35f, 0f, 1.6f + rng.nextFloat() * 1.4f, 0f, 0.55f, 0.16f, c, 0.9f)
         }
+        // Star dust sinks round anyone who is slowed.
+        for (f in world.fighters) {
+            if (!f.slowed || !f.alive || !shown(f) || rng.nextFloat() > 0.45f) continue
+            val a = rng.nextFloat() * 6.28f
+            particles.spawn(f.x + cos(a) * 0.45f, 0.9f + rng.nextFloat() * 0.8f, f.y + sin(a) * 0.45f, 0f, -1.2f - rng.nextFloat(), 0f, 0.6f, 0.12f, 0xFFFF4D6A.toInt(), 0.9f)
+        }
         // Sparks of stray code come off anyone who is corrupted and standing there.
         for (f in world.fighters) {
             if (!f.enthralled || !f.alive || !shown(f) || rng.nextFloat() > 0.35f) continue
@@ -982,6 +1024,21 @@ class MatchRenderer(
                     setModel(x, y - size * 0.73f, z, size * 0.7f, size * 0.08f, size * 0.45f, spin); bit.draw()
                     tint(0xFF8C95B4)
                     setModel(x, y - size * 0.95f, z, size * 1.05f, size * 0.07f, size * 0.36f, spin + 35f); bit.draw()
+                }
+                ShotStyle.STAR -> {
+                    // A spite star: a puffy star spinning end over end as it flies, with a trail of little ones
+                    // dwindling behind it.
+                    val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
+                    val dx = pr.vx / len; val dz = pr.vy / len
+                    val k = pr.radius * 1.5f
+                    val y = 0.8f + 0.05f * sin(pr.age * 15f)
+                    tint(skin.accent)
+                    setModel(x, y, z, k, k, k, yaw + 90f + pr.age * 1100f); starShot.draw()
+                    tint(skin.primary)
+                    for (j in 1..3) {
+                        val m = k * (0.55f - j * 0.12f)
+                        setModel(x - dx * k * (0.8f + j * 0.7f), y + sin(pr.age * 20f + j) * 0.06f, z - dz * k * (0.8f + j * 0.7f), m, m, m, pr.age * 700f + j * 40f); starShot.draw()
+                    }
                 }
                 ShotStyle.HEX -> {
                     // A hex: a rune thrown flat, a triangle of light wheeling round a lidless eye, with a tail of
@@ -1091,7 +1148,7 @@ class MatchRenderer(
         }
         // In a realm, a rocket of its own comes straight down on the captive every second.
         for (f in world.fighters) {
-            if (f.realm != f.id || f.realm != match.player.realm) continue
+            if (f.realm != f.id || f.realm != match.player.realm || f.def.superSpec.shadows > 0) continue
             val t = world.fighters.firstOrNull { it.realm == f.id && it !== f } ?: continue
             val skin = f.def.skins[f.skin]
             val u = (1f - f.realmTick / io.github.projectwip.data.Balance.REALM_ROCKET_SECONDS).coerceIn(0f, 1f)
@@ -1559,5 +1616,8 @@ class MatchRenderer(
         const val HAMMER_LEAP = 0.5f
         /** How long a sword swing takes to draw. */
         const val SLASH_SECONDS = 0.26f
+        /** The shadows of a realm: what they look like, and how long one takes to lunge in and back as it strikes. */
+        const val SHADOW_SHADE = 0xFF1C1024L
+        const val SHADOW_LUNGE = 0.3f
     }
 }

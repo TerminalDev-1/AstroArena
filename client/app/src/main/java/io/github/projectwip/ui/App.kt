@@ -104,9 +104,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "kito" -> Screen.Fighters(FighterId.KITO)
                 "buddy" -> Screen.Fighters(FighterId.BUDDY)
                 // The Training Area as any fighter, unlocked or not, for looking at them in play.
-                // (Rocket is still BYTE underneath.)
-                "trybuddy", "trykito", "trykira", "trybrakk", "trybyte", "tryrocket" -> Screen.Match(startMatchConfig(repo.save.value).copy(
-                    playerFighter = FighterId.valueOf(startScreen.removePrefix("try").uppercase().replace("ROCKET", "BYTE")), playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
+                // (Spark is still BYTE underneath.)
+                "trybuddy", "trykito", "trykira", "trybrakk", "trybyte", "tryspark" -> Screen.Match(startMatchConfig(repo.save.value).copy(
+                    playerFighter = FighterId.valueOf(startScreen.removePrefix("try").uppercase().replace("SPARK", "BYTE")), playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road
                 "track" -> Screen.CupTrack
@@ -345,6 +345,11 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         val metrics = UiMetrics((maxWidth.value - cutoutPx / base.density) / scale, maxHeight.value / scale, scale)
 
         val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
+        // Whenever Spark stands in the lobby, the whole screen goes red and glitches.
+        val glitch = rememberSparkGlitch {
+            screen !is Screen.Match && capsule == null && haul == null && lobby.showFighter && lobby.fighter == FighterId.BYTE &&
+                lobby.shot != io.github.projectwip.render3d.LobbyShot.ROAD
+        }
         CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalCutout provides cutoutSides, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalOfflineGame provides local, LocalOfflineMode provides offline, LocalDev provides dev, LocalServerCall provides ask) {
             if (screen !is Screen.Match) {
                 androidx.compose.ui.viewinterop.AndroidView(
@@ -355,7 +360,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             // The menu steps aside while a capsule is being opened, so nothing sits on top of the 3D capsule.
             val menuAlpha by androidx.compose.animation.core.animateFloatAsState(if (capsule != null || haul != null) 0f else 1f, tween(160), label = "menu")
             AnimatedContent(
-                modifier = Modifier.graphicsLayer { alpha = menuAlpha }.then(if (screen is Screen.Match) Modifier else Modifier.windowInsetsPadding(cutout)),
+                modifier = Modifier.graphicsLayer { alpha = menuAlpha; translationX = glitch.shift(14.dp.toPx()) }.then(if (screen is Screen.Match) Modifier else Modifier.windowInsetsPadding(cutout)),
                 targetState = screen,
                 contentKey = { it::class },
                 transitionSpec = {
@@ -437,6 +442,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 if (serverStatus.disabled) io.github.projectwip.ui.screens.DisabledScreen(serverStatus.disabledReason, serverStatus.disabledUntil)
                 else io.github.projectwip.ui.screens.DisabledScreen("An example reason, as the server's owner wrote it.", System.currentTimeMillis() + 54 * 3600_000L)
             }
+            SparkGlitchOverlay(glitch)
             if (judging) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
                 GameText("THE SERVER IS CHECKING THE MATCH…", Type.Title, outline = 3.5.dp)
             }

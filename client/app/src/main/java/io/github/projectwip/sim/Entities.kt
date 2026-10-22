@@ -130,6 +130,11 @@ class Fighter(
     var realm = -1
     var realmLeft = 0f
     var realmTick = 0f
+    /** How many strikes the realm's shadows have made so far ([SuperSpec.shadows]): they take turns. */
+    var realmStrikes = 0
+    /** Slowed ([AttackSpec.slowSeconds]) for this much longer. */
+    var slowLeft = 0f
+    val slowed get() = slowLeft > 0f
     val inRealm get() = realm >= 0
     /** Taken into somebody else's realm: it can do nothing until it is over. */
     val captive get() = realm >= 0 && realm != id
@@ -164,7 +169,7 @@ class Fighter(
 /** One hex on a fighter: who did it, what each bite does, the time to the next bite, and how long it has left. */
 class Hex(val by: Int, val damage: Int, var tick: Float, var left: Float)
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, STAR }
 
 class Projectile(
     val ownerId: Int,
@@ -187,6 +192,8 @@ class Projectile(
     val share: Float = 0f,
     /** Poisons whoever it hits for this many seconds (0 = it doesn't): see `AttackSpec.hexSeconds`. */
     val hex: Float = 0f,
+    /** Slows whoever it hits for this many seconds (0 = it doesn't): see `AttackSpec.slowSeconds`. */
+    val slow: Float = 0f,
 ) {
     var prevX = x
     var prevY = y
