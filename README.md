@@ -1,36 +1,36 @@
 # AstroArena
 
-A mobile-first, landscape, **3D arena brawler for Android phones and tablets** — quick 3v3 matches,
-twin-stick touch controls, fighters you level up, Cups, a Cup Track, a Shop — and **bots as a first-class
-way to play**. Launch it, pick a fighter, press PLAY, and you're in a match against bots in seconds. No
-account and no matchmaking, and the optional game server is not needed to play.
+A mobile-first, landscape, **3D arena brawler for Android phones and tablets**: quick matches against bots,
+twin-stick touch controls, five fighters to unlock and level up, bosses to take down, and 1v1s and team play
+against real players through its own game server. Launch it, press PLAY, and you're in a match in seconds.
 
 **Repository:** https://github.com/TerminalDev-1/AstroArena
 
-> **Preview software.** This is an experiment. Anything — rules, balance, saves, code — may change without
-> notice. There is no promise of maintenance.
+> **Beta.** This is an experiment. Anything (rules, balance, saves, code) may change without notice. Every build
+> replaces the last one: the game checks GitHub for a newer release when it starts and asks you to update.
 
-Everything in the game is original: 3D characters and arena (all meshes generated in code), icons, the
-Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game assets are used.
+Everything in the game is original: the 3D fighters, bosses and arenas (all meshes generated in code), icons, the
+Cup emblem, music and sounds (synthesised at runtime), UI and rules. No third-party game assets are used.
 
-## What's in the first vertical slice
+## What's in it
 
 | | |
 |---|---|
-| **Modes** | **Last Spark** — 10-fighter free-for-all, last one standing; break Spark Crates for stacking Power Cells (+10% health & damage each) while the Static Storm closes in. **Knockout Rush** — 3v3, first team to 10 KOs, your team starts at the bottom. **Boss Mode** — you against a giant version of a random fighter; knock it out to win, with unlimited lives. The boss's strength is fixed and it pays Bolts only. **Training Area** — a practice ground with four dummies, a swarm of twelve minis, a sentry gun and a boss, none of which move; nothing at stake |
-| **Arenas** | *Static Canyon* (44×44, free-for-all) and *Foundry Yard* (vertical 3v3): walls, tall-grass thickets (hide inside), coolant pools (block movement, not shots), destructible crates |
-| **Fighters** | **Byte** (scatter rifle, knockback super, starter) · **Brakk** (shotgun tank, ram super) · **Mira** (sniper, piercing super) · **Kito** (fast blade assassin, dash super) · **Buddy** (Ultra: a rogue AI that smashes a computer into whoever is close, and whose super poisons the nearest enemy until they are knocked out) · **Varun** (rocket firefighter: three rockets a shot, a super of eight seekers that fly over walls, hunt enemies and never land the knockout). Every fighter also has a **Hyper**: 8 seconds of +25% damage, health and shield |
-| **Graphics** | Custom OpenGL ES 3.0: toon lighting, real-time shadows, inked outlines, 4× MSAA, up to 120 Hz |
-| **Controls** | Floating/fixed move stick · drag-to-aim attack stick (tap anywhere on it = auto-aim that locks the nearest enemy and leads moving targets; visible target marker; drag back to centre = cancel) · super stick · optional aim assist · camera centred on you |
-| **Bots** | Easy / Normal / Hard / Elite — behaviour only (reaction, aim, leading, dodging, spacing, targeting, supers) |
-| **Progression** | Levels 1–10 with linear, fully visible stat gains · Bolts (upgrades) · Prisms (shop) · Cups · Cup Track rewards |
-| **Glitch Drops** | Earned from your first three good finishes a day (a team win, or top 4 in Last Spark). Tap to charge one through six tiers — Scrap, Tuned, Charged, Overclocked, Prismatic, Ultra — then it bursts open: Bolts, Prisms, a colourway or a new fighter, never a duplicate. A drop can split into two, four or eight, and the pieces roll better than a plain one |
-| **Leaderboard** | A Cup ladder of 100. There is no online play yet, so the other 99 are simulated rivals whose Cups drift from day to day |
-| **Sound** | Music (a sixteen-bar dark-electro lobby loop in four sections, plus separate victory and defeat themes) and every effect are designed in code by a small synth (`audio/SfxSynth.kt`): band-limited oscillators, FM bells, filtered noise, drive, echo and reverb |
-| **Shop** | Daily free gift · fighter unlocks · Bolt supplies · colourways · **Offer Creator**: design your own deals (bundle contents, price in Bolts/Prisms/free, discount display, expiry, purchase limit, colour theme) |
-| **Menus** | A live 3D lobby behind every screen (camera glides between shots), your fighter on a pedestal you can spin, 3D portraits, mode picker |
-| **Settings** | Bot difficulty, player name, control size/opacity/mode, auto-aim, volume/mute, haptics, frame rate, damage numbers, FPS, reset |
-| **Persistence** | Everything above is saved to a JSON file and survives restarts; with the server running, a copy is kept there too |
+| **Modes** | **Last Spark**: a 10-fighter free-for-all, last one standing; break crates for Power Cells while the Static Storm closes in. **Knockout Rush**: 3v3, first team to 10 KOs. **Boss Mode**: you (or a team of friends) against one of three bosses, each with moves of its own (Hailstorm, a rocket platform; Lighthouse, a beam sweeper; Ramrod, a wrecking bull); watch the marked ground, unlimited lives. **1v1**: against another real player, each on their own device, first to 3 knockouts. **Training Area**: dummies, a swarm of minis, a boss that stands still and one sentry gun; nothing at stake |
+| **Arenas** | *Static Canyon* (free-for-all), *Foundry Yard* (3v3), *Proving Ground* (bosses and 1v1s) and the *Training Area*: walls, tall grass to hide in, water that blocks movement but not shots, destructible crates |
+| **Fighters** | **Spark**, the starter: a glossy blue star who lobs his Spite Star over walls, and whose Shadow Realm traps an enemy with four of his shadows. **Bark**: a dog who throws paw prints that take a share of what health is left. **Kira**: a witch whose Hex Bolts poison and stack, and whose Bitter Brew hurts enemies and heals her. **Kito**: a ninja whose sword swing hits everyone in its arc, with an edge bar that makes the next swing reach further, and a super that blinks him to the first enemy on a line. **Buddy**: a rogue AI who hurls computers, and whose super leaps onto an enemy's back and corrupts them. Every fighter has a **super** and a **Hyper** that charges from hits |
+| **Graphics** | Custom OpenGL ES 3.0: toon lighting, real-time shadows, inked outlines, gloss, 4× MSAA, up to 120 Hz |
+| **Controls** | Floating or fixed move stick · drag-to-aim attack stick (a tap auto-aims at the nearest enemy) · super and Hyper buttons · aim assist · a layout editor for the controls |
+| **Bots** | Easy / Normal / Hard / Elite: behaviour only (reaction, aim, leading, dodging, spacing, targeting, supers). The server approves the choice |
+| **Progression** | Levels 1–10 with fully visible stat gains, paid for with **Upgrade Credits**. **CPU Chips** are the shop currency. **Cups** for every win, a rank and Cups of each fighter's own, and the **Cup Track** of rewards |
+| **Arena Boxes** | Earned from good finishes. Each holds several items, revealed one at a time: Credits, CPU Chips, colourways, and now and then a jackpot. Open them one by one or all at once |
+| **Spark Road** | A 3D road with every fighter standing along it. Credits fill it toward the next fighter, who unlocks the moment they're covered (or can be bought with CPU Chips) |
+| **Shop** | A daily free gift, daily offers and the server's deals |
+| **Online** | A real **leaderboard** of the server's players, a **News** tab, **1v1** and **teams**: two or three players in one Boss Mode or Knockout Rush match, joined with a four-digit code |
+| **Offline** | When the server can't be reached the game carries on with an offline profile of its own, kept on the device: **Chaos Mode**, where every tweak (luck, free drops, upgrade cost, hand-outs) is open to everyone |
+| **Menus** | A live 3D lobby behind every screen, with dark steel-glass panels over it: a navigation rail on the home screen, tabs between the sub-screens, your fighter on show and a mode picker |
+| **Sound** | Upbeat lobby and victory music, a defeat theme and every effect are designed in code by a small synth (`audio/SfxSynth.kt`): band-limited oscillators, FM bells, filtered noise, drive, echo and reverb |
+| **Settings** | Bot difficulty, player name, controls, audio and haptics, display, data, and an "Arena Boxes only" layout |
 
 ## Layout
 
@@ -39,13 +39,13 @@ Cup emblem, sounds (synthesised at runtime), UI and rules. No third-party game a
 | [`client/`](client) | The Android game: Kotlin, Jetpack Compose menus, a custom OpenGL ES 3.0 renderer |
 | [`server/`](server) | The game server: Python (standard library only) with a SQLite database. See [server/README.md](server/README.md) |
 
-The server is in charge of what matters: it keeps each player's Cups, Glitch Drops, Bolts, Prisms and fighters,
-referees every match (it replays the match from the player's inputs and the result is its own), works out what
-a match is worth, rolls what comes out of a drop, runs the shop and its deals, sets how tough the bots are,
-decides who gets the debug menu, and turns away versions that are no longer supported. If it can't be
-reached, the game switches by itself to an offline profile kept on the device: a separate account with its own
-Cups, drops, currencies and fighters, run by the same rules on the device. It goes back to the server's account
-by itself when the server answers, and nothing from the offline profile is ever sent to it.
+The server is in charge of what matters: it keeps each player's Cups, Arena Boxes, Credits, CPU Chips and
+fighters, referees every match (it replays the match from the player's inputs through the same simulation, built
+into `server/referee/referee.jar`, and the result is its own), works out what a match is worth, rolls what comes
+out of a box, runs the shop, the daily gift and the News, sets how tough the bots are, pairs 1v1s and teams,
+and turns away versions that are no longer supported. If it can't be reached, the game switches by itself to the
+offline profile and goes back to the server's account when it answers; nothing from the offline profile is ever
+sent to the server.
 
 ## Build & run
 
@@ -56,8 +56,11 @@ Requirements: **JDK 17 or 21** (Gradle 8.11 can't run on Java 24+), Android SDK 
 # local.properties must point at your SDK, e.g.  sdk.dir=C\:/Users/you/AppData/Local/Android/Sdk
 cd client && ./gradlew assembleDebug          # APK -> client/app/build/outputs/apk/debug/app-debug.apk
 ./gradlew installDebug           # install on the connected device
-./gradlew testDebugUnitTest      # JVM tests: progression, economy, collision, full bot matches
+./gradlew testDebugUnitTest      # JVM tests: simulation, economy, progression, bot matches, the referee
+./gradlew :referee:installReferee   # rebuild the server's referee after any change to sim/, ai/ or data/
 ```
+
+The server: `cd server && python run.py` (or `run.bat`) starts it on port 8765; `python -m unittest` runs its tests.
 
 Wireless debugging: `adb mdns services` lists devices advertising it; `adb connect <ip:port>` attaches.
 On Xiaomi/HyperOS, ADB installs show an "Install via USB" prompt on the device that must be accepted.
@@ -65,7 +68,7 @@ On Xiaomi/HyperOS, ADB installs show an "Install via USB" prompt on the device t
 Debug builds accept a start screen for automated testing:
 
 ```bash
-adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match   # or fighters|shop|track|settings
+adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match   # or boss|train|duel|fighters|shop|road|track|settings|news|leaders|result|loading
 adb shell run-as io.github.projectwip cat files/save.json                        # inspect the save
 ```
 
@@ -73,23 +76,19 @@ adb shell run-as io.github.projectwip cat files/save.json                       
 
 Almost every number lives in two files:
 
-* [`data/Balance.kt`](client/app/src/main/java/io/github/projectwip/data/Balance.kt) — fighters, stats
-  (`StatLine(base, perLevel)`: e.g. damage `100 + 5/level`), upgrade costs, match length, reward formulas,
-  bot difficulty reward bonuses.
-* [`data/Catalog.kt`](client/app/src/main/java/io/github/projectwip/data/Catalog.kt) — Cup Track milestones, Shop
-  items, daily gift, Glitch Drop tiers, odds and rewards.
+* [`data/Balance.kt`](client/app/src/main/java/io/github/projectwip/data/Balance.kt): fighters, bosses, stats
+  (`StatLine(base, perLevel)`), supers and Hypers, upgrade costs, match length, bot difficulty.
+* [`data/Catalog.kt`](client/app/src/main/java/io/github/projectwip/data/Catalog.kt): the Cup Track, the Spark
+  Road, Arena Box tiers and rewards, fighter ranks, the shop.
+
+The server's copies are the ones that count: prices, drop tables and what a match pays are also in
+[`server/astro/economy.py`](server/astro/economy.py) and [`rules.py`](server/astro/rules.py), and Cups per mode in
+`server/trophies.cfg`. Change both sides; `EconomyTest` and `test_server.py` check that they agree.
 
 Bot behaviour per difficulty: [`ai/BotProfile.kt`](client/app/src/main/java/io/github/projectwip/ai/BotProfile.kt).
-The arena is ASCII: edit the quadrant in [`sim/Arena.kt`](client/app/src/main/java/io/github/projectwip/sim/Arena.kt).
+Arenas are ASCII maps in [`sim/Arena.kt`](client/app/src/main/java/io/github/projectwip/sim/Arena.kt).
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together.
-
-## Roadmap (not promises)
-
-* **Online play.** The simulation is deterministic-friendly, fixed-step and has no Android dependencies, and humans
-  and bots already drive fighters through the same `Control` input. That is the foundation for an authoritative
-  server later (server runs `World`, clients send `Control`s); bots would keep filling empty slots.
-* Layout editor for the touch controls, more fighters/arenas, music.
 
 ## License
 
