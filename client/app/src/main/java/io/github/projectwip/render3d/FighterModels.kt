@@ -101,43 +101,63 @@ class FighterModels {
 
     private fun buildSpark(): FighterModel {
         val a = Assembler()
-        val cy = 0.98f
-        val r = 0.58f
-        val rig = Rig(headY = 1.5f, hipY = 0.48f, hipZ = 0.16f, shoulder = floatArrayOf(0f, cy + 0.18f, 0.62f), shoulderL = floatArrayOf(0f, cy + 0.18f, -0.62f), floatY = 1.85f)
-        // Two short dark legs in pointed boots under the lower points.
+        val cy = 0.8f
+        val r = 0.66f
+        // The star leans well back, its face turned up to the camera: stood straight up it was only a red sliver from
+        // above, and at a lesser lean it went edge-on again whenever he faced away from the camera.
+        val lean = 65f
+        fun MeshBuilder.onStar(block: MeshBuilder.() -> Unit) = at(0f, cy, 0f) { rotate(lean, 0f, 0f, 1f); block() }
+        fun MeshBuilder.inPlane(block: MeshBuilder.() -> Unit) = onStar { rotate(90f, 0f, 1f, 0f); block() }
+        val rig = Rig(headY = 1.3f, hipY = 0.46f, hipZ = 0.2f, shoulder = floatArrayOf(-0.16f, cy + 0.1f, 0.66f), shoulderL = floatArrayOf(-0.16f, cy + 0.1f, -0.66f), floatY = 1.3f)
+        // Two stout dark legs in big pointed boots, each with a lit toe.
         for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
-            a.add(bone, Slot.DARK) { at(0f, -0.17f, 0f) { capsule(0.075f, 0.2f) } }
-            a.add(bone, Slot.SECONDARY) { at(0.06f, -0.42f, 0f) { roundedBox(0.28f, 0.1f, 0.17f, 0.045f) } }
-            a.add(bone, Slot.ACCENT, outline = false, emissive = true) { at(0.2f, -0.42f, 0f) { octa(0.05f, 0.03f, 0.05f) } }
+            a.add(bone, Slot.DARK) { at(0f, -0.17f, 0f) { capsule(0.1f, 0.2f) } }
+            a.add(bone, Slot.SECONDARY) { at(0.07f, -0.43f, 0f) { roundedBox(0.36f, 0.13f, 0.22f, 0.055f) } }
+            a.add(bone, Slot.ACCENT, outline = false, emissive = true) { at(0.26f, -0.43f, 0f) { octa(0.065f, 0.04f, 0.065f) } }
         }
-        // The body is the drop itself: a puffy five-pointed star standing on end, its face to the front, with a
-        // darker star set in behind it and a lit seam where the two halves meet.
-        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, cy, 0f) { rotate(90f, 0f, 1f, 0f); puffyStar(r, 0.26f) } }
-        a.add(Bone.BODY, Slot.SECONDARY) { at(-0.06f, cy, 0f) { rotate(90f, 0f, 1f, 0f); puffyStar(r * 0.86f, 0.22f) } }
-        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0f, cy, 0f) { rotate(90f, 0f, 1f, 0f); puffyStar(r * 1.015f, 0.03f) } }
-        // A villain's face: glowing eyes that slant down to the middle with a slit in each, heavy brows dug in over
-        // them, and a wide grin full of fangs.
-        for (z in floatArrayOf(0.12f, -0.12f)) {
-            val tilt = if (z > 0f) -24f else 24f
-            a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.225f, cy + 0.07f, z) { rotate(tilt, 1f, 0f, 0f); ellipsoid(0.055f, 0.05f, 0.09f, 6, 10) } }
-            a.add(Bone.BODY, Slot.INK, outline = false) { at(0.275f, cy + 0.065f, z * 0.92f) { roundedBox(0.02f, 0.065f, 0.025f, 0.008f) } }
-            a.add(Bone.BODY, Slot.INK, outline = false) { at(0.2f, cy + 0.165f, z * 1.05f) { rotate(tilt * 1.4f, 1f, 0f, 0f); roundedBox(0.06f, 0.04f, 0.18f, 0.015f) } }
+        // Stubby arms out of the side points, in dark gloves.
+        a.add(Bone.ARM, Slot.DARK) { at(0f, -0.1f, 0f) { capsule(0.07f, 0.12f) } }
+        a.add(Bone.ARM, Slot.SECONDARY) { at(0f, -0.25f, 0f) { sphere(0.1f, 8, 10) } }
+        // The body is the drop itself: a fat puffy five-pointed star, its face to the front, with a darker star set in
+        // behind it, a lit seam where the two halves meet and a glowing tip on every point.
+        a.add(Bone.BODY, Slot.PRIMARY) { inPlane { puffyStar(r, 0.33f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { onStar { at(-0.08f, 0f, 0f) { rotate(90f, 0f, 1f, 0f); puffyStar(r * 0.88f, 0.28f) } } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { inPlane { puffyStar(r * 1.03f, 0.05f) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) {
+            inPlane {
+                for (i in 0 until 5) {
+                    val ang = -Math.PI / 2 + i * 2 * Math.PI / 5
+                    at((kotlin.math.cos(ang) * r * 0.97f).toFloat(), (-sin(ang) * r * 0.97f).toFloat(), 0f) { octa(0.055f, 0.055f, 0.055f) }
+                }
+            }
         }
-        a.add(Bone.BODY, Slot.INK, outline = false) { at(0.225f, cy - 0.11f, 0f) { ellipsoid(0.045f, 0.06f, 0.16f, 6, 12) } }
+        // A villain's face, big enough to read from above: glowing eyes that slant down to the middle with a slit in
+        // each, heavy brows dug in over them, and a wide grin full of fangs.
+        val k = 1.15f
+        fun MeshBuilder.onFace(block: MeshBuilder.() -> Unit) = onStar { scale(k, k, k); block() }
+        for (z in floatArrayOf(0.13f, -0.13f)) {
+            val tilt = if (z > 0f) -26f else 26f
+            a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { onFace { at(0.235f, 0.075f, z) { rotate(tilt, 1f, 0f, 0f); ellipsoid(0.065f, 0.06f, 0.105f, 6, 10) } } }
+            a.add(Bone.BODY, Slot.INK, outline = false) { onFace { at(0.295f, 0.07f, z * 0.92f) { roundedBox(0.02f, 0.08f, 0.03f, 0.008f) } } }
+            a.add(Bone.BODY, Slot.INK, outline = false) { onFace { at(0.215f, 0.18f, z * 1.05f) { rotate(tilt * 1.4f, 1f, 0f, 0f); roundedBox(0.07f, 0.055f, 0.2f, 0.018f) } } }
+        }
+        a.add(Bone.BODY, Slot.INK, outline = false) { onFace { at(0.235f, -0.11f, 0f) { ellipsoid(0.05f, 0.07f, 0.18f, 6, 12) } } }
         a.add(Bone.BODY, Slot.INK, outline = false) {
-            for (z in floatArrayOf(0.14f, -0.14f)) at(0.215f, cy - 0.075f, z) { rotate(if (z > 0f) 30f else -30f, 1f, 0f, 0f); roundedBox(0.04f, 0.025f, 0.07f, 0.01f) }
+            onFace { for (z in floatArrayOf(0.16f, -0.16f)) at(0.22f, -0.07f, z) { rotate(if (z > 0f) 30f else -30f, 1f, 0f, 0f); roundedBox(0.045f, 0.03f, 0.08f, 0.01f) } }
         }
         a.add(Bone.BODY, Slot.WHITE, outline = false) {
-            for (z in floatArrayOf(-0.09f, -0.03f, 0.03f, 0.09f)) at(0.262f, cy - 0.075f, z) { rotate(180f, 1f, 0f, 0f); cylinder(0.02f, 0.05f, 5, topRadius = 0f) }
-            for (z in floatArrayOf(-0.06f, 0.06f)) at(0.262f, cy - 0.15f, z) { cylinder(0.017f, 0.04f, 5, topRadius = 0f) }
+            onFace {
+                for (z in floatArrayOf(-0.105f, -0.035f, 0.035f, 0.105f)) at(0.275f, -0.07f, z) { rotate(180f, 1f, 0f, 0f); cylinder(0.024f, 0.06f, 5, topRadius = 0f) }
+                for (z in floatArrayOf(-0.07f, 0.07f)) at(0.275f, -0.16f, z) { cylinder(0.02f, 0.05f, 5, topRadius = 0f) }
+            }
         }
         // Stray sparks crackling round the top point.
         a.add(Bone.FLOAT, Slot.ACCENT, outline = false, emissive = true) {
-            for (k in 0 until 3) { val t = k * 2.094f; at(kotlin.math.cos(t) * 0.42f, (k - 1) * 0.08f, sin(t) * 0.42f) { octa(0.05f, 0.07f, 0.05f) } }
+            for (n in 0 until 3) { val t = n * 2.094f; at(kotlin.math.cos(t) * 0.46f - 0.5f, (n - 1) * 0.08f, sin(t) * 0.46f) { octa(0.055f, 0.08f, 0.055f) } }
         }
-        // What he throws: a little star of his own, lit, held out on the end of a point.
-        a.add(Bone.WEAPON, Slot.PRIMARY) { at(0.02f, 0f, 0f) { sphere(0.06f, 8, 10) } }
-        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.1f, 0.05f, 0.04f) { rotate(90f, 0f, 1f, 0f); puffyStar(0.13f, 0.065f) } }
+        // What he throws: a little star of his own, lit, held out in a dark glove.
+        a.add(Bone.WEAPON, Slot.SECONDARY) { at(0.02f, 0f, 0f) { sphere(0.1f, 8, 10) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.13f, 0.06f, 0.04f) { rotate(90f, 0f, 1f, 0f); puffyStar(0.15f, 0.075f) } }
         return a.build(rig)
     }
 

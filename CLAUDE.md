@@ -41,19 +41,23 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   decision (build 89) and Spark took hers, each time keeping the id, so whoever had Rocket has Spark at the same level
   (nothing was paid back for her, by the user's decision). Don't bring Byte or Juno back, or Rocket unless the user asks. Spark is the user's
   idea and part of the lore: the Spark Drop that would not go away, a puffy five-pointed star (the drops' shape,
-  `render3d/StarMesh.kt`) with a villain's face. Whenever he is on screen in the menus (the lobby showing him, or the
+  `render3d/StarMesh.kt`) with a villain's face. Since build 91 the star leans back 65 degrees with its face turned up
+  to the camera (stood upright it was a thin red sliver from above), fatter, with a lit seam, glowing tips, stout legs
+  and stubby gloved arms (`FighterModels.buildSpark`). Whenever he is on screen in the menus (the lobby showing him, or the
   loading screen's spotlight) the screen goes red and glitches (`ui/SparkGlitch.kt`), but only as a hint, by the
   user's decision (build 89's took the UI over): it is drawn over the 3D lobby (or the loading backdrop) and under the
   menus, a faint red light with red edges, faint scanlines and a short burst of torn bars every few seconds; buttons,
   text and currencies keep their colours, and nothing jitters. His attack, Spite Star (`AttackShape.STAR`,
-  `Sound.STAR`), is lobbed like dynamite, as the user asked: aimed at a spot like the planted rockets (how far the stick
+  `Sound.STAR`: a swish and a whistle that climbs and sinks with the lob; the burst has its own `Sound.STAR_BURST`), is lobbed like dynamite, as the user asked: aimed at a spot like the planted rockets (how far the stick
   is pushed is how far it goes; `aimPlant`), it flies over walls in an arc (`World.lobs`, `Lob`) for
   `STAR_FLIGHT_SECONDS` and bursts where it lands (`GameEvent.StarBurst`), hitting every enemy within its
   `AttackSpec.blast` and slowing them to `SLOW_FACTOR` of their speed for two seconds (`AttackSpec.slowSeconds`,
   `Fighter.slowLeft`). A straight shot with `slowSeconds` (`ShotStyle.STAR`) still slows whoever it hits, with nobody using it. His super, Shadow Realm, is
   Rocket's realm (`SuperKind.REALM`) with four shadows of his (`SuperSpec.shadows`): they stand round the captive
   and take turns to strike, each once a second, in place of the realm's own rocket (drawn as dark copies of him in
-  `MatchRenderer.forEachRealmShadow`). His name, look and words are ours.
+  `MatchRenderer.forEachRealmShadow`). The shadows' strikes charge his super by only `REALM_SHADOW_CHARGE` (2.5%) of
+  a hit, as the user asked (at full rate four strikes a second gave the super back in under a second): a whole realm
+  of them is about a third of a super. The realm stays chainable. His name, look and words are ours.
 - Rocket's code is kept for reuse, by the user's decision: her plain aimed rockets (`AttackShape.ROCKETS`), her realm
   (`SuperKind.REALM`, `REALM_SECONDS`, `Fighter.captive`, `Fighter.realm`, the realm's own rocket each second) and
   her model (`buildRocket`, unregistered), with nobody using them; `SimulationTest` keeps them tested with a stand-in

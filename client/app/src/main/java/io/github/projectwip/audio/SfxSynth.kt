@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX, STAR,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX, STAR, STAR_BURST,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -35,7 +35,8 @@ object SfxSynth {
         Sound.GLASS -> glass().finish(0.75f)
         Sound.EMPTY -> empty().finish(0.5f)
         Sound.HEX -> hex().finish(0.7f)
-        Sound.STAR -> star().finish(0.7f)
+        Sound.STAR -> starThrow().finish(0.7f)
+        Sound.STAR_BURST -> starBurst().finish(0.7f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -493,7 +494,27 @@ object SfxSynth {
     }
 
     /** Spark throwing a star: a bright rising glint over a hiss of air, with a crackle of static and a low sneer under it. */
-    private fun star() = Clip(0.45f).apply {
+    /**
+     * Spark lobbing his star: a quick swish of the throw with a grunt under it, then a whistle that climbs as the star
+     * goes up and sinks as it comes down, with a twinkle or two on the way.
+     */
+    private fun starThrow() = Clip(0.7f).apply {
+        noise(91, 0f, 0.14f, Band.BAND, { glide(it, 0.12f, 800f, 3600f) }, 2.2f, { hold(it, 0.02f, 0.05f, 0.04f) * 0.45f })
+        osc(Wave.TRI, 0f, 0.1f, { glide(it, 0.08f, 210f, 140f) }, { perc(it, 0.004f, 0.03f) * 0.35f })
+        // The arc: up for the first third of the flight, then down past where it started.
+        osc(Wave.SINE, 0.06f, 0.6f, { t ->
+            val arc = if (t < 0.2f) glide(t, 0.2f, 1500f, 2350f) else glide(t - 0.2f, 0.38f, 2350f, 1050f)
+            arc * (1f + 0.012f * sin(t * 2f * Math.PI.toFloat() * 11f))
+        }, { hold(it, 0.04f, 0.42f, 0.07f) * 0.3f })
+        noise(92, 0.06f, 0.6f, Band.BAND, { t -> if (t < 0.2f) glide(t, 0.2f, 1500f, 2350f) else glide(t - 0.2f, 0.38f, 2350f, 1050f) }, 6f, { hold(it, 0.05f, 0.4f, 0.08f) * 0.12f })
+        for ((k, at) in floatArrayOf(0.14f, 0.29f, 0.44f).withIndex()) {
+            osc(Wave.SINE, at, 0.1f, { 4200f - k * 500f }, { perc(it, 0.002f, 0.025f) * 0.16f })
+        }
+        filter(Band.LOW, 0.8f) { 7000f }
+        echo(0.06f, 0.18f, 0.1f)
+    }
+
+    private fun starBurst() = Clip(0.45f).apply {
         for (k in 0 until 4) {
             val at = k * 0.035f
             val top = 1180f + k * 260f

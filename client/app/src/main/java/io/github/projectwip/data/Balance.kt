@@ -287,6 +287,12 @@ object Balance {
     /** Whoever opened the realm reloads this many times as fast in it, and charges their super this many times as fast. */
     const val REALM_RELOAD = 1.5f
     const val REALM_CHARGE = 1.5f
+    /**
+     * A strike of a realm's shadows ([SuperSpec.shadows]) charges the super (and the hyper) by this share of a normal
+     * hit: they strike four times a second, so at full rate the super came back in under a second. At 2.5% a whole
+     * realm of shadow strikes gives back about a third of a super; the realm stays chainable.
+     */
+    const val REALM_SHADOW_CHARGE = 0.025f
 
     /** A slowed fighter ([AttackSpec.slowSeconds]) moves at this share of its speed. */
     const val SLOW_FACTOR = 0.5f
@@ -365,7 +371,7 @@ object Balance {
             superDamage = StatLine(400, 20),
             moveSpeed = 3.6f,
             attack = AttackSpec(AttackShape.STAR, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.26f, burstInterval = 0f, blast = 1.2f, slowSeconds = 2f),
-            superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 12 seconds, where four shadows of his fight them. In there they can do nothing, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4),
+            superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 12 seconds, where four shadows of his fight them. In there they can do nothing, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again, though his shadows' strikes barely charge it. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4),
             ammoMax = 3,
             reloadSeconds = 1.4f,
             superChargePerHit = 0.2f,

@@ -623,8 +623,9 @@ class World(
         f.realmTick += realmBeat(f)
         f.realmStrikes++
         events += GameEvent.Burst(t.x, t.y, t.radius + if (f.def.superSpec.shadows > 0) 0.2f else 0.5f)
-        // (It charges her super like a rocket of her own, so one realm can follow another. A knockout closes the realm by itself.)
-        damage(t, f, f.superDamage, false, t.x, t.y)
+        // (It charges the super like an attack of the owner's, so one realm can follow another; a shadow's strike only by
+        // a small share of one. A knockout closes the realm by itself.)
+        damage(t, f, f.superDamage, false, t.x, t.y, chargeShare = if (f.def.superSpec.shadows > 0) Balance.REALM_SHADOW_CHARGE else 1f)
     }
 
     /** The realm [id] opened is over: everyone in it is back in the arena, where they stood. */
@@ -1009,7 +1010,7 @@ class World(
     }
 
     /** [lethal] false: the hit can take the target down to its last point of health, but never knocks it out. */
-    private fun damage(target: Fighter, source: Fighter?, wanted: Int, isSuper: Boolean, x: Float, y: Float, lethal: Boolean = true, charge: Boolean = true) {
+    private fun damage(target: Fighter, source: Fighter?, wanted: Int, isSuper: Boolean, x: Float, y: Float, lethal: Boolean = true, charge: Boolean = true, chargeShare: Float = 1f) {
         // (Nothing crosses from the arena into a realm, or out of one.)
         if (source != null && source.realm != target.realm) return
         val amount = if (lethal) wanted else minOf(wanted, target.hp - 1)
@@ -1029,11 +1030,11 @@ class World(
             if (!isSuper && charge) {
                 val before = source.superReady
                 val faster = (if (source.hyperActive) source.def.hyper?.superCharge ?: 1f else 1f) * (if (source.realm == source.id) Balance.REALM_CHARGE else 1f)
-                source.superCharge = (source.superCharge + source.def.superChargePerHit * faster).coerceAtMost(1f)
+                source.superCharge = (source.superCharge + source.def.superChargePerHit * faster * chargeShare).coerceAtMost(1f)
                 if (!before && source.superReady) events += GameEvent.SuperReady(source.id)
                 // Hits charge the hyper even while one is running, so the next can follow straight on.
                 if (source.hyperCharge < 1f) {
-                    source.hyperCharge = (source.hyperCharge + source.def.superChargePerHit * Balance.HYPER_CHARGE_RATE * (source.def.hyper?.charge ?: 1f)).coerceAtMost(1f)
+                    source.hyperCharge = (source.hyperCharge + source.def.superChargePerHit * chargeShare * Balance.HYPER_CHARGE_RATE * (source.def.hyper?.charge ?: 1f)).coerceAtMost(1f)
                     if (source.hyperCharge >= 1f) events += GameEvent.HyperReady(source.id)
                 }
             }

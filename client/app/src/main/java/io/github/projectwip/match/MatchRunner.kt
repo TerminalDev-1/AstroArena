@@ -394,7 +394,7 @@ class MatchRunner(
             is GameEvent.StarBurst -> {
                 val p = match.player
                 val near = (if (e.ownerId == pid) 0.8f else 0.5f) / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)
-                sfx.play(Sound.STAR, near, 0.7f); sfx.play(Sound.GLASS, near * 0.5f, 1.6f)
+                sfx.play(Sound.STAR_BURST, near, 0.7f); sfx.play(Sound.GLASS, near * 0.5f, 1.6f)
             }
             is GameEvent.Burst -> {
                 val p = match.player
