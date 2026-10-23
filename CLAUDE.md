@@ -42,7 +42,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - The starter fighter is Swish (since build 96, by the user's decision: "a god fighter in place of Spark"). The code,
   the server and the saves still call her `BYTE` (`FighterId.BYTE`, `STARTING_FIGHTER`): Byte was removed, then Rocket
   took her place, then Spark took Rocket's (build 89), and then Swish took Spark's, each time keeping the id, so whoever
-  had Spark has Swish at the same level. She is Legendary and still free (never on the Spark Road, no CPU Chip price).
+  had Spark has Swish at the same level. Her rarity is Starter (the user's decision; she was Legendary for one unreleased
+  build): free, never on the Spark Road, no CPU Chip price. The Training Area's dummies, swarm and sentry are made from
+  her and look like her, as the user asked (they were Spark).
   Swish is a girl, a storm goddess with long silver hair, a tiara set with a diamond, a little thundercloud beside her
   and a giant bow (`FighterModels.buildSwish`). Her attack, Facet Arrow (`AttackShape.ARROW`, `ShotStyle.ARROW`,
   `Sound.ARROW`), is the user's design: one giant arrow with a diamond tip, a sniper's shot but not a long-range one
@@ -62,8 +64,7 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Spark is not retired: the user meant him to stay, as a Legendary of his own (`FighterId.SPARK`, `Balance.spark`,
   `"SPARK"` on the server), last on the Spark Road after Buddy (7,000 Credits, or 160 CPU Chips). Everyone who had
   him when Swish took the starter's id kept him as he was, level, colourways and Cups (`economy.complete` and
-  `SaveStore.fromJson` copy BYTE's entry into a missing SPARK one). The Training Area's dummies, swarm and sentry are
-  made from him. Don't bring Byte or Juno back, or Rocket unless the user asks. Spark is the user's
+  `SaveStore.fromJson` copy BYTE's entry into a missing SPARK one). Don't bring Byte or Juno back, or Rocket unless the user asks. Spark is the user's
   idea and part of the lore: the Spark Drop that would not go away, a puffy five-pointed star (the drops' shape,
   `render3d/StarMesh.kt`). (As the starter he was `BYTE`; since build 96 he is `SPARK`.) Since build 92 he is chromatic blue and glossy, by the user's decision (build 91's fat
   red villain with fangs looked creepy; `Part.gloss`, the lit shader's `uGloss`: small hard highlights and a

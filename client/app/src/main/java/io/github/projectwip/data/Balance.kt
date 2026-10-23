@@ -49,7 +49,7 @@ enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
 
 /**
  * How rare a fighter is. Rarer fighters take more Credits on the Spark Road ([roadCost]; the server's own table
- * in `economy.py` is the one that counts). Swish, the fighter everyone starts with, is shown as Legendary but is free: she is never on the road and has no price.
+ * in `economy.py` is the one that counts). Swish, the fighter everyone starts with, is the Starter: free, never on the road, and with no price.
  */
 enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
     STARTER("Starter", 0xFF9BE7FF, 0),
@@ -416,7 +416,7 @@ object Balance {
     /**
      * Spark: a Legendary of his own since build 96, by the user's decision, last on the Spark Road. Swish took his place as
      * the starter (and his old id, BYTE); everyone who had him then kept him (`economy.complete`, `SaveStore.fromJson`).
-     * The Training Area's dummies, swarm and sentry are made from him, and so is the size of a boss.
+     * The size of a boss is still made from him.
      */
     val spark: FighterDef = FighterDef(
         id = FighterId.SPARK,
@@ -449,7 +449,8 @@ object Balance {
     val fighters: List<FighterDef> = listOf(
         FighterDef(
             id = FighterId.BYTE,
-            rarity = Rarity.LEGENDARY,
+            // (Starter, by the user's decision: she was Legendary for one unreleased build.)
+            rarity = Rarity.STARTER,
             // (The id is still BYTE: Swish took Spark's place, by the user's decision (build 96), as Spark had taken
             // Rocket's and Rocket Byte's. Spark's def is kept as [spark].)
             name = "Swish",
@@ -642,13 +643,14 @@ object Balance {
     fun boss(kind: BossKind): FighterDef = bosses.first { it.boss == kind }
 
     // ---- Training Area ----
+    // (The dummies, swarm and sentry are made from Swish, the starter, and look like her, as the user asked.)
     // Everything here is created at level 1 with flat stat lines, like the boss: it is a fixed yardstick.
 
     /** A target dummy: never attacks, soaks up damage and regenerates like anyone else. */
-    val dummy: FighterDef = spark.let { it.copy(name = "Dummy", title = "Target", health = StatLine(8000, 0)) }
+    val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(8000, 0)) }
 
     /** One of the swarm: a little over half size and fragile. In the Training Area it is a target and never attacks. */
-    val mini: FighterDef = spark.let {
+    val mini: FighterDef = fighter(FighterId.BYTE).let {
         it.copy(
             name = "Mini", title = "Swarm", health = StatLine(3000, 0),
             attackDamage = StatLine(Math.round(it.attackDamage.base * 0.3f), 0), superDamage = StatLine(Math.round(it.superDamage.base * 0.3f), 0),
@@ -658,7 +660,7 @@ object Balance {
     }
 
     /** The sentry: a long-range gun on an island of coolant. Slow to reload, so its shots can be dodged. */
-    val sentry: FighterDef = spark.let {
+    val sentry: FighterDef = fighter(FighterId.BYTE).let {
         // (One shot of 1,000 every five seconds. It had three shots of 1,500 and a 2.4 second reload until the user
         // found it too much.)
         it.copy(name = "Sentry", title = "Turret", health = StatLine(8000, 0), attackDamage = StatLine(1000, 0),
