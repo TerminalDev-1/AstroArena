@@ -25,6 +25,48 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   only work from the side (the user called the first tornado terrible). What an attack visibly covers must be what it
   hits: no thin effect inside a bigger damage circle. Look at the result critically before calling it done.
 
+## Lessons learned
+
+Things that went wrong or cost time before. Keep adding to this list whenever something does.
+
+- **Read the user's words literally, then ask about what they don't say.** "Swish in place of Spark" meant a new
+  starter, not a retired Spark; "god fighter" did not mean Legendary. Voice-dictated messages run together: pull out
+  every request and do each, and ask (one question, with a recommended answer) only when a choice is destructive for
+  players or can't be undone, such as removing a fighter or changing whose save gets what.
+- **Look at your own work the way a player will, before calling it done.** The first tornado was a stack of
+  see-through rings, the second hid everything under a solid cloud, the third had a thin funnel inside a bigger
+  damage ring: each was obvious in one screenshot taken while the effect was playing. Screenshot effects mid-action,
+  from the game's own camera, and ask "would this look good in a real game?".
+- **The user hears the difference between real sound design and beeps.** See the rule above: noise for natural
+  sounds, tones only for things that really are tonal (music, chimes, UI). A tempest also wants a sound for as long as
+  it lasts, not one at the start.
+- **What you draw and what the simulation does must agree.** If a ring on the ground marks a reach, the hit test uses
+  that exact reach (her radius included), and the effect fills it.
+- **Name clashes in the simulation.** The free-for-all already has a Static Storm (`GameEvent.StormHit`,
+  `Fighter.stormTick`, `STORM_*`); Swish's super had to become "tempest". Grep a name before adding it, and never
+  rename with a blanket replace across files: one renamed the Static Storm's own sound handler by mistake.
+- **The training targets, the swarm, the sentry and the boss size are made from fighter defs** (`Balance.dummy`,
+  `mini`, `sentry`, `bossDef`). Changing or moving a fighter's def changes them too: check the Training Area.
+- **The decal pass in `MatchRenderer` is unlit flat colour** (`uMode` 1): switching it to lit mode there draws things
+  dark. Glows in that pass are just bright tints. The camera looks down from above, so vertical things (a lightning
+  bolt straight down) look like dots: slant them.
+- **Debug previews start behind the loading screen.** Anything that animates once (the result reveal) plays out
+  unseen; previews of the result wait for loading (`booting`) now.
+- **Taking screenshots:** `adb exec-out screencap` takes about half a second, so catch an animation with a burst and
+  a contact sheet (PIL) rather than single shots. Average brightness can't tell screens apart.
+- **The tablet is the user's.** Besides the focus check, see whether they are touching it before installing or
+  starting anything: `timeout 6 adb shell getevent -c 1 /dev/input/event8` returns 0 when they are. If they are,
+  wait, and say so.
+- **A release APK is not the debug build.** It goes through R8 (shrinking and optimising), which can break things
+  only in the release, so the smoke test stays even when the user is sure it's the same code.
+- **The build number** (`build` in `client/app/build.gradle.kts`) can be a point release ("94.1") when the user asks;
+  a wrong number on a published release is fixed by deleting that release and its tag and publishing the right one,
+  built from a commit with the right number.
+- **Shell traps on this machine** (Git Bash on Windows): adb under `MSYS_NO_PATHCONV=1` needs Windows paths
+  (`C:/Users/...`), not `/c/Users/...`; Gradle runs from `client/` (a `cd` that is a level off fails silently behind a
+  `grep`); long Python edits with quotes in them go in a script file in the scratchpad (run with `python -I`), not a
+  heredoc; `rm` on a path built from a variable is refused: use a fresh folder instead.
+
 ## Build
 
 - Use the portable JDK (system Java 25 breaks Gradle 8.11):
@@ -37,7 +79,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `crash` crashes the game on purpose to try the crash reporter; `roster` is the fighter grid with every model shown unlocked, `tryspark` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
+  (`match|boss|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `crash` crashes the game on purpose to try the crash reporter;
+  `result` (first in Last Spark), `result3`, `resultwin` and `resultloss` preview the end of a match, reveal first;
+  `tryswish` / `tryspark` are the Training Area as Swish / Spark; `roster` is the fighter grid with every model shown unlocked, `tryspark` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - Crashes on players' devices: `net/CrashReporter.kt` saves a crash (and, on Android 11+, Android's record of a native
   crash, a freeze or a kill for memory) and hands it to the server the next time it answers (`POST /v1/crashes`, no
   sign-in needed). The server appends it to `server/logs/crashes.log` (gitignored) with the device, Android version and GPU.
@@ -196,6 +240,14 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (the user rejected two busts as not saying what it is).
 - The music is upbeat by the user's decision ("too calm" before build 94): the lobby loop is 128 BPM and the victory
   theme 148, both with a snare, open hats and a rolling sixteenth-note bass.
+- A match ends with a reveal before its stats (`ui/screens/ResultReveal.kt`), as the user asked ("like Brawl Stars,
+  an animation that's played"; the idea is familiar, the look, words and timing are ours): the screen goes dark,
+  beams sweep in, the result slams down letter by letter with a shake and a flash (VICTORY / DEFEAT / DRAW, or in
+  Last Spark the place, "1ST", in a turning star medallion, with "YOU ARE FIRST!" or "YOU PLACED 3RD"), an MVP star,
+  then the fighter rises live onto a lit pedestal and celebrates (`FighterView.celebrateKey`: spin, jump, confetti),
+  or after a loss shakes their head (`sulkKey`, `StageParams.sulkAt`). Then it sweeps away to the stats, whose own
+  animations wait for it. A tap skips it. It is drawn over the result screen, not instead of it, so nothing shows
+  through as it fades.
 - The home screen has no Cup Track tile (removed in build 92, as the user asked): the Cups panel in the top bar opens
   the Cup Track and carries its badge.
 - Level 1 is buffed for players only, by the user's decision (build 95): a player's fighter at level 1 gets
@@ -265,7 +317,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 - Days and times are the server's: the day number, when it ends, the daily gift and the daily offers
   (`server/shop.cfg`). The client moves server times onto its own clock on receipt and only counts down.
 - The News tab shows `server/news.cfg` (`GET /v1/news`), newest first; add an item there when a release changes what
-  players see. Offline there is none.
+  players see. Offline it still shows News, as the user asked: every build carries a copy of `news.cfg` (an asset,
+  copied by the `copyNews` Gradle task), the device keeps the last copy the server sent, and offline the newer of the
+  two is shown under a note (`GameServer.news`, `data/NewsFile.kt`, which reads the file the way `config.py` does).
 - Cups don't depend on bot difficulty. What each mode pays (Boss Mode included) is `server/trophies.cfg`, over
   `DEFAULT_CUPS` in `rules.py`; the client has no copy and shows what the verdict says (`cupDelta`, `mvpCups`). Each fighter has Cups and a rank of its own
   (`FIGHTER_RANK_CUPS` in `rules.py`, `FighterRanks` in `Catalog.kt`); only a judged match changes them. Ranks have no

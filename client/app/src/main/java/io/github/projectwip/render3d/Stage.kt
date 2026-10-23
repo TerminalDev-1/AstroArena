@@ -41,6 +41,8 @@ class StageParams {
     @Volatile var dragYaw = 0f
     @Volatile var celebrateAt = 0L
     @Volatile var cheerAt = 0L
+    /** Beaten: the fighter hangs their head and shakes it (the result screen, after a loss). */
+    @Volatile var sulkAt = 0L
 }
 
 /**
@@ -95,6 +97,7 @@ class StageScene(private val withPedestal: Boolean) {
         val now = System.currentTimeMillis()
         val ct = (now - p.celebrateAt) / 1000f
         val cheer = (now - p.cheerAt) / 1000f
+        val sulk = (now - p.sulkAt) / 1000f
         if (p.celebrateAt != lastCelebrate && ct < 0.05f) {
             lastCelebrate = p.celebrateAt
             val c = skin.accent.toInt()
@@ -121,6 +124,11 @@ class StageScene(private val withPedestal: Boolean) {
         } else if (cheer in 0f..0.5f) {
             anim.jump = sin(cheer / 0.5f * PI.toFloat()) * 0.35f
             anim.recoil = sin(cheer / 0.5f * PI.toFloat())
+        } else if (sulk in 0f..1.6f) {
+            // A slow shake of the head, side to side, dying away, sinking a little.
+            val k = 1f - sulk / 1.6f
+            anim.spin = sin(sulk * 11f) * 22f * k
+            anim.jump = -0.05f * sin(minOf(sulk, 0.8f) / 0.8f * PI.toFloat() * 0.5f)
         }
         // Face mostly toward the camera, 3/4 view, with a gentle idle sway.
         val facing = (PI / 2 - 0.62).toFloat() + sin(time * 0.6f) * 0.08f - Math.toRadians(shownYaw.toDouble()).toFloat()

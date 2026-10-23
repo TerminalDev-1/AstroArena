@@ -113,7 +113,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "settings" -> Screen.Settings
                 "leaders" -> Screen.Leaderboard
                 "news" -> Screen.News
-                "result" -> previewResult(repo.save.value)
+                "result", "resultwin", "resultloss", "result3" -> previewResult(repo.save.value, startScreen)
                 else -> Screen.Home
             }
         )
@@ -420,7 +420,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                                 else screen = Screen.Result(shown, repo.applyMatch(shown.report, verdict))
                             }
                         })
-                    is Screen.Result -> ResultScreen(s.summary, s.rewards, save, go)
+                    // (Not while the loading screen is still up: a debug preview opens here at start-up, and the result's
+                    // reveal would play out unseen behind it.)
+                    is Screen.Result -> if (!booting) ResultScreen(s.summary, s.rewards, save, go)
                 } }
             }
 
@@ -463,9 +465,13 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
 }
 
 /** Debug (`--es screen result`): the result screen with made-up numbers, without playing or touching the save. */
-private fun previewResult(save: io.github.projectwip.data.SaveData): Screen {
+/** Debug: `result` (first in Last Spark), `result3` (third), `resultwin` (a Knockout Rush win), `resultloss` (a loss). */
+private fun previewResult(save: io.github.projectwip.data.SaveData, kind: String = "result"): Screen {
+    val ffa = kind == "result" || kind == "result3"
     val report = io.github.projectwip.data.MatchReport(
-        outcome = io.github.projectwip.data.MatchOutcome.VICTORY, mode = io.github.projectwip.data.GameMode.LAST_SPARK, placement = 1, players = 10,
+        outcome = if (kind == "resultloss") io.github.projectwip.data.MatchOutcome.DEFEAT else io.github.projectwip.data.MatchOutcome.VICTORY,
+        mode = if (ffa) io.github.projectwip.data.GameMode.LAST_SPARK else io.github.projectwip.data.GameMode.KNOCKOUT_RUSH,
+        placement = if (kind == "result3") 3 else 1, players = 10,
         fighter = save.selectedFighter, kos = 4, deaths = 0, damageDealt = 5200, mvp = true, difficulty = save.settings.botDifficulty, blueScore = 0, redScore = 0,
     )
     val players = (1..10).map { i ->

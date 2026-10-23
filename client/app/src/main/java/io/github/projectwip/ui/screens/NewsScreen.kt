@@ -30,7 +30,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import io.github.projectwip.net.NewsItem
+import io.github.projectwip.data.NewsItem
 import io.github.projectwip.ui.Badge
 import io.github.projectwip.ui.GameText
 import io.github.projectwip.ui.Palette
@@ -41,16 +41,23 @@ import io.github.projectwip.ui.ScreenHeader
 import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.plateShape
 
-/** What's new: the items the game server is carrying (its `news.cfg`), newest first. Offline there is none to show. */
+/**
+ * What's new: the items the game server is carrying (its `news.cfg`), newest first. Offline it shows the newest copy
+ * the device has: the last one the server sent, or the one the game was built with.
+ */
 @Composable
 fun NewsScreen(go: (Screen) -> Unit) {
     val server = io.github.projectwip.ui.LocalServer.current
     /** Null while loading; empty when the server couldn't be asked or has nothing to say. */
     var news by remember { androidx.compose.runtime.mutableStateOf<List<NewsItem>?>(null) }
+    /** True when what is showing came from the server just now; false for a copy kept on the device. */
+    var live by remember { androidx.compose.runtime.mutableStateOf(true) }
     // Asked again when the connection comes up, so opening the tab a moment too early still fills it.
     val online = server?.status?.collectAsState()?.value?.online == true
     LaunchedEffect(online) {
-        news = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server?.news() }.orEmpty()
+        val got = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server?.news() }
+        news = got?.first.orEmpty()
+        live = got?.second ?: false
     }
     val items = news
 
@@ -62,6 +69,10 @@ fun NewsScreen(go: (Screen) -> Unit) {
             Row(Modifier.weight(1f).fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp), horizontalArrangement = Arrangement.Center) {
                 Panel(Modifier.widthIn(max = 860.dp).fillMaxHeight(), cut = 18.dp) {
                     Column(Modifier.fillMaxSize().padding(12.dp)) {
+                        if (!live && !items.isNullOrEmpty()) {
+                            PlainText("Offline: showing the News saved on this device. It updates when the server is back.", Type.Small, color = Palette.Gold)
+                            Spacer(Modifier.height(6.dp))
+                        }
                         when {
                             items == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                                 GameText("LOADING…", Type.Title, outline = 3.5.dp)
@@ -69,7 +80,7 @@ fun NewsScreen(go: (Screen) -> Unit) {
                             items.isEmpty() -> Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                                 GameText("NO NEWS RIGHT NOW", Type.Title, color = Palette.Gold, outline = 3.5.dp)
                                 Spacer(Modifier.height(6.dp))
-                                PlainText("News comes from the server. It will be here when you're online and there is some.", Type.Body, color = Color.White)
+                                PlainText("There is nothing saved on this device yet. It will be here once the server can be reached.", Type.Body, color = Color.White)
                             }
                             else -> LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(items) { NewsCard(it) }

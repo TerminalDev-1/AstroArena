@@ -116,14 +116,18 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     var flyFrom by remember { mutableStateOf(Offset.Unspecified) }
     var flyTo by remember { mutableStateOf(Offset.Unspecified) }
     var flyOrigin by remember { mutableStateOf(Offset.Zero) }
-    LaunchedEffect(Unit) {
+    /** The reveal ([ResultReveal]) plays first; the stats and their own animations follow it. */
+    var revealed by remember { mutableStateOf(false) }
+    LaunchedEffect(revealed) {
+        if (!revealed) return@LaunchedEffect
         // The banner lands (lower and duller for a loss)...
         sfx?.play(Sound.WHOOSH, 0.7f)
         sfx?.play(Sound.BANNER, pitch = if (won) 1f else 0.72f)
         sfx?.buzz(50, 200)
         bannerPop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow))
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(revealed) {
+        if (!revealed) return@LaunchedEffect
         // ...then the rewards pop in one by one, each a little higher...
         delay(550)
         repeat(8) { i ->
@@ -321,6 +325,8 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                 })
             }
         }
+        // The reveal plays over it all first, then sweeps away to show it.
+        if (!revealed) ResultReveal(summary) { revealed = true }
     }
 }
 

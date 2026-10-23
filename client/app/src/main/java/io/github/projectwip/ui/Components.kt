@@ -438,6 +438,8 @@ fun FighterView(
     rays: Boolean = false,
     locked: Boolean = false,
     celebrateKey: Int = 0,
+    /** Bumped to have the fighter shake their head (on a pedestal only): see `StageParams.sulkAt`. */
+    sulkKey: Int = 0,
 ) {
     val accent = Color(def.skins[skin.coerceIn(0, def.skins.lastIndex)].secondary)
     Box(modifier) {
@@ -473,6 +475,9 @@ fun FighterView(
             LaunchedEffect(celebrateKey) {
                 if (first[0]) { first[0] = false; return@LaunchedEffect }
                 view?.params?.celebrateAt = System.currentTimeMillis()
+            }
+            LaunchedEffect(sulkKey) {
+                if (sulkKey > 0) view?.params?.sulkAt = System.currentTimeMillis()
             }
         } else {
             val images by Portraits.images.collectAsState()

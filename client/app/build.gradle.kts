@@ -47,7 +47,16 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // The server's News, as it was when the game was built: shown when the server can't be reached.
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/newsAssets"))
 }
+
+val copyNews by tasks.registering(Copy::class) {
+    from(rootProject.file("../server/news.cfg"))
+    into(layout.buildDirectory.dir("generated/newsAssets"))
+}
+tasks.named("preBuild") { dependsOn(copyNews) }
 
 dependencies {
     implementation(libs.androidx.core.ktx)

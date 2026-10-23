@@ -85,7 +85,7 @@ data class MatchPlan(
 )
 
 /** One item on the News tab, as the server wrote it. */
-data class NewsItem(val title: String, val date: String, val tag: String, val text: String)
+typealias NewsItem = io.github.projectwip.data.NewsItem
 
 /** A real player on the server's leaderboard. */
 data class RemotePlayer(val id: String, val name: String, val cups: Int, val fighter: FighterId)
@@ -106,6 +106,8 @@ data class RemotePlayer(val id: String, val name: String, val cups: Int, val fig
  */
 class GameServer(context: Context) : GameActions {
     private val prefs = context.getSharedPreferences("server", Context.MODE_PRIVATE)
+    /** For the News the game was built with (an asset). */
+    private val assets = context.applicationContext.assets
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "server-io").apply { isDaemon = true } }
     private val pendingSave = AtomicReference<JSONObject?>(null)
     private val _status = MutableStateFlow(ServerStatus())
@@ -510,13 +512,26 @@ class GameServer(context: Context) : GameActions {
         JSONObject().put("token", token.orEmpty()).put("version", version).put("fighter", fighter.name).put("skin", skin)
 
     /** The News tab's items, newest first, or null when the server can't be asked. */
-    fun news(): List<NewsItem>? {
-        if (!_status.value.online) return null
-        val items = call("GET", "/v1/news")?.body?.optJSONArray("news") ?: return null
-        return (0 until items.length()).mapNotNull { i ->
-            val n = items.optJSONObject(i) ?: return@mapNotNull null
-            NewsItem(n.optString("title"), n.optString("date"), n.optString("tag", "NEWS"), n.optString("text"))
+    /**
+     * The News, with where it came from. Online it is the server's, and a copy is kept on the device; offline (or if
+     * the server doesn't answer) it is the newer of that copy and the one the game was built with.
+     */
+    fun news(): Pair<List<NewsItem>, Boolean> {
+        if (_status.value.online) {
+            val items = call("GET", "/v1/news")?.body?.optJSONArray("news")
+            if (items != null) {
+                prefs.edit().putString("news", items.toString()).apply()
+                return newsFrom(items) to true
+            }
         }
+        val kept = prefs.getString("news", null)?.let { runCatching { newsFrom(org.json.JSONArray(it)) }.getOrNull() }.orEmpty()
+        val built = runCatching { assets.open("news.cfg").bufferedReader().use { io.github.projectwip.data.NewsFile.parse(it.readText()) } }.getOrDefault(emptyList())
+        return io.github.projectwip.data.NewsFile.newer(kept, built) to false
+    }
+
+    private fun newsFrom(items: org.json.JSONArray) = (0 until items.length()).mapNotNull { i ->
+        val n = items.optJSONObject(i) ?: return@mapNotNull null
+        NewsItem(n.optString("title"), n.optString("date"), n.optString("tag", "NEWS"), n.optString("text"))
     }
 
     /** Real players by Cups, or null when the server can't be asked. */
