@@ -60,6 +60,10 @@ class MatchRenderer(
     private lateinit var rocketDownBody: Mesh
     private lateinit var rocketDownTrim: Mesh
     private lateinit var thinRing: Mesh
+    /** An open-ended tube, one unit across and one high: a slice of a tempest's funnel. */
+    private lateinit var funnel: Mesh
+    /** Lightning a tempest brought down, still showing: x, z, when, from x, from z, seed, whose. */
+    private val tempestBolts = ArrayList<FloatArray>()
     /** Swings of a blade still fading: x, z, yaw in degrees, reach, arc in degrees, when, charged (1 or 0), colour. */
     private val slashes = ArrayList<FloatArray>()
     /** 0..1: how far the arena has gone over to the look of a realm (the player is in one). */
@@ -152,6 +156,7 @@ class MatchRenderer(
         rocketDownBody = MeshBuilder().apply { with { rotate(9f, 1f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); body() } }.build()
         rocketDownTrim = MeshBuilder().apply { with { rotate(9f, 1f, 0f, 0f); rotate(-90f, 0f, 0f, 1f); trim() } }.build()
         thinRing = MeshBuilder().apply { ring(0.94f, 1f, 48) }.build()
+        funnel = MeshBuilder().apply { cylinder(1f, 1f, 18, caps = false) }.build()
         disc = MeshBuilder().apply { ring(0f, 1f, 40) }.build()
         ring = MeshBuilder().apply { ring(0.82f, 1f, 48) }.build()
         dashRing = MeshBuilder().apply { for (k in 0 until 8) ring(0.9f, 1f, 6, k * 45f, k * 45f + 28f) }.build()
@@ -412,7 +417,7 @@ class MatchRenderer(
     /** Fighters drawn fully solid (the normal case). Ones that are mid-fade are drawn by [drawFadingFighters]. */
     private inline fun forEachSolidFighter(alpha: Float, block: (Fighter, Float, Float, Float) -> Unit) {
         for (f in world.fighters) {
-            if (!f.alive || shownVis[f.id] < 0.999f || !inView(f.x, f.y)) continue
+            if (!f.alive || shownVis[f.id] < 0.999f || !inView(f.x, f.y) || f.inTempest) continue
             poseFor(f)
             block(f, lerp(f.prevX, f.x, alpha), lerp(f.prevY, f.y, alpha), shownFacing[f.id])
         }
@@ -542,7 +547,7 @@ class MatchRenderer(
             }
             for (f in world.fighters) {
                 val v = shownVis[f.id]
-                if (!f.alive || v <= 0.02f || v >= 0.999f || !inView(f.x, f.y)) continue
+                if (!f.alive || v <= 0.02f || v >= 0.999f || !inView(f.x, f.y) || f.inTempest) continue
                 poseFor(f)
                 litFade.f("uDissolve", 1f - v)
                 models.draw(litFade, f.def, f.skin, lerp(f.prevX, f.x, alpha), lerp(f.prevY, f.y, alpha), shownFacing[f.id], anim, if (pass == 0) Pass.COLOR else Pass.OUTLINE)
@@ -656,6 +661,31 @@ class MatchRenderer(
             if (hypot(ex - camX, ez - camZ) < 16f) {
                 particles.spawn(ex, 0.2f + rng.nextFloat() * 2.5f, ez, 0f, 0.8f, 0f, 0.5f, 0.16f, 0xFFC08CFF.toInt(), 0.9f)
             }
+        }
+    }
+
+    /** Lightning: a jagged line of bits from ([x0], [y0], [z0]) down to ([x1], [y1], [z1]), its kinks set by [seed]. */
+    private fun jagged(x0: Float, y0: Float, z0: Float, x1: Float, y1: Float, z1: Float, seed: Int, thick: Float) {
+        val steps = 7
+        var px = x0; var py = y0; var pz = z0
+        for (k in 1..steps) {
+            val u = k / steps.toFloat()
+            val h = ((seed * 7919 + k * 104729) and 0x7FFFFFFF)
+            val kink = if (k == steps) 0f else 0.35f * (1f - u * 0.5f)
+            val nx = x0 + (x1 - x0) * u + (((h % 200) - 100) / 100f) * kink
+            val nz = z0 + (z1 - z0) * u + ((((h / 200) % 200) - 100) / 100f) * kink
+            val ny = y0 + (y1 - y0) * u
+            val dx = nx - px; val dy = ny - py; val dz = nz - pz
+            val len = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz).coerceAtLeast(0.01f)
+            Matrix.setIdentityM(model, 0)
+            Matrix.translateM(model, 0, (px + nx) / 2f, (py + ny) / 2f, (pz + nz) / 2f)
+            // (Turn the bit's X axis along the stroke.)
+            Matrix.rotateM(model, 0, -Math.toDegrees(atan2(dz.toDouble(), dx.toDouble())).toFloat(), 0f, 1f, 0f)
+            Matrix.rotateM(model, 0, Math.toDegrees(atan2(dy.toDouble(), hypot(dx, dz).toDouble())).toFloat(), 0f, 0f, 1f)
+            Matrix.scaleM(model, 0, len + thick, thick, thick)
+            lit.mat4("uModel", model)
+            bit.draw()
+            px = nx; py = ny; pz = nz
         }
     }
 
@@ -804,8 +834,9 @@ class MatchRenderer(
                 particles.spawn(f.x + cos(a) * r, 0.1f, f.y + sin(a) * r, -cos(a) * 1.2f, 1.5f + rng.nextFloat() * 1.5f, -sin(a) * 1.2f, 0.5f, 0.14f, 0xFFB98CFF.toInt(), 0.9f)
             }
         }
-        // A tempest: a funnel of storm cloud turning round her, wide at the top and tight at the ground, with lightning
-        // flickering in it and a ring on the ground as far as it strikes.
+        // A tempest: she is the tornado. A tall dark funnel, tight at the ground and wide at the top, bending as it goes
+        // and leaning back from where it is heading, with pale streaks whipping round it, dust torn up at its foot,
+        // lightning flickering inside it, and a ring on the ground as far as it strikes.
         for (f in world.fighters) {
             if (!f.alive || !f.inTempest || f.realm != p.realm) continue
             val fx = lerp(f.prevX, f.x, alpha)
@@ -813,50 +844,112 @@ class MatchRenderer(
             val reach = f.def.superSpec.radius + f.radius
             val skin = f.def.skins.getOrElse(f.skin) { f.def.skins[0] }
             val mine = f.team == p.team
-            if (mine) lit.v4("uTint", 0.5f, 0.85f, 1f, 0.12f) else lit.v4("uTint", 1f, 0.3f, 0.25f, 0.14f)
+            val grow = ((f.def.superSpec.tempestSeconds - f.tempestLeft) / 0.35f).coerceIn(0f, 1f)
+            val fade = (f.tempestLeft / 0.4f).coerceIn(0f, 1f)
+            val k0 = grow * fade
+            if (mine) lit.v4("uTint", 0.45f, 0.8f, 1f, 0.16f * k0) else lit.v4("uTint", 1f, 0.3f, 0.25f, 0.18f * k0)
             setModel(fx, 0.046f, fz, reach, 1f, reach); sector(360f).draw()
-            if (mine) lit.v4("uTint", 0.6f, 0.9f, 1f, 0.6f) else lit.v4("uTint", 1f, 0.4f, 0.3f, 0.65f)
-            setModel(fx, 0.052f, fz, reach, 1f, reach, -time * 260f); thinRing.draw()
-            val rings = 11
-            for (j in 0 until rings) {
-                val u = j / (rings - 1f)
-                val y = 0.15f + u * 2.6f
-                val r = 0.3f + (reach * 1.1f) * u * u + 0.12f * sin(time * 9f + j)
-                val sway = 0.18f * u
-                val cx = fx + cos(time * 3.1f + j * 0.6f) * sway
-                val cz = fz + sin(time * 2.7f + j * 0.6f) * sway
-                val c = (0.55f + 0.25f * u)
-                lit.v4("uTint", c * 0.85f, c * 0.85f, c, 0.28f + 0.2f * (1f - u))
-                setModel(cx, y, cz, r, 1f, r, time * (520f - j * 25f) + j * 33f); ring.draw()
-                tint(skin.accent, 0.35f)
-                setModel(cx, y + 0.06f, cz, r * 0.82f, 1f, r * 0.82f, -time * 380f + j * 50f); thinRing.draw()
-            }
-            // Lightning: now and then a jagged bolt runs down through the funnel.
-            val flash = ((time * 3.3f + f.id * 0.37f) % 1f)
-            if (flash < 0.18f) {
-                lit.i("uMode", 0)
-                lit.f("uEmissive", 1f)
-                tint(skin.accent)
-                var lx = fx; var lz = fz; var ly = 2.8f
-                val seed = (time * 3.3f).toInt() * 31 + f.id
-                for (k in 0 until 5) {
-                    val ang = ((seed * 7919 + k * 104729) % 628) / 100f
-                    val nx = fx + cos(ang) * 0.45f * (1f - k / 5f)
-                    val nz = fz + sin(ang) * 0.45f * (1f - k / 5f)
-                    val ny = ly - 0.55f
-                    val seg = hypot(nx - lx, nz - lz).coerceAtLeast(0.01f)
-                    val yaw = -Math.toDegrees(atan2((nz - lz).toDouble(), (nx - lx).toDouble())).toFloat()
-                    setModel((lx + nx) / 2f, (ly + ny) / 2f, (lz + nz) / 2f, seg + 0.05f, 0.6f, 0.05f, yaw); bit.draw()
-                    lx = nx; lz = nz; ly = ny
+            if (mine) lit.v4("uTint", 0.6f, 0.9f, 1f, 0.75f * k0) else lit.v4("uTint", 1f, 0.4f, 0.3f, 0.8f * k0)
+            setModel(fx, 0.052f, fz, reach, 1f, reach, -time * 400f); ring.draw()
+            lit.v4("uTint", 0.1f, 0.1f, 0.16f, 0.35f * k0)
+            setModel(fx, 0.049f, fz, reach * 0.55f, 1f, reach * 0.55f); sector(360f).draw()
+            val height = 3.8f * k0
+            val top = reach * 1.15f
+            // (The cloud lights up from inside when lightning goes.)
+            val lastBolt = tempestBolts.lastOrNull { it[6].toInt() == f.id }
+            val flick = ((time * 4.1f + f.id * 0.37f) % 1f)
+            val flash = maxOf(if (lastBolt != null) (1f - (time - lastBolt[2]) / 0.25f).coerceIn(0f, 1f) else 0f, if (flick < 0.12f) 0.4f else 0f)
+            val lean = 0.16f
+            val segs = 12
+            for (k in 0 until segs) {
+                val u = (k + 0.5f) / segs
+                val y = 0.05f + u * height
+                val r = (0.22f + top * u * kotlin.math.sqrt(u)) * (0.75f + 0.25f * k0)
+                val bend = 0.35f * u * u
+                val cx = fx + sin(time * 2.3f + u * 2.8f) * bend - f.vx * lean * u
+                val cz = fz + cos(time * 1.9f + u * 2.4f) * bend - f.vy * lean * u
+                val h = height / segs * 1.7f
+                // Shells: dark storm cloud outside (darker the higher it goes), dusty air inside, a glow in the eye.
+                val dark = 0.34f - 0.16f * u + 0.25f * flash
+                lit.v4("uTint", dark, dark * 1.04f, dark * 1.3f, 0.88f * k0)
+                setModel(cx, y, cz, r, h, r, time * 900f); funnel.draw()
+                lit.v4("uTint", 0.62f, 0.6f, 0.62f, 0.45f * k0)
+                setModel(cx, y, cz, r * 0.82f, h, r * 0.82f, -time * 1200f); funnel.draw()
+                tint(skin.accent, 0.3f * k0)
+                setModel(cx, y, cz, r * 0.38f, h, r * 0.38f); funnel.draw()
+                // Streaks whipping round it, fast.
+                for (st in 0 until 4) {
+                    val a = time * 15f + k * 0.85f + st * 1.5708f
+                    val rr = r * 1.04f
+                    lit.v4("uTint", 0.86f, 0.9f, 1f, 0.75f * k0)
+                    setModel(cx + cos(a) * rr, y + 0.05f * sin(a * 2f), cz + sin(a) * rr, 0.42f * r + 0.12f, 0.05f, 0.07f,
+                        -Math.toDegrees(a.toDouble()).toFloat() - 90f); bit.draw()
                 }
-                lit.f("uEmissive", 0f)
-                lit.i("uMode", 1)
             }
-            if (rng.nextFloat() < 0.6f) {
+            // The thundercloud it hangs from: a churning ring of dark puffs round the top, over a dark core, turning.
+            val capX = fx + sin(time * 2.3f + 2.8f) * 0.35f - f.vx * lean
+            val capZ = fz + cos(time * 1.9f + 2.4f) * 0.35f - f.vy * lean
+            val capY = height + 0.15f
+            val cd = 0.2f + 0.3f * flash
+            for (n in 0 until 9) {
+                val a = -time * 4f + n * 0.698f
+                val pr = top * (0.9f + 0.1f * sin(time * 3f + n * 1.7f))
+                val ps = top * (0.22f + 0.04f * sin(time * 4f + n))
+                val c = 0.24f + 0.06f * (n % 3) + 0.35f * flash
+                lit.v4("uTint", c * 0.85f, c * 0.88f, c * 1.1f, 0.8f * k0)
+                setModel(capX + cos(a) * pr, capY + 0.1f * sin(time * 5f + n), capZ + sin(a) * pr, ps, ps * 0.62f, ps); sphere.draw()
+                val c2 = c + 0.12f
+                lit.v4("uTint", c2 * 0.85f, c2 * 0.88f, c2 * 1.1f, 0.8f * k0)
+                setModel(capX + cos(a + 0.35f) * pr * 0.8f, capY + 0.22f, capZ + sin(a + 0.35f) * pr * 0.8f, ps * 0.6f, ps * 0.42f, ps * 0.6f); sphere.draw()
+            }
+            // Pale streaks spiralling into the middle of the cloud.
+            for (n in 0 until 6) {
+                val a = -time * 5f + n * 1.047f
+                val rr = top * 0.7f
+                lit.v4("uTint", 0.8f, 0.84f, 0.95f, 0.6f * k0)
+                setModel(capX + cos(a) * rr, capY + 0.2f, capZ + sin(a) * rr, top * 0.35f, 0.04f, 0.07f, -Math.toDegrees(a.toDouble()).toFloat() - 70f); bit.draw()
+            }
+            // Lightning flickering inside the funnel, top to bottom.
+            if (flick < 0.22f && k0 > 0.5f) {
+                lit.v4("uTint", 0.85f, 0.97f, 1f, 1f)
+                jagged(capX, height, capZ, fx + sin(time * 7f) * 0.3f, 0.2f, fz + cos(time * 5f) * 0.3f, (time * 4.1f).toInt() * 31 + f.id, 0.05f)
+                tint(skin.accent, 0.9f)
+                jagged(capX + 0.3f, height * 0.8f, capZ, capX + cos(time * 9f) * top, height * 0.6f, capZ + sin(time * 9f) * top, (time * 4.1f).toInt() * 17 + f.id, 0.035f)
+            }
+            // Dust torn up at its foot, cloud flung off its top, and sparks in the wind.
+            for (n in 0 until 2) {
                 val a = rng.nextFloat() * 6.28f
-                val h = rng.nextFloat() * 2.4f
-                val rr = 0.3f + reach * (h / 2.6f) * (h / 2.6f)
-                particles.spawn(fx + cos(a) * rr, 0.15f + h, fz + sin(a) * rr, -sin(a) * 3f, 0.6f, cos(a) * 3f, 0.4f, 0.12f, skin.accent.toInt(), 0.9f)
+                particles.spawn(fx + cos(a) * 0.5f, 0.1f, fz + sin(a) * 0.5f, -sin(a) * 5f + cos(a) * 1.5f, 0.8f + rng.nextFloat(), cos(a) * 5f + sin(a) * 1.5f, 0.45f, 0.16f, 0xFFB9B39F.toInt(), 0.75f)
+            }
+            if (rng.nextFloat() < 0.7f) {
+                val a = rng.nextFloat() * 6.28f
+                particles.spawn(fx + cos(a) * top, height, fz + sin(a) * top, -sin(a) * 4f, 0.3f, cos(a) * 4f, 0.6f, 0.24f, 0xFF6D7391.toInt(), 0.7f)
+            }
+            if (rng.nextFloat() < 0.5f) {
+                val a = rng.nextFloat() * 6.28f
+                val uu = rng.nextFloat()
+                val rr = 0.22f + top * uu * kotlin.math.sqrt(uu)
+                particles.spawn(fx + cos(a) * rr, uu * height, fz + sin(a) * rr, -sin(a) * 6f, 1f, cos(a) * 6f, 0.3f, 0.1f, skin.accent.toInt(), 1f)
+            }
+        }
+        // Its lightning bolts: a jagged stroke from high above down to where each landed, and a flash on the ground.
+        run {
+            val bi = tempestBolts.iterator()
+            while (bi.hasNext()) {
+                val b = bi.next()
+                val age = time - b[2]
+                if (age > 0.3f || age < 0f) { bi.remove(); continue }
+                val k = 1f - age / 0.3f
+                lit.v4("uTint", 0.75f, 0.95f, 1f, 0.5f * k)
+                val rr = io.github.projectwip.data.Balance.TEMPEST_BOLT_RADIUS * (0.6f + 0.6f * age / 0.3f)
+                setModel(b[0], 0.055f, b[1], rr, 1f, rr); sector(360f).draw()
+                if (age < 0.18f) {
+                    // (A glow round the stroke, then the bright core.)
+                    lit.v4("uTint", 0.5f, 0.85f, 1f, 0.45f * k)
+                    jagged(b[3], 4.1f, b[4], b[0], 0.05f, b[1], b[5].toInt(), 0.2f)
+                    lit.v4("uTint", 0.95f, 1f, 1f, 1f)
+                    jagged(b[3], 4.1f, b[4], b[0], 0.05f, b[1], b[5].toInt(), 0.08f)
+                }
             }
         }
         // And from inside: rings of light run out from under the captive, across the dark floor.
@@ -1640,6 +1733,26 @@ class MatchRenderer(
                     particles.spawn(e.x + cos(a) * 0.3f, 0.3f, e.y + sin(a) * 0.3f, cos(a) * 1.2f, 3f + rng.nextFloat() * 2f, sin(a) * 1.2f, 0.6f, 0.1f, 0xFFFFE066.toInt(), 1f)
                 }
             }
+            is GameEvent.TempestBolt -> {
+                val f = world.fighter(e.fighterId)
+                val fx = f?.x ?: e.x
+                val fz = f?.y ?: e.y
+                tempestBolts += floatArrayOf(e.x, e.y, time, fx, fz, (time * 1000f).toInt().toFloat(), e.fighterId.toFloat())
+                val c = (f?.def?.skins?.getOrElse(f.skin) { f.def.skins[0] }?.accent ?: 0xFF7DF9FF).toInt()
+                repeat(10) {
+                    val a = rng.nextFloat() * 6.28f
+                    particles.spawn(e.x, 0.15f, e.y, cos(a) * 3.5f, 1.5f + rng.nextFloat() * 2f, sin(a) * 3.5f, 0.35f, 0.12f, c, 1f)
+                }
+                val pl = match.player
+                if (hypot(e.x - pl.x, e.y - pl.y) < 6f) shake = max(shake, 0.1f)
+            }
+            is GameEvent.TempestHit -> {
+                repeat(6) {
+                    val a = rng.nextFloat() * 6.28f
+                    particles.spawn(e.x, 0.5f + rng.nextFloat(), e.y, cos(a) * 3f, 1f, sin(a) * 3f, 0.3f, 0.1f, 0xFFDDF4FF.toInt(), 1f)
+                }
+                if (e.targetId == pid) shake = max(shake, 0.12f)
+            }
             is GameEvent.StormHit -> {
                 repeat(4) { particles.spawn(e.x + rng.nextFloat() - 0.5f, 0.4f + rng.nextFloat(), e.y + rng.nextFloat() - 0.5f, 0f, 1.5f, 0f, 0.4f, 0.12f, 0xFFC08CFF.toInt(), 1f) }
                 if (e.targetId == pid) shake = max(shake, 0.08f)
@@ -1709,13 +1822,14 @@ class MatchRenderer(
         hud.publish()
     }
 
-    private fun headHeight(def: io.github.projectwip.data.FighterDef) = if (def.sparkLook) FIGHTER_SCALE * 1.85f else headHeight(def.id)
+    private fun headHeight(def: io.github.projectwip.data.FighterDef) = headHeight(def.id)
     private fun headHeight(id: FighterId) = FIGHTER_SCALE * when (id) {
         FighterId.BYTE -> 2.05f
         FighterId.BRAKK -> 1.6f
         FighterId.KIRA -> 2.25f
         FighterId.KITO -> 1.9f
         FighterId.BUDDY -> 2.05f
+        FighterId.SPARK -> 1.85f
     }
 
     override fun onDestroyed() {}

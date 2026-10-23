@@ -21,7 +21,8 @@ data class StatLine(val base: Int, val perLevel: Int) {
     }
 }
 
-enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
+/** [BYTE] is Swish, the starter (the id has been Byte, Rocket, Spark and now her). [SPARK] is Spark with an id of his own (build 96). */
+enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY, SPARK }
 
 /**
  * [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. [SMASH] is heavy things hurled a
@@ -79,8 +80,9 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
  * in between, hits them for the super's damage as it arrives, and has its ammo and its blade's bar full. With nobody on the line it goes to the end of its reach, for nothing.
  */
 /**
- * [TEMPEST]: the fighter becomes a lightning-storm tornado for [SuperSpec.stormSeconds]. It moves [Balance.TEMPEST_SPEED]
- * times as fast and can't attack, and every [Balance.TEMPEST_TICK_SECONDS] every enemy within [SuperSpec.radius] of it is hit
+ * [TEMPEST]: the fighter becomes a lightning-storm tornado for [SuperSpec.tempestSeconds]. It flies over anything
+ * [Balance.TEMPEST_SPEED] times as fast and can't attack; lightning comes down on enemies near it (`Balance.TEMPEST_BOLT_*`),
+ * and every [Balance.TEMPEST_TICK_SECONDS] every enemy within [SuperSpec.radius] of it (the funnel's wide top) is hit
  * for the super's damage and flung [SuperSpec.knockback] tiles outward. Its hits charge the super by only
  * [Balance.TEMPEST_CHARGE] of a hit, and a full super in the middle of one starts it over.
  */
@@ -189,8 +191,6 @@ data class FighterDef(
     val notice: String? = null,
     /** False for a fighter that can no longer be levelled up: it stays at whatever level it has. */
     val upgradable: Boolean = true,
-    /** Drawn as Spark (retired): the Training Area's dummies, swarm and sentry still look like him. */
-    val sparkLook: Boolean = false,
 )
 
 /**
@@ -341,11 +341,21 @@ object Balance {
     const val ARROW_SEEK_RADIUS = 3.5f
 
     /** A tempest ([SuperKind.TEMPEST]) hits everyone in it this often... */
-    const val TEMPEST_TICK_SECONDS = 0.5f
-    /** ...moves this many times as fast as the fighter walks... */
-    const val TEMPEST_SPEED = 1.15f
+    const val TEMPEST_TICK_SECONDS = 0.4f
+    /** ...flies (over walls and water) this many times as fast as the fighter walks... */
+    const val TEMPEST_SPEED = 1.6f
     /** ...and each of its hits charges the super by only this share of a normal hit, so a tempest doesn't pay for the next one. */
     const val TEMPEST_CHARGE = 0.25f
+    /**
+     * ...and brings lightning down every [TEMPEST_BOLT_SECONDS] on the nearest enemy it can see within [TEMPEST_BOLT_RANGE],
+     * up to [TEMPEST_BOLT_SCATTER] tiles off, hitting everyone within [TEMPEST_BOLT_RADIUS] of where it lands for this share of
+     * the super's damage.
+     */
+    const val TEMPEST_BOLT_SECONDS = 0.7f
+    const val TEMPEST_BOLT_RANGE = 4.5f
+    const val TEMPEST_BOLT_SCATTER = 0.6f
+    const val TEMPEST_BOLT_RADIUS = 0.9f
+    const val TEMPEST_BOLT_DAMAGE = 0.75f
 
     /** A lobbed star ([AttackShape.STAR]) takes this long to come down on its spot. */
     const val STAR_FLIGHT_SECONDS = 0.6f
@@ -404,15 +414,14 @@ object Balance {
     const val MIN_AMMO_DAMAGE = 1300
 
     /**
-     * Spark, retired by the user's decision (build 96): Swish took his place, keeping the id. His def is kept for reuse
-     * (and tested with it): his lobbed star, his Shadow Realm with its shadows, and his look. The Training Area's
-     * dummies, swarm and sentry are still made from him, and so is the size of a boss.
+     * Spark: a Legendary of his own since build 96, by the user's decision, last on the Spark Road. Swish took his place as
+     * the starter (and his old id, BYTE); everyone who had him then kept him (`economy.complete`, `SaveStore.fromJson`).
+     * The Training Area's dummies, swarm and sentry are made from him, and so is the size of a boss.
      */
     val spark: FighterDef = FighterDef(
-        id = FighterId.BYTE,
+        id = FighterId.SPARK,
         rarity = Rarity.LEGENDARY,
-        // (The id is still BYTE: Spark took Rocket's place, by the user's decision, as Rocket had taken Byte's. Her
-        // rockets and her realm are still in the simulation, and Spark's super is that realm.)
+        // (His realm is Rocket's, whose rockets and realm are still in the simulation.)
         name = "Spark",
         title = "The Drop That Woke",
         role = "Trickster",
@@ -434,7 +443,6 @@ object Balance {
             Skin("Void Spark", 0xFF2C2350, 0xFF0C0A1C, 0xFF3CF2FF, 20),
             Skin("Solar Spite", 0xFFFFB627, 0xFF4A1206, 0xFFFF3B3B, 20),
         ),
-        sparkLook = true,
         hyper = HyperSpec("Wild Spark", "Lasts 8 seconds. His stars fly half as fast again.", seconds = 8f, shotSpeed = 1.5f),
     )
 
@@ -458,7 +466,7 @@ object Balance {
             // A sniper, but not a long-range one: nine tiles, and the homing is gentle (120 degrees a second, only
             // toward someone close ahead of the arrow), so a sidestep at the right moment still beats it.
             attack = AttackSpec(AttackShape.ARROW, projectiles = 1, spreadDegrees = 0f, range = 9f, speed = 16f, radius = 0.22f, burstInterval = 0f, homing = 120f),
-            superSpec = SuperSpec(SuperKind.TEMPEST, "Thunderhead", "She becomes a lightning storm for 12 seconds, a little faster than she walks. Every half second whoever is caught in it is struck and flung out of it. She can't shoot while she is the storm, but its strikes slowly charge her next one.", range = 0f, speed = 0f, radius = 1.3f, knockback = 1.6f, tempestSeconds = 12f),
+            superSpec = SuperSpec(SuperKind.TEMPEST, "Thunderhead", "She becomes a raging lightning tornado for 12 seconds, flying fast over walls and water. Whoever the funnel touches is struck and flung away, and lightning cracks down on enemies nearby. She can't shoot while she is the storm, but its strikes slowly charge her next one.", range = 0f, speed = 0f, radius = 1.6f, knockback = 1.8f, tempestSeconds = 12f),
             ammoMax = 3,
             reloadSeconds = 1.5f,
             // Half of what most fighters get: her storm keeps charging the super while it runs (the user asked for that,
@@ -596,6 +604,8 @@ object Balance {
                 VoiceCue.BACK to listOf("Restored from backup."),
             ),
         ),
+        // Last on the Spark Road, after Buddy.
+        spark,
     )
 
     fun fighter(id: FighterId): FighterDef = fighters.first { it.id == id }

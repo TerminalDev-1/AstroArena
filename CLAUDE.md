@@ -48,19 +48,24 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   `Sound.ARROW`), is the user's design: one giant arrow with a diamond tip, a sniper's shot but not a long-range one
   (9 tiles), 1,700 at level 1, that homes gently (`AttackSpec.homing`, 120 degrees a second, only toward an enemy
   within `ARROW_SEEK_RADIUS` ahead of it; `World.steer`): "the honing is not going to be too powerful". Her super,
-  Thunderhead (`SuperKind.TEMPEST`, `Fighter.tempestLeft`, `World.stepTempest`), is the user's too: she becomes a
-  lightning-storm tornado for 12 seconds (`SuperSpec.tempestSeconds`), moves `TEMPEST_SPEED` times as fast, can't shoot,
-  and every `TEMPEST_TICK_SECONDS` strikes everyone within its radius and flings them out. She can recharge the super
+  Thunderhead (`SuperKind.TEMPEST`, `Fighter.tempestLeft`, `World.stepTempest`), is the user's too: "a fast, menacing
+  tornado that she can fly around, with lightning, and even the tip of the tornado does damage". For 12 seconds
+  (`SuperSpec.tempestSeconds`) she is the tornado (her model is hidden): she flies over walls and water at
+  `TEMPEST_SPEED` (set down on open ground when it ends), can't shoot, every `TEMPEST_TICK_SECONDS` strikes everyone
+  under the funnel's wide top (`SuperSpec.radius`) and flings them out, and brings lightning down on the nearest enemy
+  in reach (`TEMPEST_BOLT_*`, `GameEvent.TempestBolt`, `Sound.THUNDER`). It is drawn in `MatchRenderer` as a dark,
+  bending funnel with streaks, a churning ring of thundercloud round an open, glowing eye, and jagged bolts (flat
+  colour: that pass is unlit; the user called a first version, a stack of see-through rings, terrible). She can recharge the super
   during it, as the user asked, with a much lower charge rate to pay for it: her arrows charge 0.1 a hit, and the
   tempest's strikes only `TEMPEST_CHARGE` of that; a full super mid-tempest starts it over. ("Tempest" in the code,
   because the free-for-all already has a Static Storm.) Her name, look and words are ours.
-- Spark is retired (build 96), by the user's decision, and his code is kept, like Rocket's: his def is `Balance.spark`
-  (unregistered; `SimulationTest` uses it), with his star lob, his Shadow Realm and his model. The Training Area's
-  dummies, swarm and sentry are still made from him and still look like him (`FighterDef.sparkLook`). His blue menu
-  glitch is off (`SPARK_GLITCH_ON` in `ui/SparkGlitch.kt`). Don't bring Byte or Juno back, or Rocket or Spark unless
-  the user asks. What follows is Spark as he was. Spark is the user's
+- Spark is not retired: the user meant him to stay, as a Legendary of his own (`FighterId.SPARK`, `Balance.spark`,
+  `"SPARK"` on the server), last on the Spark Road after Buddy (7,000 Credits, or 160 CPU Chips). Everyone who had
+  him when Swish took the starter's id kept him as he was, level, colourways and Cups (`economy.complete` and
+  `SaveStore.fromJson` copy BYTE's entry into a missing SPARK one). The Training Area's dummies, swarm and sentry are
+  made from him. Don't bring Byte or Juno back, or Rocket unless the user asks. Spark is the user's
   idea and part of the lore: the Spark Drop that would not go away, a puffy five-pointed star (the drops' shape,
-  `render3d/StarMesh.kt`). Since build 92 he is chromatic blue and glossy, by the user's decision (build 91's fat
+  `render3d/StarMesh.kt`). (As the starter he was `BYTE`; since build 96 he is `SPARK`.) Since build 92 he is chromatic blue and glossy, by the user's decision (build 91's fat
   red villain with fangs looked creepy; `Part.gloss`, the lit shader's `uGloss`: small hard highlights and a
   cyan-to-violet sheen at the edges), with round feet and white mitts. Since build 93 he stands upright (leaning back
   only 10 degrees), as the user asked: the 65-degree lean of builds 91 and 92 had him staring at the sky and looking

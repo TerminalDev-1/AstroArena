@@ -427,6 +427,11 @@ class MatchRunner(
                 if (e.on) sfx.play(Sound.TEMPEST, near) else sfx.play(Sound.WHOOSH, near * 0.7f, 0.6f)
                 if (e.on && e.fighterId == pid) sfx.buzz(120, 230)
             }
+            is GameEvent.TempestBolt -> {
+                val p = match.player
+                sfx.play(Sound.THUNDER, (if (e.fighterId == pid) 0.9f else 0.7f) / (1f + hypot(e.x - p.x, e.y - p.y) * 0.12f), 0.9f + (e.x % 0.2f))
+                if (hypot(e.x - p.x, e.y - p.y) < 1.5f) sfx.buzz(50, 200)
+            }
             is GameEvent.TempestHit -> {
                 val p = match.player
                 val mine = e.fighterId == pid || e.targetId == pid

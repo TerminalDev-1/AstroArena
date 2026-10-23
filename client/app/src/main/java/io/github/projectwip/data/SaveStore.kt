@@ -116,7 +116,9 @@ class SaveStore(context: Context, name: String = "save.json") {
             val fightersJson = o.optJSONObject("fighters")
             val fighters = FighterId.entries.associateWith { id ->
                 val def = d.progress(id)
-                val f = fightersJson?.optJSONObject(id.name) ?: return@associateWith def
+                // (A save from before build 96 has no SPARK: Spark was BYTE then, so he is kept just as BYTE was.)
+                val legacySpark = id == FighterId.SPARK && fightersJson != null && !fightersJson.has("SPARK") && fightersJson.has("BYTE")
+                val f = (if (legacySpark) fightersJson?.optJSONObject("BYTE") else fightersJson?.optJSONObject(id.name)) ?: return@associateWith def
                 FighterProgress(
                     unlocked = f.optBoolean("unlocked", def.unlocked),
                     level = f.optInt("level", 1).coerceIn(1, Balance.LEVEL_LIMIT),

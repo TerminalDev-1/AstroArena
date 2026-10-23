@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX, STAR, STAR_BURST, ARROW, TEMPEST, TEMPEST_HIT,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX, STAR, STAR_BURST, ARROW, TEMPEST, TEMPEST_HIT, THUNDER,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -40,6 +40,7 @@ object SfxSynth {
         Sound.ARROW -> arrowShot().finish(0.7f)
         Sound.TEMPEST -> tempestRise().finish(0.9f)
         Sound.TEMPEST_HIT -> tempestHit().finish(0.7f)
+        Sound.THUNDER -> thunder().finish(0.9f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -612,6 +613,17 @@ object SfxSynth {
         }
         filter(Band.LOW, 0.8f) { 7000f }
         echo(0.11f, 0.3f, 0.2f)
+    }
+
+    /** A tempest's lightning bolt: a hard crack right on top of you, and thunder rolling away under it. */
+    private fun thunder() = Clip(1.1f).apply {
+        noise(231, 0f, 0.12f, Band.HIGH, { 2600f }, 0.7f, { perc(it, 0.0005f, 0.03f) * 0.9f })
+        noise(232, 0.005f, 0.3f, Band.LOW, { glide(it, 0.25f, 6000f, 900f) }, 0.7f, { perc(it, 0.002f, 0.07f) * 0.7f })
+        noise(233, 0.04f, 1.05f, Band.LOW, { t -> 260f + 80f * sin(t * TAU * 5f) }, 0.9f, { t -> hold(t, 0.06f, 0.35f, 0.6f) * (0.7f + 0.3f * sin(t * TAU * 9f)) * 0.55f })
+        osc(Wave.SAW, 0.02f, 0.9f, { glide(it, 0.8f, 70f, 38f) }, { hold(it, 0.03f, 0.25f, 0.55f) * 0.3f })
+        osc(Wave.SQUARE, 0f, 0.06f, { glide(it, 0.05f, 3000f, 500f) }, { perc(it, 0.0005f, 0.015f) * 0.15f })
+        filter(Band.LOW, 0.8f) { 8000f }
+        echo(0.13f, 0.3f, 0.22f)
     }
 
     /** The storm striking someone: a short electric zap and a crackle. */

@@ -132,6 +132,7 @@ class Fighter(
     /** Seconds left as a tempest ([io.github.projectwip.data.SuperKind.TEMPEST]), and until its next hit. */
     var tempestLeft = 0f
     var tempestTick = 0f
+    var tempestBolt = 0f
     val inTempest get() = tempestLeft > 0f
     var realmTick = 0f
     /** How many strikes the realm's shadows have made so far ([SuperSpec.shadows]): they take turns. */
@@ -274,6 +275,8 @@ sealed interface GameEvent {
     data class Tempest(val fighterId: Int, val on: Boolean) : GameEvent
     /** A tempest's hit on [targetId], who is flung away from it. */
     data class TempestHit(val fighterId: Int, val targetId: Int, val x: Float, val y: Float) : GameEvent
+    /** A tempest's lightning bolt comes down at ([x], [y]). */
+    data class TempestBolt(val fighterId: Int, val x: Float, val y: Float) : GameEvent
     /** A rocket went off. */
     data class Burst(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A lobbed star came down and burst. */

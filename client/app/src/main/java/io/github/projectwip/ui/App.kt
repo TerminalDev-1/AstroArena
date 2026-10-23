@@ -104,9 +104,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 "kito" -> Screen.Fighters(FighterId.KITO)
                 "buddy" -> Screen.Fighters(FighterId.BUDDY)
                 // The Training Area as any fighter, unlocked or not, for looking at them in play.
-                // (Swish is BYTE underneath; "tryspark" still works, and is her now.)
+                // (Swish is BYTE underneath.)
                 "trybuddy", "trykito", "trykira", "trybrakk", "trybyte", "tryspark", "tryswish" -> Screen.Match(startMatchConfig(repo.save.value).copy(
-                    playerFighter = FighterId.valueOf(startScreen.removePrefix("try").uppercase().replace("SPARK", "BYTE").replace("SWISH", "BYTE")), playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
+                    playerFighter = FighterId.valueOf(startScreen.removePrefix("try").uppercase().replace("SWISH", "BYTE")), playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road
                 "track" -> Screen.CupTrack
@@ -345,9 +345,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         val metrics = UiMetrics((maxWidth.value - cutoutPx / base.density) / scale, maxHeight.value / scale, scale)
 
         val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
-        // Whenever Spark stood in the lobby, the scene behind the menus went blue and glitched now and then (off since he retired).
+        // Whenever Spark stands in the lobby, the scene behind the menus goes blue and glitches now and then.
         val glitch = rememberSparkGlitch {
-            screen !is Screen.Match && capsule == null && haul == null && lobby.showFighter && io.github.projectwip.ui.SPARK_GLITCH_ON && lobby.fighter == FighterId.BYTE &&
+            screen !is Screen.Match && capsule == null && haul == null && lobby.showFighter && io.github.projectwip.ui.SPARK_GLITCH_ON && lobby.fighter == FighterId.SPARK &&
                 lobby.shot != io.github.projectwip.render3d.LobbyShot.ROAD
         }
         CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalCutout provides cutoutSides, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalOfflineGame provides local, LocalOfflineMode provides offline, LocalDev provides dev, LocalServerCall provides ask, LocalNav provides go) {

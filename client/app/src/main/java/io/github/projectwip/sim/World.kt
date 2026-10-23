@@ -250,8 +250,13 @@ class World(
             if (len > 1f) { mx /= len; my /= len }
             val speed = f.def.moveSpeed * (if (f.slowed) Balance.SLOW_FACTOR else 1f) * (if (f.captive) Balance.REALM_CAPTIVE_SPEED else 1f) *
                 (if (f.inTempest) Balance.TEMPEST_SPEED else 1f)
-            val blocked = arena.moveCircle(f.x, f.y, f.radius, mx * speed * dt, my * speed * dt, tmp)
-            f.x = tmp[0]; f.y = tmp[1]
+            // (A tempest flies: over walls and water alike, only kept inside the arena.)
+            val blocked = if (f.inTempest) {
+                f.x = (f.x + mx * speed * dt).coerceIn(f.radius, arena.width - f.radius)
+                f.y = (f.y + my * speed * dt).coerceIn(f.radius, arena.height - f.radius)
+                false
+            } else arena.moveCircle(f.x, f.y, f.radius, mx * speed * dt, my * speed * dt, tmp)
+            if (!f.inTempest) { f.x = tmp[0]; f.y = tmp[1] }
             if (len > 0.05f) f.walkCycle += hypot(f.x - f.prevX, f.y - f.prevY) * 3.2f
             if (!blocked && len < 0.05f) f.walkCycle = 0f
         }
@@ -639,6 +644,31 @@ class World(
     private fun stepTempest(f: Fighter, dt: Float) {
         f.tempestLeft -= dt
         if (f.tempestLeft <= 0f) { endTempest(f); return }
+        // Lightning: every so often a bolt comes down on (or near) the nearest enemy in reach.
+        f.tempestBolt -= dt
+        if (f.tempestBolt <= 0f) {
+            f.tempestBolt += Balance.TEMPEST_BOLT_SECONDS
+            var t: Fighter? = null
+            var best = Balance.TEMPEST_BOLT_RANGE
+            for (o in fighters) {
+                if (o.team == f.team || !o.alive || o.realm != f.realm || o.isLeaping || !isVisibleTo(o, f.team)) continue
+                val d = hypot(o.x - f.x, o.y - f.y)
+                if (d < best) { t = o; best = d }
+            }
+            if (t != null) {
+                val a = random.nextFloat() * 6.2832f
+                val off = random.nextFloat() * Balance.TEMPEST_BOLT_SCATTER
+                val bx = t.x + cos(a) * off
+                val by = t.y + sin(a) * off
+                events += GameEvent.TempestBolt(f.id, bx, by)
+                val hit = (f.superDamage * Balance.TEMPEST_BOLT_DAMAGE).toInt()
+                for (o in fighters) {
+                    if (o.team == f.team || !o.alive || o.realm != f.realm || o.isLeaping) continue
+                    if (hypot(o.x - bx, o.y - by) > Balance.TEMPEST_BOLT_RADIUS + o.radius) continue
+                    damage(o, f, hit, false, o.x, o.y, chargeShare = Balance.TEMPEST_CHARGE)
+                }
+            }
+        }
         f.tempestTick -= dt
         if (f.tempestTick > 0f) return
         f.tempestTick += Balance.TEMPEST_TICK_SECONDS
@@ -665,6 +695,12 @@ class World(
         events += GameEvent.Tempest(f.id, false)
         f.tempestLeft = 0f
         f.tempestTick = 0f
+        f.tempestBolt = 0f
+        // (She flew: she comes down on open ground.)
+        if (f.alive && arena.circleBlocked(f.x, f.y, f.radius)) {
+            val spot = arena.nearestOpen(f.x, f.y, f.radius)
+            f.x = spot.x; f.y = spot.y; f.prevX = f.x; f.prevY = f.y
+        }
     }
 
     /** The realm [id] opened is over: everyone in it is back in the arena, where they stood. */
@@ -841,6 +877,7 @@ class World(
                 if (!f.inTempest) events += GameEvent.Tempest(f.id, true)
                 f.tempestLeft = s.tempestSeconds
                 f.tempestTick = Balance.TEMPEST_TICK_SECONDS / 2f
+                f.tempestBolt = Balance.TEMPEST_BOLT_SECONDS / 2f
                 f.pending.clear()
             }
             // (With nobody on the line it takes nobody: a miss.)

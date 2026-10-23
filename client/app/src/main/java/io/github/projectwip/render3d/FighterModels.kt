@@ -63,9 +63,9 @@ class FighterModels {
     private val bossModels = HashMap<io.github.projectwip.data.BossKind, FighterModel>()
 
     init {
-        // (Swish took Spark's place, as Spark took Rocket's: both their models are kept. Spark's still stands in the
-        // Training Area as its dummies, swarm and sentry: see [FighterDef.sparkLook].)
+        // (Swish took Spark's place as the starter, as Spark took Rocket's; Rocket's model is kept.)
         models[FighterId.BYTE] = buildSwish()
+        models[FighterId.SPARK] = buildSpark()
         models[FighterId.BRAKK] = buildBrakk()
         models[FighterId.KIRA] = buildKira()
         models[FighterId.KITO] = buildKito()
@@ -77,8 +77,7 @@ class FighterModels {
 
     fun model(id: FighterId) = models.getValue(id)
     /** A fighter's model, or a boss's own. */
-    fun model(def: FighterDef) = def.boss?.let { bossModels.getValue(it) } ?: if (def.sparkLook) spark else models.getValue(def.id)
-    private val spark by lazy { buildSpark() }
+    fun model(def: FighterDef) = def.boss?.let { bossModels.getValue(it) } ?: models.getValue(def.id)
 
     // ------------------------------------------------------------------ construction helpers
 
@@ -173,7 +172,7 @@ class FighterModels {
         return a.build(rig)
     }
 
-    // ------------------------------------------------------------------ Spark — the Spark Drop that woke up (retired: the Training Area's targets)
+    // ------------------------------------------------------------------ Spark — the Spark Drop that woke up
 
     private fun buildSpark(): FighterModel {
         val a = Assembler()

@@ -1191,14 +1191,34 @@ class SimulationTest {
         assertTrue("and then she is herself again", !swish.inTempest)
     }
 
-    @Test fun swishIsTheFreeStarterAndShownAsLegendary() {
+    @Test fun swishsTempestBringsLightningDownOnEnemiesNearIt() {
+        val swish = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "S", false)
+        val tough = Balance.fighter(FighterId.BRAKK).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
+        val out = Fighter(1, tough, 1, 0, 1, "O", true)
+        val w = onOpenGround(swish, out)
+        // Outside the funnel, but in reach of its lightning.
+        out.x = swish.x + 3.5f; out.y = swish.y
+        swish.superCharge = 1f
+        swish.control.superAttack = true
+        var bolts = 0
+        seconds(w, 1.2f) { bolts += w.events.count { it is io.github.projectwip.sim.GameEvent.TempestBolt }; w.events.clear() }
+        assertTrue("lightning came down", bolts >= 1)
+        assertTrue("and hurt them, though the funnel never touched them", out.hp < out.maxHp)
+        assertTrue(w.events.none { it is io.github.projectwip.sim.GameEvent.TempestHit })
+    }
+
+    @Test fun swishIsTheFreeStarterAndSparkALegendaryOfHisOwn() {
         val def = Balance.fighter(FighterId.BYTE)
         assertEquals("Swish", def.name)
         assertEquals(io.github.projectwip.data.Rarity.LEGENDARY, def.rarity)
         assertEquals(null, Balance.unlockPrismPrice(FighterId.BYTE))
         assertTrue("not on the Spark Road", io.github.projectwip.data.SparkRoad.steps.none { it.fighter == FighterId.BYTE })
-        assertTrue("the Training Area's targets still look like Spark", Balance.dummy.sparkLook && Balance.mini.sparkLook && Balance.sentry.sparkLook)
-        assertEquals("and are made from him", "Spark", Balance.spark.name)
+        // Spark is a Legendary of his own, last on the road, and the Training Area's targets are still made from him.
+        assertEquals(Balance.spark, Balance.fighter(FighterId.SPARK))
+        assertEquals(io.github.projectwip.data.Rarity.LEGENDARY, Balance.spark.rarity)
+        assertEquals(FighterId.SPARK, io.github.projectwip.data.SparkRoad.steps.last().fighter)
+        assertEquals(160, Balance.unlockPrismPrice(FighterId.SPARK))
+        assertEquals(FighterId.SPARK, Balance.dummy.id)
     }
 
     @Test fun buddyMissesWhenThereIsNobodyOnTheLine() {
