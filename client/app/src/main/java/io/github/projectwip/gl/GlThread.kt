@@ -103,6 +103,9 @@ class GlThread(
         val egl = try { Egl(transparent) } catch (e: Exception) { Log.e(name, "EGL init failed", e); return }
         val surface = egl.windowSurface(nativeWindow)
         egl.makeCurrent(surface)
+        if (io.github.projectwip.net.CrashReporter.gpu.isBlank()) {
+            io.github.projectwip.net.CrashReporter.gpu = listOf(GLES30.GL_RENDERER, GLES30.GL_VERSION).joinToString(" / ") { GLES30.glGetString(it).orEmpty() }
+        }
         try {
             renderer.onCreated()
             var last = System.nanoTime()

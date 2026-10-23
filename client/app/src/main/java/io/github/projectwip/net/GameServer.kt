@@ -299,6 +299,8 @@ class GameServer(context: Context) : GameActions {
             BotProfile.overrides = emptyMap()
             return null
         }
+        // Crashes saved since the last time the server answered (any account, or none yet).
+        CrashReporter.sendPending { report -> call("POST", "/v1/crashes", report, auth = token != null)?.code }
         val state = ServerStatus(
             online = true, supported = info.optBoolean("supported", true), message = info.optString("message"),
             notice = info.optString("notice"), url = baseUrl, account = known,

@@ -246,6 +246,18 @@ class Api(unittest.TestCase):
         except urllib.error.HTTPError as e:
             return e.code, json.loads(e.read())
 
+    def test_crash_reports_are_logged_and_limited(self):
+        status, reply = self.call("POST", "/v1/crashes", {"report": "java.lang.IllegalStateException: boom", "version": "95",
+                                                          "device": "OPPO CPH2591", "android": "13", "gpu": "Mali-G52"}, version=None)
+        self.assertEqual((200, True), (status, reply["ok"]))
+        with open(os.path.join(self.dir, "logs", "crashes.log"), encoding="utf-8") as log:
+            text = log.read()
+        self.assertIn("IllegalStateException: boom", text)
+        self.assertIn("device: OPPO CPH2591", text)
+        for _ in range(20):
+            status, _ = self.call("POST", "/v1/crashes", {"report": "again"}, version=None)
+        self.assertEqual(429, status)
+
     def write_cfg(self, name, text):
         path = os.path.join(self.dir, name)
         with open(path, "w", encoding="utf-8") as f:

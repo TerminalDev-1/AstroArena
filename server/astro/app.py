@@ -27,6 +27,7 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/dev/deals/<id>/delete      take a deal out of the shop                           (token, developer)
     GET  /v1/leaderboard?limit=50       players by Cups
     GET  /v1/news                       the News tab's items (news.cfg)
+    POST /v1/crashes        {report, version, device}  a crash the game saved; appended to logs/crashes.log
 
 A token goes in the `Authorization: Bearer <token>` header, and every request with a token must also say which
 version of the game is asking (`X-Client-Version`); versions listed in versions_not_supported.cfg are refused.
@@ -63,6 +64,9 @@ _DEAL_DELETE = re.compile(r"^/v1/dev/deals/(\d+)/delete$")
 _DAILY_BUY = re.compile(r"^/v1/shop/daily/(\d+)/buy$")
 
 
+CRASHES_PER_HOUR = 10
+MAX_CRASH_CHARS = 32_000
+
 DISABLED = "This account has been disabled by the server's owner."
 
 
@@ -81,6 +85,38 @@ class Game:
         self.started = time.time()
         self._signups: dict[str, list[float]] = {}
         self._signup_lock = threading.Lock()
+        # Crash reports from devices, for the owner to read (gitignored with the rest of logs/).
+        self.crash_log = os.path.join(directory, "logs", "crashes.log")
+        self._crashes: dict[str, list[float]] = {}
+        self._crash_lock = threading.Lock()
+
+    def record_crash(self, address: str, player_id: str, data: dict) -> bool:
+        """Appends a device's crash report to the crash log. At most CRASHES_PER_HOUR from one address."""
+        now = time.time()
+        with self._crash_lock:
+            recent = [t for t in self._crashes.get(address, []) if now - t < 3600]
+            if len(recent) >= CRASHES_PER_HOUR:
+                self._crashes[address] = recent
+                return False
+            recent.append(now)
+            self._crashes[address] = recent
+            report = str(data.get("report") or "")[:MAX_CRASH_CHARS]
+            fields = {
+                "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
+                "player": player_id or "-",
+                "version": str(data.get("version") or "?")[:40],
+                "device": str(data.get("device") or "?")[:200],
+                "android": str(data.get("android") or "?")[:40],
+                "gpu": str(data.get("gpu") or "?")[:200],
+                "crashed": str(data.get("crashed") or "?")[:40],
+            }
+            os.makedirs(os.path.dirname(self.crash_log), exist_ok=True)
+            with open(self.crash_log, "a", encoding="utf-8") as log:
+                log.write("=" * 72 + "\n")
+                log.write("".join("%s: %s\n" % item for item in fields.items()))
+                log.write(report.rstrip() + "\n\n")
+        print("crash report from %s (%s)" % (fields["device"], fields["version"]), flush=True)
+        return True
 
     def may_sign_up(self, address: str) -> bool:
         """Limits how many accounts one address can create per hour."""
@@ -255,6 +291,17 @@ def make_handler(game: Game, quiet: bool = False):
                 if not game.may_sign_up(self.client_address[0]):
                     return self._error(429, "too many new accounts from this address; try again later")
                 return self._send(201, game.store.register(data.get("name"), str(data.get("version") or "")))
+            if url.path == "/v1/crashes":
+                data = self._body()
+                if data is None:
+                    return None
+                # No sign-in needed: a game can crash before it has an account. A token, if sent, names the player.
+                header = self.headers.get("Authorization") or ""
+                token = header[7:].strip() if header.startswith("Bearer ") else ""
+                player = game.store.player_for(token, (self.headers.get("X-Client-Version") or "").strip()) if token else None
+                if not game.record_crash(self.client_address[0], player["id"] if player else "", data):
+                    return self._error(429, "too many crash reports from this address; try again later")
+                return self._send(200, {"ok": True})
             if url.path == "/v1/matches":
                 return self._plan_match()
             m = _MATCH_RESULT.match(url.path)

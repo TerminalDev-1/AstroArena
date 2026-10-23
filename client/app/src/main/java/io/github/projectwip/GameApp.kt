@@ -11,6 +11,11 @@ class GameApp : Application() {
         const val OFFLINE_SAVE = "offline.json"
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        io.github.projectwip.net.CrashReporter.install(this)
+    }
+
     val repository: GameRepository by lazy { GameRepository(SaveStore(this), SaveStore(this, OFFLINE_SAVE)) }
     val server: io.github.projectwip.net.GameServer by lazy { io.github.projectwip.net.GameServer(this) }
 }
