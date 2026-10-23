@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX, STAR, STAR_BURST, ARROW, TEMPEST, TEMPEST_HIT, THUNDER,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX, STAR, STAR_BURST, ARROW, TEMPEST, TEMPEST_HIT, THUNDER, TEMPEST_WIND,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -41,6 +41,7 @@ object SfxSynth {
         Sound.TEMPEST -> tempestRise().finish(0.9f)
         Sound.TEMPEST_HIT -> tempestHit().finish(0.7f)
         Sound.THUNDER -> thunder().finish(0.9f)
+        Sound.TEMPEST_WIND -> tempestWind().finish(0.7f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -602,36 +603,45 @@ object SfxSynth {
         filter(Band.LOW, 0.8f) { 8000f }
     }
 
-    /** Swish becoming the storm: a crack of thunder, a rolling rumble, and wind winding up into a howl. */
-    private fun tempestRise() = Clip(1.4f).apply {
-        noise(211, 0f, 0.35f, Band.LOW, { glide(it, 0.3f, 5000f, 600f) }, 0.7f, { perc(it, 0.002f, 0.09f) * 0.8f })
-        osc(Wave.SAW, 0.02f, 1.2f, { t -> 46f + 6f * sin(t * TAU * 7f) }, { hold(it, 0.05f, 0.5f, 0.6f) * 0.32f })
-        noise(212, 0.05f, 1.3f, Band.BAND, { glide(it, 1.1f, 300f, 1500f) }, 5f, { hold(it, 0.4f, 0.55f, 0.35f) * 0.3f })
-        noise(213, 0.15f, 1.2f, Band.BAND, { t -> glide(t, 1f, 500f, 2300f) * (1f + 0.15f * sin(t * TAU * 3f)) }, 9f, { hold(it, 0.5f, 0.35f, 0.3f) * 0.18f })
-        for ((k, at) in floatArrayOf(0.08f, 0.5f, 0.86f).withIndex()) {
-            osc(Wave.SQUARE, at, 0.07f, { glide(it, 0.06f, 2200f - k * 300f, 300f) }, { perc(it, 0.001f, 0.02f) * 0.1f })
+    // Swish's storm is all air and weather, so it is made from shaped noise (as real wind and thunder are), with no
+    // tuned tones in it: the user found the first version's droning tones and zaps sounded fake.
+
+    /** Swish becoming the storm: air rushing in and winding up into a roaring, howling wind. */
+    private fun tempestRise() = Clip(1.7f).apply {
+        noise(241, 0f, 1.7f, Band.BAND, { glide(it, 1.2f, 160f, 850f) }, 1.1f, { hold(it, 0.35f, 0.85f, 0.5f) * 0.6f })
+        noise(242, 0.15f, 1.5f, Band.BAND, { t -> glide(t, 1.1f, 500f, 1900f) * (1f + 0.12f * sin(t * TAU * 2.7f)) }, 3.5f, { t -> hold(t, 0.4f, 0.7f, 0.4f) * (0.75f + 0.25f * sin(t * TAU * 3.3f)) * 0.22f })
+        noise(243, 0.05f, 1.6f, Band.LOW, { 140f }, 0.8f, { hold(it, 0.3f, 0.9f, 0.45f) * 0.4f })
+        noise(244, 0.3f, 1.3f, Band.HIGH, { 5200f }, 0.7f, { hold(it, 0.4f, 0.5f, 0.4f) * 0.07f })
+        echo(0.09f, 0.25f, 0.15f)
+    }
+
+    /** The tempest's wind, played over and over while it lasts: a gusting roar with a howl riding on it. */
+    private fun tempestWind() = Clip(1.3f).apply {
+        noise(251, 0f, 1.3f, Band.BAND, { t -> 380f + 160f * sin(t * TAU * 0.77f) + 60f * sin(t * TAU * 2.1f) }, 1.6f, { hold(it, 0.3f, 0.7f, 0.3f) * 0.5f })
+        noise(252, 0f, 1.3f, Band.BAND, { t -> 1050f + 320f * sin(t * TAU * 0.9f + 1f) }, 6f, { t -> hold(t, 0.35f, 0.6f, 0.35f) * (0.6f + 0.4f * sin(t * TAU * 1.7f)) * 0.14f })
+        noise(253, 0f, 1.3f, Band.LOW, { 150f }, 0.8f, { hold(it, 0.3f, 0.7f, 0.3f) * 0.32f })
+    }
+
+    /** A tempest's lightning bolt: a sharp crack and the tearing crackle of it, then thunder rolling away. */
+    private fun thunder() = Clip(1.8f).apply {
+        noise(231, 0f, 0.08f, Band.HIGH, { 1800f }, 0.7f, { perc(it, 0.0005f, 0.02f) * 1f })
+        val r = kotlin.random.Random(77)
+        for (k in 0 until 7) {
+            noise(260 + k, r.nextFloat() * 0.14f, 0.05f, Band.BAND, { 2200f + 900f * r.nextFloat() }, 1f, { perc(it, 0.0005f, 0.012f) * 0.45f })
         }
-        filter(Band.LOW, 0.8f) { 7000f }
-        echo(0.11f, 0.3f, 0.2f)
+        noise(232, 0.005f, 0.4f, Band.LOW, { glide(it, 0.3f, 3200f, 420f) }, 0.7f, { perc(it, 0.002f, 0.12f) * 0.8f })
+        noise(233, 0.06f, 1.7f, Band.LOW, { t -> 170f + 40f * sin(t * TAU * 1.3f) }, 0.7f, { t ->
+            val roll = 0.55f + 0.2f * sin(t * TAU * 2.3f) + 0.15f * sin(t * TAU * 3.7f + 1f) + 0.1f * sin(t * TAU * 5.1f + 2f)
+            hold(t, 0.08f, 0.45f, 1f) * roll * 0.75f
+        })
+        echo(0.14f, 0.3f, 0.2f)
     }
 
-    /** A tempest's lightning bolt: a hard crack right on top of you, and thunder rolling away under it. */
-    private fun thunder() = Clip(1.1f).apply {
-        noise(231, 0f, 0.12f, Band.HIGH, { 2600f }, 0.7f, { perc(it, 0.0005f, 0.03f) * 0.9f })
-        noise(232, 0.005f, 0.3f, Band.LOW, { glide(it, 0.25f, 6000f, 900f) }, 0.7f, { perc(it, 0.002f, 0.07f) * 0.7f })
-        noise(233, 0.04f, 1.05f, Band.LOW, { t -> 260f + 80f * sin(t * TAU * 5f) }, 0.9f, { t -> hold(t, 0.06f, 0.35f, 0.6f) * (0.7f + 0.3f * sin(t * TAU * 9f)) * 0.55f })
-        osc(Wave.SAW, 0.02f, 0.9f, { glide(it, 0.8f, 70f, 38f) }, { hold(it, 0.03f, 0.25f, 0.55f) * 0.3f })
-        osc(Wave.SQUARE, 0f, 0.06f, { glide(it, 0.05f, 3000f, 500f) }, { perc(it, 0.0005f, 0.015f) * 0.15f })
-        filter(Band.LOW, 0.8f) { 8000f }
-        echo(0.13f, 0.3f, 0.22f)
-    }
-
-    /** The storm striking someone: a short electric zap and a crackle. */
-    private fun tempestHit() = Clip(0.3f).apply {
-        osc(Wave.SQUARE, 0f, 0.12f, { glide(it, 0.1f, 1900f, 280f) }, { perc(it, 0.001f, 0.035f) * 0.22f })
-        noise(221, 0f, 0.2f, Band.HIGH, { 4200f }, 0.9f, { t -> perc(t, 0.001f, 0.05f) * (0.6f + 0.4f * sin(t * TAU * 90f)) * 0.3f })
-        osc(Wave.SINE, 0f, 0.18f, { glide(it, 0.15f, 120f, 60f) }, { perc(it, 0.002f, 0.06f) * 0.3f })
-        filter(Band.LOW, 0.8f) { 9000f }
+    /** The tempest hitting someone: a gust slamming into them, a thump, and grit. */
+    private fun tempestHit() = Clip(0.4f).apply {
+        noise(221, 0f, 0.3f, Band.BAND, { glide(it, 0.2f, 1100f, 280f) }, 1f, { perc(it, 0.003f, 0.08f) * 0.6f })
+        noise(222, 0f, 0.15f, Band.HIGH, { 3200f }, 0.8f, { perc(it, 0.002f, 0.04f) * 0.22f })
+        osc(Wave.SINE, 0f, 0.2f, { glide(it, 0.15f, 95f, 50f) }, { perc(it, 0.003f, 0.06f) * 0.35f })
     }
 
     private fun starBurst() = Clip(0.45f).apply {

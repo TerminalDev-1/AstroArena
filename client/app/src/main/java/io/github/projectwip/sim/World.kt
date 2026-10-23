@@ -678,7 +678,8 @@ class World(
             val ox = o.x - f.x
             val oy = o.y - f.y
             val d = hypot(ox, oy)
-            if (d > s.radius + o.radius) continue
+            // (Anyone the funnel touches: its foot reaches the super's radius out past her own edge.)
+            if (d > s.radius + f.radius + o.radius) continue
             // (Counted like the realm's strikes, as hits that charge the super, but only by a small share of one.)
             damage(o, f, f.superDamage, false, o.x, o.y, chargeShare = Balance.TEMPEST_CHARGE)
             events += GameEvent.TempestHit(f.id, o.id, o.x, o.y)

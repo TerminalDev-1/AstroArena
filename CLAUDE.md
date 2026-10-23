@@ -55,9 +55,13 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (`SuperSpec.tempestSeconds`) she is the tornado (her model is hidden): she flies over walls and water at
   `TEMPEST_SPEED` (set down on open ground when it ends), can't shoot, every `TEMPEST_TICK_SECONDS` strikes everyone
   under the funnel's wide top (`SuperSpec.radius`) and flings them out, and brings lightning down on the nearest enemy
-  in reach (`TEMPEST_BOLT_*`, `GameEvent.TempestBolt`, `Sound.THUNDER`). It is drawn in `MatchRenderer` as a dark,
-  bending funnel with streaks, a churning ring of thundercloud round an open, glowing eye, and jagged bolts (flat
-  colour: that pass is unlit; the user called a first version, a stack of see-through rings, terrible). She can recharge the super
+  in reach (`TEMPEST_BOLT_*`, `GameEvent.TempestBolt`, `Sound.THUNDER`). It is drawn in `MatchRenderer` as one wide,
+  solid, bending whirlwind whose foot is exactly the ground it strikes (`SuperSpec.radius` past her own edge: the
+  user didn't want a thin tornado inside a bigger damage circle), with streaks, a churning ring of thundercloud
+  round its open top, and jagged bolts (flat colour: that pass is unlit; the user called a first version, a stack of
+  see-through rings, terrible). Its sounds are shaped noise only, no tuned tones (the user found droning tones and
+  zaps fake): `Sound.TEMPEST` (rising roar), `TEMPEST_WIND` (replayed every second while it lasts, from `MatchRunner`),
+  `TEMPEST_HIT` and `THUNDER`. She can recharge the super
   during it, as the user asked, with a much lower charge rate to pay for it: her arrows charge 0.1 a hit, and the
   tempest's strikes only `TEMPEST_CHARGE` of that; a full super mid-tempest starts it over. ("Tempest" in the code,
   because the free-for-all already has a Static Storm.) Her name, look and words are ours.

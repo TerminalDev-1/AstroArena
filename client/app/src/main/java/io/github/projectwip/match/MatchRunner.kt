@@ -87,6 +87,9 @@ class MatchRunner(
         return acc / Match.STEP
     }
 
+    /** Until the tempest's wind is played again. */
+    private var windLeft = 0f
+
     private fun tick() {
         val p = match.player
         controls.superReady = p.superReady && p.alive
@@ -191,6 +194,17 @@ class MatchRunner(
             feedback(e)
         }
         match.world.events.clear()
+
+        // A tempest's wind howls for as long as it lasts, louder the closer it is.
+        val storm = match.world.fighters.filter { it.alive && it.inTempest && it.realm == p.realm }
+            .minByOrNull { hypot(it.x - p.x, it.y - p.y) }
+        if (storm != null) {
+            windLeft -= Match.STEP
+            if (windLeft <= 0f) {
+                windLeft += 1.0f
+                sfx.play(Sound.TEMPEST_WIND, (if (storm.id == p.id) 0.8f else 0.6f) / (1f + hypot(storm.x - p.x, storm.y - p.y) * 0.15f), 0.95f + (storm.tempestLeft % 0.1f))
+            }
+        } else windLeft = 0.5f
 
         if (match.isOver && match.overFor > 2.8f && !finished) {
             finished = true

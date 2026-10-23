@@ -834,9 +834,10 @@ class MatchRenderer(
                 particles.spawn(f.x + cos(a) * r, 0.1f, f.y + sin(a) * r, -cos(a) * 1.2f, 1.5f + rng.nextFloat() * 1.5f, -sin(a) * 1.2f, 0.5f, 0.14f, 0xFFB98CFF.toInt(), 0.9f)
             }
         }
-        // A tempest: she is the tornado. A tall dark funnel, tight at the ground and wide at the top, bending as it goes
-        // and leaning back from where it is heading, with pale streaks whipping round it, dust torn up at its foot,
-        // lightning flickering inside it, and a ring on the ground as far as it strikes.
+        // A tempest: she is the tornado. One wide dark whirlwind whose foot covers exactly the ground it strikes (the
+        // user wanted no tornado inside a bigger circle: what it touches is what it hits), flaring a little toward the top,
+        // bending as it goes and leaning back from where it is heading, with pale streaks whipping round it, dust torn
+        // up at its foot, and lightning flickering inside it.
         for (f in world.fighters) {
             if (!f.alive || !f.inTempest || f.realm != p.realm) continue
             val fx = lerp(f.prevX, f.x, alpha)
@@ -847,14 +848,11 @@ class MatchRenderer(
             val grow = ((f.def.superSpec.tempestSeconds - f.tempestLeft) / 0.35f).coerceIn(0f, 1f)
             val fade = (f.tempestLeft / 0.4f).coerceIn(0f, 1f)
             val k0 = grow * fade
-            if (mine) lit.v4("uTint", 0.45f, 0.8f, 1f, 0.16f * k0) else lit.v4("uTint", 1f, 0.3f, 0.25f, 0.18f * k0)
+            // (Its shadow on the ground is its own foot, tinted for whose side it is on.)
+            if (mine) lit.v4("uTint", 0.2f, 0.3f, 0.45f, 0.35f * k0) else lit.v4("uTint", 0.45f, 0.12f, 0.12f, 0.4f * k0)
             setModel(fx, 0.046f, fz, reach, 1f, reach); sector(360f).draw()
-            if (mine) lit.v4("uTint", 0.6f, 0.9f, 1f, 0.75f * k0) else lit.v4("uTint", 1f, 0.4f, 0.3f, 0.8f * k0)
-            setModel(fx, 0.052f, fz, reach, 1f, reach, -time * 400f); ring.draw()
-            lit.v4("uTint", 0.1f, 0.1f, 0.16f, 0.35f * k0)
-            setModel(fx, 0.049f, fz, reach * 0.55f, 1f, reach * 0.55f); sector(360f).draw()
-            val height = 3.8f * k0
-            val top = reach * 1.15f
+            val height = 3.4f * k0
+            val top = reach * 1.35f
             // (The cloud lights up from inside when lightning goes.)
             val lastBolt = tempestBolts.lastOrNull { it[6].toInt() == f.id }
             val flick = ((time * 4.1f + f.id * 0.37f) % 1f)
@@ -864,22 +862,18 @@ class MatchRenderer(
             for (k in 0 until segs) {
                 val u = (k + 0.5f) / segs
                 val y = 0.05f + u * height
-                val r = (0.22f + top * u * kotlin.math.sqrt(u)) * (0.75f + 0.25f * k0)
-                val bend = 0.35f * u * u
+                val r = (reach + (top - reach) * u * kotlin.math.sqrt(u)) * (0.6f + 0.4f * k0)
+                val bend = 0.4f * u * u
                 val cx = fx + sin(time * 2.3f + u * 2.8f) * bend - f.vx * lean * u
                 val cz = fz + cos(time * 1.9f + u * 2.4f) * bend - f.vy * lean * u
                 val h = height / segs * 1.7f
-                // Shells: dark storm cloud outside (darker the higher it goes), dusty air inside, a glow in the eye.
-                val dark = 0.34f - 0.16f * u + 0.25f * flash
-                lit.v4("uTint", dark, dark * 1.04f, dark * 1.3f, 0.88f * k0)
+                // One wall of storm cloud, dusty at the foot and darker the higher it goes, lighting up with the lightning.
+                val dark = 0.42f - 0.22f * u + 0.25f * flash
+                lit.v4("uTint", dark * 1.05f, dark, dark * 1.15f, k0)
                 setModel(cx, y, cz, r, h, r, time * 900f); funnel.draw()
-                lit.v4("uTint", 0.62f, 0.6f, 0.62f, 0.45f * k0)
-                setModel(cx, y, cz, r * 0.82f, h, r * 0.82f, -time * 1200f); funnel.draw()
-                tint(skin.accent, 0.3f * k0)
-                setModel(cx, y, cz, r * 0.38f, h, r * 0.38f); funnel.draw()
                 // Streaks whipping round it, fast.
-                for (st in 0 until 4) {
-                    val a = time * 15f + k * 0.85f + st * 1.5708f
+                for (st in 0 until 5) {
+                    val a = time * 15f + k * 0.85f + st * 1.2566f
                     val rr = r * 1.04f
                     lit.v4("uTint", 0.86f, 0.9f, 1f, 0.75f * k0)
                     setModel(cx + cos(a) * rr, y + 0.05f * sin(a * 2f), cz + sin(a) * rr, 0.42f * r + 0.12f, 0.05f, 0.07f,
@@ -919,7 +913,7 @@ class MatchRenderer(
             // Dust torn up at its foot, cloud flung off its top, and sparks in the wind.
             for (n in 0 until 2) {
                 val a = rng.nextFloat() * 6.28f
-                particles.spawn(fx + cos(a) * 0.5f, 0.1f, fz + sin(a) * 0.5f, -sin(a) * 5f + cos(a) * 1.5f, 0.8f + rng.nextFloat(), cos(a) * 5f + sin(a) * 1.5f, 0.45f, 0.16f, 0xFFB9B39F.toInt(), 0.75f)
+                particles.spawn(fx + cos(a) * reach, 0.1f, fz + sin(a) * reach, -sin(a) * 5f + cos(a) * 1.5f, 0.8f + rng.nextFloat(), cos(a) * 5f + sin(a) * 1.5f, 0.45f, 0.16f, 0xFFB9B39F.toInt(), 0.75f)
             }
             if (rng.nextFloat() < 0.7f) {
                 val a = rng.nextFloat() * 6.28f
@@ -928,7 +922,7 @@ class MatchRenderer(
             if (rng.nextFloat() < 0.5f) {
                 val a = rng.nextFloat() * 6.28f
                 val uu = rng.nextFloat()
-                val rr = 0.22f + top * uu * kotlin.math.sqrt(uu)
+                val rr = reach + (top - reach) * uu * kotlin.math.sqrt(uu)
                 particles.spawn(fx + cos(a) * rr, uu * height, fz + sin(a) * rr, -sin(a) * 6f, 1f, cos(a) * 6f, 0.3f, 0.1f, skin.accent.toInt(), 1f)
             }
         }
