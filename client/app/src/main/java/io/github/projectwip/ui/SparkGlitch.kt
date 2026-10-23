@@ -49,6 +49,9 @@ internal fun hash(x: Float): Float {
     return s - floor(s)
 }
 
+/** Spark's glitch was his alone: off since Swish took his place (build 96). The code is kept in case he comes back. */
+const val SPARK_GLITCH_ON = false
+
 /** Keeps a [SparkGlitch] running: it fades in while [active] says Spark is on screen, and out when he isn't. */
 @Composable
 fun rememberSparkGlitch(active: () -> Boolean): SparkGlitch {

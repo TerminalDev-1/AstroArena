@@ -860,7 +860,7 @@ class SimulationTest {
     )
 
     @Test fun sparkLobsAStarThatBurstsWhereItLandsAndSlowsEveryoneInItForTwoSeconds() {
-        val spark = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "S", false)
+        val spark = Fighter(7, Balance.spark, 1, 0, 0, "S", false)
         val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
         val far = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "F", true)
         val w = onOpenGround(spark, near, far)
@@ -895,7 +895,7 @@ class SimulationTest {
     }
 
     @Test fun aStraightShotThatSlowsStillSlowsWhoeverItHits() {
-        val def = Balance.fighter(FighterId.BYTE).let { it.copy(attack = it.attack.copy(shape = io.github.projectwip.data.AttackShape.LANCE, blast = 0f)) }
+        val def = Balance.spark.let { it.copy(attack = it.attack.copy(shape = io.github.projectwip.data.AttackShape.LANCE, blast = 0f)) }
         val shooter = Fighter(7, def, 1, 0, 0, "S", false)
         val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
         val w = onOpenGround(shooter, near)
@@ -909,7 +909,7 @@ class SimulationTest {
 
     @Test fun sparksRealmHasFourShadowsThatStrikeInTurnEachOnceASecond() {
         val tough = Balance.fighter(FighterId.BRAKK).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
-        val spark = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "S", false)
+        val spark = Fighter(7, Balance.spark, 1, 0, 0, "S", false)
         val near = Fighter(1, tough, 1, 0, 1, "N", true)
         val w = onOpenGround(spark, near)
         assertEquals(4, spark.def.superSpec.shadows)
@@ -938,7 +938,7 @@ class SimulationTest {
     }
 
     @Test fun sparksCaptiveCanMoveAndFightBackAQuarterSlowerAndSofter() {
-        val tough = Balance.fighter(FighterId.BYTE).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
+        val tough = Balance.spark.copy(health = io.github.projectwip.data.StatLine(100_000, 0))
         val spark = Fighter(7, tough, 1, 0, 0, "S", false)
         val kito = Fighter(1, Balance.fighter(FighterId.KITO), 1, 0, 1, "K", true)
         val w = onOpenGround(spark, kito)
@@ -1100,17 +1100,105 @@ class SimulationTest {
         assertEquals("while the realm's rockets land", boss.maxHp - 11 * rocket.superDamage, boss.hp)
     }
 
-    @Test fun botsCanPlaySparkThroughAWholeMatch() {
+    @Test fun botsCanPlaySwishThroughAWholeMatch() {
         val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 33L))
+        assertEquals("Swish", m.player.def.name)
         var t = 0f
-        var realms = 0
+        var tempests = 0
         while (m.world.phase != Phase.ENDED && t < 200f) {
             m.step(Match.STEP); t += Match.STEP
-            realms += m.world.events.count { it is io.github.projectwip.sim.GameEvent.Realm && it.open }
+            tempests += m.world.events.count { it is io.github.projectwip.sim.GameEvent.Tempest && it.on }
             m.world.events.clear()
         }
-        println("Spark bot: ${m.player.kos} KOs, ${m.player.deaths} deaths, ${m.player.damageDealt} damage, $realms realms")
-        assertTrue("a bot playing Spark throws stars and opens realms", m.player.damageDealt > 0 && realms > 0)
+        println("Swish bot: ${m.player.kos} KOs, ${m.player.deaths} deaths, ${m.player.damageDealt} damage, $tempests tempests")
+        assertTrue("a bot playing Swish looses arrows and raises tempests", m.player.damageDealt > 0 && tempests > 0)
+    }
+
+    @Test fun swishsArrowHomesInALittleOnWhoeverIsAheadOfIt() {
+        fun shoot(homing: Boolean): Fighter {
+            val def = Balance.fighter(FighterId.BYTE).let { if (homing) it else it.copy(attack = it.attack.copy(homing = 0f)) }
+            val swish = Fighter(7, def, 1, 0, 0, "S", false)
+            val tough = Balance.fighter(FighterId.BRAKK).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
+            val off = Fighter(1, tough, 1, 0, 1, "O", true)
+            val w = onOpenGround(swish, off)
+            // Six tiles ahead and a little to the side: a straight arrow goes past.
+            off.x = swish.x + 6f; off.y = swish.y + 0.8f
+            swish.control.aimX = 1f; swish.control.aimY = 0f; swish.control.attack = true
+            seconds(w, 0.8f)
+            return off
+        }
+        assertEquals(io.github.projectwip.data.AttackShape.ARROW, Balance.fighter(FighterId.BYTE).attack.shape)
+        assertEquals("1,700 an arrow at level 1", 1700, Balance.fighter(FighterId.BYTE).attackDamage.at(1))
+        val straight = shoot(false)
+        assertEquals("without homing it misses", straight.maxHp, straight.hp)
+        val homed = shoot(true)
+        assertEquals("with it, the arrow finds them", homed.maxHp - Balance.fighter(FighterId.BYTE).attackDamage.at(1, player = true), homed.hp)
+    }
+
+    @Test fun swishsArrowNeverTurnsBackForSomeoneBehindIt() {
+        val swish = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "S", false)
+        val behind = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "B", true)
+        val w = onOpenGround(swish, behind)
+        swish.x += 3f
+        behind.x = swish.x - 1.5f; behind.y = swish.y
+        swish.control.aimX = 1f; swish.control.aimY = 0f; swish.control.attack = true
+        seconds(w, 1f)
+        assertEquals(behind.maxHp, behind.hp)
+    }
+
+    @Test fun swishBecomesATempestForTwelveSecondsThatStrikesAndFlingsAndSlowlyRecharges() {
+        val swish = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "S", false)
+        val tough = Balance.fighter(FighterId.BRAKK).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
+        val near = Fighter(1, tough, 1, 0, 1, "N", true)
+        val w = onOpenGround(swish, near)
+        near.x = swish.x + 1.2f; near.y = swish.y
+        assertEquals(io.github.projectwip.data.SuperKind.TEMPEST, swish.def.superSpec.kind)
+        assertEquals(12f, swish.def.superSpec.tempestSeconds)
+        swish.superCharge = 1f
+        swish.control.superAttack = true
+        w.step(Match.STEP)
+        assertTrue("she is the storm", swish.inTempest)
+        assertTrue(w.events.any { it is io.github.projectwip.sim.GameEvent.Tempest && it.on })
+        w.events.clear()
+        // The first strike comes a quarter of a second in: it hurts, flings them out, and charges the super a little.
+        val x0 = near.x
+        seconds(w, 0.3f)
+        assertEquals("struck once", near.maxHp - swish.superDamage, near.hp)
+        assertTrue("and flung away from her", near.x - x0 > 1f)
+        assertEquals("a strike barely charges her super", swish.def.superChargePerHit * Balance.TEMPEST_CHARGE, swish.superCharge, 0.0001f)
+        // She can't shoot while she is the storm.
+        val ammo = swish.ammo
+        swish.control.aimX = 1f; swish.control.aimY = 0f; swish.control.attack = true
+        w.step(Match.STEP)
+        assertTrue("no arrow", w.projectiles.isEmpty())
+        assertEquals(ammo, swish.ammo, 0.01f)
+        // She moves a little faster than she walks.
+        val sx = swish.x
+        // (Forward: the test ground is only sure to be open ahead of her.)
+        swish.control.moveX = 1f; swish.control.moveY = 0f
+        seconds(w, 0.5f) { swish.control.moveX = 1f; swish.control.moveY = 0f }
+        assertEquals(swish.def.moveSpeed * Balance.TEMPEST_SPEED * 0.5f, swish.x - sx, 0.12f)
+        swish.control.moveX = 0f
+        // A full super in the middle of one starts it over.
+        seconds(w, 5f)
+        swish.superCharge = 1f
+        swish.control.superAttack = true
+        w.step(Match.STEP)
+        assertEquals(12f, swish.tempestLeft, 0.05f)
+        seconds(w, 11.9f)
+        assertTrue("still going", swish.inTempest)
+        seconds(w, 0.2f)
+        assertTrue("and then she is herself again", !swish.inTempest)
+    }
+
+    @Test fun swishIsTheFreeStarterAndShownAsLegendary() {
+        val def = Balance.fighter(FighterId.BYTE)
+        assertEquals("Swish", def.name)
+        assertEquals(io.github.projectwip.data.Rarity.LEGENDARY, def.rarity)
+        assertEquals(null, Balance.unlockPrismPrice(FighterId.BYTE))
+        assertTrue("not on the Spark Road", io.github.projectwip.data.SparkRoad.steps.none { it.fighter == FighterId.BYTE })
+        assertTrue("the Training Area's targets still look like Spark", Balance.dummy.sparkLook && Balance.mini.sparkLook && Balance.sentry.sparkLook)
+        assertEquals("and are made from him", "Spark", Balance.spark.name)
     }
 
     @Test fun buddyMissesWhenThereIsNobodyOnTheLine() {

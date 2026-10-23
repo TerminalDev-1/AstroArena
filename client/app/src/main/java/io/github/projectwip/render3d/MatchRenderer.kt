@@ -518,6 +518,12 @@ class MatchRenderer(
             val t = (time - at) / HAMMER_LEAP
             if (t in 0f..1f) { anim.jump = sin(t * 3.1416f) * 0.9f; anim.swing = t; anim.spin = -30f * sin(t * 3.1416f) }
         }
+        // In the eye of her tempest: lifted a little off the ground and turning fast.
+        if (f.inTempest) {
+            anim.spin = (time * 720f + i * 40f) % 360f
+            anim.jump = 0.35f + 0.08f * sin(time * 6f + i)
+            anim.moving = 0f
+        }
         anim.scale = FIGHTER_SCALE * f.scale
     }
 
@@ -798,6 +804,61 @@ class MatchRenderer(
                 particles.spawn(f.x + cos(a) * r, 0.1f, f.y + sin(a) * r, -cos(a) * 1.2f, 1.5f + rng.nextFloat() * 1.5f, -sin(a) * 1.2f, 0.5f, 0.14f, 0xFFB98CFF.toInt(), 0.9f)
             }
         }
+        // A tempest: a funnel of storm cloud turning round her, wide at the top and tight at the ground, with lightning
+        // flickering in it and a ring on the ground as far as it strikes.
+        for (f in world.fighters) {
+            if (!f.alive || !f.inTempest || f.realm != p.realm) continue
+            val fx = lerp(f.prevX, f.x, alpha)
+            val fz = lerp(f.prevY, f.y, alpha)
+            val reach = f.def.superSpec.radius + f.radius
+            val skin = f.def.skins.getOrElse(f.skin) { f.def.skins[0] }
+            val mine = f.team == p.team
+            if (mine) lit.v4("uTint", 0.5f, 0.85f, 1f, 0.12f) else lit.v4("uTint", 1f, 0.3f, 0.25f, 0.14f)
+            setModel(fx, 0.046f, fz, reach, 1f, reach); sector(360f).draw()
+            if (mine) lit.v4("uTint", 0.6f, 0.9f, 1f, 0.6f) else lit.v4("uTint", 1f, 0.4f, 0.3f, 0.65f)
+            setModel(fx, 0.052f, fz, reach, 1f, reach, -time * 260f); thinRing.draw()
+            val rings = 11
+            for (j in 0 until rings) {
+                val u = j / (rings - 1f)
+                val y = 0.15f + u * 2.6f
+                val r = 0.3f + (reach * 1.1f) * u * u + 0.12f * sin(time * 9f + j)
+                val sway = 0.18f * u
+                val cx = fx + cos(time * 3.1f + j * 0.6f) * sway
+                val cz = fz + sin(time * 2.7f + j * 0.6f) * sway
+                val c = (0.55f + 0.25f * u)
+                lit.v4("uTint", c * 0.85f, c * 0.85f, c, 0.28f + 0.2f * (1f - u))
+                setModel(cx, y, cz, r, 1f, r, time * (520f - j * 25f) + j * 33f); ring.draw()
+                tint(skin.accent, 0.35f)
+                setModel(cx, y + 0.06f, cz, r * 0.82f, 1f, r * 0.82f, -time * 380f + j * 50f); thinRing.draw()
+            }
+            // Lightning: now and then a jagged bolt runs down through the funnel.
+            val flash = ((time * 3.3f + f.id * 0.37f) % 1f)
+            if (flash < 0.18f) {
+                lit.i("uMode", 0)
+                lit.f("uEmissive", 1f)
+                tint(skin.accent)
+                var lx = fx; var lz = fz; var ly = 2.8f
+                val seed = (time * 3.3f).toInt() * 31 + f.id
+                for (k in 0 until 5) {
+                    val ang = ((seed * 7919 + k * 104729) % 628) / 100f
+                    val nx = fx + cos(ang) * 0.45f * (1f - k / 5f)
+                    val nz = fz + sin(ang) * 0.45f * (1f - k / 5f)
+                    val ny = ly - 0.55f
+                    val seg = hypot(nx - lx, nz - lz).coerceAtLeast(0.01f)
+                    val yaw = -Math.toDegrees(atan2((nz - lz).toDouble(), (nx - lx).toDouble())).toFloat()
+                    setModel((lx + nx) / 2f, (ly + ny) / 2f, (lz + nz) / 2f, seg + 0.05f, 0.6f, 0.05f, yaw); bit.draw()
+                    lx = nx; lz = nz; ly = ny
+                }
+                lit.f("uEmissive", 0f)
+                lit.i("uMode", 1)
+            }
+            if (rng.nextFloat() < 0.6f) {
+                val a = rng.nextFloat() * 6.28f
+                val h = rng.nextFloat() * 2.4f
+                val rr = 0.3f + reach * (h / 2.6f) * (h / 2.6f)
+                particles.spawn(fx + cos(a) * rr, 0.15f + h, fz + sin(a) * rr, -sin(a) * 3f, 0.6f, cos(a) * 3f, 0.4f, 0.12f, skin.accent.toInt(), 0.9f)
+            }
+        }
         // And from inside: rings of light run out from under the captive, across the dark floor.
         if (p.inRealm) for (f in world.fighters) {
             if (!f.alive || !f.captive || f.realm != p.realm) continue
@@ -882,6 +943,12 @@ class MatchRenderer(
                                 tint(2); setModel(tx, 0.056f, tz, r, 1f, r); ring.draw()
                             }
                         }
+                        // The tempest needs no aim: it is a ring round her, as far as it reaches.
+                        SuperKind.TEMPEST -> {
+                            lit.v4("uTint", 0.5f, 0.85f, 1f, 0.18f + 0.1f * pulse)
+                            setModel(px, 0.05f, pz, s.radius + p.radius, 1f, s.radius + p.radius); sector(360f).draw()
+                            tint(2); setModel(px, 0.056f, pz, s.radius + p.radius, 1f, s.radius + p.radius, time * 120f); ring.draw()
+                        }
                         SuperKind.SWARM, SuperKind.BREW -> {
                             // The rockets go up and come down: an arc from the fighter, up and over, to one big
                             // circle where they will land. How far the stick is pushed is how far away that is.
@@ -935,7 +1002,7 @@ class MatchRenderer(
         if (t != null || runner.autoCrate >= 0) {
             val ax = if (t != null) lerp(t.prevX, t.x, alpha) else runner.autoCrate % world.arena.width + 0.5f
             val az = if (t != null) lerp(t.prevY, t.y, alpha) else runner.autoCrate / world.arena.width + 0.5f
-            val ay = if (t != null) headHeight(t.def.id) * t.scale + 0.9f else 1.7f
+            val ay = if (t != null) headHeight(t.def) * t.scale + 0.9f else 1.7f
             lit.i("uMode", 0)
             lit.f("uEmissive", 0.7f)
             lit.v4("uTint", 1f, 0.8f, 0.2f, 1f)
@@ -967,7 +1034,7 @@ class MatchRenderer(
             val page = age % 0.9f
             val x = lerp(victim.prevX, victim.x, alpha)
             val z = lerp(victim.prevY, victim.y, alpha)
-            val y = (headHeight(victim.def.id) * victim.scale + 1.25f) + 0.05f * sin(age * 9f)
+            val y = (headHeight(victim.def) * victim.scale + 1.25f) + 0.05f * sin(age * 9f)
             val sk = coder.def.skins[coder.skin]
             tint(0xFF0A1420)
             setModel(x, y, z, 1.25f * open, 0.8f * open, 0.08f); bit.draw()
@@ -1035,6 +1102,23 @@ class MatchRenderer(
                     setModel(x, y - size * 0.73f, z, size * 0.7f, size * 0.08f, size * 0.45f, spin); bit.draw()
                     tint(0xFF8C95B4)
                     setModel(x, y - size * 0.95f, z, size * 1.05f, size * 0.07f, size * 0.36f, spin + 35f); bit.draw()
+                }
+                ShotStyle.ARROW -> {
+                    // A giant arrow: a long shaft, fletching at the back, and a cut diamond for a tip, glinting as
+                    // it turns toward whoever it is after.
+                    val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
+                    val dx = pr.vx / len; val dz = pr.vy / len
+                    val y = 0.85f
+                    tint(skin.secondary)
+                    setModel(x - dx * 0.25f, y, z - dz * 0.25f, 1.15f, 0.06f, 0.06f, yaw); bit.draw()
+                    tint(skin.primary)
+                    for (k in 0 until 2) for (up in floatArrayOf(0.06f, -0.06f)) {
+                        setModel(x - dx * (0.72f + k * 0.14f), y + up, z - dz * (0.72f + k * 0.14f), 0.13f, 0.11f, 0.02f, yaw); bit.draw()
+                    }
+                    lit.f("uEmissive", 0.6f)
+                    tint(skin.accent)
+                    setModel(x + dx * 0.42f, y, z + dz * 0.42f, 0.24f, 0.15f, 0.15f, yaw); octa.draw()
+                    lit.f("uEmissive", 0f)
                 }
                 ShotStyle.STAR -> {
                     // A spite star: a puffy star spinning end over end as it flies, with a trail of little ones
@@ -1605,7 +1689,7 @@ class MatchRenderer(
             val vis = shown(f)
             var onScreen = false
             if (vis) {
-                v4[0] = lerp(f.prevX, f.x, alpha); v4[1] = headHeight(f.def.id) * f.scale; v4[2] = lerp(f.prevY, f.y, alpha); v4[3] = 1f
+                v4[0] = lerp(f.prevX, f.x, alpha); v4[1] = headHeight(f.def) * f.scale; v4[2] = lerp(f.prevY, f.y, alpha); v4[3] = 1f
                 Matrix.multiplyMV(o4, 0, viewProj, 0, v4, 0)
                 if (o4[3] > 0f) {
                     s.sx[i] = (o4[0] / o4[3] * 0.5f + 0.5f) * width
@@ -1625,8 +1709,9 @@ class MatchRenderer(
         hud.publish()
     }
 
+    private fun headHeight(def: io.github.projectwip.data.FighterDef) = if (def.sparkLook) FIGHTER_SCALE * 1.85f else headHeight(def.id)
     private fun headHeight(id: FighterId) = FIGHTER_SCALE * when (id) {
-        FighterId.BYTE -> 1.85f
+        FighterId.BYTE -> 2.05f
         FighterId.BRAKK -> 1.6f
         FighterId.KIRA -> 2.25f
         FighterId.KITO -> 1.9f

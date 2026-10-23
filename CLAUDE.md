@@ -39,10 +39,26 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 - `sim/`, `ai/`, `data/` and `audio/SfxSynth.kt` are pure Kotlin (no Android imports); they run in JVM tests.
 - Humans and bots drive fighters through the same `Control`. Visibility goes through `World.isVisibleTo`.
-- The starter fighter is Spark. The code, the server and the saves still call him `BYTE` (`FighterId.BYTE`,
-  `STARTING_FIGHTER`): Byte was removed, then Rocket took her place, and then Rocket was retired by the user's
-  decision (build 89) and Spark took hers, each time keeping the id, so whoever had Rocket has Spark at the same level
-  (nothing was paid back for her, by the user's decision). Don't bring Byte or Juno back, or Rocket unless the user asks. Spark is the user's
+- The starter fighter is Swish (since build 96, by the user's decision: "a god fighter in place of Spark"). The code,
+  the server and the saves still call her `BYTE` (`FighterId.BYTE`, `STARTING_FIGHTER`): Byte was removed, then Rocket
+  took her place, then Spark took Rocket's (build 89), and then Swish took Spark's, each time keeping the id, so whoever
+  had Spark has Swish at the same level. She is Legendary and still free (never on the Spark Road, no CPU Chip price).
+  Swish is a girl, a storm goddess with long silver hair, a tiara set with a diamond, a little thundercloud beside her
+  and a giant bow (`FighterModels.buildSwish`). Her attack, Facet Arrow (`AttackShape.ARROW`, `ShotStyle.ARROW`,
+  `Sound.ARROW`), is the user's design: one giant arrow with a diamond tip, a sniper's shot but not a long-range one
+  (9 tiles), 1,700 at level 1, that homes gently (`AttackSpec.homing`, 120 degrees a second, only toward an enemy
+  within `ARROW_SEEK_RADIUS` ahead of it; `World.steer`): "the honing is not going to be too powerful". Her super,
+  Thunderhead (`SuperKind.TEMPEST`, `Fighter.tempestLeft`, `World.stepTempest`), is the user's too: she becomes a
+  lightning-storm tornado for 12 seconds (`SuperSpec.tempestSeconds`), moves `TEMPEST_SPEED` times as fast, can't shoot,
+  and every `TEMPEST_TICK_SECONDS` strikes everyone within its radius and flings them out. She can recharge the super
+  during it, as the user asked, with a much lower charge rate to pay for it: her arrows charge 0.1 a hit, and the
+  tempest's strikes only `TEMPEST_CHARGE` of that; a full super mid-tempest starts it over. ("Tempest" in the code,
+  because the free-for-all already has a Static Storm.) Her name, look and words are ours.
+- Spark is retired (build 96), by the user's decision, and his code is kept, like Rocket's: his def is `Balance.spark`
+  (unregistered; `SimulationTest` uses it), with his star lob, his Shadow Realm and his model. The Training Area's
+  dummies, swarm and sentry are still made from him and still look like him (`FighterDef.sparkLook`). His blue menu
+  glitch is off (`SPARK_GLITCH_ON` in `ui/SparkGlitch.kt`). Don't bring Byte or Juno back, or Rocket or Spark unless
+  the user asks. What follows is Spark as he was. Spark is the user's
   idea and part of the lore: the Spark Drop that would not go away, a puffy five-pointed star (the drops' shape,
   `render3d/StarMesh.kt`). Since build 92 he is chromatic blue and glossy, by the user's decision (build 91's fat
   red villain with fangs looked creepy; `Part.gloss`, the lit shader's `uGloss`: small hard highlights and a

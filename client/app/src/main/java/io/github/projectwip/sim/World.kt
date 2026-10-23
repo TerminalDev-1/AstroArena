@@ -193,7 +193,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits()); mix(f.slowLeft.toRawBits())
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits()); mix(f.slowLeft.toRawBits()); mix(f.tempestLeft.toRawBits())
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(lobs.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -248,7 +248,8 @@ class World(
             var my = if (f.rooted) 0f else c.moveY
             val len = hypot(mx, my)
             if (len > 1f) { mx /= len; my /= len }
-            val speed = f.def.moveSpeed * (if (f.slowed) Balance.SLOW_FACTOR else 1f) * (if (f.captive) Balance.REALM_CAPTIVE_SPEED else 1f)
+            val speed = f.def.moveSpeed * (if (f.slowed) Balance.SLOW_FACTOR else 1f) * (if (f.captive) Balance.REALM_CAPTIVE_SPEED else 1f) *
+                (if (f.inTempest) Balance.TEMPEST_SPEED else 1f)
             val blocked = arena.moveCircle(f.x, f.y, f.radius, mx * speed * dt, my * speed * dt, tmp)
             f.x = tmp[0]; f.y = tmp[1]
             if (len > 0.05f) f.walkCycle += hypot(f.x - f.prevX, f.y - f.prevY) * 3.2f
@@ -267,7 +268,8 @@ class World(
         else if (hypot(c.moveX, c.moveY) > 0.1f && !f.isDashing) f.facing = atan2(c.moveY, c.moveX)
 
         // --- main attack
-        if (c.attack && f.ammo >= 1f && f.attackCooldown <= 0f && f.pending.isEmpty() && !f.isDashing && !f.isLeaping && !idle) {
+        // (A storm can't shoot: it is the attack.)
+        if (c.attack && f.ammo >= 1f && f.attackCooldown <= 0f && f.pending.isEmpty() && !f.isDashing && !f.isLeaping && !idle && !f.inTempest) {
             val (dx, dy) = aimDirection(f)
             f.facing = atan2(dy, dx)
             f.ammo -= 1f
@@ -336,6 +338,7 @@ class World(
         }
 
         if (f.realm == f.id) stepRealm(f, dt)
+        if (f.inTempest) stepTempest(f, dt)
 
         // --- reload (paused while a burst is still firing; quicker for whoever opened the realm they are in)
         if (f.ammo < f.def.ammoMax && f.pending.isEmpty()) {
@@ -629,6 +632,41 @@ class World(
         damage(t, f, f.superDamage, false, t.x, t.y, chargeShare = if (f.def.superSpec.shadows > 0) Balance.REALM_SHADOW_CHARGE else 1f)
     }
 
+    /**
+     * [f] is a tempest: every [Balance.TEMPEST_TICK_SECONDS] each enemy within the super's radius is hit for its damage and
+     * flung outward, until the time is up. (A giant or a fighter fixed to the spot is hit but not flung.)
+     */
+    private fun stepTempest(f: Fighter, dt: Float) {
+        f.tempestLeft -= dt
+        if (f.tempestLeft <= 0f) { endTempest(f); return }
+        f.tempestTick -= dt
+        if (f.tempestTick > 0f) return
+        f.tempestTick += Balance.TEMPEST_TICK_SECONDS
+        val s = f.def.superSpec
+        for (o in fighters) {
+            if (o.team == f.team || !o.alive || o.realm != f.realm || o.isLeaping) continue
+            val ox = o.x - f.x
+            val oy = o.y - f.y
+            val d = hypot(ox, oy)
+            if (d > s.radius + o.radius) continue
+            // (Counted like the realm's strikes, as hits that charge the super, but only by a small share of one.)
+            damage(o, f, f.superDamage, false, o.x, o.y, chargeShare = Balance.TEMPEST_CHARGE)
+            events += GameEvent.TempestHit(f.id, o.id, o.x, o.y)
+            if (o.alive && !o.rooted && o.scale <= 1f && !o.latched && !o.heldInRealm) {
+                // (Straight out from the eye; anyone standing right in it goes the way the tempest is facing.)
+                val (ux, uy) = if (d > 1e-3f) (ox / d) to (oy / d) else cos(f.facing) to sin(f.facing)
+                arena.moveCircle(o.x, o.y, o.radius, ux * s.knockback, uy * s.knockback, tmp)
+                o.x = tmp[0]; o.y = tmp[1]
+            }
+        }
+    }
+
+    private fun endTempest(f: Fighter) {
+        events += GameEvent.Tempest(f.id, false)
+        f.tempestLeft = 0f
+        f.tempestTick = 0f
+    }
+
     /** The realm [id] opened is over: everyone in it is back in the arena, where they stood. */
     private fun closeRealm(id: Int) {
         for (o in fighters) {
@@ -717,13 +755,15 @@ class World(
             AttackShape.PLANT -> ShotStyle.ROCKET
             AttackShape.SLASH -> ShotStyle.PELLET
             AttackShape.STAR -> ShotStyle.STAR
+            AttackShape.ARROW -> ShotStyle.ARROW
         }
         val baseAng = atan2(dy, dx)
         val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
         val spread = Math.toRadians(a.spreadDegrees.toDouble()).toFloat()
         for (i in 0 until n) {
             val ang = if (n == 1) baseAng else baseAng - spread / 2 + spread * i / (n - 1)
-            spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast, share = a.healthShare * f.damageMultiplier, hex = a.hexSeconds, slow = a.slowSeconds)
+            spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast, share = a.healthShare * f.damageMultiplier, hex = a.hexSeconds, slow = a.slowSeconds,
+                homing = Math.toRadians(a.homing.toDouble()).toFloat())
         }
     }
 
@@ -796,6 +836,13 @@ class World(
                 // (He cuts them as he arrives.)
                 if (t != null) damage(t, f, f.superDamage, true, t.x, t.y)
             }
+            // She becomes the tempest (or, already one, starts it over).
+            SuperKind.TEMPEST -> {
+                if (!f.inTempest) events += GameEvent.Tempest(f.id, true)
+                f.tempestLeft = s.tempestSeconds
+                f.tempestTick = Balance.TEMPEST_TICK_SECONDS / 2f
+                f.pending.clear()
+            }
             // (With nobody on the line it takes nobody: a miss.)
             SuperKind.REALM -> corruptTarget(f, dx, dy)?.let { t -> openRealm(f, t) }
             // Up and over, whatever is in the way: the code goes in when the leaper lands (see [stepLeap]). With nobody
@@ -822,6 +869,7 @@ class World(
     private fun spawnProjectile(
         f: Fighter, ang: Float, speed: Float, radius: Float, damage: Int, range: Float,
         pierce: Boolean, isSuper: Boolean, style: ShotStyle, side: Float = 0f, blast: Float = 0f, knock: Float = 0f, share: Float = 0f, hex: Float = 0f, slow: Float = 0f,
+        homing: Float = 0f,
     ) {
         val dx = cos(ang)
         val dy = sin(ang)
@@ -829,7 +877,7 @@ class World(
         val off = f.radius * 0.6f
         val sx = f.x + dx * off - dy * side
         val sy = f.y + dy * off + dx * side
-        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock, share, hex, slow)
+        val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock, share, hex, slow, homing)
         if (arena.tileAt(sx, sy).blocksShots) {
             events += GameEvent.WallHit(sx, sy, style)
             return
@@ -955,6 +1003,7 @@ class World(
             p.prevX = p.x
             p.prevY = p.y
             p.age += dt
+            if (p.homing > 0f) steer(p, dt)
             val speed = hypot(p.vx, p.vy)
             val total = speed * dt
             val sub = maxOf(1, (total / 0.15f).toInt() + 1)
@@ -1000,6 +1049,37 @@ class World(
             }
             if (!p.alive) it.remove()
         }
+    }
+
+    /**
+     * A homing shot turns toward the nearest enemy it can see within [Balance.ARROW_SEEK_RADIUS], and ahead of it (it
+     * never doubles back), at most [Projectile.homing] radians a second. Its speed stays the same.
+     */
+    private fun steer(p: Projectile, dt: Float) {
+        val speed = hypot(p.vx, p.vy)
+        if (speed <= 0f) return
+        val hx = p.vx / speed
+        val hy = p.vy / speed
+        val realm = fighter(p.ownerId)?.realm ?: -1
+        var best: Fighter? = null
+        var bestD = Balance.ARROW_SEEK_RADIUS
+        for (f in fighters) {
+            if (f.team == p.team || !f.alive || f.id in p.hit || f.realm != realm || f.isLeaping || !isVisibleTo(f, p.team)) continue
+            val ox = f.x - p.x
+            val oy = f.y - p.y
+            val d = hypot(ox, oy)
+            if (d >= bestD || ox * hx + oy * hy <= 0f) continue
+            best = f; bestD = d
+        }
+        val t = best ?: return
+        val want = atan2(t.y - p.y, t.x - p.x)
+        val now = atan2(p.vy, p.vx)
+        var turn = want - now
+        while (turn > Math.PI) turn -= (2 * Math.PI).toFloat()
+        while (turn < -Math.PI) turn += (2 * Math.PI).toFloat()
+        val ang = now + turn.coerceIn(-p.homing * dt, p.homing * dt)
+        p.vx = cos(ang) * speed
+        p.vy = sin(ang) * speed
     }
 
     // ------------------------------------------------------------------ damage & respawn
@@ -1063,6 +1143,7 @@ class World(
         release(victim)
         cure(victim)
         if (victim.hyperActive) endHyper(victim)
+        if (victim.inTempest) endTempest(victim)
         // The super and hyper charges are kept: whatever was charged is still there after the respawn.
         events += GameEvent.Ko(killer?.id ?: -1, victim.id, victim.x, victim.y)
         killer?.let { it.kos++ }

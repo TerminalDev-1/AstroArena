@@ -306,7 +306,9 @@ class MatchRunner(
                 val f = world.fighter(e.fighterId) ?: return
                 val near = 1f / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
                 val gain = if (e.fighterId == pid) 1f else near * 0.6f
-                if (e.isSuper) sfx.play(Sound.SUPER, gain)
+                // (The storm has a sound of its own, when it rises.)
+                if (e.isSuper && f.def.superSpec.kind == io.github.projectwip.data.SuperKind.TEMPEST) Unit
+                else if (e.isSuper) sfx.play(Sound.SUPER, gain)
                 else sfx.play(when (f.def.attack.shape) {
                     AttackShape.BURST -> Sound.SHOOT_SPARK
                     AttackShape.SPREAD -> Sound.SHOOT_HEAVY
@@ -319,6 +321,7 @@ class MatchRunner(
                     AttackShape.PLANT -> Sound.WHOOSH
                     AttackShape.SLASH -> Sound.WHOOSH
                     AttackShape.STAR -> Sound.STAR
+                    AttackShape.ARROW -> Sound.ARROW
                 }, gain, (if (f.def.attack.shape == AttackShape.SLASH) 1.5f else 0.95f) + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }
@@ -417,6 +420,17 @@ class MatchRunner(
                 if (e.open) { sfx.play(Sound.WHOOSH, near, 0.5f); sfx.play(Sound.HYPER, near * 0.8f, 0.7f) }
                 else sfx.play(Sound.WHOOSH, near * 0.8f, 1.4f)
                 if (mine) sfx.buzz(if (e.open) 120 else 40, 220)
+            }
+            is GameEvent.Tempest -> {
+                val f = world.fighter(e.fighterId) ?: return
+                val near = (if (e.fighterId == pid) 1f else 0.6f) / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f)
+                if (e.on) sfx.play(Sound.TEMPEST, near) else sfx.play(Sound.WHOOSH, near * 0.7f, 0.6f)
+                if (e.on && e.fighterId == pid) sfx.buzz(120, 230)
+            }
+            is GameEvent.TempestHit -> {
+                val p = match.player
+                val mine = e.fighterId == pid || e.targetId == pid
+                sfx.play(Sound.TEMPEST_HIT, (if (mine) 0.9f else 0.5f) / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f), 0.9f + (e.x % 0.2f))
             }
             is GameEvent.Launch -> {
                 val f = world.fighter(e.fighterId) ?: return

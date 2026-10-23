@@ -129,6 +129,10 @@ class Fighter(
     // everybody else). The one who opened it also keeps how long it has left and the time to its next rocket.
     var realm = -1
     var realmLeft = 0f
+    /** Seconds left as a tempest ([io.github.projectwip.data.SuperKind.TEMPEST]), and until its next hit. */
+    var tempestLeft = 0f
+    var tempestTick = 0f
+    val inTempest get() = tempestLeft > 0f
     var realmTick = 0f
     /** How many strikes the realm's shadows have made so far ([SuperSpec.shadows]): they take turns. */
     var realmStrikes = 0
@@ -173,7 +177,7 @@ class Fighter(
 /** One hex on a fighter: who did it, what each bite does, the time to the next bite, and how long it has left. */
 class Hex(val by: Int, val damage: Int, var tick: Float, var left: Float)
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, STAR }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, STAR, ARROW }
 
 class Projectile(
     val ownerId: Int,
@@ -198,6 +202,8 @@ class Projectile(
     val hex: Float = 0f,
     /** Slows whoever it hits for this many seconds (0 = it doesn't): see `AttackSpec.slowSeconds`. */
     val slow: Float = 0f,
+    /** Turns toward the nearest enemy ahead of it at most this many radians a second (0 = flies straight): see `AttackSpec.homing`. */
+    val homing: Float = 0f,
 ) {
     var prevX = x
     var prevY = y
@@ -264,6 +270,10 @@ sealed interface GameEvent {
     data class Armed(val fighterId: Int, val x: Float, val y: Float) : GameEvent
     /** [fighterId] took [targetId] into a realm ([open]), or the realm they were in is over. */
     data class Realm(val fighterId: Int, val targetId: Int, val open: Boolean) : GameEvent
+    /** [fighterId] became a tempest ([on]: Swish's super) or stopped being one. */
+    data class Tempest(val fighterId: Int, val on: Boolean) : GameEvent
+    /** A tempest's hit on [targetId], who is flung away from it. */
+    data class TempestHit(val fighterId: Int, val targetId: Int, val x: Float, val y: Float) : GameEvent
     /** A rocket went off. */
     data class Burst(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A lobbed star came down and burst. */

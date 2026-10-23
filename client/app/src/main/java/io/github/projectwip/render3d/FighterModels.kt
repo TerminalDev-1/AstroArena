@@ -63,8 +63,9 @@ class FighterModels {
     private val bossModels = HashMap<io.github.projectwip.data.BossKind, FighterModel>()
 
     init {
-        // (Spark took Rocket's place, and her model is kept in case she comes back.)
-        models[FighterId.BYTE] = buildSpark()
+        // (Swish took Spark's place, as Spark took Rocket's: both their models are kept. Spark's still stands in the
+        // Training Area as its dummies, swarm and sentry: see [FighterDef.sparkLook].)
+        models[FighterId.BYTE] = buildSwish()
         models[FighterId.BRAKK] = buildBrakk()
         models[FighterId.KIRA] = buildKira()
         models[FighterId.KITO] = buildKito()
@@ -76,7 +77,8 @@ class FighterModels {
 
     fun model(id: FighterId) = models.getValue(id)
     /** A fighter's model, or a boss's own. */
-    fun model(def: FighterDef) = def.boss?.let { bossModels.getValue(it) } ?: models.getValue(def.id)
+    fun model(def: FighterDef) = def.boss?.let { bossModels.getValue(it) } ?: if (def.sparkLook) spark else models.getValue(def.id)
+    private val spark by lazy { buildSpark() }
 
     // ------------------------------------------------------------------ construction helpers
 
@@ -98,7 +100,80 @@ class FighterModels {
     private fun MeshBuilder.alongZ(block: MeshBuilder.() -> Unit) = with { rotate(90f, 1f, 0f, 0f); block() }
     private fun MeshBuilder.octa(rx: Float, ry: Float, rz: Float) = ellipsoid(rx, ry, rz, 2, 4)
 
-    // ------------------------------------------------------------------ Spark — the Spark Drop that woke up
+    // ------------------------------------------------------------------ Swish — a storm goddess with a giant bow
+
+    private fun buildSwish(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 1.02f, hipY = 0.36f, hipZ = 0.11f, shoulder = floatArrayOf(0.08f, 0.76f, 0.27f), shoulderL = floatArrayOf(0.02f, 0.8f, -0.27f), floatY = 1.3f)
+        // Slim legs in dark leggings, and boots with a lit band round the top.
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.DARK) { at(0f, -0.12f, 0f) { capsule(0.065f, 0.16f) } }
+            a.add(bone, Slot.SECONDARY) { at(0.04f, -0.29f, 0f) { roundedBox(0.24f, 0.1f, 0.13f, 0.045f) } }
+            a.add(bone, Slot.ACCENT, outline = false, emissive = true) { at(0f, -0.21f, 0f) { torus(0.07f, 0.018f, 12, 5) } }
+        }
+        // A short dress that flares out, a lit hem, a sash, and a diamond brooch.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.42f, 0f) { cylinder(0.34f, 0.36f, 18, topRadius = 0.19f) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0f, 0.25f, 0f) { torus(0.335f, 0.022f, 22, 5) } }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.72f, 0f) { roundedBox(0.3f, 0.32f, 0.36f, 0.13f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0f, 0.6f, 0f) { torus(0.2f, 0.04f, 16, 6) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.18f, 0.62f, 0f) { octa(0.04f, 0.06f, 0.04f) } }
+        // A little capelet over the shoulders, and her neck.
+        a.add(Bone.BODY, Slot.SECONDARY) { at(-0.03f, 0.87f, 0f) { ellipsoid(0.23f, 0.09f, 0.3f) } }
+        a.add(Bone.BODY, Slot.SKIN) { at(0f, 0.93f, 0f) { capsule(0.06f, 0.06f) } }
+        // Head: a round face with big eyes, long silver hair, and a tiara set with a diamond.
+        a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.17f, 0f) { sphere(0.27f) } }
+        a.add(Bone.HEAD, Slot.WHITE) { at(-0.05f, 0.18f, 0f) { ellipsoid(0.3f, 0.32f, 0.3f, 8, 16, 0f, 0.55f) } }
+        a.add(Bone.HEAD, Slot.WHITE) { at(0.17f, 0.33f, 0f) { ellipsoid(0.12f, 0.08f, 0.27f) } }
+        a.add(Bone.HEAD, Slot.WHITE) { at(-0.21f, -0.14f, 0f) { roundedBox(0.16f, 0.62f, 0.44f, 0.08f) } }
+        for (z in listOf(0.24f, -0.24f)) a.add(Bone.HEAD, Slot.WHITE) { at(0.06f, -0.03f, z) { capsule(0.055f, 0.24f) } }
+        a.add(Bone.HEAD, Slot.INK, outline = false) {
+            for (z in listOf(0.095f, -0.095f)) {
+                at(0.245f, 0.16f, z) { ellipsoid(0.035f, 0.06f, 0.045f, 6, 8) }
+                // (Lashes, flicked out at the corners.)
+                at(0.25f, 0.225f, z * 1.15f) { rotate(if (z > 0f) -18f else 18f, 1f, 0f, 0f); roundedBox(0.02f, 0.016f, 0.08f, 0.006f) }
+            }
+            at(0.262f, 0.05f, 0f) { roundedBox(0.02f, 0.014f, 0.07f, 0.006f) }
+        }
+        a.add(Bone.HEAD, Slot.WHITE, outline = false) { for (z in listOf(0.08f, -0.11f)) at(0.275f, 0.185f, z) { sphere(0.014f, 4, 6) } }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) {
+            at(0f, 0.34f, 0f) { rotate(-8f, 0f, 0f, 1f); torus(0.265f, 0.02f, 22, 5) }
+            at(0.27f, 0.39f, 0f) { octa(0.05f, 0.08f, 0.045f) }
+        }
+        // A little thundercloud keeps her company, with a spark of lightning under it.
+        a.add(Bone.FLOAT, Slot.METAL) {
+            at(-0.42f, 0f, 0.42f) { sphere(0.11f, 8, 10) }
+            at(-0.32f, 0.02f, 0.44f) { sphere(0.085f, 8, 10) }
+            at(-0.52f, -0.01f, 0.4f) { sphere(0.08f, 8, 10) }
+        }
+        a.add(Bone.FLOAT, Slot.ACCENT, outline = false, emissive = true) { at(-0.42f, -0.14f, 0.42f) { rotate(25f, 1f, 0f, 0f); roundedBox(0.025f, 0.12f, 0.025f, 0.008f) } }
+        // Her bow: a long arc held upright, lit at both tips, with its string.
+        val r = 0.62f
+        val cx = -0.3f
+        val steps = 9
+        val span = 62f
+        for (k in 0 until steps) {
+            val deg = -span + (2 * span) * (k + 0.5f) / steps
+            val rad = Math.toRadians(deg.toDouble())
+            val seg = r * Math.toRadians(2.0 * span / steps).toFloat()
+            a.add(Bone.WEAPON, Slot.PRIMARY) {
+                at(cx + r * kotlin.math.cos(rad).toFloat(), r * kotlin.math.sin(rad).toFloat(), 0f) { rotate(deg, 0f, 0f, 1f); capsule(0.035f, seg) }
+            }
+        }
+        val tipX = cx + r * kotlin.math.cos(Math.toRadians(span.toDouble())).toFloat()
+        val tipY = r * kotlin.math.sin(Math.toRadians(span.toDouble())).toFloat()
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) {
+            at(tipX, tipY, 0f) { octa(0.045f, 0.07f, 0.045f) }
+            at(tipX, -tipY, 0f) { octa(0.045f, 0.07f, 0.045f) }
+        }
+        a.add(Bone.WEAPON, Slot.WHITE, outline = false) { at(tipX, 0f, 0f) { cylinder(0.008f, tipY * 2f, 5) } }
+        a.add(Bone.WEAPON, Slot.SECONDARY) { at(cx + r, 0f, 0f) { roundedBox(0.08f, 0.16f, 0.08f, 0.03f) } }
+        a.add(Bone.WEAPON, Slot.SKIN) { at(cx + r - 0.02f, 0f, 0f) { sphere(0.065f, 8, 10) } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.1f, 0f) { capsule(0.07f, 0.12f) } }
+        a.add(Bone.ARM, Slot.SKIN) { at(0f, -0.25f, 0f) { sphere(0.065f, 8, 10) } }
+        return a.build(rig)
+    }
+
+    // ------------------------------------------------------------------ Spark — the Spark Drop that woke up (retired: the Training Area's targets)
 
     private fun buildSpark(): FighterModel {
         val a = Assembler()

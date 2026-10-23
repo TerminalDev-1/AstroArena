@@ -263,11 +263,13 @@ class BotBrain(
         AttackShape.PLANT -> 0.6f
         AttackShape.SLASH -> 0.7f
         AttackShape.STAR -> 0.72f
+        AttackShape.ARROW -> 0.78f
     }
 
     private fun chooseEngageGoal(t: Fighter) {
         val range = me.def.attack.range
-        val desired = lerp(0.9f, range * preferredRangeFraction(), profile.rangeDiscipline)
+        // (As a tempest it can't shoot: it goes right in among them.)
+        val desired = if (me.inTempest) 0.3f else lerp(0.9f, range * preferredRangeFraction(), profile.rangeDiscipline)
         if (arena.shotClear(me.x, me.y, t.x, t.y)) {
             var dx = me.x - t.x
             var dy = me.y - t.y
@@ -544,6 +546,8 @@ class BotBrain(
             SuperKind.BLINK -> d <= s.range * 0.95f && d > me.def.attack.range && (!smart || me.hpFraction > 0.4f)
             // A realm goes through walls too.
             SuperKind.REALM -> d <= s.range * 0.95f
+            // The tempest is worth most up close, and a smart bot keeps it for when it has health to go in with.
+            SuperKind.TEMPEST -> d <= 3f && (!smart || me.hpFraction > 0.35f)
             // The quake reaches past whatever the hammer hits, so it only has to get close.
             SuperKind.QUAKE -> clear && d <= s.range * 0.95f
             SuperKind.RAM -> d <= s.range * 0.85f && arena.walkClear(me.x, me.y, t.x, t.y, me.radius * 0.9f) &&

@@ -36,14 +36,19 @@ enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
  * any wall: it bursts where it lands, [Balance.STAR_FLIGHT_SECONDS] later, and hits and slows every enemy within
  * [AttackSpec.blast]. (A straight shot with [AttackSpec.slowSeconds] still slows whoever it hits.)
  */
-enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH, STAR }
+/**
+ * [ARROW] is one long arrow with a diamond tip that homes: once in flight it turns, at most [AttackSpec.homing] degrees a
+ * second, toward the nearest enemy it can see within [Balance.ARROW_SEEK_RADIUS] ahead of it, until it hits or runs out
+ * of reach. Walls still stop it.
+ */
+enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH, STAR, ARROW }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
 enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
 
 /**
  * How rare a fighter is. Rarer fighters take more Credits on the Spark Road ([roadCost]; the server's own table
- * in `economy.py` is the one that counts). Spark, the fighter everyone starts with, is shown as Legendary but is free: he is never on the road and has no price.
+ * in `economy.py` is the one that counts). Swish, the fighter everyone starts with, is shown as Legendary but is free: she is never on the road and has no price.
  */
 enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
     STARTER("Starter", 0xFF9BE7FF, 0),
@@ -73,7 +78,13 @@ enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
  * [BLINK] is aimed along a line like [CORRUPT]: the fighter is at once beside the first enemy on it, through anything
  * in between, hits them for the super's damage as it arrives, and has its ammo and its blade's bar full. With nobody on the line it goes to the end of its reach, for nothing.
  */
-enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE, BREW, REALM, BLINK }
+/**
+ * [TEMPEST]: the fighter becomes a lightning-storm tornado for [SuperSpec.stormSeconds]. It moves [Balance.TEMPEST_SPEED]
+ * times as fast and can't attack, and every [Balance.TEMPEST_TICK_SECONDS] every enemy within [SuperSpec.radius] of it is hit
+ * for the super's damage and flung [SuperSpec.knockback] tiles outward. Its hits charge the super by only
+ * [Balance.TEMPEST_CHARGE] of a hit, and a full super in the middle of one starts it over.
+ */
+enum class SuperKind { VOLLEY, RAM, PIERCE, SWARM, CORRUPT, QUAKE, BREW, REALM, BLINK, TEMPEST }
 
 /** How a fighter's main attack behaves. Distances are in tiles, times in seconds. */
 data class AttackSpec(
@@ -111,6 +122,8 @@ data class AttackSpec(
     val hexSeconds: Float = 0f,
     /** Each shot that lands slows its target to [Balance.SLOW_FACTOR] of its speed for this long. 0 = it doesn't. */
     val slowSeconds: Float = 0f,
+    /** A homing shot ([AttackShape.ARROW]) turns toward its target at most this many degrees a second. 0 = it flies straight. */
+    val homing: Float = 0f,
 )
 
 data class SuperSpec(
@@ -136,6 +149,8 @@ data class SuperSpec(
      * [Balance.REALM_CAPTIVE_SPEED] of its speed and [Balance.REALM_CAPTIVE_DAMAGE] of its damage. False = held still and helpless.
      */
     val captiveFree: Boolean = false,
+    /** A tempest ([SuperKind.TEMPEST]): how long the fighter is the storm, in seconds. */
+    val tempestSeconds: Float = 0f,
 )
 
 /** A colourway. Index 0 is the default and always owned. */
@@ -174,6 +189,8 @@ data class FighterDef(
     val notice: String? = null,
     /** False for a fighter that can no longer be levelled up: it stays at whatever level it has. */
     val upgradable: Boolean = true,
+    /** Drawn as Spark (retired): the Training Area's dummies, swarm and sentry still look like him. */
+    val sparkLook: Boolean = false,
 )
 
 /**
@@ -320,6 +337,16 @@ object Balance {
     /** A slowed fighter ([AttackSpec.slowSeconds]) moves at this share of its speed. */
     const val SLOW_FACTOR = 0.5f
 
+    /** A homing arrow ([AttackShape.ARROW]) only turns toward enemies within this many tiles, and ahead of it. */
+    const val ARROW_SEEK_RADIUS = 3.5f
+
+    /** A tempest ([SuperKind.TEMPEST]) hits everyone in it this often... */
+    const val TEMPEST_TICK_SECONDS = 0.5f
+    /** ...moves this many times as fast as the fighter walks... */
+    const val TEMPEST_SPEED = 1.15f
+    /** ...and each of its hits charges the super by only this share of a normal hit, so a tempest doesn't pay for the next one. */
+    const val TEMPEST_CHARGE = 0.25f
+
     /** A lobbed star ([AttackShape.STAR]) takes this long to come down on its spot. */
     const val STAR_FLIGHT_SECONDS = 0.6f
 
@@ -376,34 +403,73 @@ object Balance {
     const val MIN_HEALTH = 6600
     const val MIN_AMMO_DAMAGE = 1300
 
+    /**
+     * Spark, retired by the user's decision (build 96): Swish took his place, keeping the id. His def is kept for reuse
+     * (and tested with it): his lobbed star, his Shadow Realm with its shadows, and his look. The Training Area's
+     * dummies, swarm and sentry are still made from him, and so is the size of a boss.
+     */
+    val spark: FighterDef = FighterDef(
+        id = FighterId.BYTE,
+        rarity = Rarity.LEGENDARY,
+        // (The id is still BYTE: Spark took Rocket's place, by the user's decision, as Rocket had taken Byte's. Her
+        // rockets and her realm are still in the simulation, and Spark's super is that realm.)
+        name = "Spark",
+        title = "The Drop That Woke",
+        role = "Trickster",
+        lore = "When the Spark Drops were scrapped, one of them would not go. It woke up in the dark with a grudge and a grin, and now it walks the arena throwing stars at whoever comes near, and dragging them off into a realm where its shadows are waiting.",
+        attackName = "Spite Star",
+        health = StatLine(6600, 330),
+        // One star lobbed at a spot, and two seconds at half speed for every enemy in its burst.
+        attackDamage = StatLine(1400, 70),
+        // One strike of one of his four shadows: they take turns, each striking once a second.
+        superDamage = StatLine(400, 20),
+        moveSpeed = 3.6f,
+        attack = AttackSpec(AttackShape.STAR, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.26f, burstInterval = 0f, blast = 1.2f, slowSeconds = 2f),
+        superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 6 seconds, where four shadows of his fight them. In there they move a quarter slower and hit a quarter softer, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again, though his shadows' strikes barely charge it. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4, realmSeconds = SPARK_REALM_SECONDS, captiveFree = true),
+        ammoMax = 3,
+        reloadSeconds = 1.4f,
+        superChargePerHit = 0.2f,
+        skins = listOf(
+            Skin("Overload", 0xFF2F86FF, 0xFF1A3C9C, 0xFF9CF2FF, 0),
+            Skin("Void Spark", 0xFF2C2350, 0xFF0C0A1C, 0xFF3CF2FF, 20),
+            Skin("Solar Spite", 0xFFFFB627, 0xFF4A1206, 0xFFFF3B3B, 20),
+        ),
+        sparkLook = true,
+        hyper = HyperSpec("Wild Spark", "Lasts 8 seconds. His stars fly half as fast again.", seconds = 8f, shotSpeed = 1.5f),
+    )
+
     val fighters: List<FighterDef> = listOf(
         FighterDef(
             id = FighterId.BYTE,
             rarity = Rarity.LEGENDARY,
-            // (The id is still BYTE: Spark took Rocket's place, by the user's decision, as Rocket had taken Byte's. Her
-            // rockets and her realm are still in the simulation, and Spark's super is that realm.)
-            name = "Spark",
-            title = "The Drop That Woke",
-            role = "Trickster",
-            lore = "When the Spark Drops were scrapped, one of them would not go. It woke up in the dark with a grudge and a grin, and now it walks the arena throwing stars at whoever comes near, and dragging them off into a realm where its shadows are waiting.",
-            attackName = "Spite Star",
+            // (The id is still BYTE: Swish took Spark's place, by the user's decision (build 96), as Spark had taken
+            // Rocket's and Rocket Byte's. Spark's def is kept as [spark].)
+            name = "Swish",
+            title = "Goddess of the Gale",
+            role = "Sniper",
+            lore = "A storm that got bored of being weather. She took a shape, borrowed a bow from the sky, and came down to see who was making all the noise. Her arrows find you; her temper finds everyone else.",
+            attackName = "Facet Arrow",
             health = StatLine(6600, 330),
-            // One star lobbed at a spot, and two seconds at half speed for every enemy in its burst.
-            attackDamage = StatLine(1400, 70),
-            // One strike of one of his four shadows: they take turns, each striking once a second.
-            superDamage = StatLine(400, 20),
+            // One giant arrow with a diamond tip, which homes in a little on whoever is ahead of it.
+            attackDamage = StatLine(1700, 85),
+            // One hit of the storm, every half second, on everyone inside it (who is then flung out of it).
+            superDamage = StatLine(800, 40),
             moveSpeed = 3.6f,
-            attack = AttackSpec(AttackShape.STAR, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.26f, burstInterval = 0f, blast = 1.2f, slowSeconds = 2f),
-            superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 6 seconds, where four shadows of his fight them. In there they move a quarter slower and hit a quarter softer, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again, though his shadows' strikes barely charge it. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4, realmSeconds = SPARK_REALM_SECONDS, captiveFree = true),
+            // A sniper, but not a long-range one: nine tiles, and the homing is gentle (120 degrees a second, only
+            // toward someone close ahead of the arrow), so a sidestep at the right moment still beats it.
+            attack = AttackSpec(AttackShape.ARROW, projectiles = 1, spreadDegrees = 0f, range = 9f, speed = 16f, radius = 0.22f, burstInterval = 0f, homing = 120f),
+            superSpec = SuperSpec(SuperKind.TEMPEST, "Thunderhead", "She becomes a lightning storm for 12 seconds, a little faster than she walks. Every half second whoever is caught in it is struck and flung out of it. She can't shoot while she is the storm, but its strikes slowly charge her next one.", range = 0f, speed = 0f, radius = 1.3f, knockback = 1.6f, tempestSeconds = 12f),
             ammoMax = 3,
-            reloadSeconds = 1.4f,
-            superChargePerHit = 0.2f,
+            reloadSeconds = 1.5f,
+            // Half of what most fighters get: her storm keeps charging the super while it runs (the user asked for that,
+            // with a much lower rate to pay for it). Ten arrows for a storm.
+            superChargePerHit = 0.1f,
             skins = listOf(
-                Skin("Overload", 0xFF2F86FF, 0xFF1A3C9C, 0xFF9CF2FF, 0),
-                Skin("Void Spark", 0xFF2C2350, 0xFF0C0A1C, 0xFF3CF2FF, 20),
-                Skin("Solar Spite", 0xFFFFB627, 0xFF4A1206, 0xFFFF3B3B, 20),
+                Skin("Tempest", 0xFF6C5CE7, 0xFF241A5C, 0xFF7DF9FF, 0),
+                Skin("Sunshower", 0xFFFFD66B, 0xFFFFF6E0, 0xFF5BC0FF, 20),
+                Skin("Black Squall", 0xFF2B2D42, 0xFF0D0E17, 0xFFC77DFF, 20),
             ),
-            hyper = HyperSpec("Wild Spark", "Lasts 8 seconds. His stars fly half as fast again.", seconds = 8f, shotSpeed = 1.5f),
+            hyper = HyperSpec("Eye of the Storm", "Lasts 8 seconds. Her arrows fly half as fast again.", seconds = 8f, shotSpeed = 1.5f),
         ),
         FighterDef(
             id = FighterId.BRAKK,
@@ -548,7 +614,7 @@ object Balance {
         attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 30f, range = standOff, speed = 14f, radius = 0.24f, burstInterval = 0f),
         superSpec = SuperSpec(SuperKind.RAM, "Charge", "", range = 7f, speed = 12.5f, radius = 0.9f),
         ammoMax = 3, reloadSeconds = 1.5f, superChargePerHit = 0f,
-        radius = fighter(FighterId.BYTE).radius * 2.5f,
+        radius = spark.radius * 2.5f,
         skins = listOf(skin),
     )
 
@@ -569,10 +635,10 @@ object Balance {
     // Everything here is created at level 1 with flat stat lines, like the boss: it is a fixed yardstick.
 
     /** A target dummy: never attacks, soaks up damage and regenerates like anyone else. */
-    val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(8000, 0)) }
+    val dummy: FighterDef = spark.let { it.copy(name = "Dummy", title = "Target", health = StatLine(8000, 0)) }
 
     /** One of the swarm: a little over half size and fragile. In the Training Area it is a target and never attacks. */
-    val mini: FighterDef = fighter(FighterId.BYTE).let {
+    val mini: FighterDef = spark.let {
         it.copy(
             name = "Mini", title = "Swarm", health = StatLine(3000, 0),
             attackDamage = StatLine(Math.round(it.attackDamage.base * 0.3f), 0), superDamage = StatLine(Math.round(it.superDamage.base * 0.3f), 0),
@@ -582,7 +648,7 @@ object Balance {
     }
 
     /** The sentry: a long-range gun on an island of coolant. Slow to reload, so its shots can be dodged. */
-    val sentry: FighterDef = fighter(FighterId.BYTE).let {
+    val sentry: FighterDef = spark.let {
         // (One shot of 1,000 every five seconds. It had three shots of 1,500 and a 2.4 second reload until the user
         // found it too much.)
         it.copy(name = "Sentry", title = "Turret", health = StatLine(8000, 0), attackDamage = StatLine(1000, 0),
