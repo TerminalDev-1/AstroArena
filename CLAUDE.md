@@ -56,18 +56,22 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   it is drawn over the 3D lobby (or the loading backdrop) and under the menus, a faint blue light with deeper blue
   edges, faint scanlines and a short burst of cyan and violet torn bars every few seconds; buttons, text and
   currencies keep their colours, and nothing jitters. His attack, Spite Star (`AttackShape.STAR`,
-  `Sound.STAR`: a swish and a whistle that climbs and sinks with the lob; the burst has its own `Sound.STAR_BURST`), is lobbed like dynamite, as the user asked: aimed at a spot like the planted rockets (how far the stick
+  `Sound.STAR`: a little twinkle, four quick bell pings climbing, as the user asked (it was a swish and a whistle until build 95); the burst has its own `Sound.STAR_BURST`), is lobbed like dynamite, as the user asked: aimed at a spot like the planted rockets (how far the stick
   is pushed is how far it goes; `aimPlant`), it flies over walls in an arc (`World.lobs`, `Lob`) for
   `STAR_FLIGHT_SECONDS` and bursts where it lands (`GameEvent.StarBurst`), hitting every enemy within its
   `AttackSpec.blast` and slowing them to `SLOW_FACTOR` of their speed for two seconds (`AttackSpec.slowSeconds`,
-  `Fighter.slowLeft`). A straight shot with `slowSeconds` (`ShotStyle.STAR`) still slows whoever it hits, with nobody using it. His super, Shadow Realm, is
+  `Fighter.slowLeft`). A straight shot with `slowSeconds` (`ShotStyle.STAR`) still slows whoever it hits, with nobody using it. Since build 95 he is Legendary, by the user's decision, and still
+  the free starter: he is never on the Spark Road and has no CPU Chip price (`FighterId.BYTE` is checked, not the
+  rarity; the server lists no rarity for him). His super, Shadow Realm, is
   Rocket's realm (`SuperKind.REALM`) with four shadows of his (`SuperSpec.shadows`): they stand round the captive
   and take turns to strike, each once a second, in place of the realm's own rocket (drawn as dark copies of him in
   `MatchRenderer.forEachRealmShadow`). His realm lasts `SPARK_REALM_SECONDS` (6 seconds, `SuperSpec.realmSeconds`;
   Rocket's kept realm is still `REALM_SECONDS`, 12), as the user asked: 12 felt endless. The shadows' strikes charge
   his super by only `REALM_SHADOW_CHARGE` (2.5%) of a hit, as the user asked (at full rate four strikes a second gave
   the super back in under a second): a whole six-second realm of them is about a sixth of a super. The realm stays
-  chainable. His name, look and words are ours.
+  chainable. Since build 95 his captive is not held (`SuperSpec.captiveFree`, `Fighter.realmFree`), as the user
+  asked: it can move and fight in there at `REALM_CAPTIVE_SPEED` (75%) of its speed and `REALM_CAPTIVE_DAMAGE` (75%)
+  of its damage, and the only one it can reach is Spark. Rocket's kept realm still holds its captive still (`heldInRealm`). His name, look and words are ours.
 - Rocket's code is kept for reuse, by the user's decision: her plain aimed rockets (`AttackShape.ROCKETS`), her realm
   (`SuperKind.REALM`, `REALM_SECONDS`, `Fighter.captive`, `Fighter.realm`, the realm's own rocket each second) and
   her model (`buildRocket`, unregistered), with nobody using them; `SimulationTest` keeps them tested with a stand-in
@@ -156,6 +160,9 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   theme 148, both with a snare, open hats and a rolling sixteenth-note bass.
 - The home screen has no Cup Track tile (removed in build 92, as the user asked): the Cups panel in the top bar opens
   the Cup Track and carries its badge.
+- Level 1 is buffed for players only, by the user's decision (build 95): a player's fighter at level 1 gets
+  `LEVEL_ONE_BOOST` (half) of one level's growth on top (`StatLine.at(level, player)`); levels 2 and up are untouched,
+  and bots never get it (they fight at the player's level, so it would cancel out).
 - All balance numbers live in `data/Balance.kt` and `data/Catalog.kt`; progression is pure functions in `Progression`.
 - New save field: update both `toJson` and `fromJson` in `SaveStore`, with an `opt*` default.
 - Changed a sound: bump `CACHE` in `audio/Sfx.kt`, or devices keep the old WAVs.

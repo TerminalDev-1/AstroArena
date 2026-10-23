@@ -195,7 +195,7 @@ object Progression {
 
     fun statPreview(def: FighterDef, level: Int, capped: Boolean = false): List<StatPreview> {
         val next: Int? = if (capped || !def.upgradable) null else level + 1
-        fun line(label: String, s: StatLine, suffix: String = "") = StatPreview(label, s.at(level), next?.let { s.at(it) }, suffix)
+        fun line(label: String, s: StatLine, suffix: String = "") = StatPreview(label, s.at(level, player = true), next?.let { s.at(it, player = true) }, suffix)
         val shots = def.attack.projectiles
         return listOf(
             line("Health", def.health),

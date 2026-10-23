@@ -8,9 +8,17 @@ package io.github.projectwip.data
  * Change a number here and both the game and the upgrade screen follow automatically.
  */
 
-/** A stat that grows by a fixed amount every level. */
+/**
+ * A stat that grows by a fixed amount every level. A player's fighter at level 1 ([player]) gets
+ * [Balance.LEVEL_ONE_BOOST] of a level's growth on top, so a new fighter isn't hopeless; level 2 and up are untouched,
+ * and bots (who fight at the player's level) never get it.
+ */
 data class StatLine(val base: Int, val perLevel: Int) {
-    fun at(level: Int): Int = base + perLevel * (level.coerceAtLeast(1) - 1)
+    fun at(level: Int, player: Boolean = false): Int {
+        val l = level.coerceAtLeast(1)
+        val boost = if (player && l == 1) (perLevel * Balance.LEVEL_ONE_BOOST).toInt() else 0
+        return base + perLevel * (l - 1) + boost
+    }
 }
 
 enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
@@ -35,7 +43,7 @@ enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
 
 /**
  * How rare a fighter is. Rarer fighters take more Credits on the Spark Road ([roadCost]; the server's own table
- * in `economy.py` is the one that counts). The fighter everyone starts with has no rarity of its own.
+ * in `economy.py` is the one that counts). Spark, the fighter everyone starts with, is shown as Legendary but is free: he is never on the road and has no price.
  */
 enum class Rarity(val label: String, val color: Long, val roadCost: Int) {
     STARTER("Starter", 0xFF9BE7FF, 0),
@@ -123,6 +131,11 @@ data class SuperSpec(
     val shadows: Int = 0,
     /** A realm ([SuperKind.REALM]): how long it lasts, in seconds. 0 = [Balance.REALM_SECONDS]. */
     val realmSeconds: Float = 0f,
+    /**
+     * A realm ([SuperKind.REALM]) whose captive is not held: it can move and fight in there, but at
+     * [Balance.REALM_CAPTIVE_SPEED] of its speed and [Balance.REALM_CAPTIVE_DAMAGE] of its damage. False = held still and helpless.
+     */
+    val captiveFree: Boolean = false,
 )
 
 /** A colourway. Index 0 is the default and always owned. */
@@ -220,6 +233,12 @@ object Balance {
 
     /** Stops a damaged save from loading a nonsense level (levels above [MAX_LEVEL] are valid with the cap off). */
     const val LEVEL_LIMIT = 9999
+    /** How much of one upgrade's growth a player's level-1 fighter gets for free ([StatLine.at]). */
+    const val LEVEL_ONE_BOOST = 0.5f
+    /** In a realm that lets its captive fight ([SuperSpec.captiveFree]), the captive moves this much of its speed... */
+    const val REALM_CAPTIVE_SPEED = 0.75f
+    /** ...and deals this much of its damage. */
+    const val REALM_CAPTIVE_DAMAGE = 0.75f
 
     /** Bolts needed to go FROM level (index+1) TO level (index+2). Past the end of the table see [upgradeCostFrom]. */
     val upgradeCost = intArrayOf(10, 20, 35, 60, 95, 145, 210, 290, 400)
@@ -360,7 +379,7 @@ object Balance {
     val fighters: List<FighterDef> = listOf(
         FighterDef(
             id = FighterId.BYTE,
-            rarity = Rarity.STARTER,
+            rarity = Rarity.LEGENDARY,
             // (The id is still BYTE: Spark took Rocket's place, by the user's decision, as Rocket had taken Byte's. Her
             // rockets and her realm are still in the simulation, and Spark's super is that realm.)
             name = "Spark",
@@ -375,7 +394,7 @@ object Balance {
             superDamage = StatLine(400, 20),
             moveSpeed = 3.6f,
             attack = AttackSpec(AttackShape.STAR, projectiles = 1, spreadDegrees = 0f, range = 8f, speed = 12f, radius = 0.26f, burstInterval = 0f, blast = 1.2f, slowSeconds = 2f),
-            superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 6 seconds, where four shadows of his fight them. In there they can do nothing, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again, though his shadows' strikes barely charge it. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4, realmSeconds = SPARK_REALM_SECONDS),
+            superSpec = SuperSpec(SuperKind.REALM, "Shadow Realm", "Aim it at an enemy (or tap, and it picks the nearest): he drags the first one on the line away into a realm of his own for 6 seconds, where four shadows of his fight them. In there they move a quarter slower and hit a quarter softer, bosses included, and nobody outside can touch either of them. He reloads and charges his super half as fast again, though his shadows' strikes barely charge it. Aimed at nobody, it misses.", range = 7f, speed = 30f, radius = 0f, shadows = 4, realmSeconds = SPARK_REALM_SECONDS, captiveFree = true),
             ammoMax = 3,
             reloadSeconds = 1.4f,
             superChargePerHit = 0.2f,
@@ -572,7 +591,7 @@ object Balance {
     }
 
     /** How a locked fighter can be obtained. */
-    fun unlockPrismPrice(id: FighterId): Int? = when (fighter(id).rarity) {
+    fun unlockPrismPrice(id: FighterId): Int? = if (id == FighterId.BYTE) null else when (fighter(id).rarity) {
         Rarity.STARTER -> null
         Rarity.RARE -> 40
         Rarity.EPIC -> 70

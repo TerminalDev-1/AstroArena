@@ -35,7 +35,7 @@ object SfxSynth {
         Sound.GLASS -> glass().finish(0.75f)
         Sound.EMPTY -> empty().finish(0.5f)
         Sound.HEX -> hex().finish(0.7f)
-        Sound.STAR -> starThrow().finish(0.7f)
+        Sound.STAR -> starThrow().finish(0.6f)
         Sound.STAR_BURST -> starBurst().finish(0.7f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
@@ -573,20 +573,19 @@ object SfxSynth {
      * Spark lobbing his star: a quick swish of the throw with a grunt under it, then a whistle that climbs as the star
      * goes up and sinks as it comes down, with a twinkle or two on the way.
      */
-    private fun starThrow() = Clip(0.7f).apply {
-        noise(91, 0f, 0.14f, Band.BAND, { glide(it, 0.12f, 800f, 3600f) }, 2.2f, { hold(it, 0.02f, 0.05f, 0.04f) * 0.45f })
-        osc(Wave.TRI, 0f, 0.1f, { glide(it, 0.08f, 210f, 140f) }, { perc(it, 0.004f, 0.03f) * 0.35f })
-        // The arc: up for the first third of the flight, then down past where it started.
-        osc(Wave.SINE, 0.06f, 0.6f, { t ->
-            val arc = if (t < 0.2f) glide(t, 0.2f, 1500f, 2350f) else glide(t - 0.2f, 0.38f, 2350f, 1050f)
-            arc * (1f + 0.012f * sin(t * 2f * Math.PI.toFloat() * 11f))
-        }, { hold(it, 0.04f, 0.42f, 0.07f) * 0.3f })
-        noise(92, 0.06f, 0.6f, Band.BAND, { t -> if (t < 0.2f) glide(t, 0.2f, 1500f, 2350f) else glide(t - 0.2f, 0.38f, 2350f, 1050f) }, 6f, { hold(it, 0.05f, 0.4f, 0.08f) * 0.12f })
-        for ((k, at) in floatArrayOf(0.14f, 0.29f, 0.44f).withIndex()) {
-            osc(Wave.SINE, at, 0.1f, { 4200f - k * 500f }, { perc(it, 0.002f, 0.025f) * 0.16f })
+    /** Spark's throw: a little twinkle. Four quick bell pings climbing an E major arpeggio over a soft shimmer. */
+    private fun starThrow() = Clip(0.55f).apply {
+        val notes = floatArrayOf(1318.5f, 1661.2f, 1975.5f, 2637f)
+        for ((k, f) in notes.withIndex()) {
+            val at = k * 0.045f
+            val loud = 0.3f - k * 0.03f
+            osc(Wave.SINE, at, 0.32f, { f }, { perc(it, 0.002f, 0.16f) * loud })
+            // A bell's bright, out-of-tune overtone, gone almost at once.
+            osc(Wave.SINE, at, 0.12f, { f * 2.76f }, { perc(it, 0.001f, 0.04f) * loud * 0.35f })
         }
-        filter(Band.LOW, 0.8f) { 7000f }
-        echo(0.06f, 0.18f, 0.1f)
+        noise(91, 0.02f, 0.3f, Band.HIGH, { glide(it, 0.25f, 5200f, 8400f) }, 0.8f, { hold(it, 0.03f, 0.1f, 0.15f) * 0.07f })
+        filter(Band.LOW, 0.8f) { 9000f }
+        echo(0.08f, 0.25f, 0.15f)
     }
 
     private fun starBurst() = Clip(0.45f).apply {

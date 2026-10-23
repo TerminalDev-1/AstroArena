@@ -42,14 +42,14 @@ class Fighter(
     val rooted: Boolean = false,
 ) {
     val control = Control()
-    val baseMaxHp = def.health.at(level)
+    val baseMaxHp = def.health.at(level, player = !isBot)
     var maxHp = baseMaxHp
     /** Power Cells collected (free-for-all). Each adds health and damage. */
     var cells = 0
     val damageMultiplier get() = (1f + io.github.projectwip.data.Balance.CELL_DAMAGE_BONUS * cells) *
         (if (hyperActive) 1f + io.github.projectwip.data.Balance.HYPER_DAMAGE_BONUS else 1f)
-    val attackDamage get() = (def.attackDamage.at(level) * damageMultiplier).toInt()
-    val superDamage get() = (def.superDamage.at(level) * damageMultiplier).toInt()
+    val attackDamage get() = (def.attackDamage.at(level, player = !isBot) * damageMultiplier).toInt()
+    val superDamage get() = (def.superDamage.at(level, player = !isBot) * damageMultiplier).toInt()
     val radius = def.radius
     /** How much bigger than a normal fighter of its kind this one is (a Boss Mode giant). */
     val scale = def.radius / io.github.projectwip.data.Balance.fighter(def.id).radius
@@ -136,6 +136,10 @@ class Fighter(
     var slowLeft = 0f
     val slowed get() = slowLeft > 0f
     val inRealm get() = realm >= 0
+    /** Taken into a realm that lets its captive move and fight ([io.github.projectwip.data.SuperSpec.captiveFree]). */
+    var realmFree = false
+    /** Taken into a realm that holds its captive still: it can do nothing until it is over. */
+    val heldInRealm get() = captive && !realmFree
     /** Taken into somebody else's realm: it can do nothing until it is over. */
     val captive get() = realm >= 0 && realm != id
 

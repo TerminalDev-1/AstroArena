@@ -771,7 +771,8 @@ class SimulationTest {
         val w = onOpenGround(kito, near, far)
         val a = kito.def.attack
         assertEquals(io.github.projectwip.data.AttackShape.SLASH, a.shape)
-        assertEquals("the damage is what the user set", 2800, kito.attackDamage)
+        assertEquals("the damage is what the user set", 2800, kito.def.attackDamage.at(1))
+        assertEquals("a player's level-1 fighter gets half a level's growth on top (Balance.LEVEL_ONE_BOOST)", 2870, kito.attackDamage)
         assertEquals("and so is the six seconds his bar takes", 6f, a.edgeSeconds, 0f)
         // One stands just past a plain swing's reach, inside a charged one's; the other is well out of both.
         near.x = kito.x + a.range + near.radius + 0.3f
@@ -831,7 +832,8 @@ class SimulationTest {
         assertFalse("not on their back: he stands on his own feet, and they are free", kito.latched || far.poisoned)
         assertTrue("with his ammo and his bar full", kito.ammo == 3f && kito.edgeFull)
         assertEquals("he cuts them as he arrives", far.maxHp - kito.superDamage, far.hp)
-        assertEquals(2000, kito.superDamage)
+        assertEquals(2000, kito.def.superDamage.at(1))
+        assertEquals("a player's level-1 fighter gets half a level's growth on top (Balance.LEVEL_ONE_BOOST)", 2050, kito.superDamage)
         kito.control.aimX = far.x - kito.x; kito.control.aimY = far.y - kito.y; kito.control.attack = true
         w.step(Match.STEP)
         assertEquals("and his sword follows", far.maxHp - kito.superDamage - kito.attackDamage, far.hp)
@@ -873,7 +875,8 @@ class SimulationTest {
         seconds(w, Balance.STAR_FLIGHT_SECONDS * 0.4f)
         assertTrue("then it has burst", w.lobs.isEmpty())
         assertEquals(near.maxHp - spark.attackDamage, near.hp)
-        assertEquals(1400, spark.attackDamage)
+        assertEquals(1400, spark.def.attackDamage.at(1))
+        assertEquals("a player's level-1 fighter gets half a level's growth on top (Balance.LEVEL_ONE_BOOST)", 1435, spark.attackDamage)
         assertTrue("and it is slowed", near.slowed)
         assertEquals("only those in the burst", far.maxHp, far.hp)
         assertFalse(far.slowed)
@@ -934,6 +937,31 @@ class SimulationTest {
         assertTrue("and then it is over", !near.inRealm && !spark.inRealm)
     }
 
+    @Test fun sparksCaptiveCanMoveAndFightBackAQuarterSlowerAndSofter() {
+        val tough = Balance.fighter(FighterId.BYTE).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
+        val spark = Fighter(7, tough, 1, 0, 0, "S", false)
+        val kito = Fighter(1, Balance.fighter(FighterId.KITO), 1, 0, 1, "K", true)
+        val w = onOpenGround(spark, kito)
+        kito.x = spark.x + 1.5f; kito.y = spark.y
+        assertTrue(spark.def.superSpec.captiveFree)
+        spark.superCharge = 1f
+        spark.control.aimX = 1f; spark.control.aimY = 0f; spark.control.superAttack = true
+        w.step(Match.STEP)
+        assertTrue("he takes them into his realm", kito.captive && !kito.heldInRealm)
+        // It fights back: one swing, a quarter softer, at Spark (the only one it can reach in there).
+        kito.shield = 0f; spark.shield = 0f
+        val before = spark.hp
+        kito.control.aimX = -1f; kito.control.aimY = 0f; kito.control.attack = true
+        w.step(Match.STEP)
+        assertEquals("a quarter less damage", (kito.attackDamage * Balance.REALM_CAPTIVE_DAMAGE).toInt(), before - spark.hp)
+        // And it walks, a quarter slower.
+        val x0 = kito.x
+        seconds(w, 1f) { kito.control.moveX = 1f; kito.control.moveY = 0f }
+        assertEquals("a quarter slower", kito.def.moveSpeed * Balance.REALM_CAPTIVE_SPEED, kito.x - x0, 0.15f)
+        seconds(w, Balance.SPARK_REALM_SECONDS)
+        assertTrue("once it is over it is free again", !kito.inRealm && !kito.realmFree)
+    }
+
     @Test fun rocketFiresARocketThatBurstsOnWhatItHits() {
         val rocket = Fighter(7, rocketStandIn, 1, 0, 0, "R", false)
         val near = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "N", true)
@@ -946,7 +974,8 @@ class SimulationTest {
         assertEquals("one rocket leaves her, with nothing to set off", 1 to 0, w.projectiles.size to w.planted.size)
         seconds(w, 1f)
         assertEquals("it goes off on the first enemy it meets", near.maxHp - rocket.attackDamage, near.hp)
-        assertEquals(1800, rocket.attackDamage)
+        assertEquals(1800, rocket.def.attackDamage.at(1))
+        assertEquals("a player's level-1 fighter gets half a level's growth on top (Balance.LEVEL_ONE_BOOST)", 1845, rocket.attackDamage)
         assertEquals("and only reaches those in its blast", far.maxHp, far.hp)
         assertTrue(rocket.ammo < 4f)
     }
@@ -1150,7 +1179,7 @@ class SimulationTest {
             return bites
         }
         val one = count(9f, 1)
-        assertEquals("two hundred a bite", setOf(200), one.toSet())
+        assertEquals("two hundred a bite, and five more for a player's level-1 boost", setOf(205), one.toSet())
         assertEquals("a bite every half second for six seconds, the hit being the first: 2,400 from one bolt", 12, one.size)
         assertFalse("and then it is over", hit.hexed)
         assertEquals("only the one it hit is poisoned", other.maxHp, other.hp)
@@ -1170,7 +1199,7 @@ class SimulationTest {
             w2.events.clear()
         }
         assertEquals("two on them at once", 2, most)
-        assertEquals("and the whole of both is done", 2 * 12 * 200, hpBefore - hit.hp)
+        assertEquals("and the whole of both is done (205 a bite with a player's level-1 boost)", 2 * 12 * 205, hpBefore - hit.hp)
         assertEquals("she is Epic", io.github.projectwip.data.Rarity.EPIC, kira.def.rarity)
     }
 

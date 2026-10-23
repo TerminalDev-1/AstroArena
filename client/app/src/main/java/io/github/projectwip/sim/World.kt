@@ -158,7 +158,7 @@ class World(
         }
 
         for (f in fighters) stepFighter(f, dt)
-        if (rules.boss) for (f in fighters) if (f.def.boss != null && f.alive && !f.enthralled && !f.captive) bossScripts.getOrPut(f.id) { BossScript(this, f) }.step(dt)
+        if (rules.boss) for (f in fighters) if (f.def.boss != null && f.alive && !f.enthralled && !f.heldInRealm) bossScripts.getOrPut(f.id) { BossScript(this, f) }.step(dt)
         stepConcealment(dt)
         stepProjectiles(dt)
         stepPlanted(dt)
@@ -233,8 +233,8 @@ class World(
 
         // --- movement
         if (f.latched) stepLatch(f)
-        if (f.captive) {
-            // (Taken into a realm: held where it stands until it is over.)
+        if (f.heldInRealm) {
+            // (Taken into a realm that holds its captive: held where it stands until it is over.)
         } else if (f.enthralled) {
             stepThrall(f, dt)
         } else if (f.latched) {
@@ -248,7 +248,7 @@ class World(
             var my = if (f.rooted) 0f else c.moveY
             val len = hypot(mx, my)
             if (len > 1f) { mx /= len; my /= len }
-            val speed = f.def.moveSpeed * (if (f.slowed) Balance.SLOW_FACTOR else 1f)
+            val speed = f.def.moveSpeed * (if (f.slowed) Balance.SLOW_FACTOR else 1f) * (if (f.captive) Balance.REALM_CAPTIVE_SPEED else 1f)
             val blocked = arena.moveCircle(f.x, f.y, f.radius, mx * speed * dt, my * speed * dt, tmp)
             f.x = tmp[0]; f.y = tmp[1]
             if (len > 0.05f) f.walkCycle += hypot(f.x - f.prevX, f.y - f.prevY) * 3.2f
@@ -258,7 +258,7 @@ class World(
         f.vy = (f.y - f.prevY) / dt
 
         // A fighter that is busy on someone's back, or is not its own any more, does nothing it is told to.
-        val idle = f.latched || f.enthralled || f.captive
+        val idle = f.latched || f.enthralled || f.heldInRealm
         if (idle) { c.attack = false; c.superAttack = false; c.hyper = false; c.detonate = false }
 
         // --- facing
@@ -601,6 +601,7 @@ class World(
         f.realmStrikes = 0
         if (t.latched) unlatch(t)
         t.realm = f.id
+        t.realmFree = f.def.superSpec.captiveFree
         t.dashTime = 0f
         t.pending.clear()
         t.revealTimer = maxOf(t.revealTimer, 1.5f)
@@ -635,6 +636,7 @@ class World(
             if (o.captive) events += GameEvent.Realm(id, o.id, false)
             o.realm = -1
             o.realmLeft = 0f
+            o.realmFree = false
         }
     }
 
@@ -1013,7 +1015,9 @@ class World(
     private fun damage(target: Fighter, source: Fighter?, wanted: Int, isSuper: Boolean, x: Float, y: Float, lethal: Boolean = true, charge: Boolean = true, chargeShare: Float = 1f) {
         // (Nothing crosses from the arena into a realm, or out of one.)
         if (source != null && source.realm != target.realm) return
-        val amount = if (lethal) wanted else minOf(wanted, target.hp - 1)
+        // (A captive that may fight back in there hits softer.)
+        val wantedHere = if (source != null && source.captive) (wanted * Balance.REALM_CAPTIVE_DAMAGE).toInt() else wanted
+        val amount = if (lethal) wantedHere else minOf(wantedHere, target.hp - 1)
         // (Nothing reaches a fighter in the middle of a leap.)
         if (target.shield > 0f || target.isLeaping || amount <= 0) {
             events += GameEvent.Blocked(x, y)

@@ -111,7 +111,7 @@ data class RoadStep(val fighter: FighterId, val cost: Int)
  */
 object SparkRoad {
     /** Every fighter on the road, in the order they are unlocked. */
-    val steps: List<RoadStep> = Balance.fighters.filter { it.rarity != Rarity.STARTER }.map { RoadStep(it.id, it.rarity.roadCost) }.sortedBy { it.cost }
+    val steps: List<RoadStep> = Balance.fighters.filter { it.rarity != Rarity.STARTER && it.id != FighterId.BYTE }.map { RoadStep(it.id, it.rarity.roadCost) }.sortedBy { it.cost }
 
     /** The fighter the Credits are filling: the first one along the road that is still locked. Null when the road is finished. */
     fun next(save: SaveData): RoadStep? = steps.firstOrNull { !save.progress(it.fighter).unlocked }
