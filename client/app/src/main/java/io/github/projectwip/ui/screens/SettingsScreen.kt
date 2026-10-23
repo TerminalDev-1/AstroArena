@@ -275,7 +275,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     PlainText("Leave the address empty to use the built-in one. Start the server on your computer with server/run.bat; it prints the address to type here.",
         Type.Small, color = Palette.TextDim.copy(alpha = 0.8f))
     Spacer(Modifier.height(10.dp))
-    SectionTitle("ABOUT", "AstroArena ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE}). Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
+    SectionTitle("ABOUT", "AstroArena ${BuildConfig.VERSION_NAME} (build ${BuildConfig.BUILD}). Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
     val context = androidx.compose.ui.platform.LocalContext.current
     ChunkyButton({
         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(REPO_URL)))

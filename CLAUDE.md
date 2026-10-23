@@ -291,14 +291,16 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   (`git add <path>`, never `git add -A` or `git commit -a`). Anything else that shows up in `git status`, such as
   an edited `.cfg` on the live server, is the user's: leave it uncommitted and untouched, and mention it.
 - **The version is "Beta", and it stays "Beta".** `versionName = "Beta"` is all players see. Underneath, the build
-  number (`versionCode`) is what the updater and the server's version gate compare.
+  number (`BuildConfig.BUILD`) is what the updater and the server's version gate compare.
 - **No long-term support, by the user's decision.** Every build is replaced by the next: the update screen has no
   way past it, and nothing on the server is kept for the sake of an older build. Build 46 shipped with a LATER
   button, so the server refuses it (`versions_not_supported.cfg`); keep that rule. Don't add an update-later option.
 - **Non-negotiable: release without being asked.** The user must never have to say "release". When a task that
   changed the client is finished, verified and pushed, release it: add one to `versionCode` (unless that build
   number has not been released yet), commit, tag `vN.0` (N = the build number), push the tag, and publish a GitHub
-  pre-release titled "AstroArena Beta" with the release APK attached (`AstroArena-Beta-N.apk`). One release per
+  pre-release titled "AstroArena Beta" with the release APK attached (`AstroArena-Beta-N.apk`). The build number is
+  `build` in `client/app/build.gradle.kts` (`BuildConfig.BUILD`): it can be a point release such as "94.1" (tag
+  `v94.1`) when the user asks for one; Android's `versionCode` is made from it (major * 100 + minor). One release per
   finished task, not one per checkpoint commit; server-only or docs-only work needs none. The tag keeps the
   `vN.0` form because older installs (0.4.2 to v11.1) can only read tags like that.
   The newest release must always be the newest build, so nobody downloads a stale APK.

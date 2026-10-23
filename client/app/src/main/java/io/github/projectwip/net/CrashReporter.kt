@@ -57,7 +57,7 @@ object CrashReporter {
     private fun report(text: String, kind: String) = JSONObject()
         .put("report", text.take(MAX_CHARS))
         .put("kind", kind)
-        .put("version", BuildConfig.VERSION_CODE.toString())
+        .put("version", BuildConfig.BUILD)
         .put("device", "${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})")
         .put("android", "${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
         .put("gpu", gpu.ifBlank { prefs.getString("gpu", "").orEmpty() })

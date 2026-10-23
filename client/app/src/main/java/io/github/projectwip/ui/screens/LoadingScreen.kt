@@ -138,7 +138,7 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
         if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
             GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
         }
-        PlainText(BuildConfig.VERSION_NAME + " · build " + BuildConfig.VERSION_CODE, Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp), color = Palette.TextDim)
+        PlainText(BuildConfig.VERSION_NAME + " · build " + BuildConfig.BUILD, Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp), color = Palette.TextDim)
     }
 }
 

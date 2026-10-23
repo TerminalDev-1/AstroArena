@@ -182,7 +182,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     LaunchedEffect(Unit) {
         val checked = java.util.concurrent.atomic.AtomicBoolean(false)
         // Debug: `--es screen updatecheck` runs the real check pretending to be a very old version.
-        val running = if (startScreen == "updatecheck") "0.0.1" else io.github.projectwip.BuildConfig.VERSION_CODE.toString()
+        val running = if (startScreen == "updatecheck") "0.0.1" else io.github.projectwip.BuildConfig.BUILD
         launch(kotlinx.coroutines.Dispatchers.IO) {
             val found = io.github.projectwip.net.Updater.check(running)
             if (found != null) update = found
@@ -493,7 +493,7 @@ fun connectToServer(server: io.github.projectwip.net.GameServer, repo: GameRepos
     val save = repo.online
     val settings = repo.save.value.settings
     val url = settings.serverUrl.ifBlank { io.github.projectwip.BuildConfig.SERVER_URL }
-    val stored = server.connect(url, io.github.projectwip.BuildConfig.VERSION_CODE.toString(), settings.playerName)
+    val stored = server.connect(url, io.github.projectwip.BuildConfig.BUILD, settings.playerName)
     val status = server.status.value
     if (!status.online || !status.supported) return
     val restored = stored?.let { runCatching { io.github.projectwip.data.SaveStore.fromJson(it) }.getOrNull() }
