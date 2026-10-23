@@ -19,7 +19,7 @@ interface GlRenderer {
 }
 
 /** Minimal EGL setup (ES 3.0, RGBA8888, depth 24, 4x MSAA when available). */
-class Egl(transparent: Boolean) {
+class Egl(transparent: Boolean, msaa: Boolean = true) {
     val display: EGLDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
     val config: EGLConfig
     val context: EGLContext
@@ -27,7 +27,7 @@ class Egl(transparent: Boolean) {
     init {
         val ver = IntArray(2)
         check(EGL14.eglInitialize(display, ver, 0, ver, 1)) { "eglInitialize failed" }
-        config = chooseConfig(4) ?: chooseConfig(0) ?: error("No EGL config")
+        config = (if (msaa) chooseConfig(4) else null) ?: chooseConfig(0) ?: error("No EGL config")
         val attrs = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE)
         context = EGL14.eglCreateContext(display, config, EGL14.EGL_NO_CONTEXT, attrs, 0)
         check(context != EGL14.EGL_NO_CONTEXT) { "eglCreateContext failed" }
@@ -78,6 +78,8 @@ class GlThread(
     private val renderer: GlRenderer,
     private val name: String,
     private val transparent: Boolean = false,
+    /** Told (on this thread) when the graphics couldn't start or stopped working; the error is already reported. */
+    private val onFailure: ((Throwable) -> Unit)? = null,
 ) : Thread(name) {
     @Volatile private var running = true
     @Volatile private var width = 0
@@ -99,10 +101,37 @@ class GlThread(
         join(1500)
     }
 
+    /**
+     * EGL for this window: with anti-aliasing if the GPU will make a surface with it, and without if not (some phones
+     * refuse a multisampled surface for a window, and the match used to crash right there).
+     */
+    private fun startEgl(): Pair<Egl, EGLSurface> {
+        var egl = Egl(transparent)
+        var surface = egl.windowSurface(nativeWindow)
+        if (surface == EGL14.EGL_NO_SURFACE) {
+            Log.w(name, "eglCreateWindowSurface failed (0x${Integer.toHexString(EGL14.eglGetError())}); trying without MSAA")
+            egl.release()
+            egl = Egl(transparent, msaa = false)
+            surface = egl.windowSurface(nativeWindow)
+            if (surface == EGL14.EGL_NO_SURFACE) {
+                val err = EGL14.eglGetError()
+                egl.release()
+                error("eglCreateWindowSurface failed: 0x${Integer.toHexString(err)}")
+            }
+        }
+        if (!EGL14.eglMakeCurrent(egl.display, surface, surface, egl.context)) {
+            val err = EGL14.eglGetError()
+            egl.destroySurface(surface)
+            egl.release()
+            error("eglMakeCurrent failed: 0x${Integer.toHexString(err)}")
+        }
+        return egl to surface
+    }
+
     override fun run() {
-        val egl = try { Egl(transparent) } catch (e: Exception) { Log.e(name, "EGL init failed", e); return }
-        val surface = egl.windowSurface(nativeWindow)
-        egl.makeCurrent(surface)
+        // Anything that goes wrong with the graphics is reported, and the game carries on without them (a black
+        // view) rather than crashing: the player can still leave the match.
+        val (egl, surface) = try { startEgl() } catch (e: Throwable) { failed("couldn't start", e); return }
         if (io.github.projectwip.net.CrashReporter.gpu.isBlank()) {
             io.github.projectwip.net.CrashReporter.gpu = listOf(GLES30.GL_RENDERER, GLES30.GL_VERSION).joinToString(" / ") { GLES30.glGetString(it).orEmpty() }
         }
@@ -139,12 +168,17 @@ class GlThread(
                     sleep(16)
                 }
             }
-        } catch (e: Exception) {
-            Log.e(name, "render thread crashed", e)
+        } catch (e: Throwable) {
+            failed("stopped", e)
         } finally {
-            try { renderer.onDestroyed() } catch (_: Exception) {}
-            egl.destroySurface(surface)
-            egl.release()
+            try { renderer.onDestroyed() } catch (_: Throwable) {}
+            try { egl.destroySurface(surface); egl.release() } catch (_: Throwable) {}
         }
+    }
+
+    private fun failed(what: String, e: Throwable) {
+        Log.e(name, "graphics $what", e)
+        io.github.projectwip.net.CrashReporter.record("Graphics $what on $name", e)
+        try { onFailure?.invoke(e) } catch (_: Throwable) {}
     }
 }

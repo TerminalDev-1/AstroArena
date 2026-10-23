@@ -151,6 +151,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // Debug: `--es screen disabled` shows the notice with made-up details.
     val disabledShown = serverStatus.disabled || startScreen == "disabled"
     var booting by remember { mutableStateOf(true) }
+    /** A problem report waiting to be offered to the player to share, if any. */
+    var shareReport by remember { mutableStateOf<String?>(null) }
     var bootProgress by remember { mutableStateOf(0f) }
     var bootStatus by remember { mutableStateOf("Connecting to server…") }
     var connection by remember { mutableStateOf(Connection.CONNECTING) }
@@ -212,6 +214,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         }
         bootProgress = 1f
         booting = false
+        // A crash (or a graphics failure) the server hasn't been told about yet: offer it to the player to send on,
+        // once, so a problem on a phone that can't reach the server can still be looked at.
+        if (startScreen == null && io.github.projectwip.net.CrashReporter.shouldOffer()) shareReport = io.github.projectwip.net.CrashReporter.pendingText()
     }
 
     // Cups, Arena Boxes, currencies, fighters and shop deals are the server's: whatever it says this player has is what the game shows.
@@ -449,6 +454,22 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 // Dev builds don't have to sit through the minute of trying.
                 io.github.projectwip.ui.screens.LoadingScreen(bootProgress, bootStatus,
                     onSkip = if (io.github.projectwip.BuildConfig.DEBUG && connection == Connection.CONNECTING) ({ connection = Connection.SETTLED }) else null)
+            }
+            shareReport?.let { text ->
+                val context = androidx.compose.ui.platform.LocalContext.current
+                ConfirmDialog(
+                    "SOMETHING WENT WRONG",
+                    "The game hit a problem last time. Send the report to whoever runs your server so it can be fixed: it's sent to the server by itself too, once the game can reach it.",
+                    "SHARE REPORT",
+                    {
+                        shareReport = null
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                            .putExtra(android.content.Intent.EXTRA_SUBJECT, "AstroArena problem report")
+                            .putExtra(android.content.Intent.EXTRA_TEXT, text)
+                        context.startActivity(android.content.Intent.createChooser(send, "Send the report"))
+                    },
+                    { shareReport = null },
+                )
             }
             if (needsName) io.github.projectwip.ui.screens.NameScreen { name ->
                 repo.updateSettings { it.copy(playerName = name, nameChosen = true) }

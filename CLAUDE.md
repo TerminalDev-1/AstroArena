@@ -62,6 +62,16 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - **The build number** (`build` in `client/app/build.gradle.kts`) can be a point release ("94.1") when the user asks;
   a wrong number on a published release is fixed by deleting that release and its tag and publishing the right one,
   built from a commit with the right number.
+- **Other people's phones aren't the tablet.** A friend's Redmi crashed on Play while the tablet never did: the
+  match's SurfaceView had no pixel format set, and creating its EGL surface outside any error handling crashed the
+  app on phones that refuse the mismatch. Set formats explicitly (`MatchView` asks for RGBA_8888), and keep every
+  graphics step inside `GlThread`'s handling: it retries without MSAA, and a failure is reported
+  (`CrashReporter.record`) and leaves a black view the player can leave, never a crash.
+- **A phone that can't reach the server can't send its reports.** So the game offers saved reports to the player to
+  share (the "SOMETHING WENT WRONG" message after loading, `CrashReporter.pendingText`/`shouldOffer`), and the home
+  screen says why it is offline (`GameServer.unreachable`, or that the player chose Offline mode). Ask for the shared
+  report before guessing at a crash on someone else's phone. `--es server http://192.168.1.103:9999` fakes an
+  unreachable server (this PC's firewall drops that port, so it times out); `--es server default` undoes it.
 - **Shell traps on this machine** (Git Bash on Windows): adb under `MSYS_NO_PATHCONV=1` needs Windows paths
   (`C:/Users/...`), not `/c/Users/...`; Gradle runs from `client/` (a `cd` that is a level off fails silently behind a
   `grep`); long Python edits with quotes in them go in a script file in the scratchpad (run with `python -I`), not a

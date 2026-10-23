@@ -177,8 +177,14 @@ fun HomeScreen(
         // Online, or the offline profile: under the Cups panel. It steps aside for the mode picker.
         if (!picking) {
             val offline = !online || io.github.projectwip.ui.LocalOfflineMode.current
+            // Offline, say why: the player's own choice, or what went wrong reaching the server.
+            val why = when {
+                !offline -> ""
+                save.settings.forceOffline -> " · you turned on Offline mode in Settings"
+                else -> io.github.projectwip.ui.LocalServer.current?.unreachable?.takeIf { it.isNotBlank() }?.let { " · can't reach $it" }.orEmpty()
+            }
             PlainText(
-                if (!offline) "● ONLINE" else "● OFFLINE · CHAOS MODE · your offline profile, kept on this device", Type.Small,
+                if (!offline) "● ONLINE" else "● OFFLINE · CHAOS MODE$why", Type.Small,
                 Modifier.align(Alignment.TopStart).padding(start = if (ui.roomy) 108.dp else 92.dp, top = 70.dp),
                 color = if (!offline) Palette.Positive else Palette.TextDim, maxLines = 1,
             )

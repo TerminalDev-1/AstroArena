@@ -54,6 +54,37 @@ object CrashReporter {
         }
     }
 
+    /** A problem that didn't crash the game but should be looked at (the graphics failing to start, say). */
+    fun record(what: String, error: Throwable) {
+        if (!::dir.isInitialized) return
+        try {
+            val trace = StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()
+            write(report("$what\n$trace", "problem"))
+        } catch (_: Throwable) {}
+    }
+
+    /** Every saved report, as text a player can share (they are sent to the server too, once it answers). */
+    fun pendingText(): String? {
+        if (!::dir.isInitialized) return null
+        val list = pending()
+        if (list.isEmpty()) return null
+        return list.joinToString("\n\n") { o ->
+            "AstroArena ${o.optString("kind")} report · build ${o.optString("version")} · ${o.optString("crashed")}\n" +
+                "${o.optString("device")} · Android ${o.optString("android")} · ${o.optString("gpu")}\n" + o.optString("report")
+        }.take(12_000)
+    }
+
+    /** When the reports waiting now were last offered to the player to share, so each lot is offered once. */
+    fun shouldOffer(): Boolean {
+        if (!::dir.isInitialized) return false
+        val file = File(dir, FILE)
+        if (!file.exists()) return false
+        val stamp = file.lastModified()
+        if (prefs.getLong("offered", 0L) >= stamp) return false
+        prefs.edit().putLong("offered", stamp).apply()
+        return true
+    }
+
     private fun report(text: String, kind: String) = JSONObject()
         .put("report", text.take(MAX_CHARS))
         .put("kind", kind)

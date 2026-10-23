@@ -51,6 +51,9 @@ class MatchView(
     init {
         addView(surface, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(hud, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        // The format the game's graphics are set up for (8 bits a channel). Left to Android, a SurfaceView may be given
+        // another, and some phones then refuse to make the match's drawing surface at all.
+        surface.holder.setFormat(android.graphics.PixelFormat.RGBA_8888)
         surface.holder.addCallback(this)
         keepScreenOn = true
     }
@@ -61,7 +64,11 @@ class MatchView(
             val hz = if (settings.highFrameRate) display?.refreshRate ?: 120f else 60f
             holder.surface.setFrameRate(hz, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
         }
-        thread = GlThread(holder.surface, MatchRenderer(runner, channel, matchesPlayed), "match-gl").also { it.start() }
+        thread = GlThread(holder.surface, MatchRenderer(runner, channel, matchesPlayed), "match-gl", onFailure = {
+            main.post {
+                android.widget.Toast.makeText(context, "The graphics couldn't start on this phone. A report was saved: pause to leave the match.", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }).also { it.start() }
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {

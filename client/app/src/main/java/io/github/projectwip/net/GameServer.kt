@@ -121,6 +121,10 @@ class GameServer(context: Context) : GameActions {
     private val token: String? get() = prefs.getString("token@$baseUrl", null)
     private val usable get() = _status.value.online && _status.value.supported
 
+    /** Why the server couldn't be reached the last time it wasn't ("" when the last request got through). */
+    @Volatile var unreachable = ""
+        private set
+
     /** Why the server refused the last request, in its own words ("" if it didn't). */
     @Volatile override var lastError = ""
         private set
@@ -158,6 +162,7 @@ class GameServer(context: Context) : GameActions {
                 c.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             }
             val code = c.responseCode
+            unreachable = ""
             val text = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() }
             val reply = Reply(code, text?.let { runCatching { JSONObject(it) }.getOrNull() })
             // 426: the server has stopped supporting this version since we connected.
@@ -170,6 +175,15 @@ class GameServer(context: Context) : GameActions {
         }
     } catch (e: Exception) {
         Log.i(TAG, "$method $path failed: $e")
+        val why = when (e) {
+            is java.net.SocketTimeoutException -> "timed out"
+            is java.net.ConnectException -> if ("ECONNREFUSED" in e.message.orEmpty()) "refused: is the server running?" else "can't connect"
+            is java.net.NoRouteToHostException -> "no route: is this phone on the same Wi-Fi?"
+            is java.net.UnknownHostException -> "unknown address"
+            is java.io.IOException -> e.message?.take(60) ?: e.javaClass.simpleName
+            else -> e.javaClass.simpleName
+        }
+        unreachable = "${baseUrl.removePrefix("http://").removePrefix("https://")} $why"
         null
     }
 
