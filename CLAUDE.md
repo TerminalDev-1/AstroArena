@@ -12,6 +12,18 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   already explains.
 - Never go quiet for minutes. Say in a line what you are about to do before a long stretch of reading or building,
   and show progress as pieces land (a first edit, a passing test, a screenshot).
+- **The starter fighter is always `Rarity.STARTER`.** Whoever everyone starts with (`FighterId.BYTE`) is the
+  Starter, never Legendary or any other rarity, unless the user says otherwise. When the user puts a new fighter "in
+  place of" another, don't assume the old one is removed: ask whether they stay as a fighter of their own, and keep
+  whoever had them. (Build 96 went wrong on both: Swish was made Legendary and Spark was retired, and the user had to
+  correct each.)
+- **No cheap, generated-feeling sounds or effects.** Everything here is made in code, and it must not sound or look
+  like it. Sounds of real things (wind, storms, thunder, impacts, whooshes) are built from shaped noise with natural
+  envelopes, not from tuned tones: droning saw waves and electronic zaps under a natural sound read as fake (the user
+  rejected a tornado sound for that). Effects must read as the real thing from the game's own top-down camera:
+  check them with a screenshot while they are happening, and don't ship stacked see-through rings or shapes that
+  only work from the side (the user called the first tornado terrible). What an attack visibly covers must be what it
+  hits: no thin effect inside a bigger damage circle. Look at the result critically before calling it done.
 
 ## Build
 
