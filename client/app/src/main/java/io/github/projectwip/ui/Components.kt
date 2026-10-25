@@ -125,7 +125,8 @@ fun PlainText(text: String, style: TextStyle, modifier: Modifier = Modifier, col
  */
 class NotchShape(private val cut: Dp, private val radius: Dp) : Shape {
     override fun createOutline(size: Size, layoutDirection: androidx.compose.ui.unit.LayoutDirection, density: androidx.compose.ui.unit.Density): androidx.compose.ui.graphics.Outline {
-        val half = minOf(size.width, size.height) * 0.5f
+        // Never negative: coerceIn throws when its top is below 0 (a crash on a Galaxy, build 99).
+        val half = (minOf(size.width, size.height) * 0.5f).coerceAtLeast(0f)
         val c = with(density) { cut.toPx() }.coerceIn(0f, half)
         val r = with(density) { radius.toPx() }.coerceIn(0f, half)
         val s = (c * 0.45f).coerceAtMost(half)
@@ -238,7 +239,8 @@ fun ChunkyButton(
                 drawPath(whole, Brush.verticalGradient(listOf(lerp(s.lip, s.bottom, 0.25f), lerp(s.lip, Color.Black, 0.3f))))
                 drawPath(whole, Palette.Ink, style = Stroke(ink, join = StrokeJoin.Round))
                 translate(top = pressPx) {
-                    val face = Size(size.width, size.height - lipPx)
+                    // A button squeezed shorter than its lip (small screens, big font) must not get a negative face.
+                    val face = Size(size.width, (size.height - lipPx).coerceAtLeast(0f))
                     val faceShape = Path().apply { addOutline(shape.createOutline(face, layoutDirection, this@drawBehind)) }
                     plate(shape, face, Brush.verticalGradient(listOf(lerp(s.top, Color.White, if (glass) 0.04f else 0.14f), s.top, s.bottom)), Palette.Ink, ink, gloss = !glass, rim = s.rim)
                     if (glass) clipPath(faceShape) {
