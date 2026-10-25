@@ -233,7 +233,8 @@ class FighterStageView(context: Context) : TextureView(context), TextureView.Sur
             override fun onSize(width: Int, height: Int) { w = width; h = height }
             override fun onFrame(dt: Float) { time += dt; scene?.render(w, h, params, time, dt) }
         }
-        thread = GlThread(st, renderer, "stage-gl", transparent = true).also { it.resize(width, height); it.start() }
+        val gfx = io.github.projectwip.gl.GraphicsProfile.current
+        thread = GlThread(st, renderer, "stage-gl", transparent = true, msaa = gfx.msaa).also { it.maxFps = gfx.menuFrameRate; it.resize(width, height); it.start() }
     }
 
     override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) { thread?.resize(width, height) }

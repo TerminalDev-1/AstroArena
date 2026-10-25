@@ -295,7 +295,16 @@ private fun MatchBody(
     var intro by remember { mutableStateOf(!match.practice) }
     val context = LocalContext.current
 
-    LaunchedEffect(Unit) { (context as? MainActivity)?.applyRefreshRate(settings.highFrameRate) }
+    // The match runs at the chosen frame rate; the menus go back to theirs (never above 60) when it ends.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val activity = context as? MainActivity
+        activity?.inMatch = true
+        activity?.applyRefreshRate(settings.frameRate)
+        onDispose {
+            activity?.inMatch = false
+            activity?.applyRefreshRate(io.github.projectwip.gl.GraphicsProfile.current.menuFrameRate)
+        }
+    }
 
     fun finish(report: MatchReport) {
         if (done) return

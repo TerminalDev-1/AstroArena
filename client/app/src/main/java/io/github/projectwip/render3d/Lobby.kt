@@ -74,7 +74,7 @@ class LobbyScene {
     private val depth = Program(Shaders.LIT_VS, Shaders.DEPTH_FS, "lobby-depth")
     private val sprite = Program(Shaders.SPRITE_VS, Shaders.SPRITE_FS, "lobby-sprite")
     private val models = FighterModels()
-    private val shadow = ShadowMap(1024)
+    private val shadow = ShadowMap(if (io.github.projectwip.gl.GraphicsProfile.current.shadowSize == 0) 512 else 1024)
     private val sprites = SpriteBatch(512)
     private val particles = Particles3D(512)
     private val capsule = Capsule3D()
@@ -532,12 +532,24 @@ class LobbyView(context: Context, val params: LobbyParams) : TextureView(context
             private var time = 0f
             override fun onCreated() { scene = LobbyScene() }
             override fun onSize(width: Int, height: Int) { w = width; h = height }
-            override fun onFrame(dt: Float) { time += dt; scene?.render(w, h, params, time, dt) }
+            override fun onFrame(dt: Float) {
+                time += dt; scene?.render(w, h, params, time, dt)
+                // (A frame rate picked in Settings applies to the lobby behind it at once.)
+                thread?.maxFps = io.github.projectwip.gl.GraphicsProfile.current.menuFrameRate
+            }
         }
-        thread = GlThread(st, renderer, "lobby-gl").also { it.resize(width, height); it.start() }
+        val gfx = io.github.projectwip.gl.GraphicsProfile.current
+        val (bw, bh) = gfx.bufferSize(width, height)
+        st.setDefaultBufferSize(bw, bh)
+        thread = GlThread(st, renderer, "lobby-gl", msaa = gfx.msaa).also { it.maxFps = gfx.menuFrameRate; it.resize(bw, bh); it.start() }
     }
 
-    override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) { thread?.resize(width, height) }
+    override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) {
+        // (The view resets the buffer to its own size: drawn smaller again on the lower presets.)
+        val (bw, bh) = io.github.projectwip.gl.GraphicsProfile.current.bufferSize(width, height)
+        st.setDefaultBufferSize(bw, bh)
+        thread?.resize(bw, bh)
+    }
 
     override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
         thread?.shutdown(); thread = null

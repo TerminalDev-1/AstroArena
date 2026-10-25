@@ -81,12 +81,20 @@ class Particles3D(private val max: Int = 1200) {
     private val r = FloatArray(max); private val g = FloatArray(max); private val b = FloatArray(max); private val a = FloatArray(max)
     private val additive = BooleanArray(max)
     private var n = 0
+    /** Share of spawns kept (the graphics preset's effect density); dropped evenly, not at random. */
+    var density = 1f
+    private var spawnCredit = 0f
 
     fun spawn(
         px: Float, py: Float, pz: Float, pvx: Float, pvy: Float, pvz: Float, l: Float, s: Float,
         color: Int, alpha: Float = 1f, grav: Float = 0f, growth: Float = 0f, add: Boolean = true,
     ) {
         if (n >= max) return
+        if (density < 1f) {
+            spawnCredit += density
+            if (spawnCredit < 1f) return
+            spawnCredit -= 1f
+        }
         x[n] = px; y[n] = py; z[n] = pz; vx[n] = pvx; vy[n] = pvy; vz[n] = pvz
         life[n] = l; maxLife[n] = l; size[n] = s; grow[n] = growth; gravity[n] = grav
         r[n] = ((color shr 16) and 0xFF) / 255f; g[n] = ((color shr 8) and 0xFF) / 255f; b[n] = (color and 0xFF) / 255f; a[n] = alpha

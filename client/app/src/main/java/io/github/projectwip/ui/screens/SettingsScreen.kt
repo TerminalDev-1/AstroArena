@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import io.github.projectwip.BuildConfig
 import io.github.projectwip.data.BotDifficulty
 import io.github.projectwip.data.GameRepository
+import io.github.projectwip.data.GraphicsQuality
 import io.github.projectwip.data.MoveStickMode
 import io.github.projectwip.data.SaveData
 import io.github.projectwip.data.Settings
@@ -71,7 +72,7 @@ import androidx.compose.runtime.collectAsState
 
 const val REPO_URL = "https://github.com/TerminalDev-1/AstroArena"
 
-private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), MODES("Modes"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Display"), DATA("Data"), CHAOS("Chaos Command Center") }
+private enum class Tab(val label: String) { GAMEPLAY("Gameplay"), MODES("Modes"), CONTROLS("Controls"), AUDIO("Audio & Feel"), DISPLAY("Graphics"), DATA("Data"), CHAOS("Chaos Command Center") }
 
 @Composable
 fun SettingsScreen(save: SaveData, repo: GameRepository, go: (Screen) -> Unit) {
@@ -236,7 +237,18 @@ private fun AudioTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
 
 @Composable
 private fun DisplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
-    ToggleRow("HIGH FRAME RATE", "Render matches at up to 120 Hz on supported screens. Turn off to save battery. Applies next match.", s.highFrameRate) { v -> set { it.copy(highFrameRate = v) } }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val auto = remember { io.github.projectwip.gl.GraphicsProfile.autoFor(context) }
+    val qualities = listOf(GraphicsQuality.AUTO, GraphicsQuality.LOW, GraphicsQuality.MEDIUM, GraphicsQuality.HIGH)
+    SectionTitle("GRAPHICS QUALITY", "Low draws at a lower resolution, without anti-aliasing or shadows, with fewer particles: the phone stays cooler and " +
+        "the battery lasts longer. High is the sharpest, and the hottest. Auto picks for this device (${auto.name.lowercase()} here). Applies next match.")
+    Segmented(qualities.map { if (it == GraphicsQuality.AUTO) "AUTO" else it.name }, qualities.indexOf(s.graphics).coerceAtLeast(0)) { i ->
+        set { it.copy(graphics = qualities[i]) }
+    }
+    val rates = remember { io.github.projectwip.gl.GraphicsProfile.frameRates(context) }
+    SectionTitle("FRAME RATE", "Frames a second in matches. Higher is smoother and much hotter; 60 is the best balance, 30 saves the most battery. " +
+        "The menus never go above 60.")
+    Segmented(rates.map { "$it FPS" }, rates.indexOfLast { it <= s.frameRate }.coerceAtLeast(0)) { i -> set { it.copy(frameRate = rates[i]) } }
     ToggleRow("DAMAGE NUMBERS", "Show damage you deal and take.", s.showDamageNumbers) { v -> set { it.copy(showDamageNumbers = v) } }
     ToggleRow("SHOW FPS", "Frame counter in matches.", s.showFps) { v -> set { it.copy(showFps = v) } }
 }

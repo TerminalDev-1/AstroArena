@@ -86,6 +86,12 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 
 ## Device
 
+- **Device order, by the user's decision:** the tablet first; when it isn't reachable, the user's Samsung Galaxy S26
+  (Xclipse GPU through ANGLE on Vulkan; the phone that got hot in build 100), on wireless debugging at
+  `192.168.1.200` (adb's mDNS name `adb-RFGL80Y4A5W`, port changes: `adb mdns services`, then `adb connect`). Pass
+  `-s <serial>` when both are connected. The S26 is the user's own phone too: the same focus and touch checks apply
+  (its launcher is Samsung's, `com.sec.android.app.launcher`, not `com.miui.home`; find its touchscreen with
+  `getevent -pl` rather than assuming `event8`).
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`

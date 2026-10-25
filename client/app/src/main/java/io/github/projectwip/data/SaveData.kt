@@ -3,6 +3,9 @@ package io.github.projectwip.data
 /** FLOATING = unlocked: the stick appears wherever the thumb lands. FIXED = locked in place. */
 enum class MoveStickMode { FLOATING, FIXED }
 
+/** Graphics preset. AUTO is picked from the device (`gl/GraphicsProfile`). Nothing here may reach `sim/`. */
+enum class GraphicsQuality { AUTO, LOW, MEDIUM, HIGH }
+
 /**
  * Where the player put the on-screen controls: the centre of each as a fraction of the screen.
  * Negative = the default spot. A moved move-stick always stays where it was put (it no longer floats).
@@ -32,7 +35,9 @@ data class Settings(
     /** Manually aimed shots snap onto an enemy within a few degrees. */
     val aimAssist: Boolean = true,
     val showDamageNumbers: Boolean = true,
-    val highFrameRate: Boolean = true,
+    val graphics: GraphicsQuality = GraphicsQuality.AUTO,
+    /** Frames a second the game draws at: 30, 60, or 90/120 where the screen has them. 60 keeps phones cool. */
+    val frameRate: Int = 60,
     val showFps: Boolean = false,
     val playerName: String = "Player",
     /** The player has picked their name (new players are asked before their account is made). */

@@ -242,6 +242,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         }
     }
 
+    val activity = androidx.compose.ui.platform.LocalContext.current as? io.github.projectwip.MainActivity
+    LaunchedEffect(save.settings.graphics, save.settings.frameRate) { activity?.applyGraphics(save.settings) }
     LaunchedEffect(save.settings) {
         sfx.volume = if (save.settings.muted) 0f else save.settings.sfxVolume
         sfx.hapticsEnabled = save.settings.haptics

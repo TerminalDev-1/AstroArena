@@ -93,7 +93,8 @@ class SaveStore(context: Context, name: String = "save.json") {
                 put("tapToAutoAim", st.tapToAutoAim)
                 put("aimAssist", st.aimAssist)
                 put("showDamageNumbers", st.showDamageNumbers)
-                put("highFrameRate", st.highFrameRate)
+                put("graphics", st.graphics.name)
+                put("frameRate", st.frameRate)
                 put("showFps", st.showFps)
                 put("playerName", st.playerName)
                 put("nameChosen", st.nameChosen)
@@ -140,7 +141,9 @@ class SaveStore(context: Context, name: String = "save.json") {
                 tapToAutoAim = so.optBoolean("tapToAutoAim", sd.tapToAutoAim),
                 aimAssist = so.optBoolean("aimAssist", sd.aimAssist),
                 showDamageNumbers = so.optBoolean("showDamageNumbers", sd.showDamageNumbers),
-                highFrameRate = so.optBoolean("highFrameRate", sd.highFrameRate),
+                graphics = enumOr(so.optString("graphics"), sd.graphics),
+                // (The old "highFrameRate" switch was on for everyone and ran hot phones at 120 Hz: everyone starts at 60.)
+                frameRate = so.optInt("frameRate", sd.frameRate).let { if (it in listOf(30, 60, 90, 120)) it else sd.frameRate },
                 showFps = so.optBoolean("showFps", sd.showFps),
                 playerName = so.optString("playerName", sd.playerName).take(16).ifBlank { sd.playerName },
                 nameChosen = so.optBoolean("nameChosen", false),

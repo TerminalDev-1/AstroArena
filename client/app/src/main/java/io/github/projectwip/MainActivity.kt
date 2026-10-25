@@ -31,7 +31,8 @@ class MainActivity : ComponentActivity() {
         sfx = Sfx(this).also { it.load(); it.loadVoice() }
         music = io.github.projectwip.audio.Music(this).also { it.load() }
         io.github.projectwip.render3d.Portraits.start()
-        applyRefreshRate(repo.save.value.settings.highFrameRate)
+        // The graphics preset and frame rate follow the settings (App calls this again when they change).
+        applyGraphics(repo.save.value.settings)
 
         // Debug builds accept `--es screen match|fighters|shop|track|settings|capsuleN` for automated testing.
         val start = if (BuildConfig.DEBUG) intent?.getStringExtra("screen") else null
@@ -70,18 +71,24 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Ask for the display's highest refresh mode (up to 144 Hz) when high frame rate is enabled. */
-    fun applyRefreshRate(high: Boolean) {
+    /** Makes [s]'s graphics preset the one the renderers use; the menus never run above 60 frames a second. */
+    fun applyGraphics(s: io.github.projectwip.data.Settings) {
+        val g = io.github.projectwip.gl.GraphicsProfile.resolve(this, s)
+        io.github.projectwip.gl.GraphicsProfile.current = g
+        if (!inMatch) applyRefreshRate(g.menuFrameRate)
+    }
+
+    /** A match is on screen: it sets the window's refresh rate itself. */
+    var inMatch = false
+
+    /** Runs the panel at the slowest mode that still shows [fps] (60 for 30: the game paces itself to half). */
+    fun applyRefreshRate(fps: Int) {
         val display = if (Build.VERSION.SDK_INT >= 30) display else @Suppress("DEPRECATION") windowManager.defaultDisplay
         display ?: return
-        val modes = display.supportedModes
         val current = display.mode
-        val best = if (high) {
-            modes.filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight && it.refreshRate <= 145f }
-                .maxByOrNull { it.refreshRate }
-        } else {
-            modes.filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
-                .minByOrNull { kotlin.math.abs(it.refreshRate - 60f) }
-        }
+        val modes = display.supportedModes.filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+        val want = maxOf(fps, 60) - 1f
+        val best = modes.filter { it.refreshRate >= want }.minByOrNull { it.refreshRate } ?: modes.maxByOrNull { it.refreshRate }
         best?.let { m ->
             window.attributes = window.attributes.apply { preferredDisplayModeId = m.modeId }
         }

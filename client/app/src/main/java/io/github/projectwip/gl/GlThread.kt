@@ -18,8 +18,8 @@ interface GlRenderer {
     fun onDestroyed() {}
 }
 
-/** Minimal EGL setup (ES 3.0, RGBA8888, depth 24, 4x MSAA when available). */
-class Egl(transparent: Boolean, msaa: Boolean = true) {
+/** Minimal EGL setup (ES 3.0, RGBA8888, depth 24, [msaa] samples when available, else 4 fewer down to none). */
+class Egl(transparent: Boolean, msaa: Int = 4) {
     val display: EGLDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
     val config: EGLConfig
     val context: EGLContext
@@ -27,7 +27,7 @@ class Egl(transparent: Boolean, msaa: Boolean = true) {
     init {
         val ver = IntArray(2)
         check(EGL14.eglInitialize(display, ver, 0, ver, 1)) { "eglInitialize failed" }
-        config = (if (msaa) chooseConfig(4) else null) ?: chooseConfig(0) ?: error("No EGL config")
+        config = (if (msaa >= 4) chooseConfig(4) else null) ?: (if (msaa >= 2) chooseConfig(2) else null) ?: chooseConfig(0) ?: error("No EGL config")
         val attrs = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE)
         context = EGL14.eglCreateContext(display, config, EGL14.EGL_NO_CONTEXT, attrs, 0)
         check(context != EGL14.EGL_NO_CONTEXT) { "eglCreateContext failed" }
@@ -80,7 +80,11 @@ class GlThread(
     private val transparent: Boolean = false,
     /** Told (on this thread) when the graphics couldn't start or stopped working; the error is already reported. */
     private val onFailure: ((Throwable) -> Unit)? = null,
+    /** Anti-aliasing samples to ask for (0 = none). */
+    private val msaa: Int = 4,
 ) : Thread(name) {
+    /** Most frames a second to draw (0 = as fast as the display shows them). Read every frame. */
+    @Volatile var maxFps = 0
     @Volatile private var running = true
     @Volatile private var width = 0
     @Volatile private var height = 0
@@ -106,12 +110,12 @@ class GlThread(
      * refuse a multisampled surface for a window, and the match used to crash right there).
      */
     private fun startEgl(): Pair<Egl, EGLSurface> {
-        var egl = Egl(transparent)
+        var egl = Egl(transparent, msaa)
         var surface = egl.windowSurface(nativeWindow)
         if (surface == EGL14.EGL_NO_SURFACE) {
             Log.w(name, "eglCreateWindowSurface failed (0x${Integer.toHexString(EGL14.eglGetError())}); trying without MSAA")
             egl.release()
-            egl = Egl(transparent, msaa = false)
+            egl = Egl(transparent, msaa = 0)
             surface = egl.windowSurface(nativeWindow)
             if (surface == EGL14.EGL_NO_SURFACE) {
                 val err = EGL14.eglGetError()
@@ -145,6 +149,7 @@ class GlThread(
                     renderer.onSize(width, height)
                 }
                 val now = System.nanoTime()
+                val frameStart = now
                 val dt = ((now - last) / 1e9f).coerceIn(0f, 0.1f)
                 last = now
                 if (paused) { sleep(30); continue }
@@ -166,6 +171,12 @@ class GlThread(
                 if (!swapped) {
                     Log.w(name, "eglSwapBuffers failed: ${EGL14.eglGetError()}")
                     sleep(16)
+                }
+                // The frame cap: rest until the next frame is due (a little early, so the swap still meets its vsync).
+                val cap = maxFps
+                if (cap > 0) {
+                    val wait = frameStart + 1_000_000_000L / cap - 2_000_000L - System.nanoTime()
+                    if (wait > 0) sleep(wait / 1_000_000, (wait % 1_000_000).toInt())
                 }
             }
         } catch (e: Throwable) {

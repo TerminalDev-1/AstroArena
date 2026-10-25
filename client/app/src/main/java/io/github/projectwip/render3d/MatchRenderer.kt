@@ -36,7 +36,12 @@ class MatchRenderer(
     private val runner: MatchRunner,
     private val hud: HudChannel,
     private val matchesPlayed: Int,
+    /** The graphics preset: what is drawn and how finely, never what happens. */
+    private val gfx: io.github.projectwip.gl.GraphicsProfile = io.github.projectwip.gl.GraphicsProfile.current,
 ) : GlRenderer {
+    /** The match view's size on screen, which the HUD is laid out in (the buffer drawn may be smaller). */
+    @Volatile var viewWidth = 0
+    @Volatile var viewHeight = 0
     private lateinit var lit: Program
     private lateinit var depth: Program
     /** The lit shader with a dissolve, used only for fighters that are mid-fade. */
@@ -82,7 +87,8 @@ class MatchRenderer(
     private val crateHitAt = HashMap<Int, Float>()
     private val sectors = HashMap<Int, Mesh>()
 
-    private lateinit var shadow: ShadowMap
+    /** Null on presets without shadows. */
+    private var shadow: ShadowMap? = null
     private val eye = FloatArray(3)
 
     private val proj = FloatArray(16)
@@ -187,7 +193,8 @@ class MatchRenderer(
         // Static Storm: an open cylinder wall (unit radius/height) and a ground shadow outside it.
         stormWall = MeshBuilder().apply { color(1f, 1f, 1f); with { translate(0f, 0.5f, 0f); cylinder(1f, 1f, 72, caps = false) } }.build()
         stormFloor = MeshBuilder().apply { color(1f, 1f, 1f); ring(1f, 6f, 72) }.build()
-        shadow = ShadowMap(SHADOW_SIZE)
+        shadow = if (gfx.shadowSize > 0) ShadowMap(gfx.shadowSize) else null
+        particles.density = gfx.effects
         for (f in world.fighters) { shownFacing[f.id] = f.facing; shownVis[f.id] = 1f }
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
         GLES30.glDepthFunc(GLES30.GL_LEQUAL)
@@ -267,6 +274,7 @@ class MatchRenderer(
     // ------------------------------------------------------------------ passes
 
     private fun renderShadows(alpha: Float) {
+        val shadow = shadow ?: return
         shadow.begin()
         depth.use()
         depth.mat4("uViewProj", lightVP)
@@ -337,8 +345,10 @@ class MatchRenderer(
         lit.v4("uTint", INK[0], INK[1], INK[2], 1f)
         lit.f("uOutline", 0.028f)
         lit.mat4("uModel", identity)
-        arena.solids.draw()
-        drawCrates(lit, shadowPass = false, outline = true)
+        if (gfx.arenaOutlines) {
+            arena.solids.draw()
+            drawCrates(lit, shadowPass = false, outline = true)
+        }
         lit.f("uOutline", FighterModels.OUTLINE)
         forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
         forEachRealmShadow(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
@@ -1764,7 +1774,9 @@ class MatchRenderer(
         val s = hud.back
         val w = world
         val p = match.player
-        s.width = width; s.height = height
+        // The HUD is laid out over the view, which may be bigger than the buffer drawn here: projected points scale up.
+        val vw = viewWidth; val vh = viewHeight
+        s.width = if (vw > 0) vw else width; s.height = if (vh > 0) vh else height
         System.arraycopy(viewProj, 0, s.viewProj, 0, 16)
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
         s.freeForAll = w.rules.freeForAll
@@ -1799,8 +1811,8 @@ class MatchRenderer(
                 v4[0] = lerp(f.prevX, f.x, alpha); v4[1] = headHeight(f.def) * f.scale; v4[2] = lerp(f.prevY, f.y, alpha); v4[3] = 1f
                 Matrix.multiplyMV(o4, 0, viewProj, 0, v4, 0)
                 if (o4[3] > 0f) {
-                    s.sx[i] = (o4[0] / o4[3] * 0.5f + 0.5f) * width
-                    s.sy[i] = (1f - (o4[1] / o4[3] * 0.5f + 0.5f)) * height
+                    s.sx[i] = (o4[0] / o4[3] * 0.5f + 0.5f) * s.width
+                    s.sy[i] = (1f - (o4[1] / o4[3] * 0.5f + 0.5f)) * s.height
                     onScreen = true
                 }
             }
@@ -1834,7 +1846,6 @@ class MatchRenderer(
         /** Fighters are drawn a bit larger than their collision radius for readability (genre convention). */
         const val FIGHTER_SCALE = 1.25f
         const val PITCH = 57f
-        const val SHADOW_SIZE = 2048
         const val VIS_FADE_IN = 0.12f
         const val VIS_FADE_OUT = 0.3f
         val LIGHT = Toon.LIGHT

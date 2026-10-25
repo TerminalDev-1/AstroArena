@@ -43,6 +43,9 @@ class MatchView(
     private val surface = SurfaceView(context)
     private val hud = HudView(context, channel, runner)
     private var thread: GlThread? = null
+    private var renderer: MatchRenderer? = null
+    /** The graphics preset this match is drawn with (taken when it starts). */
+    private val gfx = io.github.projectwip.gl.GraphicsProfile.current
 
     var paused: Boolean
         get() = runner.paused
@@ -60,19 +63,31 @@ class MatchView(
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (Build.VERSION.SDK_INT >= 30) {
-            // Ask for exactly what the panel runs at: 120 fps content on a 144 Hz screen judders.
-            val hz = if (settings.highFrameRate) display?.refreshRate ?: 120f else 60f
-            holder.surface.setFrameRate(hz, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+            holder.surface.setFrameRate(settings.frameRate.toFloat(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
         }
-        thread = GlThread(holder.surface, MatchRenderer(runner, channel, matchesPlayed), "match-gl", onFailure = {
+        val r = MatchRenderer(runner, channel, matchesPlayed, gfx).also { it.viewWidth = width; it.viewHeight = height }
+        renderer = r
+        thread = GlThread(holder.surface, r, "match-gl", msaa = gfx.msaa, onFailure = {
             main.post {
                 android.widget.Toast.makeText(context, "The graphics couldn't start on this phone. A report was saved: pause to leave the match.", android.widget.Toast.LENGTH_LONG).show()
             }
-        }).also { it.start() }
+        }).also { it.maxFps = settings.frameRate; it.start() }
     }
 
-    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        thread?.resize(width, height)
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        // A tall screen is drawn smaller and scaled up by the display hardware (the graphics preset's render scale).
+        val (bw, bh) = gfx.bufferSize(w, h)
+        if (bw != w || bh != h) surface.holder.setFixedSize(bw, bh) else surface.holder.setSizeFromLayout()
+        renderer?.let { it.viewWidth = w; it.viewHeight = h }
+    }
+
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, bufferWidth: Int, bufferHeight: Int) {
+        thread?.resize(bufferWidth, bufferHeight)
+        // Touch and the HUD work in the view's pixels, which the buffer may be smaller than.
+        val width = if (this.width > 0) this.width else bufferWidth
+        val height = if (this.height > 0) this.height else bufferHeight
+        renderer?.let { it.viewWidth = width; it.viewHeight = height }
         var left = 0
         var right = 0
         if (Build.VERSION.SDK_INT >= 30) rootWindowInsets?.let { wi ->
