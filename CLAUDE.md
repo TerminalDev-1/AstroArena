@@ -97,7 +97,7 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `crash` crashes the game on purpose to try the crash reporter;
+  (`match|boss|lastspark|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `crash` crashes the game on purpose to try the crash reporter;
   `result` (first in Last Spark), `result3`, `resultwin` and `resultloss` preview the end of a match, reveal first;
   `tryswish` / `tryspark` are the Training Area as Swish / Spark; `roster` is the fighter grid with every model shown unlocked, `tryspark` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - Crashes on players' devices: `net/CrashReporter.kt` saves a crash (and, on Android 11+, Android's record of a native
@@ -242,6 +242,15 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
   With nobody on the line he leaps anyway and the super is spent: a miss. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
+- Last Spark's closing zone is shown as green poison smoke (since build 101, the user's request: "the actual green
+  smoke"). The code still calls it the Static Storm (`Storm`, `STORM_*`, `GameEvent.StormHit`); players see
+  "Poison Smoke". `MatchRenderer.drawStorm` draws a green ground haze outside the circle and low clumps of smoke
+  (`smokeClump`, `forEachSmokeClump`): a front ring whose inner side sits exactly on the edge, and a fixed grid behind
+  it that rolls in as the edge passes. They are drawn last, depth first and then colour, so the smoke is one even
+  translucent layer (no stacked blotches) and whatever is inside it is tinted green.
+- Heat on phones nobody is charging (the user's S26): `gl/PowerWatch.kt` follows charging and Android's thermal
+  status. On battery or warm the 3D menus draw at 30 and matches at no more than 60 (also the panel's refresh), new
+  views start with a smaller buffer, and SEVERE drops everything to 30. Only drawing reads it, never the simulation.
 - Every fighter has a hyper (`Control.hyper`, the `HYPER_*` numbers in `Balance.kt`): a third button that charges from
   main-attack hits. There are no shields: the user removed them (the two seconds of spawn protection, `Fighter.shield`,
   are a different thing). Healing only starts after `REGEN_DELAY_SECONDS` without attacking or being hit.
@@ -254,7 +263,10 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   capsule currency counters. The home screen has a navigation rail down the left (Shop, Fighters, Ranks, News,
   Settings); sub-screens share `ScreenHeader`, whose section tabs (`LocalScreen`, `LocalNav`) jump between Shop,
   Fighters, Road, Cups, Ranks and News, and which says online/offline under the title. Parts arrive staggered
-  (`Modifier.enterFrom`). The Shop icon is a shopping bag; the Fighters icon is a fighter's helmet with a lit visor
+  (`Modifier.enterFrom`), flipping up into place. Since build 101 the menus have more depth again, as the user asked
+  ("3D and depth"): deeper button slabs (`SLAB`) that tip back when pressed, a rounded bevel on every face, softer
+  deeper shadows, extruded display text (`GameText`), and the home screen's rail and right column turned inward
+  (`Modifier.tilt3d`) like a cockpit. The Shop icon is a shopping bag; the Fighters icon is a fighter's helmet with a lit visor
   (the user rejected two busts as not saying what it is).
 - The music is upbeat by the user's decision ("too calm" before build 94): the lobby loop is 128 BPM and the victory
   theme 148, both with a snare, open hats and a rolling sixteenth-note bass.

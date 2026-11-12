@@ -299,7 +299,7 @@ private fun MatchBody(
     androidx.compose.runtime.DisposableEffect(Unit) {
         val activity = context as? MainActivity
         activity?.inMatch = true
-        activity?.applyRefreshRate(settings.frameRate)
+        activity?.applyRefreshRate(io.github.projectwip.gl.PowerWatch.cap(settings.frameRate, menu = false))
         onDispose {
             activity?.inMatch = false
             activity?.applyRefreshRate(io.github.projectwip.gl.GraphicsProfile.current.menuFrameRate)

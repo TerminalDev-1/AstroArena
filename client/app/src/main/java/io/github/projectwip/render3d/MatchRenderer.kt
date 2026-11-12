@@ -82,8 +82,9 @@ class MatchRenderer(
     private lateinit var crateCore: Mesh
     private lateinit var cell: Mesh
     private lateinit var cellCaps: Mesh
-    private lateinit var stormWall: Mesh
     private lateinit var stormFloor: Mesh
+    /** One clump of the poison smoke: a few low, overlapping puffs, about two tiles across. */
+    private lateinit var smokeClump: Mesh
     private val crateHitAt = HashMap<Int, Float>()
     private val sectors = HashMap<Int, Mesh>()
 
@@ -190,8 +191,14 @@ class MatchRenderer(
             with { translate(0f, -0.2f, 0f); cylinder(0.17f, 0.07f, 14) }
             with { translate(0f, 0.26f, 0f); cylinder(0.06f, 0.06f, 10) }
         }.build()
-        // Static Storm: an open cylinder wall (unit radius/height) and a ground shadow outside it.
-        stormWall = MeshBuilder().apply { color(1f, 1f, 1f); with { translate(0f, 0.5f, 0f); cylinder(1f, 1f, 72, caps = false) } }.build()
+        // The closing zone's poison smoke: a green ground haze outside it, and clumps of low smoke over that.
+        smokeClump = MeshBuilder().apply {
+            color(0.62f, 0.95f, 0.42f); ellipsoid(1f, 0.55f, 1f, 7, 10)
+            color(0.5f, 0.86f, 0.36f); with { translate(0.62f, -0.08f, 0.3f); ellipsoid(0.68f, 0.42f, 0.68f, 6, 9) }
+            color(0.7f, 1f, 0.5f); with { translate(-0.55f, -0.04f, 0.42f); ellipsoid(0.62f, 0.46f, 0.62f, 6, 9) }
+            color(0.46f, 0.8f, 0.34f); with { translate(-0.2f, -0.1f, -0.66f); ellipsoid(0.7f, 0.4f, 0.7f, 6, 9) }
+            color(0.66f, 0.98f, 0.46f); with { translate(0.35f, 0.18f, -0.25f); ellipsoid(0.5f, 0.4f, 0.5f, 6, 9) }
+        }.build()
         stormFloor = MeshBuilder().apply { color(1f, 1f, 1f); ring(1f, 6f, 72) }.build()
         shadow = if (gfx.shadowSize > 0) ShadowMap(gfx.shadowSize) else null
         particles.density = gfx.effects
@@ -393,9 +400,6 @@ class MatchRenderer(
         water.v3("uLightDir", LIGHT[0], LIGHT[1], LIGHT[2])
         arena.water.draw()
 
-        // Static Storm
-        world.storm?.let { drawStorm(it) }
-
         // Ground decals
         setupLit(lit)
         GLES30.glEnable(GLES30.GL_BLEND)
@@ -419,6 +423,9 @@ class MatchRenderer(
         drawSprites(alpha)
         GLES30.glDepthMask(true)
         GLES30.glDisable(GLES30.GL_BLEND)
+
+        // Poison smoke, last: whatever is inside it is seen through one layer of it.
+        world.storm?.let { drawStorm(it) }
     }
 
     /** Solid enough to carry HUD markers (rings, bars, shields). */
@@ -642,34 +649,95 @@ class MatchRenderer(
         lit.mat4("uModel", identity)
     }
 
+    /** A fixed pseudo-random number in 0..1 for grid site ([i], [j]) and channel [k]. */
+    private fun siteHash(i: Int, j: Int, k: Int): Float {
+        var h = (i * 73856093) xor (j * 19349663) xor (k * 83492791)
+        h = (h xor (h ushr 13)) * 1274126177
+        return ((h xor (h ushr 16)) and 0xFFFF) / 65535f
+    }
+
+    /** Calls [block] with (x, z, scale, height, seed) for every clump of poison smoke that can be on screen. */
+    private inline fun forEachSmokeClump(st: io.github.projectwip.sim.Storm, block: (Float, Float, Float, Float, Float) -> Unit) {
+        val r = st.radius
+        // The front: clumps all round the edge, their inner side on it, so the smoke starts where it starts to hurt.
+        val front = (6.2832f * r / 1.35f).toInt().coerceIn(12, 220)
+        for (k in 0 until front) {
+            val a = k * 6.2832f / front + time * 0.05f
+            val d = r + 0.85f
+            val x = st.cx + cos(a) * d
+            val z = st.cy + sin(a) * d
+            if (inView(x, z)) block(x, z, 0.85f, 0.95f, k * 0.37f)
+        }
+        // Behind it, the rest of the smoke on a fixed grid, rolling in as the edge passes each spot.
+        val step = 2.6f
+        val i0 = ((camX - 10f - 8f * aspect) / step).toInt() - 1
+        val i1 = ((camX + 10f + 8f * aspect) / step).toInt() + 1
+        val j0 = ((camZ - 17f) / step).toInt() - 1
+        val j1 = ((camZ + 11f) / step).toInt() + 1
+        val maxX = world.arena.width + 3f
+        val maxZ = world.arena.height + 3f
+        for (i in i0..i1) for (j in j0..j1) {
+            val x = i * step + (siteHash(i, j, 1) - 0.5f) * 1.4f
+            val z = j * step + (siteHash(i, j, 2) - 0.5f) * 1.4f
+            if (x < -3f || z < -3f || x > maxX || z > maxZ) continue
+            val past = hypot(x - st.cx, z - st.cy) - r
+            if (past <= 1.4f) continue
+            val size = 1.25f + siteHash(i, j, 3) * 0.5f
+            val grow = ((past - 1.4f) / size).coerceIn(0f, 1f)
+            // Deep in the smoke it lies lower; near the front it banks up.
+            val height = if (past < 5f) 0.85f else 0.6f
+            block(x, z, size * (0.45f + 0.55f * grow), height, siteHash(i, j, 4) * 9f)
+        }
+    }
+
+    private fun smokeModel(x: Float, z: Float, s: Float, h: Float, seed: Float) {
+        val breathe = 1f + 0.07f * sin(time * 0.9f + seed * 3f)
+        Matrix.setIdentityM(model, 0)
+        Matrix.translateM(model, 0, x + sin(time * 0.35f + seed) * 0.18f, 0.12f + 0.06f * sin(time * 0.7f + seed * 2f), z + cos(time * 0.3f + seed) * 0.18f)
+        Matrix.rotateM(model, 0, seed * 40f + time * (6f + seed), 0f, 1f, 0f)
+        Matrix.scaleM(model, 0, s * breathe, s * h * breathe, s * breathe)
+        lit.mat4("uModel", model)
+    }
+
+    /**
+     * The closing zone's poison smoke: thick, low, toxic-green clumps over everything outside the safe circle, with a
+     * green haze on the ground under them. It is drawn as a single layer: the clumps first lay down their depth
+     * only, then are coloured where they are nearest, so overlapping puffs never stack into darker blotches.
+     */
     private fun drawStorm(st: io.github.projectwip.sim.Storm) {
         setupLit(lit)
         GLES30.glEnable(GLES30.GL_BLEND)
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
         GLES30.glDepthMask(false)
         lit.i("uMode", 1)
-        // Darken everything outside the safe circle.
+        // A green haze on the ground outside the safe circle.
         setModel(st.cx, 0.06f, st.cy, st.radius, 1f, st.radius)
-        lit.v4("uTint", 0.28f, 0.1f, 0.55f, 0.42f)
+        lit.v4("uTint", 0.3f, 0.62f, 0.16f, 0.38f)
         stormFloor.draw()
-        // Shimmering wall at the edge.
-        val pulse = 0.22f + 0.06f * sin(time * 5f)
-        setModel(st.cx, 0f, st.cy, st.radius, 3.2f, st.radius, time * 25f)
-        lit.v4("uTint", 0.62f, 0.4f, 1f, pulse)
-        stormWall.draw()
-        setModel(st.cx, 0f, st.cy, st.radius, 0.6f, st.radius)
-        lit.v4("uTint", 0.85f, 0.7f, 1f, 0.5f)
-        stormWall.draw()
         lit.i("uMode", 0)
+        // The smoke's depth...
+        GLES30.glColorMask(false, false, false, false)
+        GLES30.glDepthMask(true)
+        forEachSmokeClump(st) { x, z, s, h, seed -> smokeModel(x, z, s, h, seed); smokeClump.draw() }
+        // ...then its colour, on the nearest surface only.
+        GLES30.glColorMask(true, true, true, true)
+        GLES30.glDepthMask(false)
+        lit.f("uRim", 0.35f)
+        lit.f("uEmissive", 0.4f)
+        val pulse = 0.04f * sin(time * 1.3f)
+        lit.v4("uTint", 0.72f + pulse, 1f, 0.5f, 0.66f)
+        forEachSmokeClump(st) { x, z, s, h, seed -> smokeModel(x, z, s, h, seed); smokeClump.draw() }
+        lit.f("uEmissive", 0f)
+        lit.mat4("uModel", identity)
         GLES30.glDepthMask(true)
         GLES30.glDisable(GLES30.GL_BLEND)
-        // Crackles along the edge near the camera.
-        repeat(3) {
+        // Wisps curling in off the front near the camera.
+        if (rng.nextFloat() < 0.7f) {
             val a = rng.nextFloat() * 6.283f
-            val ex = st.cx + cos(a) * st.radius
-            val ez = st.cy + sin(a) * st.radius
+            val ex = st.cx + cos(a) * (st.radius + 0.3f)
+            val ez = st.cy + sin(a) * (st.radius + 0.3f)
             if (hypot(ex - camX, ez - camZ) < 16f) {
-                particles.spawn(ex, 0.2f + rng.nextFloat() * 2.5f, ez, 0f, 0.8f, 0f, 0.5f, 0.16f, 0xFFC08CFF.toInt(), 0.9f)
+                particles.spawn(ex, 0.3f + rng.nextFloat() * 0.6f, ez, -cos(a) * 0.35f, 0.25f, -sin(a) * 0.35f, 1.4f, 0.35f, 0xFF8EE65A.toInt(), 0.35f, growth = 0.7f, add = false)
             }
         }
     }
@@ -1758,7 +1826,7 @@ class MatchRenderer(
                 if (e.targetId == pid) shake = max(shake, 0.12f)
             }
             is GameEvent.StormHit -> {
-                repeat(4) { particles.spawn(e.x + rng.nextFloat() - 0.5f, 0.4f + rng.nextFloat(), e.y + rng.nextFloat() - 0.5f, 0f, 1.5f, 0f, 0.4f, 0.12f, 0xFFC08CFF.toInt(), 1f) }
+                repeat(4) { particles.spawn(e.x + rng.nextFloat() - 0.5f, 0.4f + rng.nextFloat(), e.y + rng.nextFloat() - 0.5f, 0f, 1.2f, 0f, 0.6f, 0.16f, 0xFF9CFF6A.toInt(), 0.9f) }
                 if (e.targetId == pid) shake = max(shake, 0.08f)
             }
             else -> Unit

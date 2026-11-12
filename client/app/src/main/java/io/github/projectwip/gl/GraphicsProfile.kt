@@ -27,8 +27,10 @@ data class GraphicsProfile(
     fun bufferSize(w: Int, h: Int): Pair<Int, Int> {
         if (w <= 0 || h <= 0) return w to h
         val short = minOf(w, h)
-        if (short <= maxLines) return w to h
-        val k = maxLines.toFloat() / short
+        // On battery or running warm, the view is drawn smaller (PowerWatch).
+        val lines = PowerWatch.maxLines(maxLines)
+        if (short <= lines) return w to h
+        val k = lines.toFloat() / short
         return (w * k).toInt().coerceAtLeast(1) to (h * k).toInt().coerceAtLeast(1)
     }
 

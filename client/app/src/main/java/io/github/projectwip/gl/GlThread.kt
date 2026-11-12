@@ -82,6 +82,8 @@ class GlThread(
     private val onFailure: ((Throwable) -> Unit)? = null,
     /** Anti-aliasing samples to ask for (0 = none). */
     private val msaa: Int = 4,
+    /** A 3D menu (the lobby, the stage) rather than a match: capped harder on battery or when hot (PowerWatch). */
+    private val menu: Boolean = true,
 ) : Thread(name) {
     /** Most frames a second to draw (0 = as fast as the display shows them). Read every frame. */
     @Volatile var maxFps = 0
@@ -173,7 +175,7 @@ class GlThread(
                     sleep(16)
                 }
                 // The frame cap: rest until the next frame is due (a little early, so the swap still meets its vsync).
-                val cap = maxFps
+                val cap = PowerWatch.cap(maxFps, menu)
                 if (cap > 0) {
                     val wait = frameStart + 1_000_000_000L / cap - 2_000_000L - System.nanoTime()
                     if (wait > 0) sleep(wait / 1_000_000, (wait % 1_000_000).toInt())

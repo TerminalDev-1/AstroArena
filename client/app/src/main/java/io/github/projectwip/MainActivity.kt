@@ -19,6 +19,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        io.github.projectwip.gl.PowerWatch.start(this)
         enableEdgeToEdge()
         hideSystemBars()
 

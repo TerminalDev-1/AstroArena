@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.drawBehind
 import io.github.projectwip.ui.enterFrom
+import io.github.projectwip.ui.tilt3d
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -140,7 +141,7 @@ fun HomeScreen(
 
                     // ---------------- mode + play
                     Column(
-                        Modifier.width(if (ui.wide) 330.dp else 280.dp).fillMaxHeight(),
+                        Modifier.width(if (ui.wide) 330.dp else 280.dp).fillMaxHeight().tilt3d(8f, fromLeft = false),
                         verticalArrangement = Arrangement.Bottom,
                         horizontalAlignment = Alignment.End,
                     ) {
@@ -210,6 +211,7 @@ private fun NavRail(content: @Composable androidx.compose.foundation.layout.Colu
     val ui = LocalUi.current
     Column(
         Modifier.fillMaxHeight().width(if (ui.roomy) 92.dp else 78.dp)
+            .tilt3d(7f, fromLeft = true)
             .drawBehind {
                 drawRect(Brush.horizontalGradient(listOf(Color(0xFA050E18), Color(0xF00B1C2E))))
                 drawRect(Brush.verticalGradient(listOf(Palette.Rim.copy(alpha = 0.15f), Color.Transparent), 0f, size.height * 0.35f))

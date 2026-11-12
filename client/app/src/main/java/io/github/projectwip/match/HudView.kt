@@ -285,17 +285,17 @@ class HudView(
             val delay = io.github.projectwip.data.Balance.STORM_DELAY_SECONDS
             if (s.stormElapsed in (delay - 5f)..(delay + 3f)) {
                 text.textSize = dp(20f)
-                val flash = if ((time * 3f).toInt() % 2 == 0) Color.rgb(200, 150, 255) else Color.WHITE
-                outlined(c, "THE STATIC STORM IS CLOSING IN!", cx, top + panelH + dp(32f), flash, dp(4f))
+                val flash = if ((time * 3f).toInt() % 2 == 0) Color.rgb(150, 240, 100) else Color.WHITE
+                outlined(c, "THE POISON SMOKE IS CLOSING IN!", cx, top + panelH + dp(32f), flash, dp(4f))
             }
             if (s.playerOutsideStorm) {
                 val a = (0.35f + 0.2f * sin(time * 8f))
                 fill.shader = android.graphics.RadialGradient(cx, h / 2, maxOf(w, h) * 0.7f,
-                    intArrayOf(Color.TRANSPARENT, Color.argb((a * 255).toInt(), 120, 40, 200)), floatArrayOf(0.55f, 1f), android.graphics.Shader.TileMode.CLAMP)
+                    intArrayOf(Color.TRANSPARENT, Color.argb((a * 255).toInt(), 50, 150, 30)), floatArrayOf(0.55f, 1f), android.graphics.Shader.TileMode.CLAMP)
                 c.drawRect(0f, 0f, w, h, fill)
                 fill.shader = null
                 text.textSize = dp(19f)
-                outlined(c, "YOU'RE IN THE STORM — GET BACK INSIDE!", cx, h * 0.24f, Color.rgb(230, 190, 255), dp(4f))
+                outlined(c, "YOU'RE IN THE POISON SMOKE — GET BACK INSIDE!", cx, h * 0.24f, Color.rgb(170, 255, 120), dp(4f))
             }
         }
 
@@ -417,7 +417,7 @@ class HudView(
     }
 
     private fun teamCol(team: Int, mine: Int) = when (team) {
-        -2 -> Color.rgb(200, 150, 255) // the storm
+        -2 -> Color.rgb(150, 235, 100) // the poison smoke
         mine -> ALLY
         else -> ENEMY
     }

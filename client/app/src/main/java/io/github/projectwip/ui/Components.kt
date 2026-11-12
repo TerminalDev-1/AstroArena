@@ -99,7 +99,16 @@ fun GameText(
     maxLines: Int = 1,
 ) {
     val px = with(LocalDensity.current) { outline.toPx() } * 0.42f
+    val density = LocalDensity.current
     Box(modifier) {
+        // The extrusion: the letters stand out of the screen, their dark sides showing below them.
+        for (k in 3 downTo 1) {
+            val dy = with(density) { (px * k * 0.75f).toDp() }
+            BasicText(
+                text, Modifier.offset(y = dy), maxLines = maxLines, overflow = TextOverflow.Ellipsis,
+                style = style.copy(color = lerp(color, Palette.Ink, 0.72f + 0.08f * k), textAlign = align, drawStyle = Stroke(width = px * 2, join = StrokeJoin.Round)),
+            )
+        }
         BasicText(
             text, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
             style = style.copy(
@@ -162,9 +171,9 @@ enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val ri
 
 /** Soft drop shadow under a plate, so it reads as sitting above the scene. */
 private fun DrawScope.plateShadow(path: Path, depth: Float) {
-    translate(top = depth) {
-        drawPath(path, Color.Black.copy(alpha = 0.16f), style = Stroke(depth * 2.2f, join = StrokeJoin.Round))
-        drawPath(path, Color.Black.copy(alpha = 0.34f))
+    translate(top = depth * 1.15f) {
+        for (k in 3 downTo 1) drawPath(path, Color.Black.copy(alpha = 0.07f), style = Stroke(depth * k * 0.95f, join = StrokeJoin.Round))
+        drawPath(path, Color.Black.copy(alpha = 0.4f))
     }
 }
 
@@ -172,14 +181,24 @@ private fun DrawScope.plateShadow(path: Path, depth: Float) {
  * A plate's face: its fill, shade gathering low, a crisp split highlight across the top half ([gloss]), a bright
  * line of [rim] light along the top edge, a hairline of it all round just inside, and a thin ink edge outside.
  */
-private fun DrawScope.plate(shape: Shape, size: Size, brush: Brush, ink: Color, inkWidth: Float, gloss: Boolean, rim: Color = Palette.Rim) {
+private fun DrawScope.plate(shape: Shape, size: Size, brush: Brush, ink: Color, inkWidth: Float, gloss: Float, rim: Color = Palette.Rim) {
     val outline = shape.createOutline(size, layoutDirection, this)
     val path = Path().apply { addOutline(outline) }
     drawPath(path, brush)
     clipPath(path) {
         drawRect(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.24f), startY = 0f, endY = size.height), size = size)
-        if (gloss) drawRect(
-            Brush.verticalGradient(0f to Color.White.copy(alpha = 0.2f), 0.48f to Color.White.copy(alpha = 0.06f), 0.48f to Color.Transparent, startY = 0f, endY = size.height),
+        // A rounded bevel all round the face: its edges catch the light along the top and fall into shade below.
+        val bevel = minOf(4.dp.toPx(), size.height * 0.18f)
+        drawPath(
+            path,
+            Brush.verticalGradient(
+                0f to Color.White.copy(alpha = 0.26f), 0.3f to Color.White.copy(alpha = 0.05f),
+                0.7f to Color.Black.copy(alpha = 0.05f), 1f to Color.Black.copy(alpha = 0.34f), startY = 0f, endY = size.height,
+            ),
+            style = Stroke(bevel * 2, join = StrokeJoin.Round),
+        )
+        if (gloss > 0f) drawRect(
+            Brush.verticalGradient(0f to Color.White.copy(alpha = 0.2f * gloss), 0.48f to Color.White.copy(alpha = 0.06f * gloss), 0.48f to Color.Transparent, startY = 0f, endY = size.height),
             size = size,
         )
         // A hairline of rim light just inside the edge (the stroke is centred on it, so the clip keeps the inner half).
@@ -196,6 +215,9 @@ private fun DrawScope.plate(shape: Shape, size: Size, brush: Brush, ink: Color, 
 private fun DrawScope.glow(path: Path, color: Color, strength: Float = 1f) {
     for (k in 1..3) drawPath(path, color.copy(alpha = 0.06f * strength), style = Stroke(k * 5.dp.toPx(), join = StrokeJoin.Round))
 }
+
+/** How much of a button's [lip] shows as the side of its slab. */
+private const val SLAB = 1.2f
 
 /**
  * The main button: a notched slab whose face sits on a visible side and presses down onto it.
@@ -224,12 +246,12 @@ fun ChunkyButton(
     val glass = s == ButtonStyle.GLASS || s == ButtonStyle.PURPLE
     Box(
         modifier
-            .graphicsLayer { val k = 1f - 0.03f * press; scaleX = k; scaleY = k }
+            .graphicsLayer { val k = 1f - 0.03f * press; scaleX = k; scaleY = k; rotationX = 9f * press; cameraDistance = 9f * density }
             .clickable(interaction, indication = null) {
                 if (enabled) { sfx?.play(sound); onClick() } else sfx?.play(Sound.DENIED, 0.6f)
             }
             .drawBehind {
-                val lipPx = lip.toPx() * 0.8f
+                val lipPx = lip.toPx() * SLAB
                 val ink = 1.5.dp.toPx()
                 val pressPx = lipPx * press
                 val whole = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
@@ -237,12 +259,16 @@ fun ChunkyButton(
                 plateShadow(whole, lipPx * (1.2f - 0.6f * press))
                 // The side of the slab.
                 drawPath(whole, Brush.verticalGradient(listOf(lerp(s.lip, s.bottom, 0.25f), lerp(s.lip, Color.Black, 0.3f))))
+                // The side catches light along its left end and falls into shade at the right, like a lit block.
+                clipPath(whole) {
+                    drawRect(Brush.horizontalGradient(listOf(s.rim.copy(alpha = 0.22f), Color.Transparent, Color.Black.copy(alpha = 0.25f))), size = size)
+                }
                 drawPath(whole, Palette.Ink, style = Stroke(ink, join = StrokeJoin.Round))
                 translate(top = pressPx) {
                     // A button squeezed shorter than its lip (small screens, big font) must not get a negative face.
                     val face = Size(size.width, (size.height - lipPx).coerceAtLeast(0f))
                     val faceShape = Path().apply { addOutline(shape.createOutline(face, layoutDirection, this@drawBehind)) }
-                    plate(shape, face, Brush.verticalGradient(listOf(lerp(s.top, Color.White, if (glass) 0.04f else 0.14f), s.top, s.bottom)), Palette.Ink, ink, gloss = !glass, rim = s.rim)
+                    plate(shape, face, Brush.verticalGradient(listOf(lerp(s.top, Color.White, if (glass) 0.04f else 0.14f), s.top, s.bottom)), Palette.Ink, ink, gloss = if (glass) 0.45f else 1f, rim = s.rim)
                     if (glass) clipPath(faceShape) {
                         // The accent edge down the left side, and a cool wash of light from it.
                         drawRect(Brush.verticalGradient(listOf(s.rim, s.rim.copy(alpha = 0.35f))), Offset.Zero, Size(3.dp.toPx(), face.height))
@@ -261,7 +287,7 @@ fun ChunkyButton(
                     }
                 }
             }
-            .padding(top = lip * 0.8f * press, bottom = lip * 0.8f * (1f - press)),
+            .padding(top = lip * SLAB * press, bottom = lip * SLAB * (1f - press)),
         contentAlignment = Alignment.Center,
         content = content,
     )
@@ -283,13 +309,13 @@ fun Panel(
             val ink = 1.5.dp.toPx()
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
             // A panel is a slab: its side shows under the face, and it throws a shadow past that.
-            val slab = 4.dp.toPx()
-            plateShadow(path, slab + 5.dp.toPx())
+            val slab = 7.dp.toPx()
+            plateShadow(path, slab + 6.dp.toPx())
             translate(top = slab) {
                 drawPath(path, Brush.verticalGradient(listOf(lerp(colorBottom, Color.Black, 0.3f), lerp(colorBottom, Color.Black, 0.65f))))
                 drawPath(path, Palette.Ink, style = Stroke(ink, join = StrokeJoin.Round))
             }
-            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.08f), color, colorBottom)), Palette.Ink, ink, gloss = false, rim = rim)
+            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.08f), color, colorBottom)), Palette.Ink, ink, gloss = 0.3f, rim = rim)
             clipPath(path) {
                 // A faint grid, so large panels aren't a flat fill.
                 val step = 24.dp.toPx()
@@ -627,8 +653,21 @@ fun Modifier.enterFrom(delayMs: Int = 0, dx: Dp = 0.dp, dy: Dp = 14.dp): Modifie
         val k = 1f - a.value
         translationX = dx.toPx() * k
         translationY = dy.toPx() * k
+        rotationX = 28f * k * (if (dx == 0.dp) 1f else 0f)
+        rotationY = 26f * k * (if (dx > 0.dp) -1f else if (dx < 0.dp) 1f else 0f)
+        cameraDistance = 10f * density
         alpha = a.value
     }
+}
+
+/**
+ * Turns a whole column of the menus a few [degrees] about its upright axis, hinged on its outer edge ([fromLeft]),
+ * so the screen wraps round the player like a cockpit instead of lying flat. Touches follow the turn.
+ */
+fun Modifier.tilt3d(degrees: Float, fromLeft: Boolean): Modifier = this.graphicsLayer {
+    rotationY = if (fromLeft) degrees else -degrees
+    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(if (fromLeft) 0f else 1f, 0.5f)
+    cameraDistance = 14f * density
 }
 
 /**

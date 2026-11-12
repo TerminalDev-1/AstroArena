@@ -356,7 +356,7 @@ class MatchRunner(
             is GameEvent.Ko -> {
                 val k = world.fighter(e.killerId)
                 val v = world.fighter(e.victimId)
-                if (v != null) hudEvents += HudEvent.Ko(k?.name ?: if (match.freeForAll) "Static Storm" else "—", k?.team ?: -2, v.name, v.team)
+                if (v != null) hudEvents += HudEvent.Ko(k?.name ?: if (match.freeForAll) "Poison Smoke" else "—", k?.team ?: -2, v.name, v.team)
                 if (e.killerId == pid) { sfx.play(Sound.KO, 1f); sfx.buzz(60, 220); say(VoiceCue.KO) }
                 else if (e.victimId == pid) { sfx.play(Sound.KO, 0.9f, 0.7f); sfx.buzz(120, 255); say(VoiceCue.DOWN) }
                 else sfx.play(Sound.KO, 0.35f)

@@ -63,11 +63,11 @@ class MatchView(
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (Build.VERSION.SDK_INT >= 30) {
-            holder.surface.setFrameRate(settings.frameRate.toFloat(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+            holder.surface.setFrameRate(io.github.projectwip.gl.PowerWatch.cap(settings.frameRate, menu = false).toFloat(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
         }
         val r = MatchRenderer(runner, channel, matchesPlayed, gfx).also { it.viewWidth = width; it.viewHeight = height }
         renderer = r
-        thread = GlThread(holder.surface, r, "match-gl", msaa = gfx.msaa, onFailure = {
+        thread = GlThread(holder.surface, r, "match-gl", msaa = gfx.msaa, menu = false, onFailure = {
             main.post {
                 android.widget.Toast.makeText(context, "The graphics couldn't start on this phone. A report was saved: pause to leave the match.", android.widget.Toast.LENGTH_LONG).show()
             }

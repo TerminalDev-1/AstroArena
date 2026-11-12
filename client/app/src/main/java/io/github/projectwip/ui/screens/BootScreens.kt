@@ -48,7 +48,7 @@ val TIPS = listOf(
     "Tip: tall grass hides you until an enemy gets close.",
     "Tip: your super charges as you land hits.",
     "Tip: stay out of the fight for a few seconds and you start to heal.",
-    "Tip: in Last Spark, break crates for Power Cells before the storm closes in.",
+    "Tip: in Last Spark, break crates for Power Cells before the poison smoke closes in.",
     "Tip: a top-four finish or a win earns an Arena Box, up to three a day.",
     "Tip: upgrades raise a fighter's health and damage. Upgrade Credits pay for them.",
     "Tip: you can move every control in Settings > Controls.",
