@@ -1207,17 +1207,15 @@ class SimulationTest {
         assertTrue(w.events.none { it is io.github.projectwip.sim.GameEvent.TempestHit })
     }
 
-    @Test fun swishIsTheStarterAndSparkALegendaryOfHisOwn() {
+    @Test fun swishIsTheStarterAndSparkIsRetired() {
         val def = Balance.fighter(FighterId.BYTE)
         assertEquals("Swish", def.name)
         assertEquals(io.github.projectwip.data.Rarity.STARTER, def.rarity)
         assertEquals(null, Balance.unlockPrismPrice(FighterId.BYTE))
         assertTrue("not on the Spark Road", io.github.projectwip.data.SparkRoad.steps.none { it.fighter == FighterId.BYTE })
-        // Spark is a Legendary of his own, last on the road; the Training Area's targets are made from Swish.
-        assertEquals(Balance.spark, Balance.fighter(FighterId.SPARK))
-        assertEquals(io.github.projectwip.data.Rarity.LEGENDARY, Balance.spark.rarity)
-        assertEquals(FighterId.SPARK, io.github.projectwip.data.SparkRoad.steps.last().fighter)
-        assertEquals(160, Balance.unlockPrismPrice(FighterId.SPARK))
+        // Spark was retired (build 102): nobody can pick, buy or unlock him; his def is only a stand-in now.
+        assertTrue(Balance.fighters.none { it.name == "Spark" })
+        assertEquals(FighterId.BUDDY, io.github.projectwip.data.SparkRoad.steps.last().fighter)
         assertEquals(FighterId.BYTE, Balance.dummy.id)
         assertEquals(FighterId.BYTE, Balance.mini.id)
         assertEquals(FighterId.BYTE, Balance.sentry.id)

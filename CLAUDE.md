@@ -139,39 +139,14 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   during it, as the user asked, with a much lower charge rate to pay for it: her arrows charge 0.1 a hit, and the
   tempest's strikes only `TEMPEST_CHARGE` of that; a full super mid-tempest starts it over. ("Tempest" in the code,
   because the free-for-all already has a Static Storm.) Her name, look and words are ours.
-- Spark is not retired: the user meant him to stay, as a Legendary of his own (`FighterId.SPARK`, `Balance.spark`,
-  `"SPARK"` on the server), last on the Spark Road after Buddy (7,000 Credits, or 160 CPU Chips). Everyone who had
-  him when Swish took the starter's id kept him as he was, level, colourways and Cups (`economy.complete` and
-  `SaveStore.fromJson` copy BYTE's entry into a missing SPARK one). Don't bring Byte or Juno back, or Rocket unless the user asks. Spark is the user's
-  idea and part of the lore: the Spark Drop that would not go away, a puffy five-pointed star (the drops' shape,
-  `render3d/StarMesh.kt`). (As the starter he was `BYTE`; since build 96 he is `SPARK`.) Since build 92 he is chromatic blue and glossy, by the user's decision (build 91's fat
-  red villain with fangs looked creepy; `Part.gloss`, the lit shader's `uGloss`: small hard highlights and a
-  cyan-to-violet sheen at the edges), with round feet and white mitts. Since build 93 he stands upright (leaning back
-  only 10 degrees), as the user asked: the 65-degree lean of builds 91 and 92 had him staring at the sky and looking
-  like a baby. He reads from above by the star's bulk instead (a fat `puff`, front and back). His face is confident and
-  cheeky, not babyish and not villainous: narrow angled eyes with small glints under two low brows, one cocked higher,
-  and a lopsided smirk. The star has a lit seam (`FighterModels.buildSpark`). Whenever he is on screen in the menus
-  (the lobby showing him, or the loading screen's spotlight) the screen takes on his blue and glitches
-  (`ui/SparkGlitch.kt`; red until build 92), but only as a hint, by the user's decision (build 89's took the UI over):
-  it is drawn over the 3D lobby (or the loading backdrop) and under the menus, a faint blue light with deeper blue
-  edges, faint scanlines and a short burst of cyan and violet torn bars every few seconds; buttons, text and
-  currencies keep their colours, and nothing jitters. His attack, Spite Star (`AttackShape.STAR`,
-  `Sound.STAR`: a little twinkle, four quick bell pings climbing, as the user asked (it was a swish and a whistle until build 95); the burst has its own `Sound.STAR_BURST`), is lobbed like dynamite, as the user asked: aimed at a spot like the planted rockets (how far the stick
-  is pushed is how far it goes; `aimPlant`), it flies over walls in an arc (`World.lobs`, `Lob`) for
-  `STAR_FLIGHT_SECONDS` and bursts where it lands (`GameEvent.StarBurst`), hitting every enemy within its
-  `AttackSpec.blast` and slowing them to `SLOW_FACTOR` of their speed for two seconds (`AttackSpec.slowSeconds`,
-  `Fighter.slowLeft`). A straight shot with `slowSeconds` (`ShotStyle.STAR`) still slows whoever it hits, with nobody using it. Since build 95 he is Legendary, by the user's decision, and still
-  the free starter: he is never on the Spark Road and has no CPU Chip price (`FighterId.BYTE` is checked, not the
-  rarity; the server lists no rarity for him). His super, Shadow Realm, is
-  Rocket's realm (`SuperKind.REALM`) with four shadows of his (`SuperSpec.shadows`): they stand round the captive
-  and take turns to strike, each once a second, in place of the realm's own rocket (drawn as dark copies of him in
-  `MatchRenderer.forEachRealmShadow`). His realm lasts `SPARK_REALM_SECONDS` (6 seconds, `SuperSpec.realmSeconds`;
-  Rocket's kept realm is still `REALM_SECONDS`, 12), as the user asked: 12 felt endless. The shadows' strikes charge
-  his super by only `REALM_SHADOW_CHARGE` (2.5%) of a hit, as the user asked (at full rate four strikes a second gave
-  the super back in under a second): a whole six-second realm of them is about a sixth of a super. The realm stays
-  chainable. Since build 95 his captive is not held (`SuperSpec.captiveFree`, `Fighter.realmFree`), as the user
-  asked: it can move and fight in there at `REALM_CAPTIVE_SPEED` (75%) of its speed and `REALM_CAPTIVE_DAMAGE` (75%)
-  of its damage, and the only one it can reach is Spark. Rocket's kept realm still holds its captive still (`heldInRealm`). His name, look and words are ours.
+- Spark is retired (build 102), by the user's decision: "I hate him, and I hate how he's played." `FighterId.SPARK`
+  is gone; `REMOVED_FIGHTERS` in `economy.py` pays back his road cost (7,000) to whoever had him, as Credits while
+  there is road left and Upgrade Credits after (that was everyone who had him as the starter before build 96, too).
+  His code is kept with nobody using it, like Rocket's: his def (`Balance.spark`, carrying the starter's id only
+  because a def needs one; the boss size is made from it, and `SimulationTest` uses it as a stand-in), his lobbed
+  Spite Star (`AttackShape.STAR`, `World.lobs`, `Sound.STAR`), the shadow realm (`SuperSpec.shadows`,
+  `captiveFree`, `MatchRenderer.forEachRealmShadow`), his model (`buildSpark`, unregistered) and his blue glitch
+  (`ui/SparkGlitch.kt`, no longer shown). Don't bring him back unless the user asks. Buddy is last on the road again.
 - Rocket's code is kept for reuse, by the user's decision: her plain aimed rockets (`AttackShape.ROCKETS`), her realm
   (`SuperKind.REALM`, `REALM_SECONDS`, `Fighter.captive`, `Fighter.realm`, the realm's own rocket each second) and
   her model (`buildRocket`, unregistered), with nobody using them; `SimulationTest` keeps them tested with a stand-in
@@ -242,6 +217,10 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
   With nobody on the line he leaps anyway and the super is spent: a miss. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
+- The aim indicator (`MatchRenderer`, "Aim indicator") is modelled on the texture of a familiar brawler's, as the
+  user asked ("don't copy it, but make it similar"): frosted see-through white (gold for a super) laid on the floor,
+  stronger toward the far end, with a crisp bright outline and a faint dark shadow just outside it so it reads on pale
+  floors, and faint ticks (arcs on a fan) flowing outward along it. Its shape is still exactly the attack's reach.
 - Last Spark's closing zone is shown as green poison smoke (since build 101, the user's request: "the actual green
   smoke"). The code still calls it the Static Storm (`Storm`, `STORM_*`, `GameEvent.StormHit`); players see
   "Poison Smoke". `MatchRenderer.drawStorm` draws a green ground haze outside the circle and low clumps of smoke
@@ -254,20 +233,17 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - Every fighter has a hyper (`Control.hyper`, the `HYPER_*` numbers in `Balance.kt`): a third button that charges from
   main-attack hits. There are no shields: the user removed them (the two seconds of spawn protection, `Fighter.shield`,
   are a different thing). Healing only starts after `REGEN_DELAY_SECONDS` without attacking or being hit.
-- The menus are steel blue, not purple, by the user's decision (`Palette`). Since build 94 they are the user-approved
-  "arena console" redesign (build 93's glossy, rim-lit restyle of the old plates was not what they meant): one notched
-  shape (`NotchShape`/`plateShape()` in `ui/Components.kt`: rounded corners with a diagonal notch top right), dark
-  steel-glass slabs that keep a visible side (the user wants slabs), hairline rim light and a bright accent edge
-  (`ButtonStyle.GLASS`), thin-edged condensed upright type (`Type`: the device sans drawn narrower with
-  `TextGeometricTransform`, because MIUI has no condensed face; `Type.Eyebrow` for tracked capitals), pill badges and
-  capsule currency counters. The home screen has a navigation rail down the left (Shop, Fighters, Ranks, News,
-  Settings); sub-screens share `ScreenHeader`, whose section tabs (`LocalScreen`, `LocalNav`) jump between Shop,
-  Fighters, Road, Cups, Ranks and News, and which says online/offline under the title. Parts arrive staggered
-  (`Modifier.enterFrom`), flipping up into place. Since build 101 the menus have more depth again, as the user asked
-  ("3D and depth"): deeper button slabs (`SLAB`) that tip back when pressed, a rounded bevel on every face, softer
-  deeper shadows, extruded display text (`GameText`), and the home screen's rail and right column turned inward
-  (`Modifier.tilt3d`) like a cockpit. The Shop icon is a shopping bag; the Fighters icon is a fighter's helmet with a lit visor
-  (the user rejected two busts as not saying what it is).
+- The menus are purple again, in build 58's style, by the user's decision (build 102: "bring it back to its old
+  glory days where it wasn't plagued by flat buttons and it was actually purple again"). Steel blue (builds 59 to
+  101) and the flat "arena console" glass (builds 94 to 101) are gone, and so is build 101's thicker-slab attempt at
+  depth, which the user called botched. The look is `Palette` and `Type` in `ui/Theme.kt` and the plates in
+  `ui/Components.kt`, as they were in build 58: chamfered cut-corner plates (`plateShape`), a thick 2.5 to 3 dp ink
+  outline, a strong curved gloss over the top half of every button, a lit-top / dark-bottom bevel, a solid lip that
+  the face presses down onto, brushed panels with a lit inner rim, text with a thick ink outline and a hard ink drop
+  (`GameText`), and heavy italic display type. The 3D lobby room is purple again too (`Lobby.kt`, `Stage.kt`). The
+  newer layout stayed: the home screen's navigation rail (Shop, Fighters, Ranks, News, Settings), `ScreenHeader`'s
+  section tabs (`LocalScreen`, `LocalNav`), parts arriving staggered (`Modifier.enterFrom`). The Shop icon is a
+  shopping bag; the Fighters icon is a fighter's helmet with a lit visor (the user rejected two busts).
 - The music is upbeat by the user's decision ("too calm" before build 94): the lobby loop is 128 BPM and the victory
   theme 148, both with a snare, open hats and a rolling sixteenth-note bass.
 - A match ends with a reveal before its stats (`ui/screens/ResultReveal.kt`), as the user asked ("like Brawl Stars,

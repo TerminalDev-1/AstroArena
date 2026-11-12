@@ -21,8 +21,8 @@ data class StatLine(val base: Int, val perLevel: Int) {
     }
 }
 
-/** [BYTE] is Swish, the starter (the id has been Byte, Rocket, Spark and now her). [SPARK] is Spark with an id of his own (build 96). */
-enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY, SPARK }
+/** [BYTE] is Swish, the starter (the id has been Byte, Rocket, Spark and now her). Spark had an id of his own from build 96 until he was retired (build 102). */
+enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
 
 /**
  * [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. [SMASH] is heavy things hurled a
@@ -414,12 +414,12 @@ object Balance {
     const val MIN_AMMO_DAMAGE = 1300
 
     /**
-     * Spark: a Legendary of his own since build 96, by the user's decision, last on the Spark Road. Swish took his place as
-     * the starter (and his old id, BYTE); everyone who had him then kept him (`economy.complete`, `SaveStore.fromJson`).
-     * The size of a boss is still made from him.
+     * Spark, retired in build 102 by the user's decision (`REMOVED_FIGHTERS` in `economy.py` pays him back). Nobody plays
+     * him: his def is kept, like Rocket's code, because the size of a boss is made from it and the tests keep his lobbed
+     * star and shadow realm working with it. (It carries the starter's id only because a def needs one.)
      */
     val spark: FighterDef = FighterDef(
-        id = FighterId.SPARK,
+        id = FighterId.BYTE,
         rarity = Rarity.LEGENDARY,
         // (His realm is Rocket's, whose rockets and realm are still in the simulation.)
         name = "Spark",
@@ -606,7 +606,6 @@ object Balance {
             ),
         ),
         // Last on the Spark Road, after Buddy.
-        spark,
     )
 
     fun fighter(id: FighterId): FighterDef = fighters.first { it.id == id }

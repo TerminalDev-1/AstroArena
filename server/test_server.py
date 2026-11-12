@@ -125,10 +125,10 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.shop_item("crate_l"), ({"type": "bolts", "amount": 3000}, 50))
         self.assertEqual(economy.shop_item("fighter_KITO"), ({"type": "fighter", "fighter": "KITO"}, 90))
         self.assertEqual(economy.shop_item("fighter_BUDDY"), ({"type": "fighter", "fighter": "BUDDY"}, 160))
-        self.assertEqual(economy.SPARK_ROAD[-2:], [("BUDDY", 7000), ("SPARK", 7000)])
+        self.assertEqual(economy.SPARK_ROAD[-1], ("BUDDY", 7000))
         self.assertEqual(economy.shop_item("skin_BUDDY_2"), ({"type": "skin", "fighter": "BUDDY", "skin": 2}, 20))
         self.assertEqual(economy.shop_item("skin_KITO_2"), ({"type": "skin", "fighter": "KITO", "skin": 2}, 20))
-        for missing in ("fighter_BYTE", "fighter_MIRA", "fighter_VARUN", "skin_MIRA_1", "skin_KITO_0", "skin_KITO_3", "skin_NOBODY_1", "crate_xl", ""):
+        for missing in ("fighter_BYTE", "fighter_SPARK", "fighter_MIRA", "fighter_VARUN", "skin_MIRA_1", "skin_KITO_0", "skin_KITO_3", "skin_NOBODY_1", "crate_xl", ""):
             self.assertIsNone(economy.shop_item(missing))
         self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "VICTORY", 0, 2, "NORMAL"), 28)
         self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "DEFEAT", 0, 9, "ELITE"), 33)
@@ -921,8 +921,8 @@ class Api(unittest.TestCase):
         order = [f for f, _ in economy.SPARK_ROAD]
         cost = dict(economy.SPARK_ROAD)
         self.assertEqual([s["fighter"] for s in road["steps"]], order)
-        self.assertEqual(order, ["BRAKK", "KIRA", "KITO", "BUDDY", "SPARK"])
-        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 4200, 6500, 7000, 7000])
+        self.assertEqual(order, ["BRAKK", "KIRA", "KITO", "BUDDY"])
+        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 4200, 6500, 7000])
         self.assertEqual(road["steps"][0], {"fighter": "BRAKK", "cost": 2500, "rarity": "RARE"})
         self.assertEqual(len(road["steps"]), len(rules.FIGHTER_SKINS) - 1)
         # The road has a fixed order: the Credits go toward the first fighter along it that is still locked.
@@ -1001,23 +1001,28 @@ class Api(unittest.TestCase):
         self.assertEqual(sorted(old["fighters"]), sorted(rules.FIGHTER_SKINS))
         self.assertEqual(old["fighters"]["BYTE"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
 
-    def test_whoever_had_spark_keeps_him_when_swish_takes_the_starters_place(self):
-        # Before build 96 Spark was BYTE: a profile from then has no SPARK, and its BYTE is him.
+    def test_spark_is_retired_and_paid_back(self):
+        # Spark was retired in build 102: whoever had him gets his road cost back, as Credits while there is road
+        # left, Upgrade Credits after; Swish, the starter, is untouched.
         old = economy.new_profile()
-        del old["fighters"]["SPARK"]
-        old["fighters"]["BYTE"] = {"unlocked": True, "level": 7, "ownedSkins": [0, 2], "cups": 340}
+        old["fighters"]["SPARK"] = {"unlocked": True, "level": 7, "ownedSkins": [0, 2], "cups": 340}
+        old["fighters"]["BYTE"]["level"] = 7
         economy.complete(old)
-        self.assertEqual(old["fighters"]["SPARK"], {"unlocked": True, "level": 7, "ownedSkins": [0, 2], "cups": 340})
-        self.assertEqual(old["fighters"]["BYTE"]["level"], 7, "and Swish, the starter, is at his level")
-        # Reading it again changes nothing more.
-        again = json.loads(json.dumps(old))
+        self.assertNotIn("SPARK", old["fighters"])
+        self.assertEqual(old["fighters"]["BYTE"]["level"], 7)
+        self.assertGreaterEqual(old["credits"] + sum(1 for f, _ in economy.SPARK_ROAD if old["fighters"][f]["unlocked"]), 1)
+        done = economy.new_profile()
+        for f, _ in economy.SPARK_ROAD:
+            done["fighters"][f]["unlocked"] = True
+        done["fighters"]["SPARK"] = {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0}
+        bolts = done["bolts"]
+        economy.complete(done)
+        self.assertEqual(done["bolts"], bolts + 7000)
+        # Reading it again changes nothing more, and nobody new has him.
+        again = json.loads(json.dumps(done))
         economy.complete(again)
-        self.assertEqual(again, old)
-        # A new player starts with Swish only: Spark is on the road, last, a Legendary.
-        new = economy.complete(economy.new_profile())
-        self.assertFalse(new["fighters"]["SPARK"]["unlocked"])
-        self.assertTrue(new["fighters"]["BYTE"]["unlocked"])
-        self.assertEqual(economy.shop_item("fighter_SPARK"), ({"type": "fighter", "fighter": "SPARK"}, 160))
+        self.assertEqual(again, done)
+        self.assertNotIn("SPARK", economy.complete(economy.new_profile())["fighters"])
 
     def test_profiles_from_before_glory_and_the_pass_were_removed(self):
         # Stored before the change: some Glory, a Spark Pass, no entry for the newest fighter, and Credits that

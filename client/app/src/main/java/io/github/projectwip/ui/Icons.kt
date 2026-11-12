@@ -235,8 +235,8 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             drawArc(Color.White.copy(alpha = 0.7f), 205f, 55f, false, Offset(0.22f, 0.2f), Size(0.56f, 0.5f), style = Stroke(0.04f, cap = StrokeCap.Round))
             // Chin guard: a darker plate with three vents.
             val chin = poly(0.3f, 0.66f, 0.7f, 0.66f, 0.66f, 0.86f, 0.34f, 0.86f)
-            drawPath(chin, Color(0xFF2A4C6E)); outline(chin, 0.04f)
-            for (x in floatArrayOf(0.42f, 0.5f, 0.58f)) drawLine(Color(0xFF8FD6FF).copy(alpha = 0.7f), Offset(x, 0.72f), Offset(x, 0.8f), 0.03f, cap = StrokeCap.Round)
+            drawPath(chin, Color(0xFF3A2A8C)); outline(chin, 0.04f)
+            for (x in floatArrayOf(0.42f, 0.5f, 0.58f)) drawLine(Color(0xFFC9B8FF).copy(alpha = 0.7f), Offset(x, 0.72f), Offset(x, 0.8f), 0.03f, cap = StrokeCap.Round)
             outline(shell)
             // The visor: a wide wedge across the eyes, lit from inside.
             val visor = Path().apply {
@@ -285,7 +285,7 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
             drawPath(poly(0.2f, 0.42f, 0.56f, 0.24f, 0.56f, 0.34f, 0.2f, 0.48f), Color.White.copy(alpha = 0.45f))
             outline(cone)
             val handle = poly(0.24f, 0.58f, 0.36f, 0.62f, 0.32f, 0.86f, 0.2f, 0.82f)
-            drawPath(handle, Color(0xFF2A4C6E)); outline(handle, 0.05f)
+            drawPath(handle, Color(0xFF3A2A8C)); outline(handle, 0.05f)
             drawRoundRect(INK, Offset(0.06f, 0.36f), Size(0.12f, 0.28f), androidx.compose.ui.geometry.CornerRadius(0.04f))
             drawRoundRect(Palette.Orange, Offset(0.085f, 0.385f), Size(0.07f, 0.23f), androidx.compose.ui.geometry.CornerRadius(0.025f))
             for ((k, r) in floatArrayOf(0.14f, 0.26f).withIndex()) {
@@ -303,7 +303,7 @@ fun DrawScope.drawIconUnit(kind: IconKind, tint: Color?) {
         }
         IconKind.LOCK -> {
             drawArc(INK, 180f, 180f, false, Offset(0.28f, 0.14f), Size(0.44f, 0.5f), style = Stroke(0.16f))
-            drawArc(Color(0xFFCBDBEA), 180f, 180f, false, Offset(0.28f, 0.14f), Size(0.44f, 0.5f), style = Stroke(0.08f))
+            drawArc(Color(0xFFDCD2F5), 180f, 180f, false, Offset(0.28f, 0.14f), Size(0.44f, 0.5f), style = Stroke(0.08f))
             val body = poly(0.2f, 0.42f, 0.8f, 0.42f, 0.8f, 0.9f, 0.2f, 0.9f)
             drawPath(body, Palette.Gold); outline(body)
             drawCircle(INK, 0.07f, Offset(0.5f, 0.62f))

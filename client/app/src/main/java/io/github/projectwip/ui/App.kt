@@ -353,11 +353,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         val metrics = UiMetrics((maxWidth.value - cutoutPx / base.density) / scale, maxHeight.value / scale, scale)
 
         val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
-        // Whenever Spark stands in the lobby, the scene behind the menus goes blue and glitches now and then.
-        val glitch = rememberSparkGlitch {
-            screen !is Screen.Match && capsule == null && haul == null && lobby.showFighter && io.github.projectwip.ui.SPARK_GLITCH_ON && lobby.fighter == FighterId.SPARK &&
-                lobby.shot != io.github.projectwip.render3d.LobbyShot.ROAD
-        }
         CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalCutout provides cutoutSides, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalOfflineGame provides local, LocalOfflineMode provides offline, LocalDev provides dev, LocalServerCall provides ask, LocalNav provides go) {
             if (screen !is Screen.Match) {
                 androidx.compose.ui.viewinterop.AndroidView(
@@ -365,8 +360,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            // (Under the menus: Spark's red is a hint on the scene, never over the buttons and text.)
-            SparkGlitchOverlay(glitch)
             // The menu steps aside while a capsule is being opened, so nothing sits on top of the 3D capsule.
             val menuAlpha by androidx.compose.animation.core.animateFloatAsState(if (capsule != null || haul != null) 0f else 1f, tween(160), label = "menu")
             AnimatedContent(

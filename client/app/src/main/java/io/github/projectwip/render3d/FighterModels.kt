@@ -65,7 +65,7 @@ class FighterModels {
     init {
         // (Swish took Spark's place as the starter, as Spark took Rocket's; Rocket's model is kept.)
         models[FighterId.BYTE] = buildSwish()
-        models[FighterId.SPARK] = buildSpark()
+        // (Spark was retired in build 102: [buildSpark] is kept, unregistered, like Rocket's model.)
         models[FighterId.BRAKK] = buildBrakk()
         models[FighterId.KIRA] = buildKira()
         models[FighterId.KITO] = buildKito()

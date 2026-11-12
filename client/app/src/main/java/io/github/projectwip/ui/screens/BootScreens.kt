@@ -62,7 +62,7 @@ val TIPS = listOf(
 fun NameScreen(onDone: (String) -> Unit) {
     var name by remember { androidx.compose.runtime.mutableStateOf("") }
     Box(
-        Modifier.fillMaxSize().background(Color(0xFF091520)).clickable(remember { MutableInteractionSource() }, null) { },
+        Modifier.fillMaxSize().background(Color(0xFF140B38)).clickable(remember { MutableInteractionSource() }, null) { },
         contentAlignment = Alignment.TopCenter,
     ) {
         // Near the top, so the keyboard doesn't cover it.
@@ -87,7 +87,7 @@ fun UpdateScreen(update: UpdateInfo, onSkip: () -> Unit) {
     val context = LocalContext.current
     fun open(url: String) = try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) { }
     Box(
-        Modifier.fillMaxSize().background(Color(0xF0091520)).clickable(remember { MutableInteractionSource() }, null) { },
+        Modifier.fillMaxSize().background(Color(0xF0140B38)).clickable(remember { MutableInteractionSource() }, null) { },
         contentAlignment = Alignment.Center,
     ) {
         Panel(Modifier.widthIn(max = 720.dp).padding(18.dp), cut = 20.dp) {
@@ -123,7 +123,7 @@ fun UpdateScreen(update: UpdateInfo, onSkip: () -> Unit) {
 fun UnsupportedScreen(message: String, releasesUrl: String, onSkip: () -> Unit) {
     val context = LocalContext.current
     Box(
-        Modifier.fillMaxSize().background(Color(0xF0091520)).clickable(remember { MutableInteractionSource() }, null) { },
+        Modifier.fillMaxSize().background(Color(0xF0140B38)).clickable(remember { MutableInteractionSource() }, null) { },
         contentAlignment = Alignment.Center,
     ) {
         Panel(Modifier.widthIn(max = 680.dp).padding(18.dp), cut = 20.dp) {
@@ -163,7 +163,7 @@ fun DisabledScreen(reason: String, until: Long) {
         while (true) { value = until - System.currentTimeMillis(); kotlinx.coroutines.delay(1000) }
     }
     Box(
-        Modifier.fillMaxSize().background(Color(0xF0091520)).clickable(remember { MutableInteractionSource() }, null) { },
+        Modifier.fillMaxSize().background(Color(0xF0140B38)).clickable(remember { MutableInteractionSource() }, null) { },
         contentAlignment = Alignment.Center,
     ) {
         Panel(Modifier.widthIn(max = 680.dp).padding(18.dp), cut = 20.dp) {

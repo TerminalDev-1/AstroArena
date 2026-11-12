@@ -84,9 +84,6 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
         val slot = floor(time / SPOT_SECONDS).toInt()
         val featured = fighters[slot % fighters.size]
         val phase = (time / SPOT_SECONDS) - slot
-        // Spark in the spotlight turns the night red and glitches it now and then (over the backdrop, under the rest).
-        val glitch = io.github.projectwip.ui.rememberSparkGlitch { io.github.projectwip.ui.SPARK_GLITCH_ON && featured.id == io.github.projectwip.data.FighterId.SPARK }
-        io.github.projectwip.ui.SparkGlitchOverlay(glitch)
         val fighterSize = min(h.value * 0.66f, w.value * 0.38f).dp
         Column(
             Modifier.width(w * 0.46f).fillMaxHeight().padding(top = h * 0.04f, bottom = h * 0.05f),

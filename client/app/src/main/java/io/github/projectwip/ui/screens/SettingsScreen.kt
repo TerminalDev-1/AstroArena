@@ -422,6 +422,6 @@ private fun ChunkySlider(value: Float, min: Float, max: Float, onRelease: () -> 
             Offset(pad, y - trackH / 2), Size((size.width - pad * 2) * f, trackH), CornerRadius(trackH))
         val kx = pad + (size.width - pad * 2) * f
         drawCircle(Palette.Ink, pad - 1, Offset(kx, y))
-        drawCircle(Brush.verticalGradient(listOf(Color.White, Color(0xFFCBDBEA)), y - pad, y + pad), pad - 4.dp.toPx(), Offset(kx, y))
+        drawCircle(Brush.verticalGradient(listOf(Color.White, Color(0xFFDCD2F5)), y - pad, y + pad), pad - 4.dp.toPx(), Offset(kx, y))
     }
 }

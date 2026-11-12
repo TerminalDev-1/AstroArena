@@ -52,14 +52,14 @@ def _round(x: float) -> int:
 
 # What a fighter is: its rarity. That sets what it costs in the shop (Prisms) and on the Spark Road (Credits).
 # The starting fighter has no rarity and isn't sold. Keep in step with Balance.kt.
-# BYTE is Swish, the free starter (it was Spark until build 96); SPARK is Spark with an id of his own, last on the road.
-FIGHTER_RARITY = {"BRAKK": "RARE", "KIRA": "EPIC", "KITO": "MYTHIC", "BUDDY": "LEGENDARY", "SPARK": "LEGENDARY"}
+# BYTE is Swish, the free starter (it was Spark until build 96). Spark had an id of his own until he was retired (build 102).
+FIGHTER_RARITY = {"BRAKK": "RARE", "KIRA": "EPIC", "KITO": "MYTHIC", "BUDDY": "LEGENDARY"}
 # Fighters that were in the game for a few builds and were taken out again, with the Credits each took on the
 # Spark Road. A profile that still holds one loses it and gets those Credits back.
 # (Juno was the starter until Byte took her place: she cost nothing, so nothing comes back for her. Mira was the
 # Epic stop on the road for a long while before she was taken out. Varun was the Legendary one: he was made a
 # legacy fighter and then removed, and what comes back is the 9,000 he cost for most of his time.)
-REMOVED_FIGHTERS = {"JUNO": 0, "MIRA": 4200, "VARUN": 9000, "PIP": 160, "DOZER": 160, "NOVA": 420, "FENN": 420, "VOLT": 900, "ONYX": 900, "AURA": 1600, "ZERO": 2600}
+REMOVED_FIGHTERS = {"JUNO": 0, "MIRA": 4200, "VARUN": 9000, "PIP": 160, "DOZER": 160, "NOVA": 420, "FENN": 420, "VOLT": 900, "ONYX": 900, "AURA": 1600, "ZERO": 2600, "SPARK": 7000}
 # Legacy fighters: on their way out of the game, and stuck at whatever level they have. Keep in step with Balance.kt.
 NO_UPGRADES: set = set()
 RARITY_PRICE = {"RARE": 40, "EPIC": 70, "MYTHIC": 90, "LEGENDARY": 160}
@@ -237,9 +237,7 @@ def complete(profile: dict) -> dict:
         if isinstance(entry, dict) and entry.get("unlocked"):
             # Back onto the road if there is still road left; Bolts otherwise.
             profile["credits" if road_next(profile) is not None else "bolts"] += cost
-    # Spark was BYTE until build 96, when Swish took the id: whoever had him keeps him, just as he was.
-    if "SPARK" not in profile["fighters"] and isinstance(profile["fighters"].get("BYTE"), dict):
-        profile["fighters"]["SPARK"] = dict(profile["fighters"]["BYTE"], unlocked=True)
+    # (Spark, who had an id of his own from build 96, was retired in build 102: he is paid back above like the others.)
     # Everyone has the starter, including accounts made when it was a different fighter; and every fighter has
     # an entry, including ones added since the profile was made.
     for name in rules.FIGHTER_SKINS:

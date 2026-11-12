@@ -70,7 +70,7 @@ fun MatchIntro(match: Match, onDone: () -> Unit) {
 
     val me = match.player
     Box(
-        Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }.background(Color(0xE6091520))
+        Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }.background(Color(0xE6140B38))
             .clickable(remember { MutableInteractionSource() }, null, onClick = onDone),
     ) {
         Column(Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {

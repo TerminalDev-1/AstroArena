@@ -1046,27 +1046,64 @@ class MatchRenderer(
                 val pz = lerp(p.prevY, p.y, alpha)
                 val yaw = -Math.toDegrees(atan2(dz, dx).toDouble()).toFloat()
                 val a = world.arena
-                // Every reticle is drawn in three layers so it reads on any floor: a dark rim, a bright fill that
-                // pulses, and a solid mark (a bar across the far end of a beam, a line down the middle of a fan).
+                // The reticle is frosted glass laid on the floor: a see-through fill that grows a little stronger
+                // toward the far end, a crisp bright outline with a faint shadow just outside it (so it reads on pale
+                // floors too), and faint ticks flowing outward along it. White for the attack, gold for the super.
                 val pulse = 0.5f + 0.5f * sin(time * 7f)
-                fun tint(layer: Int) = when {
-                    layer == 0 -> lit.v4("uTint", 0.06f, 0.03f, 0.16f, 0.45f)
-                    // The solid mark: white on the gold super, ink on the white attack so it still shows.
-                    layer == 2 -> if (inp.aimingSuper) lit.v4("uTint", 1f, 1f, 1f, 1f) else lit.v4("uTint", 0.06f, 0.03f, 0.16f, 0.85f)
-                    // Bright white for the attack, gold for the super. Nearly solid, so it shows on pale floors too.
-                    inp.aimingSuper -> lit.v4("uTint", 1f, 0.78f, 0.1f, 0.7f + 0.15f * pulse)
-                    else -> lit.v4("uTint", 1f, 1f, 1f, 0.8f + 0.12f * pulse)
+                val gold = inp.aimingSuper
+                fun col(alpha: Float) = if (gold) lit.v4("uTint", 1f, 0.8f, 0.16f, alpha) else lit.v4("uTint", 1f, 1f, 1f, alpha)
+                fun tint(layer: Int) = when (layer) {
+                    0 -> lit.v4("uTint", 0.05f, 0.03f, 0.12f, 0.3f)
+                    2 -> col(0.95f)
+                    else -> col(0.38f + 0.08f * pulse)
                 }
+                val edge = 0.07f
+                val tickGap = 1.1f
+                val flow = (time * 2.4f) % tickGap
                 fun beam(length: Float, width: Float) {
-                    tint(0); setModel(px - dx * 0.06f, 0.045f, pz - dz * 0.06f, length + 0.12f, 1f, width + 0.16f, yaw); rect.draw()
-                    tint(1); setModel(px, 0.05f, pz, length, 1f, width, yaw); rect.draw()
-                    tint(2); setModel(px + dx * (length - 0.1f), 0.055f, pz + dz * (length - 0.1f), 0.1f, 1f, width, yaw); rect.draw()
+                    val nx = -dz
+                    val nz = dx
+                    val half = width / 2f
+                    // The fill, in three bands that strengthen toward the far end.
+                    val band = length / 3f
+                    for (k in 0..2) {
+                        col(0.3f + 0.09f * k + 0.05f * pulse)
+                        setModel(px + dx * band * k, 0.05f, pz + dz * band * k, band, 1f, width, yaw); rect.draw()
+                    }
+                    // Ticks flowing out along it.
+                    var u = flow + 0.3f
+                    while (u < length - 0.2f) {
+                        col(0.3f * (1f - u / length) + 0.22f)
+                        setModel(px + dx * u, 0.052f, pz + dz * u, 0.1f, 1f, width * 0.7f, yaw); rect.draw()
+                        u += tickGap
+                    }
+                    // The outline down both sides and across the far end, each with its shadow outside it.
+                    for (side in intArrayOf(-1, 1)) {
+                        val so = (half + edge * 0.55f) * side
+                        val bo = (half - edge * 0.5f) * side
+                        tint(0); setModel(px + nx * so, 0.051f, pz + nz * so, length, 1f, edge, yaw); rect.draw()
+                        col(0.88f); setModel(px + nx * bo, 0.054f, pz + nz * bo, length - edge, 1f, edge, yaw); rect.draw()
+                    }
+                    tint(0); setModel(px + dx * length, 0.051f, pz + dz * length, edge, 1f, width + edge * 2.1f, yaw); rect.draw()
+                    tint(2); setModel(px + dx * (length - edge), 0.055f, pz + dz * (length - edge), edge, 1f, width, yaw); rect.draw()
                 }
                 fun fan(range: Float, degrees: Float) {
-                    tint(0); setModel(px, 0.045f, pz, range + 0.12f, 1f, range + 0.12f, yaw); sector(degrees + 5f).draw()
-                    tint(1); setModel(px, 0.05f, pz, range, 1f, range, yaw); sector(degrees).draw()
-                    // A solid line down the middle shows where the fan is pointed and how far it reaches.
-                    tint(2); setModel(px, 0.055f, pz, range, 1f, 0.07f, yaw); rect.draw()
+                    col(0.34f + 0.06f * pulse); setModel(px, 0.05f, pz, range, 1f, range, yaw); sector(degrees).draw()
+                    // A stronger band round the far edge, then ticks flowing out as arcs.
+                    col(0.2f); setModel(px, 0.051f, pz, range, 1f, range, yaw); arc(degrees, 0.22f).draw()
+                    var u = flow + 0.45f
+                    while (u < range - 0.25f) {
+                        col(0.3f * (1f - u / range) + 0.22f)
+                        setModel(px, 0.052f, pz, u, 1f, u, yaw); arc(degrees, 0.03f).draw()
+                        u += tickGap
+                    }
+                    // The outline: both straight edges and the curved far end, with shadows outside them.
+                    for (side in floatArrayOf(-1f, 1f)) {
+                        tint(0); setModel(px, 0.051f, pz, range, 1f, edge * 1.9f, yaw + side * degrees / 2f); rect.draw()
+                        col(0.88f); setModel(px, 0.054f, pz, range, 1f, edge, yaw + side * degrees / 2f); rect.draw()
+                    }
+                    tint(0); setModel(px, 0.051f, pz, range + edge, 1f, range + edge, yaw); arc(degrees, edge * 1.6f / (range + edge)).draw()
+                    tint(2); setModel(px, 0.055f, pz, range, 1f, range, yaw); arc(degrees, edge / range).draw()
                 }
                 if (inp.aimingSuper) {
                     val s = p.def.superSpec
@@ -1175,6 +1212,16 @@ class MatchRenderer(
             arrow.draw()
             lit.f("uEmissive", 0f)
             lit.i("uMode", 1)
+        }
+    }
+
+    private val arcs = HashMap<Int, Mesh>()
+
+    /** A band along the curved end of a fan [spread] degrees wide: unit outer radius, [thickness] of it deep. */
+    private fun arc(spread: Float, thickness: Float): Mesh {
+        val t = thickness.coerceIn(0.005f, 0.5f)
+        return arcs.getOrPut(spread.toInt() * 1000 + (t * 999).toInt()) {
+            MeshBuilder().apply { ring(1f - t, 1f, 28, -spread.toInt() / 2f, spread.toInt() / 2f) }.build()
         }
     }
 
@@ -1903,7 +1950,6 @@ class MatchRenderer(
         FighterId.KIRA -> 2.25f
         FighterId.KITO -> 1.9f
         FighterId.BUDDY -> 2.05f
-        FighterId.SPARK -> 1.85f
     }
 
     override fun onDestroyed() {}
