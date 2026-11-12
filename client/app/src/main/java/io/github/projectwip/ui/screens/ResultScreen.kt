@@ -188,7 +188,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                                 io.github.projectwip.data.GameMode.BOSS -> "Boss Mode · Proving Ground · ${r.difficulty.label} boss"
                                 io.github.projectwip.data.GameMode.TRAINING -> "Training Area"
                                 io.github.projectwip.data.GameMode.DUEL -> "1v1 · Proving Ground"
-                                io.github.projectwip.data.GameMode.PORTAL -> "Portal Run · ${r.placement} portal${if (r.placement == 1) "" else "s"} deep · ${r.difficulty.label} enemies"
+                                io.github.projectwip.data.GameMode.PORTAL -> "Dimension · ${r.placement} portal${if (r.placement == 1) "" else "s"} deep · ${r.difficulty.label} enemies"
                             }, Type.Label, color = Palette.TextDim)
                     }
                 }
@@ -581,11 +581,18 @@ private fun RewardRow(icon: IconKind, label: String, value: String, chip: Color)
 @Composable
 private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, modifier: Modifier, ranked: Boolean = false, first: Int = 0) {
     Panel(modifier.fillMaxHeight(), cut = 14.dp) {
-        Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+      androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().padding(10.dp)) {
+        // Rows are a fixed, comfortable height from the top (one row used to stretch into a slab, and nine were
+        // squashed until their stats were cut off). When many have to fit, each becomes one tidy line.
+        val listed = (if (ranked) players else players.sortedByDescending { it.kos * 1000 + it.damage / 10 })
+        val room = (maxHeight - 30.dp) / listed.size.coerceAtLeast(1) - 6.dp
+        val rowH = room.coerceIn(30.dp, 62.dp)
+        val compact = rowH < 50.dp
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             GameText(title, Type.Label, color = color, outline = 2.dp)
-            for ((n, p) in (if (ranked) players else players.sortedByDescending { it.kos * 1000 + it.damage / 10 }).withIndex()) {
+            for ((n, p) in listed.withIndex()) {
                 Row(
-                    Modifier.fillMaxWidth().weight(1f).arrive(first + n, -50f, 0f).drawBehind {
+                    Modifier.fillMaxWidth().height(rowH).arrive(first + n, -50f, 0f).drawBehind {
                         val o = plateShape(8.dp, 3.dp).createOutline(size, layoutDirection, this)
                         val path = androidx.compose.ui.graphics.Path().apply { addOutline(o) }
                         // Each row is a little slab, the player's lit green.
@@ -600,19 +607,37 @@ private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, mo
                         GameText(if (p.placement == 0) "—" else "#${p.placement}", Type.Heading,
                             color = if (p.placement == 1) Palette.Gold else Color.White, outline = 2.dp, modifier = Modifier.width(38.dp))
                     }
-                    Box(Modifier.fillMaxHeight().width(if (ranked) 22.dp else 46.dp)) {
-                        FighterView(p.boss?.let { Balance.boss(it) } ?: Balance.fighter(p.fighter), p.skin, Modifier.fillMaxSize(), pedestal = false)
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            GameText(p.name, Type.Label, outline = 2.dp, color = if (p.isPlayer) Palette.Gold else Color.White)
-                            if (p.isBot) PlainText("  BOT", Type.Small)
-                            if (p.isMvp) { Spacer(Modifier.width(4.dp)); GameIcon(IconKind.STAR, Modifier.size(18.dp)) }
+                    val def = p.boss?.let { Balance.boss(it) } ?: Balance.fighter(p.fighter)
+                    if (compact) {
+                        // A small badge in the fighter's colours in place of the 3D model, so a long list stays light.
+                        val sk = def.skins[p.skin.coerceIn(0, def.skins.lastIndex)]
+                        Box(Modifier.size(rowH - 10.dp).drawBehind {
+                            drawCircle(Palette.Ink)
+                            drawCircle(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(sk.secondary), Color(sk.primary))), size.minDimension / 2 - 2.dp.toPx())
+                        }, contentAlignment = Alignment.Center) {
+                            GameText(def.name.take(1), Type.Small.copy(color = Color.White), outline = 1.5.dp)
                         }
-                        PlainText("${p.kos} KO · ${p.deaths} down · ${"%,d".format(p.damage)} dmg", Type.Small)
+                        Spacer(Modifier.width(8.dp))
+                        GameText(p.name, Type.Label, outline = 2.dp, color = if (p.isPlayer) Palette.Gold else Color.White, modifier = Modifier.weight(1f))
+                        if (p.isMvp) { GameIcon(IconKind.STAR, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)) }
+                        PlainText("${p.kos} KO · ${"%,d".format(p.damage)} dmg", Type.Small, maxLines = 1)
+                        Spacer(Modifier.width(4.dp))
+                    } else {
+                        Box(Modifier.fillMaxHeight().width(if (ranked) 26.dp else 50.dp)) {
+                            FighterView(def, p.skin, Modifier.fillMaxSize(), pedestal = false)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                GameText(p.name, Type.Label, outline = 2.dp, color = if (p.isPlayer) Palette.Gold else Color.White)
+                                if (p.isBot) PlainText("  BOT", Type.Small)
+                                if (p.isMvp) { Spacer(Modifier.width(4.dp)); GameIcon(IconKind.STAR, Modifier.size(18.dp)) }
+                            }
+                            PlainText("${p.kos} KO · ${p.deaths} down · ${"%,d".format(p.damage)} dmg", Type.Small, maxLines = 1)
+                        }
                     }
                 }
             }
         }
+      }
     }
 }

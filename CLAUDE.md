@@ -223,7 +223,7 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
   With nobody on the line he leaps anyway and the super is spent: a miss. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
-- Portal Run (`GameMode.PORTAL`, 1.0) is the user's idea: waves of normal enemies, then a portal into another
+- Dimension (`GameMode.PORTAL` in the code, "Dimension" to players: the user rejected "Portal Run"; 1.0) is the user's idea: waves of normal enemies, then a portal into another
   dimension, and so on. The design is ours: one life, a pool of `PORTAL_POOL` enemy fighters waiting off the board
   (eliminated) that each wave brings in (`Balance.portalWaveSize`), `PORTAL_WAVES` waves a dimension, then a portal
   at the middle (`World.portal`, `PortalRun`, `stepPortal`, `GameEvent.PortalOpened/PortalEntered`). Stepping in
@@ -232,7 +232,15 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   `MatchRenderer`). The run's placement is how many portals were entered; it pays `per_portal` Cups each (up to
   `max_portals`, in `trophies.cfg`, mirrored in `Economy.kt`) and never costs any; two deep earns an Arena Box.
   Each time the player goes through, the Void speaks (`VOID_LINES`, `VoiceStyle.VOID`, with `Sound.VOID`, a breath
-  of shaped noise, and its words on screen): eerie, never gory, as the user asked. Debug: `--es screen portal`.
+  of shaped noise): eerie, never gory, as the user asked. It is a story mode, "just the character and the Void": on
+  arriving and at every portal the match pauses for `DimensionCutscene` (the user's design): a cut to black with a
+  blinding white light in the middle, an old-TV switch-off (to a line, then a dot), then a scene where the Void (a
+  drawn figure, `VoidPortrait`) and the player's fighter talk in turns (`data/Lore.kt`: each fighter answers in their
+  own voice), typed out, tap to go on. Debug: `--es screen portal`.
+- Bots hold fire for `BOT_WARMUP_SECONDS` at the start of a match and while their spawn shield is up (`Match.step`),
+  because the user found them beating him up too early.
+- The results screen's team lists have fixed-height rows from the top, one line each when many have to fit
+  (`TeamPanel`): one row used to stretch into a slab and nine were squashed until their stats were cut off.
 - The aim indicator (`MatchRenderer`, "Aim indicator") is modelled on the texture of a familiar brawler's, as the
   user asked ("don't copy it, but make it similar"): frosted see-through white (gold for a super) laid on the floor,
   stronger toward the far end, with a crisp bright outline and a faint dark shadow just outside it so it reads on pale

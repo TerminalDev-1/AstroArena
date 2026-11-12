@@ -521,7 +521,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win to earn Cups."
                     GameMode.BOSS -> "One of three bosses, each with moves of its own: rockets, sweeping beams, charges. Watch the marked ground. Knock it out to win; you have unlimited lives. Win to earn Cups."
                     GameMode.DUEL -> "Against one real player on this server, each on their own device. First to 3 knockouts, played for Cups. Leaving a match counts as a defeat."
-                    GameMode.PORTAL -> "Clear three waves and a portal opens. Step through into a stranger dimension with tougher enemies, and keep going. One life. Every portal earns Cups. Something is listening."
+                    GameMode.PORTAL -> "A story mode: you and the Void. Clear three waves and a portal opens; step through into a stranger dimension, where the Void speaks to you, and keep going. One life. Every portal earns Cups."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a boss that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },
                 Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 5,

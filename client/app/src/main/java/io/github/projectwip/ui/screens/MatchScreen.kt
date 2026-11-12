@@ -293,6 +293,16 @@ private fun MatchBody(
     var done by remember { mutableStateOf(false) }
     /** The line-up is showing; the match waits behind it. */
     var intro by remember { mutableStateOf(!match.practice) }
+    /** Dimension: the scene showing (portals entered when it began), or -1. The match is paused behind it. */
+    var scene by remember { mutableStateOf(-1) }
+    var seenPortals by remember { mutableStateOf(0) }
+    if (match.portalRun) androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            androidx.compose.runtime.withFrameNanos { }
+            val entered = match.world.portal?.entered ?: 0
+            if (entered > seenPortals && scene < 0) { seenPortals = entered; scene = entered; view?.paused = true }
+        }
+    }
     val context = LocalContext.current
 
     // The match runs at the chosen frame rate; the menus go back to theirs (never above 60) when it ends.
@@ -332,7 +342,9 @@ private fun MatchBody(
             },
             modifier = Modifier.fillMaxSize(),
         )
-        if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
+        if (intro && match.portalRun) DimensionCutscene(0, match.config.playerFighter, match.config.playerSkin, sfx) { intro = false; view?.resumeGame() }
+        else if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
+        if (scene >= 0) DimensionCutscene(scene, match.config.playerFighter, match.config.playerSkin, sfx) { scene = -1; view?.resumeGame() }
         if (paused && !done) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
                 Panel(cut = 20.dp) {

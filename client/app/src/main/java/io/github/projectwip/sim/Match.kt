@@ -157,6 +157,12 @@ class Match(val config: MatchConfig) {
         for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
         // A boss's brain only walks it about: what it does to the player is its script's business (see World).
         for (f in world.fighters) if (f.def.boss != null) { f.control.attack = false; f.control.superAttack = false; f.control.hyper = false }
+        // Bots hold their fire for the first seconds of a match and while their spawn shield is up, so nobody is
+        // beaten up the moment they arrive (the user found the bots got stuck in too early). They still move.
+        val warmingUp = world.phase == Phase.PLAYING && world.phaseTime < Balance.BOT_WARMUP_SECONDS
+        for (f in world.fighters) if (f.isBot && f.def.boss == null && (warmingUp || f.shield > 0f)) {
+            f.control.attack = false; f.control.superAttack = false; f.control.hyper = false
+        }
         world.step(dt)
         if (isOver) overFor += dt
     }

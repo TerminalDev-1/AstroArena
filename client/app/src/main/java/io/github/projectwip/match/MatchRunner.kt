@@ -459,12 +459,7 @@ class MatchRunner(
             is GameEvent.Eliminated -> if (e.fighterId == pid) sfx.play(Sound.DEFEAT)
             is GameEvent.PortalOpened -> sfx.play(Sound.PORTAL_OPEN)
             is GameEvent.WaveStarted -> sfx.play(Sound.BANNER, 0.7f)
-            is GameEvent.PortalEntered -> {
-                // Through: the rush of the fall, and then the Void speaks, slow and from far below.
-                sfx.play(Sound.PORTAL_ENTER)
-                sfx.play(Sound.VOID)
-                sfx.say(io.github.projectwip.data.Balance.VOID_LINES[(e.entered - 1) % io.github.projectwip.data.Balance.VOID_LINES.size], io.github.projectwip.data.VoiceStyle.VOID)
-            }
+            // (Going through a portal: the scene with the Void plays over the paused match, DimensionCutscene.)
             is GameEvent.StormHit -> if (e.targetId == pid) {
                 sfx.play(Sound.HURT, 0.6f, 0.8f); sfx.buzz(20, 90)
                 if (settings.showDamageNumbers) hudEvents += HudEvent.Damage(e.x, e.y, e.damage, false, false)

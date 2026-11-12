@@ -250,7 +250,7 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
      * Portal Run (1.0, the user's idea): clear waves of enemies, step through the portal that opens into the next
      * dimension, and go as deep as you can. The Void speaks each time you go through. One life.
      */
-    PORTAL("Portal Run", "Clear the waves · step through the portal · how deep can you go?", 1 + Balance.PORTAL_POOL),
+    PORTAL("Dimension", "You and the Void · clear the waves · step through the portal", 1 + Balance.PORTAL_POOL),
 }
 
 object Balance {
@@ -407,6 +407,9 @@ object Balance {
     const val CELL_DAMAGE_BONUS = 0.10f
 
     /** Static Storm: waits, then shrinks to [STORM_FINAL_RADIUS] over [STORM_SHRINK_SECONDS]. */
+    /** Bots don't attack for this long once a match starts (they also hold fire while their spawn shield is up). */
+    const val BOT_WARMUP_SECONDS = 4f
+
     // ---- Portal Run
     /** Enemies waiting off the board for the waves; a wave never brings in more than this. */
     const val PORTAL_POOL = 8
