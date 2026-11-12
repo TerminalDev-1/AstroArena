@@ -75,6 +75,8 @@ data class SaveData(
     val bestCups: Int = 0,
     val bolts: Int = Balance.STARTING_BOLTS,
     val prisms: Int = Balance.STARTING_PRISMS,
+    /** CPU Chips became Arena Crystals in 1.0 and every save's were set to 0, once: true once that is done. */
+    val crystalsReset: Boolean = true,
     /** Credits on the Spark Road, toward the next fighter along it; a copy of what the server holds. Not a wallet: they can only become that fighter. */
     val credits: Int = 0,
     val fighters: Map<FighterId, FighterProgress> = defaultFighters(),

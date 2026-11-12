@@ -32,7 +32,7 @@ object Economy {
         if (!Balance.fighter(fighter).upgradable) throw Refused(409, "that fighter can no longer be upgraded")
         if (p.level >= if (noCap) Balance.LEVEL_LIMIT else Balance.MAX_LEVEL) throw Refused(409, "that fighter is at the top level")
         val cost = upgradeCost(p.level, factor)
-        if (save.bolts < cost) throw Refused(402, "not enough Upgrade Credits")
+        if (save.bolts < cost) throw Refused(402, "not enough Coins")
         return Done(save.copy(bolts = save.bolts - cost, fighters = save.fighters + (fighter to p.copy(level = p.level + 1))), cost)
     }
 
@@ -62,7 +62,7 @@ object Economy {
     /**
      * Credits go straight onto the Spark Road. The moment they cover the next fighter along it that fighter is
      * unlocked and what is left carries on toward the one after. Once every fighter is unlocked Credits have
-     * nowhere to go, so they are paid as Upgrade Credits instead, one for one.
+     * nowhere to go, so they are paid as Coins instead, one for one.
      */
     private fun fillRoad(save: SaveData, amount: Int): Done<Reward> {
         if (amount <= 0) return Done(save, Reward.Credits(0))
@@ -106,7 +106,7 @@ object Economy {
 
     // ---------------------------------------------------------------------------- the shop
 
-    /** The reward and CPU Chip price of a standing shop item, or null if there is no such item. */
+    /** The reward and Arena Crystal price of a standing shop item, or null if there is no such item. */
     fun shopItem(key: String): Pair<Reward, Int>? {
         Shop.creditPacks.firstOrNull { it.key == key }?.let { return Reward.Credits(it.credits) to it.pricePrisms }
         Shop.boltCrates.firstOrNull { it.key == key }?.let { return Reward.Bolts(it.bolts) to it.pricePrisms }
@@ -115,12 +115,12 @@ object Economy {
         return null
     }
 
-    /** Buys a standing shop item with CPU Chips. */
+    /** Buys a standing shop item with Arena Crystals. */
     fun buy(save: SaveData, key: String): Done<Reward> {
         val (reward, price) = shopItem(key) ?: throw Refused(404, "no such shop item")
         if (Progression.owns(save, reward)) throw Refused(409, "already owned")
         if (reward is Reward.SkinReward && !save.progress(reward.fighter).unlocked) throw Refused(409, "unlock the fighter first")
-        if (save.prisms < price) throw Refused(402, "not enough CPU Chips")
+        if (save.prisms < price) throw Refused(402, "not enough Arena Crystals")
         return grant(save.copy(prisms = save.prisms - price), reward)
     }
 
@@ -144,8 +144,8 @@ object Economy {
         if (deal.limit in 1..purchased) throw Refused(409, "sold out")
         var s = save
         when (deal.currency) {
-            Currency.BOLTS -> { if (s.bolts < deal.price) throw Refused(402, "not enough Upgrade Credits"); s = s.copy(bolts = s.bolts - deal.price) }
-            Currency.PRISMS -> { if (s.prisms < deal.price) throw Refused(402, "not enough CPU Chips"); s = s.copy(prisms = s.prisms - deal.price) }
+            Currency.BOLTS -> { if (s.bolts < deal.price) throw Refused(402, "not enough Coins"); s = s.copy(bolts = s.bolts - deal.price) }
+            Currency.PRISMS -> { if (s.prisms < deal.price) throw Refused(402, "not enough Arena Crystals"); s = s.copy(prisms = s.prisms - deal.price) }
             Currency.FREE -> {}
         }
         return grant(s, deal.reward)
@@ -185,9 +185,9 @@ object Economy {
     val dailyPool: List<CustomOffer> = listOf(
         CustomOffer(0, "Pocket Change", bolts = 60, currency = Currency.FREE),
         CustomOffer(0, "Lucky Find", prisms = 3, currency = Currency.FREE),
-        CustomOffer(0, "Upgrade Credit Pouch", bolts = 300, currency = Currency.PRISMS, price = 6, wasPrice = 10, theme = 1),
-        CustomOffer(0, "Upgrade Credit Crate", bolts = 1000, currency = Currency.PRISMS, price = 18, wasPrice = 25, theme = 1),
-        CustomOffer(0, "Upgrade Credit Haul", bolts = 2500, currency = Currency.PRISMS, price = 35, wasPrice = 50, theme = 2),
+        CustomOffer(0, "Coin Pouch", bolts = 300, currency = Currency.PRISMS, price = 6, wasPrice = 10, theme = 1),
+        CustomOffer(0, "Coin Crate", bolts = 1000, currency = Currency.PRISMS, price = 18, wasPrice = 25, theme = 1),
+        CustomOffer(0, "Coin Haul", bolts = 2500, currency = Currency.PRISMS, price = 35, wasPrice = 50, theme = 2),
         CustomOffer(0, "Chip Pinch", prisms = 12, currency = Currency.BOLTS, price = 500, theme = 3),
         CustomOffer(0, "Chip Stack", prisms = 30, currency = Currency.BOLTS, price = 1200, wasPrice = 1500, theme = 3),
         CustomOffer(0, "Double Up", bolts = 400, prisms = 10, currency = Currency.PRISMS, price = 14, wasPrice = 20, theme = 4),
@@ -225,7 +225,7 @@ object Economy {
         return roundHalfUp((base + koBonus) * difficulty.boltMultiplier.toDouble())
     }
 
-    /** CPU Chips for the first victory of the day. Boss Mode and the Training Area don't count. */
+    /** Arena Crystals for the first victory of the day. Boss Mode and the Training Area don't count. */
     fun firstWinPrisms(mode: GameMode, outcome: MatchOutcome, save: SaveData, day: Long): Int =
         if (mode == GameMode.BOSS || mode == GameMode.TRAINING || outcome != MatchOutcome.VICTORY || save.lastFirstWinDay == day) 0 else Balance.FIRST_WIN_PRISMS
 
@@ -239,15 +239,16 @@ object Economy {
         else -> if (good(mode, outcome, placement)) 6 else 2
     }
 
-    /** A win in Knockout Rush, or a top-4 finish in Last Spark, earns an Arena Box. */
+    /** A win in Knockout Rush, a top-4 finish in Last Spark, or two portals deep in Portal Run earns an Arena Box. */
     fun earnsDrop(mode: GameMode, outcome: MatchOutcome, placement: Int): Boolean = when (mode) {
         GameMode.LAST_SPARK -> placement in 1..4
         GameMode.KNOCKOUT_RUSH -> outcome == MatchOutcome.VICTORY
+        GameMode.PORTAL -> placement >= 2
         else -> false
     }
 
     /**
-     * Settles a finished match: what it pays in Bolts, CPU Chips, Credits and Spark Pass points goes into the save,
+     * Settles a finished match: what it pays in Bolts, Arena Crystals, Credits and Spark Pass points goes into the save,
      * and the verdict says the rest (Cups and Arena Boxes are applied by [Progression.applyMatch] from it).
      */
     fun settleMatch(save: SaveData, report: MatchReport, day: Long): Done<ServerVerdict> {
@@ -367,18 +368,21 @@ object Economy {
 /** What each mode pays in Cups. Cups don't depend on how hard the bots are, and the Training Area never pays. */
 object Trophies {
     /** [places]: Cups by finishing place (a mode with them is paid by place alone). Otherwise a victory, a draw, and a defeat that costs 1 Cup per [lossStep] held, up to [maxLoss]. */
-    private class Pays(val places: List<Int>? = null, val win: Int = 0, val mvpBonus: Int = 0, val draw: Int = 0, val maxLoss: Int = 0, val lossStep: Int = 0)
+    private class Pays(val places: List<Int>? = null, val win: Int = 0, val mvpBonus: Int = 0, val draw: Int = 0, val maxLoss: Int = 0, val lossStep: Int = 0, val perPortal: Int = 0, val maxPortals: Int = 0)
 
     private val table = mapOf(
         GameMode.LAST_SPARK to Pays(places = listOf(25, 22, 20, 17, 14, 12, 7, 3, 0, 0)),
         GameMode.KNOCKOUT_RUSH to Pays(win = 8, mvpBonus = 2, draw = 1, maxLoss = 6, lossStep = 80),
         GameMode.BOSS to Pays(win = 5),
+        // Portal Run: Cups for every portal stepped through (the placement), up to ten of them; a run never costs any.
+        GameMode.PORTAL to Pays(perPortal = 4, maxPortals = 10),
     )
 
     /** How a match changes a player's Cups. Never takes them below zero. */
     fun cupDelta(mode: GameMode, outcome: MatchOutcome, placement: Int, cups: Int, mvp: Boolean): Int {
         val pays = table[mode] ?: return 0
         val delta = when {
+            pays.perPortal > 0 -> pays.perPortal * placement.coerceIn(0, pays.maxPortals)
             pays.places != null -> pays.places[(placement - 1).coerceIn(0, pays.places.lastIndex)]
             outcome == MatchOutcome.VICTORY -> pays.win + if (mvp) pays.mvpBonus else 0
             outcome == MatchOutcome.DRAW -> pays.draw

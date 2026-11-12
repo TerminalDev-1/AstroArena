@@ -24,6 +24,8 @@ DEFAULT_CUPS = {
     "BOSS": {"win": 5},
     # 1v1, against another real player (the lobby replays it and says who won: duel.py).
     "DUEL": {"win": 8, "draw": 0, "max_loss": 6, "loss_step": 80},
+    # Portal Run pays by depth: Cups for every portal stepped through (the match's placement), up to max_portals.
+    "PORTAL": {"per_portal": 4, "max_portals": 10},
 }
 # The Training Area is never played for Cups (nothing referees it), whatever trophies.cfg says.
 CUP_MODES = tuple(DEFAULT_CUPS)
@@ -48,7 +50,7 @@ OUTCOMES = ("VICTORY", "DEFEAT", "DRAW")
 BOSSES = ("BARRAGE", "SWEEPER", "STAMPEDE")
 
 # Bots in each mode (the names the server hands out).
-MODES = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 5, "BOSS": 0, "TRAINING": 0}
+MODES = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 5, "BOSS": 0, "TRAINING": 0, "PORTAL": 8}
 
 
 def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, table: dict | None = None) -> int:
@@ -57,7 +59,9 @@ def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, tab
     if not pays:
         return 0
     places = pays.get("places")
-    if places:
+    if "per_portal" in pays:
+        delta = pays["per_portal"] * min(max(placement, 0), pays.get("max_portals", 10))
+    elif places:
         delta = places[min(max(placement - 1, 0), len(places) - 1)]
     elif outcome == "VICTORY":
         delta = pays.get("win", 0) + (pays.get("mvp_bonus", 0) if mvp else 0)
@@ -82,6 +86,8 @@ def earns_drop(mode: str, outcome: str, placement: int) -> bool:
         return 1 <= placement <= 4
     if mode == "KNOCKOUT_RUSH":
         return outcome == "VICTORY"
+    if mode == "PORTAL":
+        return placement >= 2
     return False
 
 
@@ -90,7 +96,7 @@ def earns_drop(mode: str, outcome: str, placement: int) -> bool:
 # Nobody wins a real match faster than this, and a match left open this long is abandoned.
 MIN_GOOD_RESULT_SECONDS = 20.0
 MAX_MATCH_SECONDS = 3600.0
-_MAX_KOS = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 40, "BOSS": 80, "DUEL": 40, "TRAINING": 100000}
+_MAX_KOS = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 40, "BOSS": 80, "DUEL": 40, "TRAINING": 100000, "PORTAL": 5000}
 _MAX_DAMAGE = 3_000_000
 
 
@@ -118,6 +124,13 @@ def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: i
             return "more than one life in Last Spark"
         if placement == 1 and kos == 0 and damage == 0:
             return "a win without a fight"
+    if mode == "PORTAL":
+        if not 0 <= placement <= 500:
+            return "placement out of range"
+        if deaths > 1:
+            return "more than one life in Portal Run"
+        if placement > 0 and kos < placement:
+            return "a portal without a fight"
     good = outcome == "VICTORY" or (mode == "LAST_SPARK" and placement <= 4)
     # (A 1v1 is won the moment the other player walks out, and it is the lobby that says so, not the device.)
     if good and mode not in ("TRAINING", "DUEL") and elapsed < MIN_GOOD_RESULT_SECONDS:

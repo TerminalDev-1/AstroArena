@@ -547,7 +547,8 @@ class BotBrain(
             // A realm goes through walls too.
             SuperKind.REALM -> d <= s.range * 0.95f
             // The tempest is worth most up close, and a smart bot keeps it for when it has health to go in with.
-            SuperKind.TEMPEST -> d <= 3f && (!smart || me.hpFraction > 0.35f)
+            // (She flies fast as the storm, and her gusts knock enemies back, so she starts it from further off.)
+            SuperKind.TEMPEST -> d <= 5.5f && (!smart || me.hpFraction > 0.35f)
             // The quake reaches past whatever the hammer hits, so it only has to get close.
             SuperKind.QUAKE -> clear && d <= s.range * 0.95f
             SuperKind.RAM -> d <= s.range * 0.85f && arena.walkClear(me.x, me.y, t.x, t.y, me.radius * 0.9f) &&

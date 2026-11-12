@@ -5,9 +5,9 @@ A player's *profile* is the part of their progress the server is in charge of:
     {"bolts", "prisms", "credits", "bestCups", "fighters": {ID: {"unlocked", "level", "ownedSkins", "cups"}},
      "claimedMilestones": [cups, ...], "lastDailyGiftDay", "lastFirstWinDay"}
 
-Players see Bolts as "Upgrade Credits" and Prisms as "CPU Chips". Credits are progress along the Spark Road toward
+Players see Bolts as "Coins" and Prisms as "Arena Crystals". Credits are progress along the Spark Road toward
 the next fighter on it: the moment they cover it that fighter is unlocked. Once every fighter is unlocked they are
-paid as Upgrade Credits instead. (There was a Glory rank and a Spark Pass; both were removed.)
+paid as Coins instead. (There was a Glory rank and a Spark Pass; both were removed.)
 
 The keys are the ones the game's save file uses, so a profile can be started from a save and sent back to the
 game as it is. Every number here used to live in the client's `Balance.kt` / `Catalog.kt`; the client still has
@@ -222,12 +222,17 @@ def new_profile() -> dict:
         "bolts": STARTING_BOLTS, "prisms": STARTING_PRISMS, "credits": 0, "bestCups": 0,
         "fighters": {name: {"unlocked": name == rules.STARTING_FIGHTER, "level": 1, "ownedSkins": [0], "cups": 0} for name in rules.FIGHTER_SKINS},
         "claimedMilestones": [], "lastDailyGiftDay": -1, "lastFirstWinDay": -1,
+        "crystalsReset": True,
     }
 
 
 def complete(profile: dict) -> dict:
     """Fills in what a profile stored by an older server doesn't have yet."""
     profile.setdefault("credits", 0)
+    # CPU Chips became Arena Crystals in 1.0 (build 103), and every account's were set to 0, once, by the user's decision.
+    if not profile.get("crystalsReset"):
+        profile["prisms"] = 0
+        profile["crystalsReset"] = True
     profile.pop("roadTarget", None)  # the road was briefly pick-your-own
     # Glory and the Spark Pass are gone. Glory that was earned is paid as Bolts, one for one.
     profile["bolts"] += _int(profile.pop("glory", 0))
@@ -341,7 +346,7 @@ def upgrade(profile: dict, fighter: str, factor: float = 1.0, no_cap: bool = Fal
         raise Refused(409, "that fighter is at the top level")
     cost = upgrade_cost(level, factor)
     if profile["bolts"] < cost:
-        raise Refused(402, "not enough Upgrade Credits")
+        raise Refused(402, "not enough Coins")
     profile["bolts"] -= cost
     entry["level"] = level + 1
     return cost
@@ -358,7 +363,7 @@ def buy(profile: dict, key: str) -> dict:
     if reward["type"] == "skin" and not profile["fighters"][reward["fighter"]]["unlocked"]:
         raise Refused(409, "unlock the fighter first")
     if profile["prisms"] < price:
-        raise Refused(402, "not enough CPU Chips")
+        raise Refused(402, "not enough Arena Crystals")
     profile["prisms"] -= price
     return grant(profile, reward)
 
@@ -432,7 +437,7 @@ def buy_deal(profile: dict, deal: dict, purchased: int, now_ms: int) -> dict:
     wallet = {"BOLTS": "bolts", "PRISMS": "prisms"}.get(deal["currency"])
     if wallet:
         if profile[wallet] < deal["price"]:
-            raise Refused(402, "not enough " + ("Upgrade Credits" if wallet == "bolts" else "CPU Chips"))
+            raise Refused(402, "not enough " + ("Coins" if wallet == "bolts" else "Arena Crystals"))
         profile[wallet] -= deal["price"]
     return grant(profile, deal_reward(deal))
 

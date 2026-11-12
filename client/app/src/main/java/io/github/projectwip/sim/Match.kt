@@ -61,6 +61,7 @@ class Match(val config: MatchConfig) {
     val bossMode = config.mode == GameMode.BOSS
     /** Training Area: nothing at stake, and it never ends on its own. */
     val practice = config.mode == GameMode.TRAINING
+    val portalRun = config.mode == GameMode.PORTAL
 
     /** Seconds since the match became "over" for the player (ended, or eliminated in free-for-all). */
     var overFor = 0f
@@ -108,6 +109,9 @@ class Match(val config: MatchConfig) {
             roster += Fighter(id++, giant, 1, giant.skins.lastIndex, 1, giant.name, isBot = true, rooted = true).also { passive += it }
             roster += Fighter(id++, Balance.sentry, 1, 1, 1, "Sentry", isBot = true, rooted = true)
             repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true).also { m -> passive += m } }
+        } else if (portalRun) {
+            // The enemies the waves are made of, all on the other side, waiting off the board until they are called.
+            repeat(Balance.PORTAL_POOL) { roster += botFighter(id++, 1, names.next()) }
         } else if (bossMode) {
             // One boss, always level 1: its stats are fixed and never follow the player's level.
             val solo = Balance.boss(config.boss ?: Balance.bosses[rng.nextInt(Balance.bosses.size)].boss!!)
@@ -120,7 +124,7 @@ class Match(val config: MatchConfig) {
         }
         val oneOnOne = config.mode == GameMode.DUEL
         val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.trainingArea() else if (bossMode || oneOnOne) Arenas.provingGround() else Arenas.foundryYard()
-        val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.training() else if (bossMode) MatchRules.bossMode() else if (oneOnOne) MatchRules.duel() else MatchRules.knockoutRush()
+        val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.training() else if (bossMode) MatchRules.bossMode() else if (oneOnOne) MatchRules.duel() else if (portalRun) MatchRules.portal() else MatchRules.knockoutRush()
         world = World(arena, roster, rules, Random(rng.nextLong()))
         pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
@@ -160,12 +164,15 @@ class Match(val config: MatchConfig) {
     /** True once the result is decided for the player. */
     val isOver get() = world.phase == Phase.ENDED || (freeForAll && player.eliminated)
 
-    /** Player's finishing place in free-for-all (1 if still standing). */
-    val placement get() = if (!freeForAll) 0 else if (player.placement > 0) player.placement else 1
+    /** Player's finishing place in free-for-all (1 if still standing); in Portal Run, how many portals they went through. */
+    val placement get() = if (portalRun) world.portal?.entered ?: 0 else if (!freeForAll) 0 else if (player.placement > 0) player.placement else 1
 
     fun report(): MatchReport {
         val outcome = if (freeForAll) {
             if (placement == 1) MatchOutcome.VICTORY else MatchOutcome.DEFEAT
+        } else if (portalRun) {
+            // A run that got through at least one portal counts as a win; how deep it went is its placement.
+            if (placement > 0) MatchOutcome.VICTORY else MatchOutcome.DEFEAT
         } else when (world.winningTeam) {
             player.team -> MatchOutcome.VICTORY
             -1 -> MatchOutcome.DRAW

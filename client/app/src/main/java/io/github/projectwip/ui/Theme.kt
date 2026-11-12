@@ -68,7 +68,7 @@ object Type {
     val Label = TextStyle(fontFamily = family, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Palette.Text)
     val Body = TextStyle(fontFamily = family, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Palette.TextDim)
     val Small = TextStyle(fontFamily = family, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Palette.TextDim)
-    /** Small capitals over a section or a figure ("NEXT REWARD", "CPU CHIPS"). */
+    /** Small capitals over a section or a figure ("NEXT REWARD", "ARENA CRYSTALS"). */
     val Eyebrow = TextStyle(fontFamily = family, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.2.sp, color = Palette.Rim)
 }
 

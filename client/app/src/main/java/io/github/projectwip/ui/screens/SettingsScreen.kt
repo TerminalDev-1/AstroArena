@@ -135,7 +135,7 @@ private fun GameplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
                         Spacer(Modifier.height(4.dp))
                         PlainText(d.blurb, Type.Small, color = Color.White.copy(alpha = 0.9f), maxLines = 5, align = androidx.compose.ui.text.style.TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
-                        PlainText("Upgrade Credits ×${d.boltMultiplier}", Type.Small, color = Palette.Gold, align = androidx.compose.ui.text.style.TextAlign.Center)
+                        PlainText("Coins ×${d.boltMultiplier}", Type.Small, color = Palette.Gold, align = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                 }
             }
@@ -272,7 +272,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
         status == null -> "No server connection in this build."
         !status.supported -> "The server at ${status.url} doesn't support this version."
         status.disabled -> "Your account on ${status.url} has been disabled by the server's owner."
-        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Arena Boxes, Upgrade Credits, CPU Chips and fighters, sets matches up and decides their results."
+        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Arena Boxes, Coins, Arena Crystals and fighters, sets matches up and decides their results."
         else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You are on your offline profile, which is kept on this device: what you earn and spend here stays here, and your server account is untouched. The game keeps trying, and goes back online by itself."
     })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -287,7 +287,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     PlainText("Leave the address empty to use the built-in one. Start the server on your computer with server/run.bat; it prints the address to type here.",
         Type.Small, color = Palette.TextDim.copy(alpha = 0.8f))
     Spacer(Modifier.height(10.dp))
-    SectionTitle("ABOUT", "AstroArena ${BuildConfig.VERSION_NAME} (build ${BuildConfig.BUILD}). Preview software: everything may change without notice. All characters, art, sounds and rules are original.")
+    SectionTitle("ABOUT", "AstroArena ${BuildConfig.VERSION_NAME} (build ${BuildConfig.BUILD}). All characters, art, sounds and rules are original.")
     val context = androidx.compose.ui.platform.LocalContext.current
     ChunkyButton({
         context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(REPO_URL)))

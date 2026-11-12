@@ -12,13 +12,13 @@ android {
         applicationId = "io.github.projectwip"
         minSdk = 26
         targetSdk = 35
-        // Players see "Beta". The build number ("95", or "94.1" for a point release) is what the updater and the
+        // Players see the version name ("1.0" since AstroArena came out of Beta in build 103). The build number ("95", or "94.1" for a point release) is what the updater and the
         // server's version gate compare; Android's own versionCode is made from it (94.1 -> 9401, 95 -> 9500).
-        val build = "102"
+        val build = "103"
         val (major, minor) = build.split(".").let { it[0].toInt() to (it.getOrNull(1)?.toInt() ?: 0) }
         versionCode = major * 100 + minor
         buildConfigField("String", "BUILD", "\"$build\"")
-        versionName = "Beta"
+        versionName = "1.0"
         // Where the game looks for its server unless the player sets another address in Settings.
         // Override at build time with -Pastro.server=http://host:port
         buildConfigField("String", "SERVER_URL", "\"${(project.findProperty("astro.server") as String?) ?: "http://192.168.1.103:8765"}\"")

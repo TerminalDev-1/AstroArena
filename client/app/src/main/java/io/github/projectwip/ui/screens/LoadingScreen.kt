@@ -282,7 +282,7 @@ private fun Logo(time: Float, roomy: Boolean) {
                 Offset(x - 40.dp.toPx(), 0f), Size(80.dp.toPx(), size.height))
         }
         Spacer(Modifier.height(4.dp))
-        PlainText("BETA", Type.Label.copy(letterSpacing = Type.Label.fontSize * 0.45f), color = Palette.TextDim, maxLines = 1)
+        PlainText("VERSION " + BuildConfig.VERSION_NAME, Type.Label.copy(letterSpacing = Type.Label.fontSize * 0.45f), color = Palette.TextDim, maxLines = 1)
     }
 }
 

@@ -16,6 +16,7 @@ enum class Sound {
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
+    PORTAL_OPEN, PORTAL_ENTER, VOID,
 }
 
 /**
@@ -42,6 +43,9 @@ object SfxSynth {
         Sound.TEMPEST_HIT -> tempestHit().finish(0.7f)
         Sound.THUNDER -> thunder().finish(0.9f)
         Sound.TEMPEST_WIND -> tempestWind().finish(0.7f)
+        Sound.PORTAL_OPEN -> portalOpen().finish(0.8f)
+        Sound.PORTAL_ENTER -> portalEnter().finish(0.9f)
+        Sound.VOID -> voidBreath().finish(0.75f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -593,8 +597,24 @@ object SfxSynth {
         echo(0.08f, 0.25f, 0.15f)
     }
 
+    /**
+     * Swish's Frost Gale: a blast of cold wind. Shaped noise only, like her storm: a hard gust that rushes out and thins
+     * into a hiss, with a dry, glassy frost crackle riding on it. (Her old arrow's twang is [arrowTwang], unused.)
+     */
+    private fun arrowShot() = Clip(0.55f).apply {
+        noise(301, 0f, 0.5f, Band.BAND, { glide(it, 0.35f, 700f, 2600f) }, 1.3f, { hold(it, 0.02f, 0.1f, 0.3f) * 0.55f })
+        noise(302, 0f, 0.45f, Band.LOW, { glide(it, 0.3f, 420f, 180f) }, 0.8f, { perc(it, 0.01f, 0.12f) * 0.45f })
+        noise(303, 0.03f, 0.45f, Band.HIGH, { glide(it, 0.4f, 4200f, 7600f) }, 0.8f, { hold(it, 0.05f, 0.12f, 0.25f) * 0.13f })
+        val r = kotlin.random.Random(303)
+        for (k in 0 until 6) {
+            noise(310 + k, 0.04f + r.nextFloat() * 0.25f, 0.03f, Band.HIGH, { 6000f + 2500f * r.nextFloat() }, 1f, { perc(it, 0.0005f, 0.008f) * 0.12f })
+        }
+        filter(Band.LOW, 0.8f) { 9500f }
+    }
+
     /** Swish loosing an arrow: the deep twang of a big bowstring, air tearing past, and a glint off the diamond tip. */
-    private fun arrowShot() = Clip(0.5f).apply {
+    @Suppress("unused")
+    private fun arrowTwang() = Clip(0.5f).apply {
         osc(Wave.TRI, 0f, 0.3f, { glide(it, 0.25f, 128f, 104f) }, { perc(it, 0.002f, 0.09f) * 0.55f })
         osc(Wave.SAW, 0f, 0.12f, { glide(it, 0.1f, 256f, 210f) }, { perc(it, 0.002f, 0.035f) * 0.18f })
         noise(201, 0.01f, 0.3f, Band.BAND, { glide(it, 0.28f, 2600f, 900f) }, 2.5f, { hold(it, 0.015f, 0.08f, 0.15f) * 0.3f })
@@ -613,6 +633,32 @@ object SfxSynth {
         noise(243, 0.05f, 1.6f, Band.LOW, { 140f }, 0.8f, { hold(it, 0.3f, 0.9f, 0.45f) * 0.4f })
         noise(244, 0.3f, 1.3f, Band.HIGH, { 5200f }, 0.7f, { hold(it, 0.4f, 0.5f, 0.4f) * 0.07f })
         echo(0.09f, 0.25f, 0.15f)
+    }
+
+    // Portal Run. A portal is a hole in the air and the Void is a great depth, so they are shaped noise too.
+
+    /** A portal tearing open: air sucked in and spiralling up into a deep, churning rush. */
+    private fun portalOpen() = Clip(2f).apply {
+        noise(401, 0f, 1.9f, Band.BAND, { t -> glide(t, 1.4f, 220f, 1200f) * (1f + 0.18f * sin(t * TAU * 3.1f)) }, 2.2f, { hold(it, 0.5f, 0.8f, 0.6f) * 0.5f })
+        noise(402, 0f, 1.9f, Band.LOW, { t -> 90f + 25f * sin(t * TAU * 0.8f) }, 0.8f, { hold(it, 0.4f, 0.9f, 0.6f) * 0.55f })
+        noise(403, 0.2f, 1.6f, Band.HIGH, { 4800f }, 0.7f, { t -> hold(t, 0.5f, 0.6f, 0.5f) * (0.6f + 0.4f * sin(t * TAU * 5f)) * 0.07f })
+        echo(0.12f, 0.35f, 0.25f)
+    }
+
+    /** Stepping through: everything rushes past, then a deep, soft fall into somewhere else. */
+    private fun portalEnter() = Clip(2.4f).apply {
+        noise(411, 0f, 0.7f, Band.BAND, { glide(it, 0.6f, 400f, 3600f) }, 1.4f, { swell(it, 0.6f) * 0.6f })
+        noise(412, 0.55f, 1.8f, Band.LOW, { glide(it - 0.55f, 1.2f, 260f, 55f) }, 0.8f, { perc(it - 0.55f, 0.01f, 0.6f) * 0.8f })
+        noise(413, 0.6f, 1.7f, Band.BAND, { glide(it - 0.6f, 1.5f, 900f, 300f) }, 3f, { perc(it - 0.6f, 0.05f, 0.7f) * 0.18f })
+        echo(0.2f, 0.4f, 0.35f)
+    }
+
+    /** Under the Void's words: a slow, enormous breath from far below, and a whisper of air around it. */
+    private fun voidBreath() = Clip(2.5f).apply {
+        noise(421, 0f, 2.45f, Band.LOW, { t -> 70f + 18f * sin(t * TAU * 0.5f) }, 0.7f, { t -> hold(t, 0.7f, 1f, 0.7f) * (0.75f + 0.25f * sin(t * TAU * 0.8f)) * 0.7f })
+        noise(422, 0.2f, 2.2f, Band.BAND, { t -> 1900f + 500f * sin(t * TAU * 0.6f) }, 5f, { t -> hold(t, 0.6f, 0.9f, 0.6f) * (0.5f + 0.5f * sin(t * TAU * 1.1f)) * 0.08f })
+        noise(423, 0.3f, 2.1f, Band.BAND, { t -> 420f + 120f * sin(t * TAU * 0.4f + 1f) }, 2.5f, { hold(it, 0.6f, 0.8f, 0.6f) * 0.18f })
+        echo(0.25f, 0.4f, 0.25f)
     }
 
     /** The tempest's wind, played over and over while it lasts: a gusting roar with a howl riding on it. */
@@ -937,7 +983,7 @@ object SfxSynth {
         osc(Wave.TRI, 0f, 0.05f, { 784f }, { perc(it, 0.001f, 0.01f) * 0.3f })
     }
 
-    /** A Upgrade Credit landing in the wallet: a quick charge. A blip that jumps up a fifth over a rising whine, a fizz of static, a soft thump. */
+    /** A Coin landing in the wallet: a quick charge. A blip that jumps up a fifth over a rising whine, a fizz of static, a soft thump. */
     private fun boltLand() = Clip(0.36f).apply {
         osc(Wave.SQUARE, 0f, 0.07f, { 660f }, { hold(it, 0.002f, 0.05f, 0.01f) * 0.3f })
         osc(Wave.SQUARE, 0.06f, 0.14f, { 990f }, { perc(it, 0.002f, 0.045f) * 0.35f })
@@ -949,8 +995,8 @@ object SfxSynth {
     }
 
     /**
-     * A CPU Chip landing in the wallet: four glass notes tumbling upward, each doubled a hair sharp so the tail
-     * shimmers, behind a tiny digital stutter (CPU Chips glitch).
+     * An Arena Crystal landing in the wallet: four glass notes tumbling upward, each doubled a hair sharp so the tail
+     * shimmers, behind a tiny digital stutter (Arena Crystals glitch).
      */
     private fun prismLand() = Clip(0.75f).apply {
         for ((i, n) in intArrayOf(96, 103, 108, 115).withIndex()) {

@@ -122,7 +122,7 @@ internal fun prismsIn(r: Reward): Int = when (r) { is Reward.Prisms -> r.amount;
 internal fun creditsIn(r: Reward): Int = when (r) { is Reward.Credits -> r.amount; is Reward.Bundle -> r.items.sumOf { creditsIn(it) }; else -> 0 }
 private fun unlocksIn(r: Reward): Int = when (r) { is Reward.UnlockFighter, is Reward.SkinReward -> 1; is Reward.Bundle -> r.items.sumOf { unlocksIn(it) }; else -> 0 }
 
-/** One icon on its way from a card to the wallet (to counter number [purse]: 0 Upgrade Credits, 1 CPU Chips, 2 Credits). The first of each handful carries the amount, paid in when it lands. */
+/** One icon on its way from a card to the wallet (to counter number [purse]: 0 Coins, 1 Arena Crystals, 2 Credits). The first of each handful carries the amount, paid in when it lands. */
 private class Flyer(val from: Offset, val purse: Int, val born: Float, val seed: Int, val amount: Int)
 
 private val PURSE_ICON = listOf(IconKind.BOLT, IconKind.PRISM, IconKind.CREDIT)
@@ -147,7 +147,7 @@ private fun shortLabel(r: Reward): String = when (r) {
 /**
  * "Open all": every drop the player had, opened at once. A ring of drops charges up through every tier and
  * overloads; then everything that came out lands on the screen one card after another, the best last. Each
- * card's Upgrade Credits and CPU Chips burst out of it and race to their own counter, which jumps and counts up as they
+ * card's Coins and Arena Crystals burst out of it and race to their own counter, which jumps and counts up as they
  * arrive; and the totals slam in underneath. It is all saved already: this only shows it.
  */
 @Composable

@@ -1111,7 +1111,7 @@ class SimulationTest {
             m.world.events.clear()
         }
         println("Swish bot: ${m.player.kos} KOs, ${m.player.deaths} deaths, ${m.player.damageDealt} damage, $tempests tempests")
-        assertTrue("a bot playing Swish looses arrows and raises tempests", m.player.damageDealt > 0 && tempests > 0)
+        assertTrue("a bot playing Swish blasts gusts and raises tempests", m.player.damageDealt > 0 && tempests > 0)
     }
 
     @Test fun swishsArrowHomesInALittleOnWhoeverIsAheadOfIt() {
@@ -1146,14 +1146,14 @@ class SimulationTest {
         assertEquals(behind.maxHp, behind.hp)
     }
 
-    @Test fun swishBecomesATempestForTwelveSecondsThatStrikesAndFlingsAndSlowlyRecharges() {
+    @Test fun swishBecomesATempestForEightSecondsThatStrikesAndFlingsAndSlowlyRecharges() {
         val swish = Fighter(7, Balance.fighter(FighterId.BYTE), 1, 0, 0, "S", false)
         val tough = Balance.fighter(FighterId.BRAKK).copy(health = io.github.projectwip.data.StatLine(100_000, 0))
         val near = Fighter(1, tough, 1, 0, 1, "N", true)
         val w = onOpenGround(swish, near)
         near.x = swish.x + 1.2f; near.y = swish.y
         assertEquals(io.github.projectwip.data.SuperKind.TEMPEST, swish.def.superSpec.kind)
-        assertEquals(12f, swish.def.superSpec.tempestSeconds)
+        assertEquals(8f, swish.def.superSpec.tempestSeconds)
         swish.superCharge = 1f
         swish.control.superAttack = true
         w.step(Match.STEP)
@@ -1184,8 +1184,8 @@ class SimulationTest {
         swish.superCharge = 1f
         swish.control.superAttack = true
         w.step(Match.STEP)
-        assertEquals(12f, swish.tempestLeft, 0.05f)
-        seconds(w, 11.9f)
+        assertEquals(8f, swish.tempestLeft, 0.05f)
+        seconds(w, 7.9f)
         assertTrue("still going", swish.inTempest)
         seconds(w, 0.2f)
         assertTrue("and then she is herself again", !swish.inTempest)
@@ -1336,4 +1336,37 @@ class SimulationTest {
         assertEquals(listOf(kira.id to kira.superDamage), heals.map { it.targetId to it.amount })
         assertEquals("she reloads in 1.2 seconds", 1.2f, kira.def.reloadSeconds, 0f)
     }
+
+    @Test fun portalRunClearsWavesOpensAPortalAndGoesDeeper() {
+        val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
+            mode = io.github.projectwip.data.GameMode.PORTAL, seed = 42L))
+        val w = m.world
+        val run = w.portal!!
+        val enemies = w.fighters.filter { it.team != m.player.team }
+        assertEquals(io.github.projectwip.data.Balance.PORTAL_POOL, enemies.size)
+        assertTrue("everyone waits off the board at first", enemies.all { it.eliminated && !it.alive })
+        fun stepFor(seconds: Float) { repeat((seconds * 60).toInt()) { m.step(io.github.projectwip.sim.Match.STEP) } }
+        fun clearWave() { for (e in enemies) if (!e.eliminated) { e.alive = false; e.eliminated = true } }
+        stepFor(3f + io.github.projectwip.data.Balance.PORTAL_FIRST_BREAK + 0.2f)
+        for (wave in 1..io.github.projectwip.data.Balance.PORTAL_WAVES) {
+            assertEquals(wave, run.wave)
+            assertEquals(io.github.projectwip.data.Balance.portalWaveSize(1, wave), enemies.count { !it.eliminated })
+            clearWave()
+            stepFor(io.github.projectwip.data.Balance.PORTAL_WAVE_BREAK + 0.2f)
+        }
+        assertEquals(io.github.projectwip.sim.PortalState.OPEN, run.state)
+        // Stepping into it takes the player one dimension deeper, whole again, and the enemies come back tougher.
+        m.player.hp = 10
+        m.player.x = run.x; m.player.y = run.y
+        stepFor(0.1f)
+        assertEquals(2, run.dimension)
+        assertEquals(1, run.entered)
+        assertEquals(m.player.maxHp, m.player.hp)
+        stepFor(io.github.projectwip.data.Balance.PORTAL_TRAVEL_SECONDS + 0.2f)
+        val back = enemies.first { !it.eliminated }
+        assertTrue("tougher a dimension down", back.maxHp > back.baseMaxHp)
+        assertEquals(1, m.placement)
+        assertEquals(io.github.projectwip.data.MatchOutcome.VICTORY, m.report().outcome)
+    }
+
 }

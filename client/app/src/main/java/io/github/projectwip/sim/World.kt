@@ -28,6 +28,8 @@ data class MatchRules(
     val boss: Boolean = false,
     /** Training Area: no clock and no score to reach, so it only ends when the player leaves. */
     val practice: Boolean = false,
+    /** Portal Run: waves of enemies, portals into deeper dimensions, one life ([World.portal]). */
+    val portal: Boolean = false,
 ) {
     val respawn get() = !freeForAll
 
@@ -39,7 +41,26 @@ data class MatchRules(
         /** One against one: first to three knockouts, or whoever is ahead after two minutes. */
         fun duel() = MatchRules(koTarget = 3, durationSeconds = 120f)
         fun training() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, practice = true)
+        /** Portal Run: no clock; one knockout of the player ends the run. */
+        fun portal() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = 1, durationSeconds = Float.MAX_VALUE, portal = true)
     }
+}
+
+enum class PortalState { BREAK, WAVE, OPEN, TRAVEL }
+
+/** Portal Run: which dimension the player is in, which wave, and where the portal is once it opens. */
+class PortalRun {
+    var dimension = 1
+    var wave = 0
+    /** Portals stepped through so far: the run's score. */
+    var entered = 0
+    var state = PortalState.BREAK
+    var timer = Balance.PORTAL_FIRST_BREAK
+    var x = 0f
+    var y = 0f
+    /** Seconds since the run began, and when the last portal was entered (for the Void's words on screen). */
+    var time = 0f
+    var enteredAt = -100f
 }
 
 /** The Static Storm: a circle that waits, then shrinks; standing outside hurts more the longer it runs. */
@@ -111,6 +132,9 @@ class World(
 
     val aliveCount get() = fighters.count { !it.eliminated }
 
+    /** Portal Run's state; null in every other mode. */
+    val portal: PortalRun? = if (rules.portal) PortalRun() else null
+
     init {
         val teams = (fighters.maxOfOrNull { it.team } ?: 0) + 1
         for (f in fighters) f.spottedBy = FloatArray(teams)
@@ -127,6 +151,8 @@ class World(
                 }
             }
         }
+        // Portal Run: the enemies wait off the board until a wave brings them in.
+        if (portal != null) for (f in fighters) if (f.team != 0) { f.alive = false; f.eliminated = true }
     }
 
     fun fighter(id: Int): Fighter? = fighters.firstOrNull { it.id == id }
@@ -166,6 +192,7 @@ class World(
         stepHazards(dt)
         stepPickups(dt)
         storm?.let { stepStorm(it, dt) }
+        portal?.let { stepPortal(it, dt) }
 
         timeLeft -= dt
         if (phase == Phase.PLAYING && timeLeft <= 0f) {
@@ -197,6 +224,7 @@ class World(
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(lobs.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
+        portal?.let { mix(it.dimension); mix(it.wave); mix(it.state.ordinal) }
         return h
     }
 
@@ -792,7 +820,8 @@ class World(
             AttackShape.PLANT -> ShotStyle.ROCKET
             AttackShape.SLASH -> ShotStyle.PELLET
             AttackShape.STAR -> ShotStyle.STAR
-            AttackShape.ARROW -> ShotStyle.ARROW
+            // (Swish's Frost Gale; the giant arrow it replaced, [ShotStyle.ARROW], is kept with nobody using it.)
+            AttackShape.ARROW -> ShotStyle.GUST
         }
         val baseAng = atan2(dy, dx)
         val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
@@ -800,7 +829,7 @@ class World(
         for (i in 0 until n) {
             val ang = if (n == 1) baseAng else baseAng - spread / 2 + spread * i / (n - 1)
             spawnProjectile(f, ang, a.speed * hyperShotSpeed(f), a.radius, f.attackDamage, a.range, a.pierce, false, style, side = side, blast = a.blast, share = a.healthShare * f.damageMultiplier, hex = a.hexSeconds, slow = a.slowSeconds,
-                homing = Math.toRadians(a.homing.toDouble()).toFloat())
+                homing = Math.toRadians(a.homing.toDouble()).toFloat(), knock = a.knockback)
         }
     }
 
@@ -1202,6 +1231,10 @@ class World(
                 winner?.placement = 1
                 end(winner?.team ?: -1)
             }
+        } else if (rules.portal && victim.team != 0) {
+            // Portal Run: a knocked-out enemy goes back to waiting off the board for a later wave.
+            victim.eliminated = true
+            score[0]++
         } else {
             val scoringTeam = 1 - victim.team
             score[scoringTeam]++
@@ -1257,6 +1290,67 @@ class World(
             f.hitFlash = 0.12f
             events += GameEvent.StormHit(f.id, dmg, f.x, f.y)
             if (f.hp <= 0) knockOut(f, null)
+        }
+    }
+
+    // ------------------------------------------------------------------ Portal Run
+
+    private fun stepPortal(run: PortalRun, dt: Float) {
+        run.time += dt
+        val enemies = fighters.filter { it.team != 0 }
+        when (run.state) {
+            PortalState.BREAK, PortalState.TRAVEL -> {
+                run.timer -= dt
+                if (run.timer > 0f) return
+                run.wave++
+                run.state = PortalState.WAVE
+                val count = minOf(enemies.size, Balance.portalWaveSize(run.dimension, run.wave))
+                val toughness = 1f + Balance.PORTAL_HEALTH_GROWTH * (run.dimension - 1)
+                for (i in 0 until count) {
+                    val f = enemies[i]
+                    f.eliminated = false
+                    f.maxHp = (f.baseMaxHp * toughness).toInt()
+                    f.dimensionDamage = 1f + Balance.PORTAL_DAMAGE_GROWTH * (run.dimension - 1)
+                    respawn(f)
+                    // Spread them round their side's spawn points, so a wave doesn't arrive in one heap.
+                    val a = i * 2.4f
+                    val spot = arena.nearestOpen(f.x + kotlin.math.cos(a) * 1.3f, f.y + kotlin.math.sin(a) * 1.3f, f.radius)
+                    f.x = spot.x; f.y = spot.y; f.prevX = spot.x; f.prevY = spot.y
+                }
+                events += GameEvent.WaveStarted(run.dimension, run.wave)
+            }
+            PortalState.WAVE -> {
+                if (enemies.any { !it.eliminated }) return
+                if (run.wave < Balance.PORTAL_WAVES) {
+                    run.state = PortalState.BREAK
+                    run.timer = Balance.PORTAL_WAVE_BREAK
+                } else {
+                    val spot = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 0.8f)
+                    run.x = spot.x; run.y = spot.y
+                    run.state = PortalState.OPEN
+                    events += GameEvent.PortalOpened(run.x, run.y)
+                }
+            }
+            PortalState.OPEN -> {
+                val through = fighters.firstOrNull { it.team == 0 && it.alive && hypot(it.x - run.x, it.y - run.y) < it.radius + Balance.PORTAL_RADIUS } ?: return
+                run.dimension++
+                run.entered++
+                run.wave = 0
+                run.state = PortalState.TRAVEL
+                run.timer = Balance.PORTAL_TRAVEL_SECONDS
+                run.enteredAt = run.time
+                // A new world: everything in the air is left behind, and the players arrive whole.
+                projectiles.clear(); hazards.clear(); lobs.clear(); planted.clear(); pickups.clear()
+                for (f in fighters) if (f.team == 0 && f.alive) {
+                    if (f.inTempest) endTempest(f)
+                    if (f.inRealm) closeRealm(f.realm)
+                    placeAtSpawn(f)
+                    f.hp = f.maxHp
+                    f.shield = Balance.SPAWN_SHIELD_SECONDS
+                }
+                events += GameEvent.PortalEntered(run.dimension, run.entered)
+                @Suppress("UNUSED_VARIABLE") val unused = through
+            }
         }
     }
 

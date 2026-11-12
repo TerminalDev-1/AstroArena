@@ -2,7 +2,7 @@
 
 AstroArena (the package id is still `io.github.projectwip`, so saves carry over): original mobile 3D arena brawler for Android (landscape, touch, bots), with an optional Python game server. Kotlin + Compose
 menus + custom OpenGL ES 3.0 renderer, no engine. All art and sound is generated in code and must stay
-original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Arena Boxes", "Upgrade Credits" and "CPU Chips"; the code (and the server's files and API) still call them capsules (or drops), bolts and prisms. (They were Spark Drops then Glitch Drops, Power Ups and Crystals: the user renamed them. Upgrade Credits pay for every fighter upgrade; their icon is the Credit card in amber. CPU Chips are the shop currency; their icon is a chip.)
+original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Arena Boxes", "Coins" and "Arena Crystals"; the code (and the server's files and API) still call them capsules (or drops), bolts and prisms. (They were Spark Drops then Glitch Drops; Power Ups, then Upgrade Credits, then Coins; Crystals, then CPU Chips, then Arena Crystals: the user renamed them. Coins pay for every fighter upgrade; their icon is a plain gold coin with a star. Arena Crystals are the shop currency; their icon is a cut violet gem. When CPU Chips became Arena Crystals (1.0, build 103) everyone's were set to 0, once: `crystalsReset` in `economy.complete` and `SaveStore.fromJson`. Road "Credits" are a separate thing and keep their name.)
 
 ## How to work here
 
@@ -97,7 +97,7 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|lastspark|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `crash` crashes the game on purpose to try the crash reporter;
+  (`match|boss|lastspark|portal|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `crash` crashes the game on purpose to try the crash reporter;
   `result` (first in Last Spark), `result3`, `resultwin` and `resultloss` preview the end of a match, reveal first;
   `tryswish` / `tryspark` are the Training Area as Swish / Spark; `roster` is the fighter grid with every model shown unlocked, `tryspark` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - Crashes on players' devices: `net/CrashReporter.kt` saves a crash (and, on Android 11+, Android's record of a native
@@ -119,6 +119,12 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   had Spark has Swish at the same level. Her rarity is Starter (the user's decision; she was Legendary for one unreleased
   build): free, never on the Spark Road, no CPU Chip price. The Training Area's dummies, swarm and sentry are made from
   her and look like her, as the user asked (they were Spark).
+  Since 1.0 (build 103) her attack is Frost Gale, the user's design: a blast of cold wind (`ShotStyle.GUST`, drawn as a
+  churning crescent of frosty air with wisps streaming off it, as wide as what it hits; its sound is shaped noise,
+  `arrowShot` in `SfxSynth`) that knocks back whoever it hits (`AttackSpec.knockback`, 1.2 tiles). It is still the
+  arrow's shape underneath (`AttackShape.ARROW`, gentle homing, 9 tiles); the arrow's look and twang are kept unused.
+  Thunderhead lasts 8 seconds (the user cut it from 12) and a strike does 1,100 at level 10 (cut from 1,160). Bots
+  raise it from 5.5 tiles: her gusts push enemies away, so at 3 they never did.
   Swish is a girl, a storm goddess with long silver hair, a tiara set with a diamond, a little thundercloud beside her
   and a giant bow (`FighterModels.buildSwish`). Her attack, Facet Arrow (`AttackShape.ARROW`, `ShotStyle.ARROW`,
   `Sound.ARROW`), is the user's design: one giant arrow with a diamond tip, a sniper's shot but not a long-range one
@@ -217,6 +223,16 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
   With nobody on the line he leaps anyway and the super is spent: a miss. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
+- Portal Run (`GameMode.PORTAL`, 1.0) is the user's idea: waves of normal enemies, then a portal into another
+  dimension, and so on. The design is ours: one life, a pool of `PORTAL_POOL` enemy fighters waiting off the board
+  (eliminated) that each wave brings in (`Balance.portalWaveSize`), `PORTAL_WAVES` waves a dimension, then a portal
+  at the middle (`World.portal`, `PortalRun`, `stepPortal`, `GameEvent.PortalOpened/PortalEntered`). Stepping in
+  heals the player and takes them a dimension deeper, where enemies have more health and hit harder
+  (`PORTAL_HEALTH_GROWTH`, `Fighter.dimensionDamage`) and the arena is lit differently (`DIMENSION_LIGHT` in
+  `MatchRenderer`). The run's placement is how many portals were entered; it pays `per_portal` Cups each (up to
+  `max_portals`, in `trophies.cfg`, mirrored in `Economy.kt`) and never costs any; two deep earns an Arena Box.
+  Each time the player goes through, the Void speaks (`VOID_LINES`, `VoiceStyle.VOID`, with `Sound.VOID`, a breath
+  of shaped noise, and its words on screen): eerie, never gory, as the user asked. Debug: `--es screen portal`.
 - The aim indicator (`MatchRenderer`, "Aim indicator") is modelled on the texture of a familiar brawler's, as the
   user asked ("don't copy it, but make it similar"): frosted see-through white (gold for a super) laid on the floor,
   stronger toward the far end, with a crisp bright outline and a faint dark shadow just outside it so it reads on pale
@@ -395,15 +411,18 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - **Never commit changes the user made on their own.** Commit only what you changed in this task, file by file
   (`git add <path>`, never `git add -A` or `git commit -a`). Anything else that shows up in `git status`, such as
   an edited `.cfg` on the live server, is the user's: leave it uncommitted and untouched, and mention it.
-- **The version is "Beta", and it stays "Beta".** `versionName = "Beta"` is all players see. Underneath, the build
-  number (`BuildConfig.BUILD`) is what the updater and the server's version gate compare.
+- **The version is "1.0".** AstroArena came out of Beta in build 103, by the user's decision: `versionName = "1.0"` is
+  what players see (it was "Beta" until then). Underneath, the build number (`BuildConfig.BUILD`) is what the updater
+  and the server's version gate compare, so tags stay `vN.0` with N the build number (v103.0 for 1.0): a `v1.0` tag
+  would look older than every build before it and nobody would update.
 - **No long-term support, by the user's decision.** Every build is replaced by the next: the update screen has no
   way past it, and nothing on the server is kept for the sake of an older build. Build 46 shipped with a LATER
   button, so the server refuses it (`versions_not_supported.cfg`); keep that rule. Don't add an update-later option.
 - **Non-negotiable: release without being asked.** The user must never have to say "release". When a task that
   changed the client is finished, verified and pushed, release it: add one to `versionCode` (unless that build
   number has not been released yet), commit, tag `vN.0` (N = the build number), push the tag, and publish a GitHub
-  pre-release titled "AstroArena Beta" with the release APK attached (`AstroArena-Beta-N.apk`). The build number is
+  release titled "AstroArena 1.0" (it was a pre-release titled "AstroArena Beta" until build 103) with the release APK
+  attached (`AstroArena-1.0-N.apk`). The build number is
   `build` in `client/app/build.gradle.kts` (`BuildConfig.BUILD`): it can be a point release such as "94.1" (tag
   `v94.1`) when the user asks for one; Android's `versionCode` is made from it (major * 100 + minor). One release per
   finished task, not one per checkpoint commit; server-only or docs-only work needs none. The tag keeps the

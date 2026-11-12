@@ -73,6 +73,8 @@ class MatchRenderer(
     private val slashes = ArrayList<FloatArray>()
     /** 0..1: how far the arena has gone over to the look of a realm (the player is in one). */
     private var realmFade = 0f
+    /** The light of the dimension being shown (Portal Run), eased toward the one the player is in. */
+    private val dimLight = floatArrayOf(1f, 1f, 1f)
     private lateinit var disc: Mesh
     private lateinit var ring: Mesh
     private lateinit var dashRing: Mesh
@@ -310,9 +312,13 @@ class MatchRenderer(
         GLES30.glDepthMask(true)
 
         // Environment. In a realm the whole arena goes dark and violet: only the fighters keep their colours.
-        val er = lerp(1f, 0.2f, realmFade)
-        val eg = lerp(1f, 0.15f, realmFade)
-        val eb = lerp(1f, 0.46f, realmFade)
+        world.portal?.let { run ->
+            val want = DIMENSION_LIGHT[(run.dimension - 1) % DIMENSION_LIGHT.size]
+            for (i in 0..2) dimLight[i] += (want[i] - dimLight[i]) * 0.03f
+        }
+        val er = lerp(1f, 0.2f, realmFade) * dimLight[0]
+        val eg = lerp(1f, 0.15f, realmFade) * dimLight[1]
+        val eb = lerp(1f, 0.46f, realmFade) * dimLight[2]
         lit.f("uRim", 0.08f)
         lit.v4("uTint", er, eg, eb, 1f)
         arena.ground.draw()
@@ -407,6 +413,7 @@ class MatchRenderer(
         GLES30.glDepthMask(false)
         lit.i("uMode", 1)
         drawDecals(alpha)
+        drawPortal()
         lit.i("uMode", 0)
 
         // Shields
@@ -647,6 +654,35 @@ class MatchRenderer(
             cellCaps.draw()
         }
         lit.mat4("uModel", identity)
+    }
+
+    /**
+     * Portal Run's portal, once it is open: a dark hole on the ground exactly as wide as the reach that pulls you in,
+     * rimmed with violet light, with rings of it winding inward, and motes spiralling into it and rising out of it.
+     */
+    private fun drawPortal() {
+        val run = world.portal ?: return
+        if (run.state != io.github.projectwip.sim.PortalState.OPEN) return
+        val r = io.github.projectwip.data.Balance.PORTAL_RADIUS + 0.45f
+        val beat = 0.5f + 0.5f * sin(time * 3f)
+        lit.v4("uTint", 0.55f, 0.25f, 1f, 0.16f + 0.06f * beat)
+        setModel(run.x, 0.05f, run.y, r * 1.5f, 1f, r * 1.5f); sector(360f).draw()
+        lit.v4("uTint", 0.03f, 0.01f, 0.08f, 0.94f)
+        setModel(run.x, 0.055f, run.y, r, 1f, r); sector(360f).draw()
+        for (k in 0 until 4) {
+            val rr = r * (1f - k * 0.21f)
+            lit.v4("uTint", if (k == 0) 0.85f else 0.6f, if (k == 0) 0.7f else 0.35f, 1f, 0.95f - k * 0.17f)
+            setModel(run.x, 0.06f + k * 0.002f, run.y, rr, 1f, rr, time * (if (k % 2 == 0) 90f else -140f) + k * 50f)
+            arc(300f, 0.09f).draw()
+        }
+        // Motes drawn in from all round, and a thin column of light rising out of the middle.
+        repeat(2) {
+            val a = rng.nextFloat() * 6.283f
+            val d = r * (1.1f + rng.nextFloat() * 0.6f)
+            particles.spawn(run.x + cos(a) * d, 0.15f, run.y + sin(a) * d, -cos(a) * d * 1.4f - sin(a) * 1.5f, 0.4f, -sin(a) * d * 1.4f + cos(a) * 1.5f,
+                0.6f, 0.1f, if (it == 0) 0xFFC9A6FF.toInt() else 0xFFFFFFFF.toInt(), 0.9f)
+        }
+        if (rng.nextFloat() < 0.6f) particles.spawn(run.x + (rng.nextFloat() - 0.5f) * 0.4f, 0.2f, run.y + (rng.nextFloat() - 0.5f) * 0.4f, 0f, 3.5f, 0f, 0.8f, 0.16f, 0xFF8E5BFF.toInt(), 0.8f)
     }
 
     /** A fixed pseudo-random number in 0..1 for grid site ([i], [j]) and channel [k]. */
@@ -1332,6 +1368,25 @@ class MatchRenderer(
                     setModel(x + dx * 0.42f, y, z + dz * 0.42f, 0.24f, 0.15f, 0.15f, yaw); octa.draw()
                     lit.f("uEmissive", 0f)
                 }
+                ShotStyle.GUST -> {
+                    // A blast of cold wind: a curling crescent of frosty air at the front, as wide as what it hits,
+                    // its puffs churning as it flies (the wisps streaming off behind it are in [drawSprites]).
+                    val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
+                    val dx = pr.vx / len; val dz = pr.vy / len
+                    val sx = -dz; val sz = dx
+                    val r = pr.radius
+                    lit.f("uEmissive", 0.5f)
+                    for (k in -2..2) {
+                        val t = k / 2f
+                        val back = t * t * r * 1.2f
+                        val churn = sin(pr.age * 26f + k * 1.7f)
+                        val s = r * (0.62f - 0.1f * kotlin.math.abs(t)) * (1f + 0.12f * churn)
+                        tint(if (k == 0) 0xFFF6FCFF else if (k % 2 == 0) 0xFFBFE6FF else 0xFFDDF2FF)
+                        setModel(x + sx * t * r - dx * back, 0.72f + 0.05f * churn, z + sz * t * r - dz * back, s * 1.25f, s * 0.6f, s, yaw + pr.age * 420f + k * 40f)
+                        sphere.draw()
+                    }
+                    lit.f("uEmissive", 0f)
+                }
                 ShotStyle.STAR -> {
                     // A spite star: a puffy star spinning end over end as it flies, with a trail of little ones
                     // dwindling behind it.
@@ -1528,7 +1583,15 @@ class MatchRenderer(
             val owner = world.fighter(pr.ownerId) ?: continue
             val c = colorOf(pr.style, owner)
             val x = lerp(pr.prevX, pr.x, alpha); val z = lerp(pr.prevY, pr.y, alpha)
-            if (pr.style == ShotStyle.ROCKET) {
+            if (pr.style == ShotStyle.GUST) {
+                // Cold air streaming off the gust (soft wisps, not glow), and a glint of frost now and then.
+                val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
+                val sx = -pr.vy / len; val sz = pr.vx / len
+                val side = (rng.nextFloat() - 0.5f) * pr.radius * 2f
+                particles.spawn(x + sx * side, 0.7f, z + sz * side, -pr.vx / len * 1.5f + sx * side * 2f, 0.15f, -pr.vy / len * 1.5f + sz * side * 2f,
+                    0.38f, pr.radius * 0.9f, 0xFFE4F5FF.toInt(), 0.42f, growth = 0.9f, add = false)
+                if (rng.nextFloat() < 0.4f) particles.spawn(x + sx * side, 0.75f, z + sz * side, 0f, 0.3f, 0f, 0.3f, 0.07f, 0xFFCFF0FF.toInt(), 0.9f)
+            } else if (pr.style == ShotStyle.ROCKET) {
                 // A rocket leaves fire behind it, and a puff of smoke that hangs in the air.
                 particles.spawn(x, 0.72f, z, 0f, 0.2f, 0f, 0.2f, 0.3f, c, 0.6f)
                 if (rng.nextFloat() < 0.5f) particles.spawn(x, 0.72f, z, 0f, 0.5f, 0f, 0.7f, 0.42f, 0xFFD8D2E6.toInt(), 0.35f)
@@ -1872,6 +1935,21 @@ class MatchRenderer(
                 }
                 if (e.targetId == pid) shake = max(shake, 0.12f)
             }
+            is GameEvent.PortalOpened -> {
+                particles.spawn(e.x, 0.6f, e.y, 0f, 0f, 0f, 0.5f, 4f, 0xFFB98CFF.toInt(), 0.8f)
+                repeat(30) {
+                    val a = rng.nextFloat() * 6.283f; val sp = 2f + rng.nextFloat() * 4f
+                    particles.spawn(e.x, 0.4f, e.y, cos(a) * sp, 1f + rng.nextFloat() * 3f, sin(a) * sp, 0.7f, 0.14f, 0xFFD9C4FF.toInt(), 1f)
+                }
+            }
+            is GameEvent.PortalEntered -> {
+                shake = max(shake, 0.35f)
+                val f = world.fighter(pid)
+                if (f != null) repeat(40) {
+                    val a = rng.nextFloat() * 6.283f; val sp = 1f + rng.nextFloat() * 5f
+                    particles.spawn(f.x, 0.5f + rng.nextFloat(), f.y, cos(a) * sp, 2f + rng.nextFloat() * 4f, sin(a) * sp, 0.9f, 0.15f, if (it % 3 == 0) 0xFFFFFFFF.toInt() else 0xFFA57BFF.toInt(), 1f)
+                }
+            }
             is GameEvent.StormHit -> {
                 repeat(4) { particles.spawn(e.x + rng.nextFloat() - 0.5f, 0.4f + rng.nextFloat(), e.y + rng.nextFloat() - 0.5f, 0f, 1.2f, 0f, 0.6f, 0.16f, 0xFF9CFF6A.toInt(), 0.9f) }
                 if (e.targetId == pid) shake = max(shake, 0.08f)
@@ -1896,6 +1974,16 @@ class MatchRenderer(
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
         s.freeForAll = w.rules.freeForAll
         s.bossMode = w.rules.boss
+        val run = w.portal
+        s.portalRun = run != null
+        if (run != null) {
+            s.portalDimension = run.dimension
+            s.portalWave = if (run.state == io.github.projectwip.sim.PortalState.TRAVEL) 0 else run.wave
+            s.portalLeft = w.fighters.count { it.team != p.team && !it.eliminated }
+            s.portalOpen = run.state == io.github.projectwip.sim.PortalState.OPEN
+            s.voidLine = if (run.entered > 0) io.github.projectwip.data.Balance.VOID_LINES[(run.entered - 1) % io.github.projectwip.data.Balance.VOID_LINES.size] else null
+            s.voidAge = run.time - run.enteredAt
+        }
         s.timesDown = p.deaths
         s.practice = w.rules.practice
         s.damage = p.damageDealt
@@ -1972,4 +2060,15 @@ class MatchRenderer(
         const val SHADOW_SHADE = 0xFF1C1024L
         const val SHADOW_LUNGE = 0.3f
     }
+
+/** Portal Run: the light each dimension is drawn in, in turn (the first is the arena as it is). */
+private val DIMENSION_LIGHT = arrayOf(
+    floatArrayOf(1f, 1f, 1f),
+    floatArrayOf(0.78f, 0.62f, 1.08f),
+    floatArrayOf(0.58f, 0.95f, 0.98f),
+    floatArrayOf(1.05f, 0.82f, 0.58f),
+    floatArrayOf(0.62f, 0.66f, 0.82f),
+    floatArrayOf(0.66f, 1f, 0.7f),
+)
+
 }

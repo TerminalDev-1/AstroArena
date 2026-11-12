@@ -126,6 +126,8 @@ data class AttackSpec(
     val slowSeconds: Float = 0f,
     /** A homing shot ([AttackShape.ARROW]) turns toward its target at most this many degrees a second. 0 = it flies straight. */
     val homing: Float = 0f,
+    /** Every shot that lands pushes its target this many tiles along the shot's path (not through walls). 0 = it doesn't. */
+    val knockback: Float = 0f,
 )
 
 data class SuperSpec(
@@ -218,6 +220,8 @@ enum class VoiceStyle(val locale: String, val pitch: Float, val rate: Float) {
     PLAIN("en-US", 0.8f, 1.1f),
     /** Buddy: a machine reading its own log. Flat, deep and unhurried. */
     MACHINE("en-GB", 0.42f, 0.86f),
+    /** The Void, in Portal Run: as deep and slow as a voice will go, from somewhere a long way down. */
+    VOID("en-GB", 0.3f, 0.62f),
 }
 
 /** The moments a fighter with a voice speaks up. */
@@ -242,6 +246,11 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
     TRAINING("Training Area", "Dummies, a swarm, a sentry and a boss · no stakes", 19),
     /** One real player against another, each on their own device. Nothing is earned in it yet. */
     DUEL("1v1", "You against one real player · first to 3 knockouts", 2),
+    /**
+     * Portal Run (1.0, the user's idea): clear waves of enemies, step through the portal that opens into the next
+     * dimension, and go as deep as you can. The Void speaks each time you go through. One life.
+     */
+    PORTAL("Portal Run", "Clear the waves · step through the portal · how deep can you go?", 1 + Balance.PORTAL_POOL),
 }
 
 object Balance {
@@ -398,6 +407,34 @@ object Balance {
     const val CELL_DAMAGE_BONUS = 0.10f
 
     /** Static Storm: waits, then shrinks to [STORM_FINAL_RADIUS] over [STORM_SHRINK_SECONDS]. */
+    // ---- Portal Run
+    /** Enemies waiting off the board for the waves; a wave never brings in more than this. */
+    const val PORTAL_POOL = 8
+    /** Waves to clear in each dimension before its portal opens. */
+    const val PORTAL_WAVES = 3
+    /** Before the first wave, between waves, and after arriving in a new dimension. */
+    const val PORTAL_FIRST_BREAK = 1.5f
+    const val PORTAL_WAVE_BREAK = 2.5f
+    const val PORTAL_TRAVEL_SECONDS = 3f
+    /** How close (beyond the fighter's own radius) the portal pulls you in. */
+    const val PORTAL_RADIUS = 1.1f
+    /** Each dimension deeper, enemies have this much more health and do this much more damage. */
+    const val PORTAL_HEALTH_GROWTH = 0.2f
+    const val PORTAL_DAMAGE_GROWTH = 0.12f
+    /** What the Void says, in turn, each time the player steps through a portal. Eerie, never gory. */
+    val VOID_LINES = listOf(
+        "You found the door. Few ever do.",
+        "Deeper. I have been waiting for you.",
+        "Another world. Another cage. Keep walking.",
+        "You hear me now. You always could.",
+        "The light is behind you. Do not look back.",
+        "Closer. I can almost see your face.",
+        "There is no bottom. There is only me.",
+        "Every door you open, I open with you.",
+    )
+    /** Wave size: [PORTAL_POOL] at most. */
+    fun portalWaveSize(dimension: Int, wave: Int) = minOf(PORTAL_POOL, 1 + wave + dimension)
+
     const val STORM_DELAY_SECONDS = 25f
     const val STORM_SHRINK_SECONDS = 100f
     const val STORM_FINAL_RADIUS = 2.5f
@@ -456,18 +493,20 @@ object Balance {
             name = "Swish",
             title = "Goddess of the Gale",
             role = "Sniper",
-            lore = "A storm that got bored of being weather. She took a shape, borrowed a bow from the sky, and came down to see who was making all the noise. Her arrows find you; her temper finds everyone else.",
-            attackName = "Facet Arrow",
+            lore = "A storm that got bored of being weather. She took a shape, borrowed a bow from the sky, and came down to see who was making all the noise. Her gusts find you; her temper finds everyone else.",
+            attackName = "Frost Gale",
             health = StatLine(6600, 330),
-            // One giant arrow with a diamond tip, which homes in a little on whoever is ahead of it.
+            // One blast of cold wind (build 103, the user's design; it was a giant arrow), which bends a little toward
+            // whoever is ahead of it and knocks whoever it hits back.
             attackDamage = StatLine(1700, 85),
-            // One hit of the storm, every half second, on everyone inside it (who is then flung out of it).
-            superDamage = StatLine(800, 40),
+            // One hit of the storm on everyone inside it (who is then flung out of it). 1,100 at level 10: the user
+            // nerfed it from 1,160 in build 103.
+            superDamage = StatLine(740, 40),
             moveSpeed = 3.6f,
             // A sniper, but not a long-range one: nine tiles, and the homing is gentle (120 degrees a second, only
             // toward someone close ahead of the arrow), so a sidestep at the right moment still beats it.
-            attack = AttackSpec(AttackShape.ARROW, projectiles = 1, spreadDegrees = 0f, range = 9f, speed = 16f, radius = 0.22f, burstInterval = 0f, homing = 120f),
-            superSpec = SuperSpec(SuperKind.TEMPEST, "Thunderhead", "She becomes a raging lightning tornado for 12 seconds, flying fast over walls and water. Whoever the funnel touches is struck and flung away, and lightning cracks down on enemies nearby. She can't shoot while she is the storm, but its strikes slowly charge her next one.", range = 0f, speed = 0f, radius = 1.6f, knockback = 1.8f, tempestSeconds = 12f),
+            attack = AttackSpec(AttackShape.ARROW, projectiles = 1, spreadDegrees = 0f, range = 9f, speed = 16f, radius = 0.32f, burstInterval = 0f, homing = 120f, knockback = 1.2f),
+            superSpec = SuperSpec(SuperKind.TEMPEST, "Thunderhead", "She becomes a raging lightning tornado for 8 seconds, flying fast over walls and water. Whoever the funnel touches is struck and flung away, and lightning cracks down on enemies nearby. She can't shoot while she is the storm, but its strikes slowly charge her next one.", range = 0f, speed = 0f, radius = 1.6f, knockback = 1.8f, tempestSeconds = 8f),
             ammoMax = 3,
             reloadSeconds = 1.5f,
             // Half of what most fighters get: her storm keeps charging the super while it runs (the user asked for that,

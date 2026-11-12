@@ -83,7 +83,7 @@ fun RewardShowcase(
     fun prisms(r: Reward) = (r as? Reward.Prisms)?.amount ?: 0
     /** Credits go to the Spark Road's meter. */
     fun credits(r: Reward) = (r as? Reward.Credits)?.amount ?: 0
-    /** Upgrade Credits and CPU Chips are counted into the wallet and Credits onto the road; fighters and colourways are revealed. */
+    /** Coins and Arena Crystals are counted into the wallet and Credits onto the road; fighters and colourways are revealed. */
     fun currency(r: Reward) = r is Reward.Bolts || r is Reward.Prisms || r is Reward.Credits
     val item = items[index]
 
@@ -98,7 +98,7 @@ fun RewardShowcase(
                 while (true) { sfx?.play(Sound.COUNT, 0.5f, 0.85f + minOf(n, 12) * 0.05f); n++; delay(70) }
             }
             // The flyers reach the wallet from about here on. Each handful that lands sounds like what it is:
-            // Upgrade Credits charge with a rising blip, CPU Chips chime like glass.
+            // Coins charge with a rising blip, Arena Crystals chime like glass.
             val landing = when (item) { is Reward.Bolts -> Sound.BOLT_LAND; is Reward.Prisms -> Sound.PRISM_LAND; is Reward.Credits -> Sound.CREDIT_LAND; else -> Sound.CHING }
             launch { delay(620); repeat(7) { sfx?.play(landing, 0.85f, 0.92f + it * 0.04f); sfx?.buzz(12, 90); delay(110) } }
             launch { fly.animateTo(1f, tween(1500, easing = LinearEasing)) }
@@ -152,7 +152,7 @@ fun RewardShowcase(
                         Modifier.size(big).graphicsLayer { scaleX = pop.value; scaleY = pop.value; rotationZ = (1f - pop.value) * -50f })
                     Spacer(Modifier.height(6.dp))
                     val bump = 1f + 0.12f * sin(count.value * 40f) * (1f - count.value)
-                    GameText("+${"%,d".format((amount * count.value).toInt())} ${when (item) { is Reward.Bolts -> "Upgrade Credits"; is Reward.Prisms -> "CPU Chips"; else -> "Credits" }}", Type.Display, outline = 4.dp,
+                    GameText("+${"%,d".format((amount * count.value).toInt())} ${when (item) { is Reward.Bolts -> "Coins"; is Reward.Prisms -> "Arena Crystals"; else -> "Credits" }}", Type.Display, outline = 4.dp,
                         modifier = Modifier.graphicsLayer { scaleX = bump; scaleY = bump })
                 }
                 else -> {

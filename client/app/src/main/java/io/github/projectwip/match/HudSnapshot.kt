@@ -39,6 +39,15 @@ class HudSnapshot {
     var freeForAll = false
     /** Boss Mode: the giant's health and the player's remaining lives go on the HUD instead of a score. */
     var bossMode = false
+    /** Portal Run: the dimension, the wave (0 between dimensions), enemies still up, whether the portal is open. */
+    var portalRun = false
+    var portalDimension = 1
+    var portalWave = 0
+    var portalLeft = 0
+    var portalOpen = false
+    /** The Void's last words, and how long ago they were said (they fade after a few seconds). */
+    var voidLine: String? = null
+    var voidAge = 99f
     /** How often the player has been knocked out (Boss Mode has no life limit, it just counts). */
     var timesDown = 0
     /** Training Area: no clock, no target. */
@@ -80,6 +89,7 @@ class HudSnapshot {
         hyperCharge = o.hyperCharge; hyperLeft = o.hyperLeft; duelNotice = o.duelNotice
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
         bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
+        portalRun = o.portalRun; portalDimension = o.portalDimension; portalWave = o.portalWave; portalLeft = o.portalLeft; portalOpen = o.portalOpen; voidLine = o.voidLine; voidAge = o.voidAge
         freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
         stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm
         n = o.n

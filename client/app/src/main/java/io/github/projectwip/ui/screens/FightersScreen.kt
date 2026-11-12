@@ -460,7 +460,7 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
     val pct = { v: Float -> "${Math.round(v * 100)}%" }
     if (def.attack.hexSeconds > 0f) PlainText("${def.attackName}: a hit poisons. That damage is done again every ${if (Balance.HEX_TICK_SECONDS == 0.5f) "half second" else "${Balance.HEX_TICK_SECONDS} seconds"} for ${def.attack.hexSeconds.toInt()} seconds. Hexes stack: every bolt that lands is a poison of its own.", Type.Small, color = Palette.Text)
     if (def.attack.shape == io.github.projectwip.data.AttackShape.STAR) PlainText("${def.attackName}: lobbed like dynamite wherever you aim, over any wall. Where it lands it bursts, and every enemy in the burst is hit and slowed to ${pct(Balance.SLOW_FACTOR)} of their speed for ${def.attack.slowSeconds.toInt()} seconds.", Type.Small, color = Palette.Text)
-    if (def.attack.shape == io.github.projectwip.data.AttackShape.ARROW) PlainText("${def.attackName}: one giant arrow with a diamond tip. Once it is flying it curves a little toward the nearest enemy ahead of it, so a near miss can still find them, but a quick sidestep beats it.", Type.Small, color = Palette.Text)
+    if (def.attack.shape == io.github.projectwip.data.AttackShape.ARROW) PlainText("${def.attackName}: a blast of freezing wind that knocks back whoever it hits. Once it is flying it curves a little toward the nearest enemy ahead of it, so a near miss can still find them, but a quick sidestep beats it.", Type.Small, color = Palette.Text)
     if (def.attack.healthShare > 0f) PlainText("${def.attackName}: each one takes ${pct(def.attack.healthShare)} of the health its target has left, and never less than its own damage.", Type.Small, color = Palette.Text)
     PlainText("Hyper: for ${(def.hyper?.seconds ?: Balance.HYPER_SECONDS).toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage and +${pct(Balance.HYPER_HEALTH_BONUS)} health.", Type.Small, color = Palette.Text)
     def.hyper?.let { PlainText("${it.name}, ${def.name}'s own hyper: ${it.description}", Type.Small, color = Palette.Gold) }
@@ -471,7 +471,7 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
 private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, go: (Screen) -> Unit, compact: Boolean = false, onUpgrade: () -> Unit) {
     val p = save.progress(id)
     if (!p.unlocked) {
-        // Fighters are unlocked on the Spark Road with Credits; the shop sells them for CPU Chips as a shortcut.
+        // Fighters are unlocked on the Spark Road with Credits; the shop sells them for Arena Crystals as a shortcut.
         val step = io.github.projectwip.data.SparkRoad.steps.firstOrNull { it.fighter == id }
         // Side by side on a phone: one above the other left no room for the stats.
         if (compact) {
@@ -532,7 +532,7 @@ private fun ActionButtons(save: SaveData, id: FighterId, repo: GameRepository, g
             }
         }
     }
-    if (!Progression.levelCapped(save, id) && save.bolts < cost) PlainText("Need ${cost - save.bolts} more Upgrade Credits — win matches or visit the Shop.", Type.Small, color = Palette.Red)
+    if (!Progression.levelCapped(save, id) && save.bolts < cost) PlainText("Need ${cost - save.bolts} more Coins — win matches or visit the Shop.", Type.Small, color = Palette.Red)
 }
 
 @Composable

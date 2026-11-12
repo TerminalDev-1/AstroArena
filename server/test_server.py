@@ -1001,9 +1001,28 @@ class Api(unittest.TestCase):
         self.assertEqual(sorted(old["fighters"]), sorted(rules.FIGHTER_SKINS))
         self.assertEqual(old["fighters"]["BYTE"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
 
+    def test_portal_run_pays_by_depth_and_never_costs_cups(self):
+        self.assertEqual([rules.cup_delta("PORTAL", "DEFEAT", 0, 100, False), rules.cup_delta("PORTAL", "VICTORY", 3, 100, False)], [0, 12])
+        self.assertEqual(rules.cup_delta("PORTAL", "VICTORY", 40, 100, False), 40, "ten portals' worth at most")
+        self.assertEqual([rules.earns_drop("PORTAL", "VICTORY", 1), rules.earns_drop("PORTAL", "VICTORY", 2)], [False, True])
+        self.assertIsNone(rules.check_result("PORTAL", 300, outcome="VICTORY", placement=2, kos=20, deaths=1, damage=50000))
+        self.assertIsNotNone(rules.check_result("PORTAL", 300, outcome="VICTORY", placement=5, kos=2, deaths=1, damage=500))
+        self.assertIn("PORTAL", rules.MODES)
+
+    def test_cpu_chips_become_arena_crystals_at_zero_once(self):
+        old = economy.new_profile()
+        old.pop("crystalsReset")
+        old["prisms"] = 123800
+        economy.complete(old)
+        self.assertEqual(old["prisms"], 0)
+        old["prisms"] = 25  # earned since: kept
+        economy.complete(old)
+        self.assertEqual(old["prisms"], 25)
+        self.assertEqual(economy.complete(economy.new_profile())["prisms"], economy.STARTING_PRISMS, "new players start as before")
+
     def test_spark_is_retired_and_paid_back(self):
         # Spark was retired in build 102: whoever had him gets his road cost back, as Credits while there is road
-        # left, Upgrade Credits after; Swish, the starter, is untouched.
+        # left, Coins after; Swish, the starter, is untouched.
         old = economy.new_profile()
         old["fighters"]["SPARK"] = {"unlocked": True, "level": 7, "ownedSkins": [0, 2], "cups": 340}
         old["fighters"]["BYTE"]["level"] = 7

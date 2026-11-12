@@ -46,7 +46,9 @@ class Fighter(
     var maxHp = baseMaxHp
     /** Power Cells collected (free-for-all). Each adds health and damage. */
     var cells = 0
-    val damageMultiplier get() = (1f + io.github.projectwip.data.Balance.CELL_DAMAGE_BONUS * cells) *
+    /** Portal Run: how much harder this enemy hits in the dimension it was brought into. */
+    var dimensionDamage = 1f
+    val damageMultiplier get() = dimensionDamage * (1f + io.github.projectwip.data.Balance.CELL_DAMAGE_BONUS * cells) *
         (if (hyperActive) 1f + io.github.projectwip.data.Balance.HYPER_DAMAGE_BONUS else 1f)
     val attackDamage get() = (def.attackDamage.at(level, player = !isBot) * damageMultiplier).toInt()
     val superDamage get() = (def.superDamage.at(level, player = !isBot) * damageMultiplier).toInt()
@@ -178,7 +180,7 @@ class Fighter(
 /** One hex on a fighter: who did it, what each bite does, the time to the next bite, and how long it has left. */
 class Hex(val by: Int, val damage: Int, var tick: Float, var left: Float)
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, STAR, ARROW }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, STAR, ARROW, GUST }
 
 class Projectile(
     val ownerId: Int,
@@ -277,6 +279,12 @@ sealed interface GameEvent {
     data class TempestHit(val fighterId: Int, val targetId: Int, val x: Float, val y: Float) : GameEvent
     /** A tempest's lightning bolt comes down at ([x], [y]). */
     data class TempestBolt(val fighterId: Int, val x: Float, val y: Float) : GameEvent
+    /** Portal Run: wave [wave] of dimension [dimension] is coming in. */
+    data class WaveStarted(val dimension: Int, val wave: Int) : GameEvent
+    /** Portal Run: the dimension is cleared and its portal has opened at ([x], [y]). */
+    data class PortalOpened(val x: Float, val y: Float) : GameEvent
+    /** Portal Run: the player went through, into [dimension]; [entered] portals so far. */
+    data class PortalEntered(val dimension: Int, val entered: Int) : GameEvent
     /** A rocket went off. */
     data class Burst(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A lobbed star came down and burst. */

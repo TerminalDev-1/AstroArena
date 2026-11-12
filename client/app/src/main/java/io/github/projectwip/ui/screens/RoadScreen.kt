@@ -137,7 +137,7 @@ private fun RoadSummary(save: SaveData, next: RoadStep?, modifier: Modifier) {
                 Column(Modifier.weight(1f)) {
                     GameText("THE ROAD IS FINISHED", Type.Label, color = Palette.Gold, outline = 2.dp)
                     ProgressBar(1f, Modifier.fillMaxWidth(), Palette.Gold, 18.dp)
-                    PlainText("Every fighter is unlocked. Credits are paid out as Upgrade Credits now.", Type.Small, color = Color.White, maxLines = 1)
+                    PlainText("Every fighter is unlocked. Credits are paid out as Coins now.", Type.Small, color = Color.White, maxLines = 1)
                 }
             }
         }

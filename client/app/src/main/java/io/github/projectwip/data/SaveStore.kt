@@ -43,6 +43,7 @@ class SaveStore(context: Context, name: String = "save.json") {
             put("bestCups", s.bestCups)
             put("bolts", s.bolts)
             put("prisms", s.prisms)
+            put("crystalsReset", s.crystalsReset)
             put("credits", s.credits)
             put("selectedFighter", s.selectedFighter.name)
             put("selectedMode", s.selectedMode.name)
@@ -164,7 +165,9 @@ class SaveStore(context: Context, name: String = "save.json") {
                 cups = o.optInt("cups", 0).coerceAtLeast(0),
                 bestCups = o.optInt("bestCups", 0).coerceAtLeast(0),
                 bolts = o.optInt("bolts", d.bolts).coerceAtLeast(0),
-                prisms = o.optInt("prisms", d.prisms).coerceAtLeast(0),
+                // (A save from before 1.0 still holds CPU Chips: they are gone, and its Arena Crystals start at 0.)
+                prisms = if (o.optBoolean("crystalsReset", false)) o.optInt("prisms", d.prisms).coerceAtLeast(0) else 0,
+                crystalsReset = true,
                 credits = o.optInt("credits", d.credits).coerceAtLeast(0),
                 fighters = fighters,
                 selectedFighter = if (fighters[selected]?.unlocked == true) selected else FighterId.BYTE,

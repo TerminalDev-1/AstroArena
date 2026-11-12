@@ -175,7 +175,7 @@ class Config:
                     try:
                         if key == "places":
                             pays[key] = [int(n) for n in re.split(r"[,\s]+", raw.strip()) if n]
-                        elif key in ("win", "draw", "mvp_bonus"):
+                        elif key in ("win", "draw", "mvp_bonus", "per_portal", "max_portals"):
                             pays[key] = int(raw)
                         elif key in ("max_loss", "loss_step"):
                             pays[key] = max(0, int(raw))

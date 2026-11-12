@@ -96,6 +96,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             when (startScreen) {
                 "match" -> Screen.Match(startMatchConfig(repo.save.value))
                 "boss" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
+                "portal" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.PORTAL))
                 "lastspark" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.LAST_SPARK))
                 "duel" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.DUEL, boss = null))
                 "train" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.TRAINING))
@@ -533,8 +534,8 @@ fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
 }
 
 fun rewardLabel(r: Reward): String = when (r) {
-    is Reward.Bolts -> "+${r.amount} Upgrade Credits"
-    is Reward.Prisms -> "+${r.amount} CPU Chips"
+    is Reward.Bolts -> "+${r.amount} Coins"
+    is Reward.Prisms -> "+${r.amount} Arena Crystals"
     is Reward.Credits -> "+${r.amount} Credits"
     is Reward.UnlockFighter -> "${Balance.fighter(r.fighter).name} unlocked!"
     is Reward.SkinReward -> "${Balance.fighter(r.fighter).skins[r.skinIndex].name} colorway"

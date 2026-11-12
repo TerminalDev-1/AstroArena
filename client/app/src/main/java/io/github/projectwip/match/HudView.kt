@@ -233,6 +233,35 @@ class HudView(
             outlined(c, "TRAINING AREA", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
             text.textSize = dp(12f)
             outlined(c, "%,d DAMAGE".format(s.damage), cx + dp(40f), top + dp(46f), Color.rgb(255, 214, 64), dp(3f))
+        } else if (s.portalRun) {
+            // Which dimension, and how the wave stands; when the portal opens, say so.
+            chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(120, 60, 220), null)
+            text.textSize = dp(30f)
+            outlined(c, s.portalDimension.toString(), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
+            text.textSize = dp(17f)
+            outlined(c, "DIMENSION", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
+            text.textSize = dp(12f)
+            outlined(c, when {
+                s.portalOpen -> "PORTAL OPEN"
+                s.portalWave == 0 -> "ARRIVING…"
+                else -> "WAVE ${s.portalWave}/${io.github.projectwip.data.Balance.PORTAL_WAVES} · ${s.portalLeft} LEFT"
+            }, cx + dp(40f), top + dp(46f), Color.rgb(200, 170, 255), dp(3f))
+            if (s.portalOpen && s.phase == Phase.PLAYING) {
+                val pulse = 0.75f + 0.25f * sin(time * 4f)
+                text.textSize = dp(20f)
+                outlined(c, "A PORTAL HAS OPENED · STEP INSIDE", cx, top + panelH + dp(34f), withAlpha(Color.rgb(205, 180, 255), pulse), dp(4f))
+            }
+            val line = s.voidLine
+            if (line != null && s.voidAge < 7f) {
+                // The Void's words, faded in and out, low on the screen like something said from far away.
+                val a = (s.voidAge / 0.8f).coerceIn(0f, 1f) * ((7f - s.voidAge) / 1.2f).coerceIn(0f, 1f)
+                textStroke.alpha = (a * 255).toInt()
+                text.textSize = dp(13f)
+                outlined(c, "THE VOID", cx, h * 0.68f, withAlpha(Color.rgb(150, 110, 230), a), dp(3f))
+                text.textSize = dp(22f)
+                outlined(c, line, cx, h * 0.68f + dp(28f), withAlpha(Color.rgb(232, 222, 255), a), dp(4f))
+                textStroke.alpha = 255
+            }
         } else if (s.bossMode) {
             // Lives left, and the boss's health across a wide bar under the panel.
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
@@ -327,7 +356,7 @@ class HudView(
             text.textSize = dp(96f) * big
             outlined(c, n.toString(), cx, h * 0.45f, Color.WHITE, dp(9f))
             text.textSize = dp(21f)
-            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.bossMode) "BOSS MODE · KNOCK OUT THE BOSS · UNLIMITED LIVES" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
+            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.portalRun) "PORTAL RUN · CLEAR THE WAVES · ONE LIFE" else if (s.bossMode) "BOSS MODE · KNOCK OUT THE BOSS · UNLIMITED LIVES" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
         } else if (s.phase == Phase.PLAYING && s.phaseTime < 0.9f) {
             text.textSize = dp(80f) * big
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))

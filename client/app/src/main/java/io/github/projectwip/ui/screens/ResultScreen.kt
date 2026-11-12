@@ -188,6 +188,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                                 io.github.projectwip.data.GameMode.BOSS -> "Boss Mode · Proving Ground · ${r.difficulty.label} boss"
                                 io.github.projectwip.data.GameMode.TRAINING -> "Training Area"
                                 io.github.projectwip.data.GameMode.DUEL -> "1v1 · Proving Ground"
+                                io.github.projectwip.data.GameMode.PORTAL -> "Portal Run · ${r.placement} portal${if (r.placement == 1) "" else "s"} deep · ${r.difficulty.label} enemies"
                             }, Type.Label, color = Palette.TextDim)
                     }
                 }

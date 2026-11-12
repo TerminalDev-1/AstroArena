@@ -50,8 +50,8 @@ HEADER = """\
 #   cups        the player's Cups: their place on the leaderboard
 #   best_cups   the most Cups they have had: how far along the Cup Track they are
 #   drops       unopened Arena Boxes
-#   bolts       Upgrade Credits
-#   prisms      CPU Chips
+#   bolts       Coins
+#   prisms      Arena Crystals
 #   credits     Credits on the Spark Road, toward the next fighter (enough of them unlocks it)
 #   <fighter>   unlocked or locked, its level (1 to %d) and its own Cups (its rank follows them):
 #                   kito = unlocked, level 4, cups 120
