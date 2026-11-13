@@ -3,19 +3,19 @@ package io.github.projectwip.data
 /**
  * The story of Dimension. The user's idea ("it's just the character and the Void"; since build 104 a lore mode that
  * goes on forever). The lore is the user's: the Void carries the soul of every fighter that was removed from the
- * game, and glitches between them. In every dimension a fighter is chained up; the player can go up to them and ask
- * what needs to be done, and they scream for help. Every word here is ours. Eerie, never horror, never gory.
+ * game, and glitches between them. In every dimension one of those forgotten fighters is chained up; the player can
+ * go up to them and ask what needs to be done, and they scream for help. Every word here is ours. Eerie, never horror, never gory.
  */
 object Lore {
     enum class Speaker { VOID, FIGHTER, CAPTIVE }
 
     /** The removed fighters whose souls the Void carries, each with the colour it flickers into. */
-    enum class Soul(val title: String, val color: Long) {
-        BYTE("Byte", 0xFF5CE1FF),
-        ROCKET("Rocket", 0xFFFF8A3C),
-        SPARK("Spark", 0xFF4C8DFF),
-        MIRA("Mira", 0xFFFFD84C),
-        VARUN("Varun", 0xFFFF4C6A),
+    enum class Soul(val title: String, val color: Long, val primary: Long, val secondary: Long) {
+        BYTE("Byte", 0xFF5CE1FF, 0xFF2B3A5A, 0xFF5CE1FF),
+        ROCKET("Rocket", 0xFFFF8A3C, 0xFF3C5A8A, 0xFFFF8A3C),
+        SPARK("Spark", 0xFF4C8DFF, 0xFF4C8DFF, 0xFF2A4FC2),
+        MIRA("Mira", 0xFFFFD84C, 0xFFE8E2D2, 0xFFE0B23C),
+        VARUN("Varun", 0xFFFF4C6A, 0xFF5A2A30, 0xFFC23C4A),
     }
 
     /** One line. When the Void speaks with one of its souls' voices, [soul] says whose. */
@@ -64,8 +64,8 @@ object Lore {
     /** How the Void closes each scene: about the one chained in this dimension. */
     private val CLOSERS = listOf(
         "Someone is chained up in this place. Go and listen to them, if you like.",
-        "There is one of yours in chains here. They scream when anyone comes near.",
-        "Your friend is waiting for you, tied to my wall. Do hurry.",
+        "One of the forgotten is in chains here. They scream when anyone comes near.",
+        "I keep one of them tied to my wall in every room. Do say hello.",
         "Break their chains, if you can. Then the door is yours.",
         "Someone else got lost on the way down. Go on. Ask them how it feels.",
         "Three echoes hold the chains. You know the rest by now.",
@@ -167,11 +167,11 @@ object Lore {
 
     // ------------------------------------------------------------------ the chained fighters
 
-    /** Who is chained up in [dimension]: never the player's own fighter, and a different one each time round. */
-    fun captive(dimension: Int, player: FighterId): FighterId {
-        val all = listOf(FighterId.BRAKK, FighterId.KIRA, FighterId.KITO, FighterId.BUDDY, FighterId.BYTE).filter { it != player }
-        return all[Math.floorMod(dimension - 1 + hash(dimension / all.size, 5) % all.size, all.size)]
-    }
+    /**
+     * Who is chained up in [dimension]: one of the forgotten fighters (never anyone still in the game, as the user
+     * said), a different one each time round. The Void keeps them; the player can free them.
+     */
+    fun captive(dimension: Int): Soul = Soul.entries[Math.floorMod(dimension - 1, Soul.entries.size)]
 
     /** What the player asks, in their own voice. */
     private val ASK: Map<FighterId, String> = mapOf(
@@ -182,27 +182,27 @@ object Lore {
         FighterId.BUDDY to "QUERY: HOW DO I RELEASE YOU?",
     )
 
-    /** What the chained fighter screams, and what they tell the player to do. */
-    private val PLEA: Map<FighterId, Pair<String, String>> = mapOf(
-        FighterId.BYTE to ("HELP! HELP ME! It won't stop whispering!" to
-            "There are echoes out there, three of them. Each one breaks a chain. Find them, please!"),
-        FighterId.BRAKK to ("*howls and yanks at the chain* AWOO! AWOOOO!" to
-            "*paws the ground three times, then stares out into the dark, whining*"),
-        FighterId.KIRA to ("HELP! These chains drink magic, I can't hex my way out!" to
-            "Three echoes. They're the locks. Bring them back to life and the chains fall off."),
-        FighterId.KITO to ("...help. Please. I have never said that before." to
-            "Three echoes hold me. Find them. Do not stand still: the ground tears here."),
-        FighterId.BUDDY to ("HELP. HELP. HELP. ERROR: HELP." to
-            "THREE ECHO SIGNALS DETECTED IN THIS SECTOR. EACH ONE IS A LOCK. RETRIEVE THEM."),
+    /** What each chained soul screams, and what they tell the player to do. */
+    private val PLEA: Map<Soul, Pair<String, String>> = mapOf(
+        Soul.BYTE to ("HELP! I was here first! Before all of them! Don't let it take my name too!" to
+            "Three echoes. They're what's left of the way out. Each one breaks a chain. Please hurry."),
+        Soul.ROCKET to ("HELP! Get me OFF this thing! I can't fly with chains on!" to
+            "Echoes, three of them, out there somewhere! Every one you grab, a chain snaps. Go!"),
+        Soul.SPARK to ("Oh. It's you. ...HELP! Fine, I said it. HELP!" to
+            "Three echoes out there. Get them and these chains drop. And don't make it weird."),
+        Soul.MIRA to ("HELP! My lance... it took my lance! Please!" to
+            "Three echoes hold these chains. Find every one and I'm free. And watch the ground: it tears."),
+        Soul.VARUN to ("HELP! They called me a legacy and left me down here!" to
+            "Echoes. Three of them. Each one is a lock. Bring them back and I walk out of here."),
     )
 
-    /** The talk with the chained fighter: the player asks, they scream for help, then say what needs doing. */
-    fun captiveTalk(captive: FighterId, player: FighterId): List<Line> {
-        val plea = PLEA[captive] ?: PLEA.getValue(FighterId.BYTE)
+    /** The talk with the chained soul: the player asks, they scream for help, then say what needs doing. */
+    fun captiveTalk(captive: Soul, player: FighterId): List<Line> {
+        val plea = PLEA.getValue(captive)
         return listOf(
             Line(Speaker.FIGHTER, ASK[player] ?: ASK.getValue(FighterId.BYTE)),
-            Line(Speaker.CAPTIVE, plea.first),
-            Line(Speaker.CAPTIVE, plea.second),
+            Line(Speaker.CAPTIVE, plea.first, captive),
+            Line(Speaker.CAPTIVE, plea.second, captive),
         )
     }
 }

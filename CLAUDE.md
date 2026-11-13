@@ -234,20 +234,26 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   it pays no Cups and no Arena Box (`rules.py`, `Economy.kt`); the result says how deep it went ("DEPTH N"), never
   VICTORY or DEFEAT (`ResultReveal`, `ResultScreen`). There are no enemies (the roster is the player alone) and no
   bottom: dimensions go on, their names, light and moods made past the end of the tables (`Lore.dimensionName`,
-  `dimensionLight`). In each one a fighter is chained to a pillar (the user's idea: `Lore.captive`, never the
-  player's own fighter; `PortalRun.captiveX/Y`; `MatchRenderer.drawCaptive`, "HELP!" over them in `HudView`):
+  `dimensionLight`). In each one a fighter is chained to a pillar (the user's idea): always one of the **forgotten**
+  fighters, never anyone still in the game (the user objected to Buddy in chains): `Lore.captive` cycles the souls;
+  `PortalRun.captiveX/Y`; `MatchRenderer.drawCaptive`, "HELP!" over them in `HudView`:
   walking up to them pauses the match for a talk (`CaptiveTalk`, `Lore.captiveTalk`): the player asks what needs
   doing, they scream for help and say it. Each of the `PORTAL_SHARDS` echoes breaks one chain; when all are found
   the portal opens where the captive stood. From the second dimension the ground tears open near the player now
   and then (`HazardKind.RIFT`, `stepRifts`): one life, so a rift can end the run.
   The lore is the user's: **the Void carries the souls of every fighter removed from the game** (`Lore.Soul`:
-  Byte, Rocket, Spark, Mira, Varun) **and glitches between them**: their figures flicker through its robe in the
-  cutscene, it turns their colour in the world during a glitch, and some of its lines are spoken in their voices
-  (the nameplate reads "THE VOID · SPARK"). It stands beside every portal after the first.
+  Byte, Rocket, Spark, Mira, Varun) **and glitches between them**. Each has a 3D model (`FighterModels.drawSoul`:
+  Spark's and Rocket's own, and new ones for Byte, Mira and Varun), and so does the Void (`buildVoid`). In the
+  cutscene the Void is that 3D model on a live stage (`SoulView`, `StageParams.voidCycle`), glitching into one of
+  the souls every few seconds (the user rejected a flat drawn Void); in the world it stands beside every portal
+  after the first and flickers into them during a glitch. Some of its lines are spoken in their voices (the
+  nameplate reads "THE VOID · SPARK").
   The look the user asked for: darker dimensions, each different, and **creepy but not horror, not constantly
   glitchy** (the first version of build 104 glitched all the time and the user called it "all glitchy"). So the
-  world is dimmed with a cast per dimension, a vignette closes in with depth, and glitches are rare short moments
-  (`glitchIn`/`glitchLeft` in `MatchRenderer`, `uGlitch` in the shader, `portalGlitch` on the HUD). Keep them rare.
+  world is dimmed with a cast per dimension, a vignette closes in with depth, a faint scanline lies over it, and
+  glitches are short moments every few seconds (`glitchIn`/`glitchLeft` in `MatchRenderer`, `uGlitch` in the
+  shader, `portalGlitch` on the HUD). The user then asked for "more, but also less than before": in between the
+  constant version and the rare blips. Keep it there.
   `DimensionCutscene` (the user's design: cut to black, a blinding light, an old-TV switch-off, then the Void and
   the fighter talking, tap to go on) is a staged scene with a `Mood` per dimension. Eerie, never gory.
 - Bots hold fire for `BOT_WARMUP_SECONDS` at the start of a match and while their spawn shield is up (`Match.step`),

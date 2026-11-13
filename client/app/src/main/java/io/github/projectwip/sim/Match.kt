@@ -139,7 +139,7 @@ class Match(val config: MatchConfig) {
         world.portal?.let { run ->
             if (config.portalStart > 1) { run.dimension = config.portalStart; run.entered = config.portalStart - 1 }
             // The echoes laid where the player starts, so they are found at once and the portal opens.
-            if (config.portalCaptiveNear) { val c = world.arena.nearestOpen(player.x, player.y - 2.2f, 0.9f); run.captiveX = c.x; run.captiveY = c.y }
+            if (config.portalCaptiveNear) { val c = world.arena.nearestOpen(player.x, player.y - 4f, 0.9f); run.captiveX = c.x; run.captiveY = c.y }
             if (config.portalOpen) for (i in 0 until Balance.PORTAL_SHARDS) { run.shards[i * 2] = player.x; run.shards[i * 2 + 1] = player.y }
         }
     }

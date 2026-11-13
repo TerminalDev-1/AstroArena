@@ -409,6 +409,19 @@ fun GameBackground(modifier: Modifier = Modifier, tint: Color = Palette.BgTop) {
  * A fighter in 3D. With [pedestal] it's a live, lit 3D stage (drag to spin, tap to cheer, celebrates when
  * [celebrateKey] changes). Without, it shows a pre-rendered 3D portrait (cheap enough for lists).
  */
+/**
+ * Dimension: a live 3D stage showing one of the forgotten fighters ([soul]), or, with [voidCycle], the Void glitching
+ * between itself and them ([voidSoul] is the one whose voice it is speaking with). No pedestal.
+ */
+@Composable
+fun SoulView(modifier: Modifier = Modifier, soul: io.github.projectwip.data.Lore.Soul? = null, voidCycle: Boolean = false, voidSoul: io.github.projectwip.data.Lore.Soul? = null) {
+    AndroidView(
+        factory = { ctx -> io.github.projectwip.render3d.FighterStageView(ctx) },
+        update = { v -> v.params.pedestal = false; v.params.soul = soul?.ordinal ?: -1; v.params.voidCycle = voidCycle; v.params.voidSoul = voidSoul?.ordinal ?: -1 },
+        modifier = modifier,
+    )
+}
+
 @Composable
 fun FighterView(
     def: FighterDef,

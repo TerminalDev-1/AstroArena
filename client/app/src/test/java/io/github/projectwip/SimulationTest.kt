@@ -1391,8 +1391,9 @@ class SimulationTest {
         assertEquals(11, run.dimension)
         assertEquals(10, m.placement)
         assertEquals(io.github.projectwip.sim.PortalState.EXPLORE, run.state)
-        // Whoever is chained up is never the player's own fighter.
-        for (d in 1..30) assertTrue(io.github.projectwip.data.Lore.captive(d, FighterId.KIRA) != FighterId.KIRA)
+        // Whoever is chained up is one of the forgotten, and the talk has a line for each of them.
+        for (soul in io.github.projectwip.data.Lore.Soul.entries) assertEquals(3, io.github.projectwip.data.Lore.captiveTalk(soul, FighterId.KIRA).size)
+        assertEquals(io.github.projectwip.data.Lore.Soul.entries.toSet(), (1..5).map { io.github.projectwip.data.Lore.captive(it) }.toSet())
         assertTrue(io.github.projectwip.data.Lore.dimensionName(57).startsWith("The "))
     }
 

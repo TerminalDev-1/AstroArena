@@ -274,18 +274,31 @@ class HudView(
             textStroke.textSkewX = 0f
         }
 
-        // A glitch moment: a faint dark flicker and one or two thin bands pulled sideways. Over in a blink.
+        // From the second dimension a faint scanline lies over everything; a glitch moment adds a dark flicker,
+        // a few torn bands split into red and cyan, and a few dead blocks. Over in a moment.
+        if (depth >= 2) {
+            fill.color = Color.argb(10 + minOf(depth, 8), 0, 0, 0)
+            var yy = 0f
+            while (yy < h) { c.drawRect(0f, yy, w, yy + dp(1f), fill); yy += dp(3f) }
+        }
         if (glitch <= 0f) return
         val beat = (time * 14f).toInt()
         fun hash(a: Int, b: Int): Float { var x = a * 374761393 + b * 668265263; x = (x xor (x ushr 13)) * 1274126177; return ((x xor (x ushr 16)) and 0xFFFF) / 65535f }
-        fill.color = Color.argb((40 * glitch).toInt(), 0, 0, 0)
+        fill.color = Color.argb((60 * glitch).toInt(), 0, 0, 0)
         c.drawRect(0f, 0f, w, h, fill)
-        for (i in 0 until 2) {
+        for (i in 0 until 2 + (glitch * 3).toInt()) {
             val by = hash(beat, i * 3 + 1) * h
-            val bh = dp(2f) + hash(beat, i * 3 + 2) * dp(6f)
-            val off = (hash(beat, i * 3 + 3) - 0.5f) * dp(24f)
-            fill.color = Color.argb((70 * glitch).toInt(), 150, 120, 255)
-            c.drawRect(off, by, w + off, by + bh, fill)
+            val bh = dp(3f) + hash(beat, i * 3 + 2) * dp(14f)
+            val off = (hash(beat, i * 3 + 3) - 0.5f) * dp(40f)
+            fill.color = Color.argb((80 * glitch).toInt(), 255, 50, 100)
+            c.drawRect(off, by, w + off, by + bh * 0.5f, fill)
+            fill.color = Color.argb((80 * glitch).toInt(), 50, 220, 255)
+            c.drawRect(-off, by + bh * 0.5f, w - off, by + bh, fill)
+        }
+        for (i in 0 until (glitch * 6).toInt()) {
+            val bx = hash(beat, 100 + i) * w; val by = hash(beat, 200 + i) * h
+            fill.color = if (i % 2 == 0) Color.argb(140, 8, 0, 18) else Color.argb(90, 220, 200, 255)
+            c.drawRect(bx, by, bx + dp(10f) + hash(beat, 300 + i) * dp(50f), by + dp(4f) + hash(beat, 400 + i) * dp(12f), fill)
         }
     }
 

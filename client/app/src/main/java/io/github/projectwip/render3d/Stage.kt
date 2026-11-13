@@ -43,6 +43,14 @@ class StageParams {
     @Volatile var cheerAt = 0L
     /** Beaten: the fighter hangs their head and shakes it (the result screen, after a loss). */
     @Volatile var sulkAt = 0L
+    /** Dimension: show one of the forgotten fighters (a [io.github.projectwip.data.Lore.Soul] ordinal) instead, or -1. */
+    @Volatile var soul = -1
+    /**
+     * Dimension: show the Void, glitching between itself and the forgotten fighters whose souls it carries (the
+     * user's lore). [voidSoul], when set, is the one whose voice it is speaking with: that one shows through.
+     */
+    @Volatile var voidCycle = false
+    @Volatile var voidSoul = -1
 }
 
 /**
@@ -133,11 +141,45 @@ class StageScene(private val withPedestal: Boolean) {
         // Face mostly toward the camera, 3/4 view, with a gentle idle sway.
         val facing = (PI / 2 - 0.62).toFloat() + sin(time * 0.6f) * 0.08f - Math.toRadians(shownYaw.toDouble()).toFloat()
 
+        // Dimension: who is drawn. The Void spends most of its time as itself, then glitches (flickering between
+        // the two, jolting, flashing) into one of the forgotten fighters for a moment, and glitches back.
+        val souls = io.github.projectwip.data.Lore.Soul.entries
+        var who: io.github.projectwip.data.Lore.Soul? = if (p.soul >= 0) souls[p.soul] else null
+        var asVoid = p.voidCycle
+        var flash = 0f
+        if (p.voidCycle) {
+            val period = 3.6f
+            val ph = time % period
+            val next = if (p.voidSoul >= 0) souls[p.voidSoul] else souls[(time / period).toInt() % souls.size]
+            val glitching = ph in 2.2f..2.45f || ph > 3.35f
+            val showingSoul = ph in 2.45f..3.35f
+            asVoid = !showingSoul
+            if (glitching) {
+                asVoid = (time * 26f).toInt() % 2 == 0
+                anim.spin += (rng.nextFloat() - 0.5f) * 40f
+                anim.jump += (rng.nextFloat() - 0.5f) * 0.08f
+                flash = 0.35f + 0.3f * rng.nextFloat()
+                if (rng.nextFloat() < 0.5f) {
+                    val c = next.color.toInt()
+                    val a = rng.nextFloat() * 6.28f
+                    particles.spawn(cos(a) * 0.5f, 0.4f + rng.nextFloat() * 1.4f, sin(a) * 0.5f, cos(a) * 2f, 0.5f, sin(a) * 2f, 0.5f, 0.1f, c, 1f)
+                }
+            }
+            who = if (asVoid) null else next
+        }
+        val special = p.voidCycle || p.soul >= 0
+        // The Void is a head taller than anyone, so it is drawn smaller to fit the same stage.
+        if (special && asVoid) anim.scale = 0.8f
+        fun drawSubject(prog: io.github.projectwip.gl.Program, pass: Pass) {
+            if (special) models.drawSoul(prog, if (asVoid) null else who, 0f, 0f, facing, anim, pass)
+            else models.draw(prog, def, p.skin, 0f, 0f, facing, anim, pass)
+        }
+
         // Shadow
         shadow.begin()
         depth.use()
         depth.mat4("uViewProj", lightVP); depth.mat4("uLightVP", lightVP); depth.f("uOutline", 0f); depth.f("uSway", 0f); depth.f("uTime", time)
-        models.draw(depth, def, p.skin, 0f, 0f, facing, anim, Pass.SHADOW)
+        drawSubject(depth, Pass.SHADOW)
         shadow.end(targetFbo)
 
         GLES30.glViewport(0, 0, width, height)
@@ -162,10 +204,12 @@ class StageScene(private val withPedestal: Boolean) {
         if (p.locked) {
             lit.i("uMode", 2)
             lit.v4("uTint", 0.13f, 0.09f, 0.28f, 1f)
-            models.draw(lit, def, p.skin, 0f, 0f, facing, anim, Pass.SILHOUETTE)
+            drawSubject(lit, Pass.SILHOUETTE)
             lit.i("uMode", 0)
         } else {
-            models.draw(lit, def, p.skin, 0f, 0f, facing, anim, Pass.COLOR)
+            anim.flash = flash
+            drawSubject(lit, Pass.COLOR)
+            anim.flash = 0f
         }
         lit.f("uFlash", 0f); lit.f("uEmissive", 0f)
         GLES30.glEnable(GLES30.GL_CULL_FACE)
@@ -173,7 +217,7 @@ class StageScene(private val withPedestal: Boolean) {
         lit.i("uMode", 1)
         lit.v4("uTint", Toon.INK[0], Toon.INK[1], Toon.INK[2], 1f)
         lit.f("uOutline", FighterModels.OUTLINE)
-        models.draw(lit, def, p.skin, 0f, 0f, facing, anim, Pass.OUTLINE)
+        drawSubject(lit, Pass.OUTLINE)
         if (withPedestal && p.pedestal) { lit.f("uOutline", 0.03f); lit.mat4("uModel", Toon.IDENTITY); base.draw() }
         lit.f("uOutline", 0f)
         lit.i("uMode", 0)

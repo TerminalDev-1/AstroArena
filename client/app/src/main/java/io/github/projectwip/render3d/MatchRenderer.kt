@@ -83,6 +83,7 @@ class MatchRenderer(
     private var frameDt = 0f
     /** Dimension: the chained fighter's pose. */
     private val captiveAnim = FighterAnim()
+    private val voidAnim = FighterAnim()
     private lateinit var disc: Mesh
     private lateinit var ring: Mesh
     private lateinit var dashRing: Mesh
@@ -93,9 +94,7 @@ class MatchRenderer(
     private lateinit var cell: Mesh
     private lateinit var cellCaps: Mesh
     private lateinit var stormFloor: Mesh
-    /** Dimension: the Void as it stands at a portal, an echo shard, and the beam over one. */
-    private lateinit var voidBody: Mesh
-    private lateinit var voidEyes: Mesh
+    /** Dimension: an echo shard, and the beam over one. */
     private lateinit var shardGem: Mesh
     private lateinit var beam: Mesh
     /** One clump of the poison smoke: a few low, overlapping puffs, about two tiles across. */
@@ -215,18 +214,6 @@ class MatchRenderer(
             color(0.66f, 0.98f, 0.46f); with { translate(0.35f, 0.18f, -0.25f); ellipsoid(0.5f, 0.4f, 0.5f, 6, 9) }
         }.build()
         stormFloor = MeshBuilder().apply { color(1f, 1f, 1f); ring(1f, 6f, 72) }.build()
-        voidBody = MeshBuilder().apply {
-            // A tall robe flaring to the ground, a deep hood, a hollow where a face should be, and sleeves hanging off it.
-            color(0xFF140A26L); with { translate(0f, 1.1f, 0f); cylinder(0.72f, 2.2f, 22, topRadius = 0.24f, caps = false) }
-            color(0xFF1C0E36L); with { translate(0f, 2.35f, 0f); ellipsoid(0.42f, 0.5f, 0.44f, 10, 16) }
-            color(0xFF000000L); with { translate(0f, 2.3f, 0.2f); ellipsoid(0.27f, 0.32f, 0.26f, 8, 14) }
-            color(0xFF160B2CL)
-            for (s in floatArrayOf(-1f, 1f)) with { translate(s * 0.45f, 1.55f, 0.05f); rotate(s * 22f, 0f, 0f, 1f); cylinder(0.12f, 1.1f, 10, topRadius = 0.2f) }
-        }.build()
-        voidEyes = MeshBuilder().apply {
-            color(1f, 1f, 1f)
-            for (s in floatArrayOf(-1f, 1f)) with { translate(s * 0.11f, 2.33f, 0.43f); ellipsoid(0.07f, 0.035f, 0.03f, 6, 10) }
-        }.build()
         shardGem = MeshBuilder().apply {
             color(1f, 1f, 1f); ellipsoid(0.26f, 0.62f, 0.26f, 2, 4)
             with { translate(0.26f, -0.2f, 0.05f); rotate(25f, 0f, 0f, 1f); ellipsoid(0.11f, 0.28f, 0.11f, 2, 4) }
@@ -354,11 +341,11 @@ class MatchRenderer(
             dimWarp += (minOf(0.16f, depth * 0.03f) - dimWarp) * 0.03f
             glitchIn -= frameDt
             if (glitchIn <= 0f && run.dimension >= 2) {
-                glitchLeft = 0.18f + rng.nextFloat() * 0.3f
-                glitchIn = maxOf(4f, 13f - depth) + rng.nextFloat() * 6f
+                glitchLeft = 0.25f + rng.nextFloat() * 0.4f
+                glitchIn = maxOf(2.5f, 7f - 0.4f * depth) + rng.nextFloat() * 3f
             }
             glitchLeft -= frameDt
-            dimGlitch = if (glitchLeft > 0f) minOf(0.55f, 0.18f + 0.05f * depth) else 0f
+            dimGlitch = if (glitchLeft > 0f) minOf(0.7f, 0.3f + 0.06f * depth) else 0f
         }
         lit.f("uWarp", dimWarp)
         lit.f("uGlitch", dimGlitch)
@@ -398,6 +385,7 @@ class MatchRenderer(
         forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR) }
         forEachRealmShadow(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR, shade = SHADOW_SHADE) }
         drawCaptive(Pass.COLOR)
+        drawWorldVoid(Pass.COLOR)
         lit.f("uFlash", 0f)
         lit.f("uEmissive", 0f)
 
@@ -416,6 +404,7 @@ class MatchRenderer(
         forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
         forEachRealmShadow(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
         drawCaptive(Pass.OUTLINE)
+        drawWorldVoid(Pass.OUTLINE)
         lit.f("uOutline", 0f)
         lit.i("uMode", 0)
         GLES30.glDisable(GLES30.GL_CULL_FACE)
@@ -756,27 +745,10 @@ class MatchRenderer(
             }
             lit.f("uEmissive", 0f)
         }
-        // The Void, waiting at the portal: hovering a little, swaying, its eyes lit.
-        if (run.state == io.github.projectwip.sim.PortalState.OPEN && depth >= 2) {
+        // (The Void waiting at the portal is drawn with the fighters: [drawWorldVoid].) Wisps of dark off its hem.
+        if (run.state == io.github.projectwip.sim.PortalState.OPEN && depth >= 2 && rng.nextFloat() < 0.5f) {
             val vx = run.x + 2.1f; val vz = run.y + 0.6f
-            val hover = 0.25f + 0.12f * sin(time * 1.3f)
-            val p = match.player
-            val face = Math.toDegrees(atan2((p.x - vx).toDouble(), (p.y - vz).toDouble())).toFloat()
-            lit.f("uRim", 0.9f)
-            // During a glitch it flickers into one of the souls it carries: their colour runs through it.
-            if (glitchLeft > 0f) {
-                val soul = io.github.projectwip.data.Lore.Soul.entries[((time * 3f).toInt() + run.dimension) % io.github.projectwip.data.Lore.Soul.entries.size].color.toInt()
-                lit.v4("uTint", 0.6f + 1.6f * r(soul), 0.6f + 1.6f * g(soul), 0.6f + 1.6f * b(soul), 1f)
-            } else lit.v4("uTint", 1f, 1f, 1f, 1f)
-            setModel(vx, hover, vz, 1f, 1f, 1f, face); voidBody.draw()
-            lit.f("uEmissive", 1f)
-            val blink = if ((time % 4.3f) > 4.15f) 0.2f else 1f
-            lit.v4("uTint", 0.85f, 0.92f, 1f, 1f)
-            setModel(vx, hover + 2.33f * (1f - blink), vz, 1f, blink, 1f, face); voidEyes.draw()
-            lit.f("uEmissive", 0f)
-            lit.f("uRim", 0.25f)
-            // Wisps of dark coming off its hem.
-            if (rng.nextFloat() < 0.5f) particles.spawn(vx + (rng.nextFloat() - 0.5f) * 1.2f, hover + 0.1f, vz + (rng.nextFloat() - 0.5f) * 1.2f,
+            particles.spawn(vx + (rng.nextFloat() - 0.5f) * 1.2f, 0.3f, vz + (rng.nextFloat() - 0.5f) * 1.2f,
                 0f, 0.8f + rng.nextFloat(), 0f, 1.1f, 0.22f, if (rng.nextFloat() < 0.3f) 0xFF8E5BFF.toInt() else 0xFF241040.toInt(), 0.7f)
         }
         // Debris hanging in the air: more of it the deeper the dimension, turning slowly, some of it flickering.
@@ -801,6 +773,27 @@ class MatchRenderer(
     }
 
     /**
+     * Dimension: the Void waiting beside every portal after the first, hovering a little and turned toward the
+     * player. During one of the world's glitch moments it flickers into one of the forgotten fighters it carries.
+     */
+    private fun drawWorldVoid(pass: Pass) {
+        val run = world.portal ?: return
+        if (run.state != io.github.projectwip.sim.PortalState.OPEN || run.dimension < 2) return
+        val vx = run.x + 2.1f; val vz = run.y + 0.6f
+        if (!inView(vx, vz)) return
+        val p = match.player
+        val souls = io.github.projectwip.data.Lore.Soul.entries
+        val soul = if (glitchLeft > 0f && (time * 20f).toInt() % 3 != 0) souls[(run.dimension + (time * 0.5f).toInt()) % souls.size] else null
+        voidAnim.time = time; voidAnim.walk = 0f; voidAnim.moving = 0f; voidAnim.recoil = 0f; voidAnim.spin = 0f
+        voidAnim.flash = if (glitchLeft > 0f) 0.3f else 0f
+        voidAnim.jump = 0.2f + 0.1f * sin(time * 1.3f)
+        voidAnim.scale = FIGHTER_SCALE * (if (soul == null) 1.05f else 1.3f)
+        if (pass == Pass.COLOR) lit.f("uRim", 0.8f)
+        models.drawSoul(lit, soul, vx, vz, atan2(p.y - vz, p.x - vx), voidAnim, pass)
+        if (pass == Pass.COLOR) { lit.f("uRim", 0.45f); lit.f("uGloss", 0f); lit.f("uEmissive", 0f); lit.f("uFlash", 0f); lit.v4("uTint", 1f, 1f, 1f, 1f); lit.mat4("uModel", identity) }
+    }
+
+    /**
      * Dimension's chained fighter (the user's idea): one of the roster, chained to a dark stone pillar, struggling,
      * one chain for each echo still to find (each echo breaks one). Gone once the chains are all broken: the portal
      * opens where they stood.
@@ -810,8 +803,7 @@ class MatchRenderer(
         if (run.state != io.github.projectwip.sim.PortalState.EXPLORE && run.state != io.github.projectwip.sim.PortalState.ARRIVE) return
         val x = run.captiveX; val z = run.captiveY
         if (!inView(x, z)) return
-        val id = io.github.projectwip.data.Lore.captive(run.dimension, match.config.playerFighter)
-        val def = io.github.projectwip.data.Balance.fighter(id)
+        val soul = io.github.projectwip.data.Lore.captive(run.dimension)
         val p = match.player
         val facing = atan2(p.y - z, p.x - x)
         // Struggling: pulling one way and the other, now and then a hard yank.
@@ -851,11 +843,12 @@ class MatchRenderer(
             lit.f("uEmissive", 0f)
             lit.f("uRim", 0.45f)
             lit.v4("uTint", 0.85f, 0.85f, 0.95f, 1f)
-            models.draw(lit, def, 0, x + 0.04f * sin(time * 11f) * yank, z, facing, captiveAnim, Pass.COLOR)
+            models.drawSoul(lit, soul, x + 0.04f * sin(time * 11f) * yank, z, facing, captiveAnim, Pass.COLOR)
+            lit.f("uGloss", 0f); lit.f("uEmissive", 0f)
             lit.v4("uTint", 1f, 1f, 1f, 1f)
             lit.mat4("uModel", identity)
         } else {
-            models.draw(lit, def, 0, x + 0.04f * sin(time * 11f) * yank, z, facing, captiveAnim, Pass.OUTLINE)
+            models.drawSoul(lit, soul, x + 0.04f * sin(time * 11f) * yank, z, facing, captiveAnim, Pass.OUTLINE)
         }
     }
 
@@ -2211,8 +2204,7 @@ class MatchRenderer(
             s.voidSoul = taunt?.soul?.title
             s.voidSoulColor = taunt?.soul?.color?.toInt() ?: 0
             s.portalGlitch = dimGlitch
-            val captive = io.github.projectwip.data.Lore.captive(run.dimension, match.config.playerFighter)
-            s.captiveName = io.github.projectwip.data.Balance.fighter(captive).name
+            s.captiveName = io.github.projectwip.data.Lore.captive(run.dimension).title
             s.captiveOn = run.state == io.github.projectwip.sim.PortalState.EXPLORE || run.state == io.github.projectwip.sim.PortalState.ARRIVE
             s.captiveX = run.captiveX; s.captiveZ = run.captiveY
             s.voidAge = run.time - run.tauntAt

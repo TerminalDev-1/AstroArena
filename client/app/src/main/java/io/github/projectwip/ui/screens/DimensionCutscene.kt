@@ -116,7 +116,7 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
     val time by rememberAnimTime()
     val voidTalking = line.speaker == Lore.Speaker.VOID
     // Past the first dimension the picture glitches now and then, for a moment: creepy, not constant.
-    val glitch = if (entered >= 1 && ((time + entered * 1.7f) % 6.5f) < 0.22f) 0.5f else 0f
+    val glitch = if (entered >= 1 && ((time + entered * 1.7f) % 4f) < 0.32f) 0.6f else 0f
 
     Box(
         Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }.background(Color.Black).pointerInput(Unit) {
@@ -143,7 +143,7 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
                         val k = if (voidTalking) 1.04f else 0.95f; scaleX = k; scaleY = k; alpha = if (voidTalking) 1f else 0.55f
                         translationY = 6.dp.toPx() * sin(time * 0.9f)
                     }) {
-                        VoidPortrait(time, voidTalking && typed < line.text.length, mood, glitch, if (voidTalking) line.soul else null, Modifier.fillMaxSize())
+                        VoidStage(time, mood, if (voidTalking) line.soul else null, Modifier.fillMaxSize())
                     }
                     Box(Modifier.fillMaxHeight(0.86f).width(250.dp).graphicsLayer {
                         val k = if (!voidTalking) 1.04f else 0.95f; scaleX = k; scaleY = k; alpha = if (!voidTalking) 1f else 0.55f
@@ -178,6 +178,7 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
                 val bar = 26.dp.toPx() * sceneIn
                 drawRect(Color.Black, Offset.Zero, Size(size.width, bar))
                 drawRect(Color.Black, Offset(0f, size.height - bar), Size(size.width, bar))
+                if (entered >= 1) { var y = 0f; while (y < size.height) { drawRect(Color.Black.copy(alpha = 0.06f), Offset(0f, y), Size(size.width, 1.dp.toPx())); y += 3.dp.toPx() } }
                 drawGlitch(time, glitch)
                 // A vignette pulling the eye to the middle.
                 drawRect(Brush.radialGradient(listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.6f)), Offset(size.width / 2, size.height / 2), size.maxDimension * 0.7f))
@@ -380,128 +381,26 @@ private fun DrawScope.drawGlitch(time: Float, k: Float) {
 }
 
 /**
- * The Void, as drawn for its scenes: a tall hooded figure cut out of a starry dark with a nebula moving inside its robe,
- * a hollow where a face should be with two pale eyes in it, a broken halo turning behind its head, tendrils of dark
- * curling off its sides, shards orbiting it (in front and behind), rings pulsing out of the hollow as it speaks, and,
- * deeper down, ghosts of it in split colour. Its eyes brighten while it speaks, and it blinks now and then.
+ * The Void, in 3D (the user asked for a model): its robe, hood, hollow face and lit eyes on a live stage, glitching
+ * now and then into one of the forgotten fighters whose souls it carries ([SoulView]); while it speaks with one's
+ * voice, that one shows through. Behind it, its glow and a broken halo turning.
  */
 @Composable
-private fun VoidPortrait(time: Float, speaking: Boolean, mood: Mood, glitch: Float, soul: Lore.Soul?, modifier: Modifier) {
-    Canvas(modifier) {
-        val w = size.width; val h = size.height
-        val cx = w / 2; val headY = h * 0.3f
-        val breathe = 1f + 0.015f * sin(time * 1.3f)
-        drawCircle(Brush.radialGradient(listOf(mood.glow.copy(alpha = 0.45f), Color.Transparent), Offset(cx, headY), w * 0.6f), w * 0.6f, Offset(cx, headY))
-        fun orbit(front: Boolean) {
-            for (i in 0 until 5) {
-                val a = time * 0.6f + i * (2 * PI / 5).toFloat()
-                val z = sin(a)
-                if ((z > 0f) != front) continue
-                val ox = cx + cos(a) * w * 0.42f
-                val oy = h * 0.45f + z * h * 0.05f + cos(a * 2f) * h * 0.02f
-                val s = (6f + 4f * (z + 1f)).dp.toPx()
-                val p = Path().apply { moveTo(ox, oy - s * 1.5f); lineTo(ox + s * 0.6f, oy); lineTo(ox, oy + s * 1.5f); lineTo(ox - s * 0.6f, oy); close() }
-                drawCircle(Brush.radialGradient(listOf(mood.accent.copy(alpha = 0.4f), Color.Transparent), Offset(ox, oy), s * 3f), s * 3f, Offset(ox, oy))
-                drawPath(p, Brush.verticalGradient(listOf(Color.White, mood.accent, mood.glow), oy - s * 1.5f, oy + s * 1.5f), alpha = if (front) 1f else 0.55f)
+private fun VoidStage(time: Float, mood: Mood, soul: Lore.Soul?, modifier: Modifier) {
+    Box(modifier) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width; val h = size.height
+            val c = Offset(w / 2, h * 0.42f)
+            drawCircle(Brush.radialGradient(listOf(mood.glow.copy(alpha = 0.5f), mood.glow.copy(alpha = 0.12f), Color.Transparent), c, w * 0.62f), w * 0.62f, c)
+            for (k in 0 until 3) {
+                val r = w * (0.3f + k * 0.04f)
+                drawArc(mood.accent.copy(alpha = 0.5f - k * 0.12f), time * (18f + k * 9f) * (if (k % 2 == 0) 1f else -1f) + k * 120f, 70f + k * 25f, false,
+                    Offset(c.x - r, c.y - r), Size(r * 2, r * 2), style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
             }
+            drawOval(Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent), Offset(w / 2, h * 0.95f), w * 0.4f),
+                Offset(w * 0.1f, h * 0.9f), Size(w * 0.8f, h * 0.1f))
         }
-        orbit(front = false)
-        // Tendrils of dark curling off its sides.
-        for (i in 0 until 6) {
-            val side = if (i % 2 == 0) -1f else 1f
-            val y0 = h * (0.42f + 0.08f * (i / 2))
-            val x0 = cx + side * w * (0.24f + 0.04f * (i / 2))
-            val p = Path().apply {
-                moveTo(x0, y0)
-                cubicTo(x0 + side * w * 0.12f, y0 - h * 0.05f + h * 0.03f * sin(time * 1.1f + i),
-                    x0 + side * w * 0.2f, y0 + h * 0.08f * sin(time * 0.8f + i * 1.3f),
-                    x0 + side * w * (0.28f + 0.03f * sin(time + i)), y0 + h * 0.12f + h * 0.05f * cos(time * 0.9f + i))
-            }
-            drawPath(p, Color(0xFF0A0418), style = Stroke((7f - i * 0.6f).dp.toPx(), cap = StrokeCap.Round))
-            drawPath(p, mood.glow.copy(alpha = 0.3f), style = Stroke(1.2.dp.toPx(), cap = StrokeCap.Round))
-        }
-        // The broken halo.
-        for (k in 0 until 3) {
-            val r = w * (0.27f + k * 0.035f)
-            drawArc(mood.accent.copy(alpha = 0.6f - k * 0.14f), time * (18f + k * 9f) * (if (k % 2 == 0) 1f else -1f) + k * 120f, 70f + k * 25f, false,
-                Offset(cx - r, headY - r), Size(r * 2, r * 2), style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
-        }
-        // The robe, with ghosts of it in split colour when the picture is breaking up.
-        val robe = Path().apply {
-            moveTo(cx, h * 0.08f)
-            cubicTo(cx + w * 0.2f, h * 0.08f, cx + w * 0.26f, h * 0.3f, cx + w * 0.3f * breathe, h * 0.46f)
-            cubicTo(cx + w * 0.36f, h * 0.65f, cx + w * 0.44f, h * 0.85f, cx + w * 0.46f, h)
-            val waves = 6
-            for (i in 1..waves) {
-                val x = cx + w * 0.46f - w * 0.92f * i / waves
-                lineTo(x, h - (if (i % 2 == 0) 0f else h * 0.03f) * (1f + 0.5f * sin(time * 2f + i)))
-            }
-            cubicTo(cx - w * 0.44f, h * 0.85f, cx - w * 0.36f, h * 0.65f, cx - w * 0.3f * breathe, h * 0.46f)
-            cubicTo(cx - w * 0.26f, h * 0.3f, cx - w * 0.2f, h * 0.08f, cx, h * 0.08f)
-            close()
-        }
-        if (glitch > 0f) {
-            val off = 4.dp.toPx()
-            drawPath(robe, Color(0xFF8E5BFF).copy(alpha = 0.25f), blendMode = BlendMode.Plus)
-            translateBy(off) { drawPath(robe, Color(0xFF5CE1FF).copy(alpha = 0.18f), blendMode = BlendMode.Plus) }
-        }
-        drawPath(robe, Brush.verticalGradient(listOf(Color(0xFF1C0C38), Color(0xFF0A0418), Color(0xFF05020C)), 0f, h))
-        clipPath(robe) {
-            // A nebula moving inside it, and stars.
-            for (i in 0 until 3) {
-                val nc = Offset(cx + w * 0.2f * sin(time * 0.2f + i * 2f), h * (0.4f + 0.18f * i) + h * 0.05f * cos(time * 0.25f + i))
-                drawCircle(Brush.radialGradient(listOf(mood.glow.copy(alpha = 0.35f), Color.Transparent), nc, w * 0.3f), w * 0.3f, nc)
-            }
-            for (i in 0 until 40) {
-                val sx = cx - w * 0.45f + w * 0.9f * (((i * 7907) % 1000) / 1000f)
-                val sy = h * 0.15f + h * 0.85f * (((i * 6271) % 1000) / 1000f)
-                drawCircle(Color.White.copy(alpha = 0.2f + 0.5f * (0.5f + 0.5f * sin(time * 2f + i))), (0.8f + (i % 3) * 0.5f).dp.toPx(), Offset(sx, sy))
-            }
-        }
-        drawPath(robe, Brush.verticalGradient(listOf(mood.accent.copy(alpha = 0.8f), mood.glow.copy(alpha = 0.3f), Color.Transparent), 0f, h), style = Stroke(2.dp.toPx()))
-        // The souls it carries (the user's lore: every fighter removed from the game). Now and then, for a blink, one
-        // of them shows through: a figure in their colour inside the robe. While it speaks with one's voice, that one
-        // keeps flickering through.
-        val showing = if (soul != null && (time * 3f).toInt() % 3 == 0) soul
-            else if ((time % 4.7f) < 0.2f || glitch > 0f) Lore.Soul.entries[((time / 4.7f).toInt()) % Lore.Soul.entries.size] else null
-        if (showing != null) clipPath(robe) {
-            val c = Color(showing.color)
-            val jx = 3.dp.toPx() * sin(time * 37f)
-            val by = h * 0.5f
-            drawCircle(Brush.radialGradient(listOf(c.copy(alpha = 0.45f), Color.Transparent), Offset(cx + jx, by), w * 0.4f), w * 0.4f, Offset(cx + jx, by))
-            // Head and shoulders, the shape of a fighter.
-            drawCircle(c.copy(alpha = 0.55f), w * 0.09f, Offset(cx + jx, by - h * 0.1f))
-            drawRoundRect(c.copy(alpha = 0.45f), Offset(cx + jx - w * 0.15f, by - h * 0.03f), Size(w * 0.3f, h * 0.24f), androidx.compose.ui.geometry.CornerRadius(w * 0.08f))
-        }
-        // The hollow where a face should be.
-        val fw = w * 0.3f; val fh = h * 0.17f
-        drawOval(Color.Black, Offset(cx - fw / 2, headY - fh / 2), Size(fw, fh))
-        drawOval(Brush.radialGradient(listOf(Color.Transparent, mood.glow.copy(alpha = 0.35f)), Offset(cx, headY), fw * 0.6f), Offset(cx - fw / 2, headY - fh / 2), Size(fw, fh))
-        // Rings pulsing out of the hollow while it speaks.
-        if (speaking) for (k in 0 until 3) {
-            val u = ((time * 0.9f + k / 3f) % 1f)
-            val r = fw * (0.5f + u * 1.4f)
-            drawOval(mood.accent.copy(alpha = 0.35f * (1f - u)), Offset(cx - r, headY - r * 0.55f), Size(r * 2, r * 1.1f), style = Stroke(1.5.dp.toPx()))
-        }
-        // Its eyes: brighter as it speaks; a blink every few seconds.
-        val blink = if ((time % 4.3f) > 4.15f) 0.15f else 1f
-        val glow = if (speaking) 0.75f + 0.25f * sin(time * 9f) else 0.55f
-        for (s in floatArrayOf(-1f, 1f)) {
-            val ex = cx + s * w * 0.065f
-            drawCircle(Brush.radialGradient(listOf(mood.accent.copy(alpha = glow), Color.Transparent), Offset(ex, headY), w * 0.08f), w * 0.08f, Offset(ex, headY))
-            val ew = w * 0.05f; val eh = h * 0.022f * blink
-            drawOval(Color(0xFFF2F6FF), Offset(ex - ew / 2, headY - eh / 2), Size(ew, eh), alpha = 0.6f + 0.4f * glow)
-        }
-        // Wisps rising off its hem.
-        for (i in 0 until 7) {
-            val x0 = cx - w * 0.38f + w * 0.76f * i / 6f
-            val p = Path().apply {
-                moveTo(x0, h * 0.97f)
-                cubicTo(x0 + w * 0.06f * sin(time + i), h * 0.88f, x0 - w * 0.05f * sin(time * 1.3f + i), h * 0.8f, x0 + w * 0.03f * sin(time * 0.7f + i), h * 0.72f)
-            }
-            drawPath(p, mood.glow.copy(alpha = 0.22f), style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
-        }
-        orbit(front = true)
+        io.github.projectwip.ui.SoulView(Modifier.fillMaxSize(), voidCycle = true, voidSoul = soul)
     }
 }
 
@@ -518,7 +417,7 @@ private fun speakerPlate(line: Lore.Line, fighterName: String, time: Float): Pai
         if (soul != null && (time * 2.5f).toInt() % 3 != 0) "THE VOID · ${soul.title.uppercase()}" to Color(soul.color)
         else "THE VOID" to Color(0xFFB98CFF)
     }
-    Lore.Speaker.CAPTIVE -> fighterName.uppercase() to Color(0xFFFF8A8A)
+    Lore.Speaker.CAPTIVE -> fighterName.uppercase() to (line.soul?.let { Color(it.color) } ?: Color(0xFFFF8A8A))
     Lore.Speaker.FIGHTER -> fighterName.uppercase() to Palette.Gold
 }
 
@@ -529,7 +428,7 @@ private fun speakerPlate(line: Lore.Line, fighterName: String, time: Float): Pai
  */
 @Composable
 fun CaptiveTalk(dimension: Int, player: FighterId, playerSkin: Int, sfx: Sfx?, onDone: () -> Unit) {
-    val captive = remember(dimension, player) { Lore.captive(dimension, player) }
+    val captive = remember(dimension) { Lore.captive(dimension) }
     val lines = remember(captive, player) { Lore.captiveTalk(captive, player) }
     val mood = MOODS[if (dimension - 1 < MOODS.size) dimension - 1 else 1 + (dimension - 2) % (MOODS.size - 1)]
     var index by remember { mutableIntStateOf(0) }
@@ -542,7 +441,6 @@ fun CaptiveTalk(dimension: Int, player: FighterId, playerSkin: Int, sfx: Sfx?, o
     LaunchedEffect(index) {
         typed = 0
         if (line.speaker == Lore.Speaker.CAPTIVE && line.text.contains("HELP")) sfx?.play(Sound.RIFT, 0.5f, 0.7f)
-        if (line.speaker == Lore.Speaker.CAPTIVE && captive == FighterId.BUDDY) sfx?.say(line.text, VoiceStyle.MACHINE)
         if (line.speaker == Lore.Speaker.FIGHTER && player == FighterId.BUDDY) sfx?.say(line.text, VoiceStyle.MACHINE)
         while (typed < line.text.length) { kotlinx.coroutines.delay(if (line.speaker == Lore.Speaker.CAPTIVE) 22L else 28L); typed++ }
     }
@@ -577,7 +475,7 @@ fun CaptiveTalk(dimension: Int, player: FighterId, playerSkin: Int, sfx: Sfx?, o
                         // The pillar behind them.
                         drawRect(Brush.verticalGradient(listOf(Color(0xFF2A1F3A), Color(0xFF120C1C)), 0f, size.height), Offset(size.width * 0.42f, 0f), Size(size.width * 0.16f, size.height))
                     }
-                    FighterView(Balance.fighter(captive), 0, Modifier.fillMaxSize(), pedestal = true)
+                    io.github.projectwip.ui.SoulView(Modifier.fillMaxSize(), soul = captive)
                     // The chains, over them: from the pillar out to their wrists and waist, rattling.
                     Canvas(Modifier.fillMaxSize()) {
                         for (k in 0 until 3) {
@@ -596,7 +494,7 @@ fun CaptiveTalk(dimension: Int, player: FighterId, playerSkin: Int, sfx: Sfx?, o
                     }
                 }
             }
-            val (name, who) = speakerPlate(line, Balance.fighter(if (line.speaker == Lore.Speaker.CAPTIVE) captive else player).name, time)
+            val (name, who) = speakerPlate(line, if (line.speaker == Lore.Speaker.CAPTIVE) captive.title else Balance.fighter(player).name, time)
             DialoguePanel(line, typed, index, lines.size, name, who, line.speaker != Lore.Speaker.CAPTIVE, mood, time, "TAP TO GO")
         }
     }
