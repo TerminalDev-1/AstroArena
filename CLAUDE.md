@@ -239,11 +239,19 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   `PortalRun.captiveX/Y`; `MatchRenderer.drawCaptive`, "HELP!" over them in `HudView`:
   walking up to them pauses the match for a talk (`CaptiveTalk`, `Lore.captiveTalk`): the player asks what needs
   doing, they scream for help and say it. Each of the `PORTAL_SHARDS` echoes breaks one chain; when all are found
-  the portal opens where the captive stood. From the second dimension the ground tears open near the player now
+  the soul is freed (`PortalRun.freedAt`): an unhook (chains snap, they leap and spin free), then they follow the
+  player a step behind (`MatchRenderer.drawFollower`, client-side only) and tell them, in speech bubbles, who the
+  Void really is: an evil demon that took the removed fighters and wears them (the user's lore; `Lore.freedLines`).
+  The portal always stands in the very middle of the arena, where the centre bush was (`Arenas.dimension()`, Foundry
+  Yard with that bush cleared), as a 3D structure the user asked for: a stone dais, standing stones crowned with
+  crystals and a great ring floating flat over it (`drawPortalStructure`), dark until the soul is freed, then lit
+  and turning through purple and the rainbow with a swirling vortex inside (`drawPortal`). From the second dimension the ground tears open near the player now
   and then (`HazardKind.RIFT`, `stepRifts`): one life, so a rift can end the run.
   The lore is the user's: **the Void carries the souls of every fighter removed from the game** (`Lore.Soul`:
-  Byte, Rocket, Spark, Mira, Varun) **and glitches between them**. Each has a 3D model (`FighterModels.drawSoul`:
-  Spark's and Rocket's own, and new ones for Byte, Mira and Varun), and so does the Void (`buildVoid`). In the
+  Byte, Rocket, Spark, Mira, Varun) **and glitches between them**. Each has its own original 3D model (`FighterModels.drawSoul`:
+  Spark's and Rocket's were kept; Mira's and Varun's are restored from git history, as the user asked: never
+  remake a removed fighter's model, find the original in the history or the GitHub releases' source. The one exception
+  is Byte: the user found her old model ugly and had her remade, keeping who she was), and so does the Void (`buildVoid`). In the
   cutscene the Void is that 3D model on a live stage (`SoulView`, `StageParams.voidCycle`), glitching into one of
   the souls every few seconds (the user rejected a flat drawn Void); in the world it stands beside every portal
   after the first and flickers into them during a glitch. Some of its lines are spoken in their voices (the

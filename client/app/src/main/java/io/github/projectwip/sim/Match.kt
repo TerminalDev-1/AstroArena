@@ -127,7 +127,7 @@ class Match(val config: MatchConfig) {
             repeat(3) { roster += botFighter(id++, 1, names.next()) }
         }
         val oneOnOne = config.mode == GameMode.DUEL
-        val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.trainingArea() else if (bossMode || oneOnOne) Arenas.provingGround() else Arenas.foundryYard()
+        val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.trainingArea() else if (bossMode || oneOnOne) Arenas.provingGround() else if (portalRun) Arenas.dimension() else Arenas.foundryYard()
         val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.training() else if (bossMode) MatchRules.bossMode() else if (oneOnOne) MatchRules.duel() else if (portalRun) MatchRules.portal() else MatchRules.knockoutRush()
         world = World(arena, roster, rules, Random(rng.nextLong()))
         pathfinder = Pathfinder(world.arena)
@@ -139,7 +139,7 @@ class Match(val config: MatchConfig) {
         world.portal?.let { run ->
             if (config.portalStart > 1) { run.dimension = config.portalStart; run.entered = config.portalStart - 1 }
             // The echoes laid where the player starts, so they are found at once and the portal opens.
-            if (config.portalCaptiveNear) { val c = world.arena.nearestOpen(player.x, player.y - 4f, 0.9f); run.captiveX = c.x; run.captiveY = c.y }
+            if (config.portalCaptiveNear) { val c = world.arena.nearestOpen(player.x + 3f, player.y - 4f, 0.9f); run.captiveX = c.x; run.captiveY = c.y }
             if (config.portalOpen) for (i in 0 until Balance.PORTAL_SHARDS) { run.shards[i * 2] = player.x; run.shards[i * 2 + 1] = player.y }
         }
     }

@@ -14,7 +14,7 @@ android {
         targetSdk = 35
         // Players see the version name ("1.0" since AstroArena came out of Beta in build 103). The build number ("95", or "94.1" for a point release) is what the updater and the
         // server's version gate compare; Android's own versionCode is made from it (94.1 -> 9401, 95 -> 9500).
-        val build = "105"
+        val build = "106"
         val (major, minor) = build.split(".").let { it[0].toInt() to (it.getOrNull(1)?.toInt() ?: 0) }
         versionCode = major * 100 + minor
         buildConfigField("String", "BUILD", "\"$build\"")

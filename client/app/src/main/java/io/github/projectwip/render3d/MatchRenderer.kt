@@ -94,7 +94,10 @@ class MatchRenderer(
     private lateinit var cell: Mesh
     private lateinit var cellCaps: Mesh
     private lateinit var stormFloor: Mesh
-    /** Dimension: an echo shard, and the beam over one. */
+    /** Dimension: the portal's stone base, its ring, and an echo shard and the beam over one. */
+    private lateinit var portalBase: Mesh
+    private lateinit var portalRing: Mesh
+    private lateinit var portalInner: Mesh
     private lateinit var shardGem: Mesh
     private lateinit var beam: Mesh
     /** One clump of the poison smoke: a few low, overlapping puffs, about two tiles across. */
@@ -214,6 +217,13 @@ class MatchRenderer(
             color(0.66f, 0.98f, 0.46f); with { translate(0.35f, 0.18f, -0.25f); ellipsoid(0.5f, 0.4f, 0.5f, 6, 9) }
         }.build()
         stormFloor = MeshBuilder().apply { color(1f, 1f, 1f); ring(1f, 6f, 72) }.build()
+        portalBase = MeshBuilder().apply {
+            // A low round dais of stone, stepped, that the ring floats over.
+            color(1f, 1f, 1f); with { translate(0f, 0.06f, 0f); cylinder(2.25f, 0.12f, 40) }
+            color(0.85f, 0.85f, 0.85f); with { translate(0f, 0.15f, 0f); cylinder(1.95f, 0.08f, 40) }
+        }.build()
+        portalRing = MeshBuilder().apply { color(1f, 1f, 1f); torus(1.62f, 0.15f, 48, 10) }.build()
+        portalInner = MeshBuilder().apply { color(1f, 1f, 1f); torus(1.4f, 0.05f, 40, 6) }.build()
         shardGem = MeshBuilder().apply {
             color(1f, 1f, 1f); ellipsoid(0.26f, 0.62f, 0.26f, 2, 4)
             with { translate(0.26f, -0.2f, 0.05f); rotate(25f, 0f, 0f, 1f); ellipsoid(0.11f, 0.28f, 0.11f, 2, 4) }
@@ -362,6 +372,7 @@ class MatchRenderer(
         lit.v4("uTint", 1f, 1f, 1f, 1f)
         drawCrates(lit, shadowPass = false)
         drawCells()
+        drawPortalStructure()
         drawDimensionSolids()
 
         // X-ray silhouettes: allies hidden behind walls still show as a tinted shape.
@@ -697,34 +708,107 @@ class MatchRenderer(
         lit.mat4("uModel", identity)
     }
 
+    /** A colour round the hue wheel, as r, g, b in 0..1 ([h] in turns). */
+    private fun hue(h: Float, out: FloatArray = hueOut): FloatArray {
+        val x = ((h % 1f) + 1f) % 1f * 6f
+        val f = x - kotlin.math.floor(x)
+        when (x.toInt()) {
+            0 -> { out[0] = 1f; out[1] = f; out[2] = 0f }
+            1 -> { out[0] = 1f - f; out[1] = 1f; out[2] = 0f }
+            2 -> { out[0] = 0f; out[1] = 1f; out[2] = f }
+            3 -> { out[0] = 0f; out[1] = 1f - f; out[2] = 1f }
+            4 -> { out[0] = f; out[1] = 0f; out[2] = 1f }
+            else -> { out[0] = 1f; out[1] = 0f; out[2] = 1f - f }
+        }
+        return out
+    }
+    private val hueOut = FloatArray(3)
+
     /**
-     * Portal Run's portal, once it is open: a dark hole on the ground exactly as wide as the reach that pulls you in,
-     * rimmed with violet light, with rings of it winding inward, and motes spiralling into it and rising out of it.
+     * Dimension's portal (the user's design, build 106): a 3D structure standing in the very middle of every level
+     * where the centre bush was: a stepped stone dais, a ring of standing stones each crowned with a crystal, and a
+     * great stone ring floating flat over it. It sits dark until the chains are broken; then the ring lights up and
+     * turns through purple and every colour of the rainbow, its crystals blaze, and a vortex opens inside it.
      */
+    private fun drawPortalStructure() {
+        val run = world.portal ?: return
+        val x = run.x; val z = run.y
+        if (!inView(x, z)) return
+        val open = run.state == io.github.projectwip.sim.PortalState.OPEN
+        val wake = if (open && run.freedAt >= 0f) ((run.time - run.freedAt) / 1.2f).coerceIn(0f, 1f) else 0f
+        val dl = dimensionLight(run.dimension)
+        lit.f("uRim", 0.35f)
+        lit.v4("uTint", 0.42f * dl[0], 0.4f * dl[1], 0.5f * dl[2], 1f)
+        setModel(x, 0f, z, 1f, 1f, 1f); portalBase.draw()
+        // The standing stones round it, and the crystal on each.
+        for (k in 0 until 6) {
+            val ang = k * 1.0472f + 0.26f
+            val px = x + cos(ang) * 2.05f; val pz = z + sin(ang) * 2.05f
+            lit.v4("uTint", 0.3f * dl[0], 0.28f * dl[1], 0.38f * dl[2], 1f)
+            setModel(px, 0.55f, pz, 0.28f, 1.1f, 0.28f, ang * 57.3f + 45f); bit.draw()
+            val c = hue(time * 0.25f + k / 6f)
+            val glow = 0.25f + 0.75f * wake
+            lit.f("uEmissive", 0.3f + 0.6f * wake)
+            lit.v4("uTint", lerp(0.45f, c[0], wake), lerp(0.3f, c[1], wake), lerp(0.75f, c[2], wake), 1f)
+            setModel(px, 1.35f + 0.08f * sin(time * 2f + k), pz, 0.14f * (0.8f + 0.2f * glow), 0.3f, 0.14f, time * 60f + k * 30f); octa.draw()
+            lit.f("uEmissive", 0f)
+        }
+        // The ring, floating flat over the dais, bobbing; dark stone, or lit and turning through the colours.
+        val y = 0.55f + 0.06f * sin(time * 1.4f)
+        if (wake > 0f) {
+            val c = hue(time * 0.18f)
+            lit.f("uEmissive", 0.45f + 0.35f * wake)
+            lit.v4("uTint", lerp(0.35f, 0.55f + 0.45f * c[0], wake), lerp(0.3f, 0.3f + 0.5f * c[1], wake), lerp(0.45f, 0.75f + 0.25f * c[2], wake), 1f)
+        } else lit.v4("uTint", 0.35f * dl[0], 0.32f * dl[1], 0.45f * dl[2], 1f)
+        setModel(x, y, z, 1f, 1f, 1f, time * 12f); portalRing.draw()
+        if (wake > 0f) {
+            val c = hue(time * 0.18f + 0.5f)
+            lit.v4("uTint", c[0], c[1], c[2], 1f)
+            setModel(x, y + 0.02f, z, 1f, 1f, 1f, -time * 40f); portalInner.draw()
+        }
+        lit.f("uEmissive", 0f)
+        lit.v4("uTint", 1f, 1f, 1f, 1f)
+        lit.f("uRim", 0.25f)
+        lit.mat4("uModel", identity)
+    }
+
+    /** The inside of the portal (decal pass): still and dark while it sleeps; a swirling rainbow vortex once it wakes. */
     private fun drawPortal() {
         val run = world.portal ?: return
-        if (run.state != io.github.projectwip.sim.PortalState.OPEN) return
-        val r = io.github.projectwip.data.Balance.PORTAL_RADIUS + 0.45f
-        val beat = 0.5f + 0.5f * sin(time * 3f)
-        lit.v4("uTint", 0.55f, 0.25f, 1f, 0.16f + 0.06f * beat)
-        setModel(run.x, 0.05f, run.y, r * 1.5f, 1f, r * 1.5f); sector(360f).draw()
-        lit.v4("uTint", 0.03f, 0.01f, 0.08f, 0.94f)
-        setModel(run.x, 0.055f, run.y, r, 1f, r); sector(360f).draw()
-        for (k in 0 until 4) {
-            val rr = r * (1f - k * 0.21f)
-            lit.v4("uTint", if (k == 0) 0.85f else 0.6f, if (k == 0) 0.7f else 0.35f, 1f, 0.95f - k * 0.17f)
-            setModel(run.x, 0.06f + k * 0.002f, run.y, rr, 1f, rr, time * (if (k % 2 == 0) 90f else -140f) + k * 50f)
-            arc(300f, 0.09f).draw()
+        if (!inView(run.x, run.y)) return
+        val open = run.state == io.github.projectwip.sim.PortalState.OPEN
+        val wake = if (open && run.freedAt >= 0f) ((run.time - run.freedAt) / 1.2f).coerceIn(0f, 1f) else 0f
+        val r = 1.45f
+        lit.v4("uTint", 0.04f, 0.02f, 0.09f, 0.9f)
+        setModel(run.x, 0.2f, run.y, r, 1f, r); sector(360f).draw()
+        if (wake <= 0f) {
+            lit.v4("uTint", 0.4f, 0.25f, 0.7f, 0.15f + 0.05f * sin(time * 2f))
+            setModel(run.x, 0.205f, run.y, r * 0.8f, 1f, r * 0.8f, time * 10f); arc(300f, 0.04f).draw()
+            return
         }
-        // Motes drawn in from all round, and a thin column of light rising out of the middle.
+        // Arms of colour winding in toward the middle, each a different hue, the whole wheel turning.
+        for (k in 0 until 7) {
+            val rr = r * (1f - k * 0.13f)
+            val c = hue(time * 0.3f + k * 0.14f)
+            lit.v4("uTint", 0.35f + 0.65f * c[0], 0.2f + 0.6f * c[1], 0.55f + 0.45f * c[2], (0.95f - k * 0.08f) * wake)
+            setModel(run.x, 0.21f + k * 0.003f, run.y, rr, 1f, rr, time * (if (k % 2 == 0) 110f else -150f) + k * 40f)
+            arc(220f, 0.14f).draw()
+        }
+        lit.v4("uTint", 1f, 0.95f, 1f, 0.9f * wake)
+        setModel(run.x, 0.24f, run.y, 0.22f + 0.04f * sin(time * 6f), 1f, 0.22f + 0.04f * sin(time * 6f)); sector(360f).draw()
+        // A column of light rising out of it, and motes drawn in from all round.
+        val c = hue(time * 0.2f)
+        lit.v4("uTint", 0.6f + 0.4f * c[0], 0.5f + 0.4f * c[1], 1f, 0.1f * wake)
+        setModel(run.x, 0.2f, run.y, r * 0.75f, 6f, r * 0.75f); beam.draw()
         repeat(2) {
             val a = rng.nextFloat() * 6.283f
             val d = r * (1.1f + rng.nextFloat() * 0.6f)
-            particles.spawn(run.x + cos(a) * d, 0.15f, run.y + sin(a) * d, -cos(a) * d * 1.4f - sin(a) * 1.5f, 0.4f, -sin(a) * d * 1.4f + cos(a) * 1.5f,
-                0.6f, 0.1f, if (it == 0) 0xFFC9A6FF.toInt() else 0xFFFFFFFF.toInt(), 0.9f)
+            val cc = hue(rng.nextFloat())
+            val col = (0xFF shl 24) or ((cc[0] * 255).toInt() shl 16) or ((cc[1] * 255).toInt() shl 8) or (cc[2] * 255).toInt()
+            particles.spawn(run.x + cos(a) * d, 0.4f, run.y + sin(a) * d, -cos(a) * d * 1.4f - sin(a) * 1.5f, 0.4f, -sin(a) * d * 1.4f + cos(a) * 1.5f, 0.6f, 0.1f, col, 0.9f)
         }
-        if (rng.nextFloat() < 0.6f) particles.spawn(run.x + (rng.nextFloat() - 0.5f) * 0.4f, 0.2f, run.y + (rng.nextFloat() - 0.5f) * 0.4f, 0f, 3.5f, 0f, 0.8f, 0.16f, 0xFF8E5BFF.toInt(), 0.8f)
     }
+
 
     /**
      * Dimension's solid things: the echo shards turning in the air, the Void standing beside the portal (at every one
@@ -747,7 +831,7 @@ class MatchRenderer(
         }
         // (The Void waiting at the portal is drawn with the fighters: [drawWorldVoid].) Wisps of dark off its hem.
         if (run.state == io.github.projectwip.sim.PortalState.OPEN && depth >= 2 && rng.nextFloat() < 0.5f) {
-            val vx = run.x + 2.1f; val vz = run.y + 0.6f
+            val vx = run.x + 2.6f; val vz = run.y + 1.2f
             particles.spawn(vx + (rng.nextFloat() - 0.5f) * 1.2f, 0.3f, vz + (rng.nextFloat() - 0.5f) * 1.2f,
                 0f, 0.8f + rng.nextFloat(), 0f, 1.1f, 0.22f, if (rng.nextFloat() < 0.3f) 0xFF8E5BFF.toInt() else 0xFF241040.toInt(), 0.7f)
         }
@@ -779,7 +863,7 @@ class MatchRenderer(
     private fun drawWorldVoid(pass: Pass) {
         val run = world.portal ?: return
         if (run.state != io.github.projectwip.sim.PortalState.OPEN || run.dimension < 2) return
-        val vx = run.x + 2.1f; val vz = run.y + 0.6f
+        val vx = run.x + 2.6f; val vz = run.y + 1.2f
         if (!inView(vx, vz)) return
         val p = match.player
         val souls = io.github.projectwip.data.Lore.Soul.entries
@@ -794,17 +878,27 @@ class MatchRenderer(
     }
 
     /**
-     * Dimension's chained fighter (the user's idea): one of the roster, chained to a dark stone pillar, struggling,
-     * one chain for each echo still to find (each echo breaks one). Gone once the chains are all broken: the portal
-     * opens where they stood.
+     * Dimension's chained fighter (the user's idea): one of the forgotten, chained to a dark stone pillar, struggling,
+     * one chain for each echo still to find (each echo breaks one). Once the chains are all broken they are freed
+     * and follow the player ([drawFollower]).
      */
     private fun drawCaptive(pass: Pass) {
         val run = world.portal ?: return
-        if (run.state != io.github.projectwip.sim.PortalState.EXPLORE && run.state != io.github.projectwip.sim.PortalState.ARRIVE) return
-        val x = run.captiveX; val z = run.captiveY
-        if (!inView(x, z)) return
         val soul = io.github.projectwip.data.Lore.captive(run.dimension)
         val p = match.player
+        val freed = run.freedAt >= 0f && run.state == io.github.projectwip.sim.PortalState.OPEN
+        if (!freed && run.state != io.github.projectwip.sim.PortalState.EXPLORE && run.state != io.github.projectwip.sim.PortalState.ARRIVE) return
+        val x = run.captiveX; val z = run.captiveY
+        // The pillar stays where it was.
+        if (pass == Pass.COLOR && inView(x, z)) {
+            lit.f("uRim", 0.3f)
+            lit.v4("uTint", 0.16f, 0.12f, 0.22f, 1f)
+            setModel(x, 1.3f, z - 0.75f, 0.42f, 2.6f, 0.42f, 45f); bit.draw()
+            lit.v4("uTint", 0.3f, 0.22f, 0.4f, 1f)
+            setModel(x, 2.7f, z - 0.75f, 0.55f, 0.18f, 0.55f, 45f); bit.draw()
+        }
+        if (freed) { drawFollower(pass, soul, run); return }
+        if (!inView(x, z)) return
         val facing = atan2(p.y - z, p.x - x)
         // Struggling: pulling one way and the other, now and then a hard yank.
         val yank = if ((time % 2.6f) < 0.35f) sin((time % 2.6f) / 0.35f * 3.14f) else 0f
@@ -817,12 +911,6 @@ class MatchRenderer(
         captiveAnim.spin = 8f * sin(time * 5f) * (0.4f + yank)
         captiveAnim.scale = FIGHTER_SCALE
         if (pass == Pass.COLOR) {
-            // The pillar behind them, and the chains from it to them.
-            lit.f("uRim", 0.3f)
-            lit.v4("uTint", 0.16f, 0.12f, 0.22f, 1f)
-            setModel(x, 1.3f, z - 0.75f, 0.42f, 2.6f, 0.42f, 45f); bit.draw()
-            lit.v4("uTint", 0.3f, 0.22f, 0.4f, 1f)
-            setModel(x, 2.7f, z - 0.75f, 0.55f, 0.18f, 0.55f, 45f); bit.draw()
             val chains = io.github.projectwip.data.Balance.PORTAL_SHARDS - run.found
             lit.f("uEmissive", 0.35f)
             lit.v4("uTint", 0.7f, 0.68f, 0.78f, 1f)
@@ -851,6 +939,69 @@ class MatchRenderer(
             models.drawSoul(lit, soul, x + 0.04f * sin(time * 11f) * yank, z, facing, captiveAnim, Pass.OUTLINE)
         }
     }
+
+    /**
+     * A freed soul (the user's idea): first the unhook (the last chains snap, they leap up and spin free, shaking it
+     * off), then they follow the player round, a step behind, telling them who the Void really is (on the HUD).
+     */
+    private fun drawFollower(pass: Pass, soul: io.github.projectwip.data.Lore.Soul, run: io.github.projectwip.sim.PortalRun) {
+        val p = match.player
+        if (followFor != run.freedAt + run.dimension * 1000f) {
+            followFor = run.freedAt + run.dimension * 1000f
+            followX = run.captiveX; followZ = run.captiveY; followFacing = 0f
+        }
+        val since = run.time - run.freedAt
+        if (pass == Pass.COLOR) {
+            val dt = frameDt.coerceAtMost(0.05f)
+            var speed = 0f
+            if (since > 1.2f) {
+                // Keep a step behind the player: walk toward a spot 1.3 tiles back from them, quicker when far.
+                val px = lerp(p.prevX, p.x, 1f); val pz = lerp(p.prevY, p.y, 1f)
+                val dx = px - followX; val dz = pz - followZ
+                val d = hypot(dx, dz)
+                if (d > 1.3f) {
+                    val step = minOf(d - 1.3f, (3.2f + d) * dt)
+                    followX += dx / d * step; followZ += dz / d * step
+                    speed = step / maxOf(dt, 0.001f)
+                    followFacing = atan2(dz, dx)
+                    followWalk += dt * 9f
+                } else followFacing = atan2(dz, dx)
+            }
+            followSpeed = speed
+        }
+        if (!inView(followX, followZ)) return
+        val anim = captiveAnim
+        anim.time = time
+        anim.walk = followWalk
+        anim.moving = (followSpeed / 4f).coerceIn(0f, 1f)
+        anim.recoil = 0f
+        anim.scale = FIGHTER_SCALE
+        // The unhook: a leap with a full turn, a flash, and settling down.
+        if (since < 1.2f) {
+            val u = since / 1.2f
+            anim.jump = sin(u * 3.14f) * 0.9f
+            anim.spin = 360f * (u * u * (3f - 2f * u))
+            anim.flash = (1f - u) * 0.6f
+        } else { anim.jump = 0f; anim.spin = 0f; anim.flash = 0f }
+        if (pass == Pass.COLOR) {
+            lit.f("uRim", 0.6f)
+            models.drawSoul(lit, soul, followX, followZ, followFacing, anim, Pass.COLOR)
+            lit.f("uGloss", 0f); lit.f("uEmissive", 0f); lit.f("uFlash", 0f)
+            lit.v4("uTint", 1f, 1f, 1f, 1f)
+            lit.mat4("uModel", identity)
+            // Snapped chain links falling away during the unhook.
+            if (since < 0.6f && rng.nextFloat() < 0.5f) particles.spawn(run.captiveX, 1.2f, run.captiveY, (rng.nextFloat() - 0.5f) * 5f, 3f, (rng.nextFloat() - 0.5f) * 5f, 0.8f, 0.09f, 0xFFB8B2C8.toInt(), 1f, grav = 10f)
+        } else {
+            models.drawSoul(lit, soul, followX, followZ, followFacing, anim, Pass.OUTLINE)
+        }
+    }
+    private var followFor = Float.NaN
+    private var followX = 0f
+    private var followZ = 0f
+    private var followFacing = 0f
+    private var followWalk = 0f
+    private var followSpeed = 0f
+
 
     /** Dimension: a beam of light over each echo still to find, and a ring on the ground under it (decal pass). */
     private fun drawShardMarks() {
@@ -2154,6 +2305,17 @@ class MatchRenderer(
                 shake = max(shake, 0.1f)
             }
             is GameEvent.PortalOpened -> {
+                world.portal?.let { run ->
+                    // The chains snapping: links flung out and a flash of the soul's colour where they stood.
+                    val c = io.github.projectwip.data.Lore.captive(run.dimension).color.toInt()
+                    particles.spawn(run.captiveX, 1f, run.captiveY, 0f, 0f, 0f, 0.4f, 3.5f, c, 0.9f)
+                    repeat(36) {
+                        val a = rng.nextFloat() * 6.283f; val sp = 2f + rng.nextFloat() * 4f
+                        particles.spawn(run.captiveX, 0.8f + rng.nextFloat(), run.captiveY, cos(a) * sp, 2f + rng.nextFloat() * 3f, sin(a) * sp, 0.9f, 0.1f,
+                            if (it % 3 == 0) c else 0xFFB8B2C8.toInt(), 1f, grav = 9f)
+                    }
+                    shake = max(shake, 0.2f)
+                }
                 particles.spawn(e.x, 0.6f, e.y, 0f, 0f, 0f, 0.5f, 4f, 0xFFB98CFF.toInt(), 0.8f)
                 repeat(30) {
                     val a = rng.nextFloat() * 6.283f; val sp = 2f + rng.nextFloat() * 4f
@@ -2206,6 +2368,18 @@ class MatchRenderer(
             s.portalGlitch = dimGlitch
             s.captiveName = io.github.projectwip.data.Lore.captive(run.dimension).title
             s.captiveOn = run.state == io.github.projectwip.sim.PortalState.EXPLORE || run.state == io.github.projectwip.sim.PortalState.ARRIVE
+            s.followerOn = run.freedAt >= 0f && run.state == io.github.projectwip.sim.PortalState.OPEN && run.time - run.freedAt > 1.2f
+            s.followerX = followX; s.followerZ = followZ
+            if (s.followerOn) {
+                val soul = io.github.projectwip.data.Lore.captive(run.dimension)
+                val lines = io.github.projectwip.data.Lore.freedLines(soul)
+                val t = run.time - run.freedAt - 1.2f
+                val i = (t / FOLLOW_LINE_SECONDS).toInt()
+                s.followerLine = if (i < lines.size) lines[i] else null
+                s.followerAge = t - i * FOLLOW_LINE_SECONDS
+                s.followerName = soul.title
+                s.followerColor = soul.color.toInt()
+            }
             s.captiveX = run.captiveX; s.captiveZ = run.captiveY
             s.voidAge = run.time - run.tauntAt
             val px = lerp(p.prevX, p.x, alpha); val pz = lerp(p.prevY, p.y, alpha)
@@ -2295,6 +2469,8 @@ class MatchRenderer(
         const val SLASH_SECONDS = 0.26f
         /** The shadows of a realm: what they look like, and how long one takes to lunge in and back as it strikes. */
         const val SHADOW_SHADE = 0xFF1C1024L
+        /** How long each thing a freed soul says stays up. */
+        const val FOLLOW_LINE_SECONDS = 4.2f
         const val SHADOW_LUNGE = 0.3f
     }
 

@@ -10,12 +10,13 @@ object Lore {
     enum class Speaker { VOID, FIGHTER, CAPTIVE }
 
     /** The removed fighters whose souls the Void carries, each with the colour it flickers into. */
-    enum class Soul(val title: String, val color: Long, val primary: Long, val secondary: Long) {
-        BYTE("Byte", 0xFF5CE1FF, 0xFF2B3A5A, 0xFF5CE1FF),
-        ROCKET("Rocket", 0xFFFF8A3C, 0xFF3C5A8A, 0xFFFF8A3C),
-        SPARK("Spark", 0xFF4C8DFF, 0xFF4C8DFF, 0xFF2A4FC2),
-        MIRA("Mira", 0xFFFFD84C, 0xFFE8E2D2, 0xFFE0B23C),
-        VARUN("Varun", 0xFFFF4C6A, 0xFF5A2A30, 0xFFC23C4A),
+    /** Each with their original default colours (from the game's history), and the colour they flicker into. */
+    enum class Soul(val title: String, val color: Long, val primary: Long, val secondary: Long, val accent: Long) {
+        BYTE("Byte", 0xFF19B8C4, 0xFF19B8C4, 0xFFE84FD8, 0xFFB6FF3C),
+        ROCKET("Rocket", 0xFFFF4D5E, 0xFFF2F5FA, 0xFFFF4D5E, 0xFF3CE6FF),
+        SPARK("Spark", 0xFF2F86FF, 0xFF2F86FF, 0xFF1A3C9C, 0xFF9CF2FF),
+        MIRA("Mira", 0xFF8E5CF7, 0xFF8E5CF7, 0xFF2EE6D6, 0xFFFFF3B0),
+        VARUN("Varun", 0xFFD9342B, 0xFFD9342B, 0xFFFFC72C, 0xFFFFF1C2),
     }
 
     /** One line. When the Void speaks with one of its souls' voices, [soul] says whose. */
@@ -153,7 +154,7 @@ object Lore {
         Line(Speaker.VOID, "Don't look down. Someone is looking up."),
         Line(Speaker.VOID, "Come to the door. I saved you a place."),
         Line(Speaker.VOID, "You're slower than you were. I noticed."),
-        Line(Speaker.VOID, "I aimed better than that, once.", Soul.MIRA),
+        Line(Speaker.VOID, "I aimed better than that, once. Through a prism.", Soul.MIRA),
         Line(Speaker.VOID, "My door. My chains. My guest."),
         Line(Speaker.VOID, "Still walking. How tiresome. How wonderful."),
         Line(Speaker.VOID, "Was it worth it? Ask them. Ask me.", Soul.VARUN),
@@ -190,11 +191,25 @@ object Lore {
             "Echoes, three of them, out there somewhere! Every one you grab, a chain snaps. Go!"),
         Soul.SPARK to ("Oh. It's you. ...HELP! Fine, I said it. HELP!" to
             "Three echoes out there. Get them and these chains drop. And don't make it weird."),
-        Soul.MIRA to ("HELP! My lance... it took my lance! Please!" to
+        Soul.MIRA to ("HELP! My prism... it took my prism! Please!" to
             "Three echoes hold these chains. Find every one and I'm free. And watch the ground: it tears."),
         Soul.VARUN to ("HELP! They called me a legacy and left me down here!" to
             "Echoes. Three of them. Each one is a lock. Bring them back and I walk out of here."),
     )
+
+    /**
+     * What each soul says once freed, following the player (the user's lore): who the Void really is. It is not an
+     * emptiness but a demon, an evil one, that took the fighters when they were removed from the game, and wears them.
+     */
+    private val FREED: Map<Soul, List<String>> = mapOf(
+        Soul.BYTE to listOf("Free! Thank you. Now listen to me.", "It isn't a void. It's a demon.", "It ate us when they took us out of the game.", "It talks in our voices. Don't trust it."),
+        Soul.ROCKET to listOf("I'm out! Okay. Okay. Listen.", "That thing at the door? It's a demon.", "It wears our souls like masks.", "Every portal goes deeper into it."),
+        Soul.SPARK to listOf("Fine. Thanks. Don't make it weird.", "The Void's a demon. A hungry one.", "It doesn't keep us. It eats us. Slowly.", "Go through. Just don't look it in the eyes."),
+        Soul.MIRA to listOf("My chains are gone... thank you.", "Hear me: the Void is a demon.", "It waited for every fighter they removed.", "It wants you too. It always wants more."),
+        Soul.VARUN to listOf("Free. I owe you one.", "The Void? A demon. Plain and simple.", "It took my name. Then my voice.", "Whatever it says at the door, it's lying."),
+    )
+
+    fun freedLines(soul: Soul): List<String> = FREED.getValue(soul)
 
     /** The talk with the chained soul: the player asks, they scream for help, then say what needs doing. */
     fun captiveTalk(captive: Soul, player: FighterId): List<Line> {

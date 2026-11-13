@@ -224,6 +224,27 @@ class HudView(
             outlined(c, s.captiveName.uppercase(), o4[0], o4[1] + dp(20f), withAlpha(Color.rgb(205, 180, 255), 0.85f), dp(2.5f))
         }
 
+        // The freed soul, talking as they follow: a speech bubble over their head, typed out, in their colour.
+        val said = s.followerLine
+        if (s.followerOn && said != null && s.phase == Phase.PLAYING && project(s.followerX, 2.2f, s.followerZ)) {
+            val a = (minOf(s.followerAge / 0.25f, 1f, (4.2f - s.followerAge) / 0.4f)).coerceIn(0f, 1f)
+            val shown = said.take((s.followerAge * 34f).toInt().coerceAtMost(said.length))
+            text.textSize = dp(15f)
+            val tw = text.measureText(said)
+            val bx = o4[0]; val by = o4[1] - dp(26f)
+            val pad = dp(10f)
+            fill.color = withAlpha(Color.rgb(16, 8, 30), 0.85f * a)
+            c.drawRoundRect(bx - tw / 2 - pad, by - dp(22f), bx + tw / 2 + pad, by + dp(8f), dp(10f), dp(10f), fill)
+            fill.style = Paint.Style.STROKE; fill.strokeWidth = dp(2f); fill.color = withAlpha(s.followerColor or 0xFF000000.toInt(), a)
+            c.drawRoundRect(bx - tw / 2 - pad, by - dp(22f), bx + tw / 2 + pad, by + dp(8f), dp(10f), dp(10f), fill)
+            fill.style = Paint.Style.FILL
+            text.textAlign = Paint.Align.LEFT; textStroke.textAlign = Paint.Align.LEFT
+            outlined(c, shown, bx - tw / 2, by, withAlpha(Color.WHITE, a), dp(3f))
+            text.textAlign = Paint.Align.CENTER; textStroke.textAlign = Paint.Align.CENTER
+            text.textSize = dp(11f)
+            outlined(c, s.followerName.uppercase(), bx, by - dp(28f), withAlpha(s.followerColor or 0xFF000000.toInt(), a), dp(2.5f))
+        }
+
         // The pointer: an arrow at the edge of a ring round the player, toward the target, while it is off to one side.
         if (s.portalTargetOn && s.phase == Phase.PLAYING && project(s.portalPlayerX, 0.6f, s.portalPlayerZ)) {
             val px = o4[0]; val py = o4[1]

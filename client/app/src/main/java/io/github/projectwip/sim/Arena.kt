@@ -50,6 +50,15 @@ class Arena(
     /** The same map with different team spawn points. */
     fun withSpawns(spawns: List<List<Spawn>>): Arena = Arena(name, width, height, tiles.copyOf(), spawns, ffaSpawns)
 
+    /** A copy with the tall grass within [r] tiles of ([cx], [cy]) cleared to floor. */
+    fun withoutGrassNear(cx: Float, cy: Float, r: Float): Arena {
+        val t = tiles.copyOf()
+        for (y in 0 until height) for (x in 0 until width) {
+            if (t[y * width + x] == Tile.THICKET && kotlin.math.hypot(x + 0.5f - cx, y + 0.5f - cy) < r) t[y * width + x] = Tile.FLOOR
+        }
+        return Arena(name, width, height, t, spawns, ffaSpawns)
+    }
+
     /**
      * Moves a circle by (dx, dy), sliding along blocking tiles. Returns the new position in [out].
      * Returns true if the move was obstructed.
@@ -260,6 +269,12 @@ class Arena(
 
 object Arenas {
     /** "Foundry Yard" — 3v3 Knockout Rush. Teams face each other bottom (you) vs top. */
+    /**
+     * Dimension's arena: Foundry Yard with the bush in the very middle cleared away, because the portal stands there
+     * (the user's decision, build 106).
+     */
+    fun dimension(): Arena = foundryYard().let { it.withoutGrassNear(it.width / 2f, it.height / 2f, 2.4f) }
+
     fun foundryYard(): Arena = Arena.fromQuadrant(
         name = "Foundry Yard",
         quadrant = listOf(

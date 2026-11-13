@@ -67,6 +67,8 @@ class PortalRun {
     var found = 0
     var x = 0f
     var y = 0f
+    /** When ([time]) the chained soul was freed (the chains all broken), or -1: they follow the player after that. */
+    var freedAt = -1f
     /** Seconds until the next glitch rift. */
     var riftIn = Float.MAX_VALUE
     /** Seconds since the run began; when the Void last spoke on screen, and which of its taunts it was. */
@@ -1332,8 +1334,8 @@ class World(
                         events += GameEvent.ShardFound(run.dimension, run.found, sx, sy)
                     }
                     if (run.found < Balance.PORTAL_SHARDS) return
-                    // The chains break, and the way down opens where the chained fighter stood.
-                    run.x = run.captiveX; run.y = run.captiveY
+                    // The chains break and the soul is free; the portal in the middle of the arena wakes.
+                    run.freedAt = run.time
                     run.state = PortalState.OPEN
                     events += GameEvent.PortalOpened(run.x, run.y)
                     return
@@ -1384,7 +1386,13 @@ class World(
         run.found = 0
         run.taken.fill(false)
         val start = arena.spawns[0][0]
-        val c = arena.nearestOpen(arena.width * (0.3f + 0.4f * rng.nextFloat()), arena.height * (0.35f + 0.3f * rng.nextFloat()), 0.9f)
+        run.freedAt = -1f
+        // The portal always stands in the very middle; the chained soul is somewhere round it, a fair walk away.
+        val mid = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 0.9f)
+        run.x = mid.x; run.y = mid.y
+        val ca = rng.nextFloat() * 6.2832f
+        val cd = 4f + rng.nextFloat() * 2.5f
+        val c = arena.nearestOpen(mid.x + kotlin.math.cos(ca) * cd, mid.y + kotlin.math.sin(ca) * cd, 0.9f)
         run.captiveX = c.x; run.captiveY = c.y
         for (i in 0 until Balance.PORTAL_SHARDS) {
             var best = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 0.6f)
@@ -1392,7 +1400,7 @@ class World(
             // A dozen tries; keep the spot furthest from where the player starts and from the shards already placed.
             for (k in 0 until 12) {
                 val c = arena.nearestOpen(2f + rng.nextFloat() * (arena.width - 4f), 2f + rng.nextFloat() * (arena.height - 4f), 0.6f)
-                var near = minOf(hypot(c.x - start.x, c.y - start.y), hypot(c.x - run.captiveX, c.y - run.captiveY))
+                var near = minOf(hypot(c.x - start.x, c.y - start.y), hypot(c.x - run.captiveX, c.y - run.captiveY), hypot(c.x - run.x, c.y - run.y) + 1f)
                 for (j in 0 until i) near = minOf(near, hypot(c.x - run.shards[j * 2], c.y - run.shards[j * 2 + 1]))
                 if (near > bestScore) { bestScore = near; best = c }
                 if (near >= Balance.PORTAL_SHARD_SPREAD * 1.6f) break

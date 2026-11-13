@@ -309,104 +309,134 @@ class FighterModels {
     }
 
     // ------------------------------------------------------------------ Dimension's forgotten fighters and the Void
-    // (Byte, Mira and Varun were removed long ago and their models with them; these are new, made for the Void's
-    // story: the souls it carries. Spark's and Rocket's own models are reused.)
+    // (The souls the Void carries are drawn with their own original models: Spark's and Rocket's were still here, and
+    // Mira's and Varun's are restored exactly from the game's history; Byte's is new, by the user's decision.)
 
-    /** Byte, the very first fighter: a kid in a hoodie with a lit visor and a little block of glowing data. */
+    /**
+     * Byte, the very first fighter, remade for Dimension (the user found her old model ugly; the other forgotten
+     * fighters keep theirs). Still who she was: an engineer in a lab coat with a replacement metal arm and leg and a
+     * glowing visor, now a big-eyed girl with a pink bob, goggles pushed up on her head, a sleek blaster, and a little
+     * holo cube floating at her shoulder.
+     */
     private fun buildByte(): FighterModel {
         val a = Assembler()
-        val rig = Rig(headY = 1.0f, hipY = 0.4f, hipZ = 0.13f, shoulder = floatArrayOf(0.1f, 0.74f, 0.29f), shoulderL = floatArrayOf(0.02f, 0.8f, -0.29f))
+        val rig = Rig(headY = 1.02f, hipY = 0.36f, hipZ = 0.11f, shoulder = floatArrayOf(0.08f, 0.76f, 0.28f), shoulderL = floatArrayOf(0.02f, 0.8f, -0.28f), floatY = 1.25f)
+        // One leg her own, in dark leggings and a chunky sneaker; the other the replacement, plated, with a lit seam.
+        a.add(Bone.LEG_L, Slot.DARK) { at(0f, -0.12f, 0f) { capsule(0.068f, 0.16f) } }
+        a.add(Bone.LEG_R, Slot.METAL) { at(0f, -0.12f, 0f) { capsule(0.075f, 0.16f) } }
+        a.add(Bone.LEG_R, Slot.ACCENT, outline = false, emissive = true) { at(0.065f, -0.12f, 0f) { roundedBox(0.02f, 0.16f, 0.04f, 0.008f) } }
+        a.add(Bone.LEG_R, Slot.ACCENT, outline = false, emissive = true) { at(0f, -0.02f, 0f) { torus(0.078f, 0.018f, 12, 5) } }
         for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
-            a.add(bone, Slot.DARK) { at(0f, -0.14f, 0f) { capsule(0.09f, 0.14f) } }
-            a.add(bone, Slot.WHITE) { at(0.05f, -0.36f, 0f) { roundedBox(0.28f, 0.11f, 0.18f, 0.05f) } }
-            a.add(bone, Slot.SECONDARY) { at(0.05f, -0.31f, 0f) { roundedBox(0.29f, 0.03f, 0.19f, 0.01f) } }
+            a.add(bone, Slot.WHITE) { at(0.045f, -0.3f, 0f) { roundedBox(0.26f, 0.11f, 0.15f, 0.05f) } }
+            a.add(bone, Slot.SECONDARY) { at(0.045f, -0.345f, 0f) { roundedBox(0.27f, 0.03f, 0.16f, 0.012f) } }
         }
-        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.68f, 0f) { roundedBox(0.44f, 0.46f, 0.5f, 0.17f) } }
-        a.add(Bone.BODY, Slot.SECONDARY) { at(0.2f, 0.58f, 0f) { roundedBox(0.08f, 0.14f, 0.32f, 0.04f) } }
-        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.235f, 0.8f, 0f) { roundedBox(0.03f, 0.08f, 0.08f, 0.01f) } }
-        for (s in listOf(1f, -1f)) a.add(Bone.BODY, Slot.WHITE) { at(0.22f, 0.86f, 0.06f * s) { capsule(0.012f, 0.07f) } }
-        a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.2f, 0f) { sphere(0.29f) } }
-        // The hood, pulled up, and a visor across the eyes, lit.
-        a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.05f, 0.22f, 0f) { ellipsoid(0.34f, 0.35f, 0.35f, 8, 16, 0f, 0.62f) } }
-        a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.15f, 0.08f, 0f) { roundedBox(0.3f, 0.3f, 0.6f, 0.12f) } }
-        a.add(Bone.HEAD, Slot.DARK) { at(0.25f, 0.22f, 0f) { roundedBox(0.1f, 0.12f, 0.46f, 0.05f) } }
-        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.3f, 0.22f, 0f) { roundedBox(0.03f, 0.06f, 0.38f, 0.02f) } }
-        a.add(Bone.HEAD, Slot.METAL) { at(-0.05f, 0.58f, 0.1f) { capsule(0.018f, 0.16f) } }
-        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(-0.05f, 0.7f, 0.1f) { sphere(0.045f, 6, 8) } }
-        // The block of data, held out and turning slowly on the weapon bone.
-        a.add(Bone.WEAPON, Slot.SKIN) { at(0f, 0f, 0f) { sphere(0.085f, 8, 10) } }
-        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.22f, 0.08f, 0f) { rotate(45f, 0f, 1f, 0f); rotate(35f, 1f, 0f, 0f); box(0.17f, 0.17f, 0.17f) } }
-        a.add(Bone.WEAPON, Slot.WHITE, outline = false) { at(0.22f, 0.08f, 0f) { rotate(45f, 0f, 1f, 0f); rotate(35f, 1f, 0f, 0f); box(0.2f, 0.035f, 0.035f); box(0.035f, 0.2f, 0.035f) } }
-        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.11f, 0f) { capsule(0.08f, 0.13f) } }
-        a.add(Bone.ARM, Slot.SKIN) { at(0f, -0.27f, 0f) { sphere(0.08f, 8, 10) } }
+        // A fitted top under an open lab coat that flares to the knee, a belt with a lit buckle, a badge on the coat.
+        a.add(Bone.BODY, Slot.WHITE) { at(-0.02f, 0.46f, 0f) { cylinder(0.33f, 0.42f, 18, topRadius = 0.22f) } }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0.03f, 0.72f, 0f) { roundedBox(0.3f, 0.34f, 0.34f, 0.13f) } }
+        a.add(Bone.BODY, Slot.WHITE) { at(-0.04f, 0.74f, 0f) { roundedBox(0.3f, 0.32f, 0.4f, 0.12f) } }
+        for (z in listOf(0.13f, -0.13f)) a.add(Bone.BODY, Slot.WHITE) { at(0.13f, 0.74f, z) { rotate(if (z > 0f) -12f else 12f, 1f, 0f, 0f); roundedBox(0.06f, 0.3f, 0.1f, 0.03f) } }
+        a.add(Bone.BODY, Slot.DARK) { at(0.02f, 0.58f, 0f) { torus(0.19f, 0.035f, 16, 6) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.2f, 0.58f, 0f) { roundedBox(0.03f, 0.06f, 0.09f, 0.012f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0.16f, 0.8f, -0.13f) { roundedBox(0.03f, 0.07f, 0.06f, 0.012f) } }
+        a.add(Bone.BODY, Slot.WHITE) { at(-0.03f, 0.88f, 0f) { torus(0.15f, 0.045f, 16, 6) } }
+        a.add(Bone.BODY, Slot.SKIN) { at(0f, 0.93f, 0f) { capsule(0.06f, 0.06f) } }
+        // Head: a round face with big eyes, a pink bob with a fringe, and goggles pushed up, their lenses lit.
+        a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.17f, 0f) { sphere(0.27f) } }
+        a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.05f, 0.19f, 0f) { ellipsoid(0.31f, 0.32f, 0.31f, 8, 16, 0f, 0.56f) } }
+        a.add(Bone.HEAD, Slot.SECONDARY) { at(0.17f, 0.32f, 0f) { ellipsoid(0.11f, 0.08f, 0.26f) } }
+        a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.12f, 0.06f, 0f) { roundedBox(0.28f, 0.3f, 0.6f, 0.13f) } }
+        for (z in listOf(0.25f, -0.25f)) a.add(Bone.HEAD, Slot.SECONDARY) { at(0.05f, 0.05f, z) { ellipsoid(0.1f, 0.17f, 0.07f, 8, 10) } }
+        a.add(Bone.HEAD, Slot.INK, outline = false) {
+            for (z in listOf(0.095f, -0.095f)) at(0.245f, 0.15f, z) { ellipsoid(0.035f, 0.062f, 0.047f, 6, 8) }
+            at(0.262f, 0.045f, 0f) { roundedBox(0.02f, 0.014f, 0.06f, 0.006f) }
+        }
+        a.add(Bone.HEAD, Slot.WHITE, outline = false) { for (z in listOf(0.08f, -0.11f)) at(0.275f, 0.175f, z) { sphere(0.014f, 4, 6) } }
+        a.add(Bone.HEAD, Slot.DARK) { at(0.02f, 0.35f, 0f) { rotate(-14f, 0f, 0f, 1f); torus(0.27f, 0.025f, 22, 5) } }
+        for (z in listOf(0.11f, -0.11f)) {
+            a.add(Bone.HEAD, Slot.METAL) { at(0.21f, 0.43f, z) { rotate(-35f, 0f, 0f, 1f); alongX { cylinder(0.075f, 0.08f, 12) } } }
+            a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.25f, 0.46f, z) { rotate(-35f, 0f, 0f, 1f); alongX { cylinder(0.057f, 0.02f, 12) } } }
+        }
+        // Her blaster: a rounded body in her colour, a metal barrel with a lit ring at the muzzle, and a lit stripe.
+        a.add(Bone.WEAPON, Slot.PRIMARY) { at(0.24f, 0.02f, 0f) { roundedBox(0.36f, 0.16f, 0.15f, 0.06f) } }
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.5f, 0.03f, 0f) { alongX { cylinder(0.05f, 0.2f, 10) } } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.61f, 0.03f, 0f) { alongX { torus(0.055f, 0.015f, 12, 5) } } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.24f, 0.105f, 0f) { roundedBox(0.24f, 0.015f, 0.05f, 0.006f) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.16f, -0.1f, 0f) { rotate(-15f, 0f, 0f, 1f); roundedBox(0.07f, 0.13f, 0.07f, 0.025f) } }
+        a.add(Bone.WEAPON, Slot.SKIN) { at(0.04f, 0f, 0f) { sphere(0.065f, 8, 10) } }
+        // The free arm is the mechanical one: plated, a lit elbow, metal fingers.
+        a.add(Bone.ARM, Slot.WHITE) { at(0f, -0.06f, 0f) { capsule(0.075f, 0.06f) } }
+        a.add(Bone.ARM, Slot.METAL) { at(0f, -0.17f, 0f) { capsule(0.06f, 0.1f) } }
+        a.add(Bone.ARM, Slot.ACCENT, outline = false, emissive = true) { at(0f, -0.13f, 0f) { sphere(0.045f, 6, 8) } }
+        a.add(Bone.ARM, Slot.METAL) { at(0f, -0.28f, 0f) { roundedBox(0.1f, 0.08f, 0.1f, 0.03f) } }
+        // A little holo cube floating at her shoulder, turning, lit, in a frame.
+        a.add(Bone.FLOAT, Slot.ACCENT, outline = false, emissive = true) { at(-0.4f, 0f, 0.38f) { rotate(45f, 1f, 0f, 1f); box(0.12f, 0.12f, 0.12f) } }
+        a.add(Bone.FLOAT, Slot.WHITE, outline = false) { at(-0.4f, 0f, 0.38f) { rotate(45f, 1f, 0f, 1f); box(0.15f, 0.025f, 0.025f); box(0.025f, 0.15f, 0.025f); box(0.025f, 0.025f, 0.15f) } }
         return a.build(rig)
     }
 
-    /** Mira, the lancer: pale armour trimmed in gold, a plumed helm with a slit visor, and a long lit lance. */
+    /** Mira, as she was (restored from the game's history, build 58). */
     private fun buildMira(): FighterModel {
         val a = Assembler()
-        val rig = Rig(headY = 1.06f, hipY = 0.44f, hipZ = 0.13f, shoulder = floatArrayOf(0.1f, 0.78f, 0.31f), shoulderL = floatArrayOf(0.02f, 0.84f, -0.31f))
+        val rig = Rig(headY = 1.0f, hipY = 0.3f, hipZ = 0.12f, shoulder = floatArrayOf(0.06f, 0.82f, 0.28f), shoulderL = floatArrayOf(0f, 0.86f, -0.28f), floatY = 1.66f)
         for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
-            a.add(bone, Slot.PRIMARY) { at(0f, -0.15f, 0f) { capsule(0.095f, 0.15f) } }
-            a.add(bone, Slot.SECONDARY) { at(0f, -0.3f, 0f) { cylinder(0.11f, 0.14f, 12, topRadius = 0.125f) } }
-            a.add(bone, Slot.PRIMARY) { at(0.05f, -0.4f, 0f) { roundedBox(0.28f, 0.1f, 0.18f, 0.05f) } }
+            a.add(bone, Slot.DARK) { at(0f, -0.12f, 0f) { capsule(0.075f, 0.14f) } }
+            a.add(bone, Slot.SECONDARY) { at(0.04f, -0.28f, 0f) { roundedBox(0.22f, 0.1f, 0.15f, 0.04f) } }
         }
-        // A breastplate over a short skirt of plates, a gold belt and a lit gem at the heart.
-        a.add(Bone.BODY, Slot.DARK) { at(0f, 0.52f, 0f) { cylinder(0.27f, 0.2f, 16, topRadius = 0.22f) } }
-        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.76f, 0f) { roundedBox(0.46f, 0.42f, 0.52f, 0.18f) } }
-        a.add(Bone.BODY, Slot.SECONDARY) { at(0f, 0.58f, 0f) { torus(0.25f, 0.04f, 18, 6) } }
-        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.24f, 0.82f, 0f) { octa(0.035f, 0.07f, 0.06f) } }
-        for (z in listOf(0.3f, -0.3f)) a.add(Bone.BODY, Slot.SECONDARY) { at(0f, 0.94f, z) { ellipsoid(0.15f, 0.1f, 0.13f, 8, 12) } }
-        // The helm: a dome over the head, a slit visor lit from inside, and a tall plume swept back.
-        a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.2f, 0f) { sphere(0.28f) } }
-        a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.02f, 0.24f, 0f) { ellipsoid(0.33f, 0.34f, 0.33f, 8, 16, 0f, 0.6f) } }
-        a.add(Bone.HEAD, Slot.PRIMARY) { at(0.2f, 0.2f, 0f) { roundedBox(0.14f, 0.24f, 0.5f, 0.07f) } }
-        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.275f, 0.22f, 0f) { roundedBox(0.02f, 0.035f, 0.34f, 0.01f) } }
-        a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.12f, 0.62f, 0f) { rotate(28f, 0f, 0f, 1f); cylinder(0.07f, 0.34f, 10, topRadius = 0.11f) } }
-        a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.32f, 0.6f, 0f) { rotate(70f, 0f, 0f, 1f); cylinder(0.1f, 0.28f, 10, topRadius = 0.02f) } }
-        // The lance: a long tapered shaft with a guard, its point lit.
-        a.add(Bone.WEAPON, Slot.SECONDARY) { at(0.02f, 0f, 0f) { sphere(0.09f, 8, 10) } }
-        a.add(Bone.WEAPON, Slot.METAL) { at(0.5f, 0.02f, 0f) { alongX { cylinder(0.05f, 0.9f, 10, topRadius = 0.035f) } } }
-        a.add(Bone.WEAPON, Slot.SECONDARY) { at(0.16f, 0.02f, 0f) { alongX { cylinder(0.16f, 0.06f, 14, topRadius = 0.1f) } } }
-        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(1.05f, 0.02f, 0f) { alongX { cylinder(0.06f, 0.22f, 10, topRadius = 0f) } } }
-        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.11f, 0f) { capsule(0.085f, 0.14f) } }
-        a.add(Bone.ARM, Slot.SECONDARY) { at(0f, -0.28f, 0f) { sphere(0.09f, 8, 10) } }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.52f, 0f) { cylinder(0.44f, 0.76f, 18, topRadius = 0.2f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0f, 0.16f, 0f) { torus(0.43f, 0.05f, 22, 6) } }
+        a.add(Bone.BODY, Slot.ACCENT) { at(0f, 0.6f, 0f) { torus(0.32f, 0.04f, 18, 6) } }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.88f, 0f) { ellipsoid(0.26f, 0.16f, 0.3f) } }
+        // Head + hood
+        a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.16f, 0f) { sphere(0.28f) } }
+        a.add(Bone.HEAD, Slot.DARK) { at(-0.05f, 0.19f, 0f) { ellipsoid(0.32f, 0.33f, 0.32f, 8, 16, 0f, 0.55f) } }
+        a.add(Bone.HEAD, Slot.INK, outline = false) {
+            at(0.255f, 0.15f, 0.09f) { sphere(0.05f, 6, 8) }
+            at(0.255f, 0.15f, -0.09f) { sphere(0.05f, 6, 8) }
+        }
+        // Floating prism
+        a.add(Bone.FLOAT, Slot.SECONDARY, emissive = true) { octa(0.13f, 0.21f, 0.13f) }
+        // Prism rifle
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.42f, 0f, 0f) { alongX { cylinder(0.05f, 1.0f, 10) } } }
+        a.add(Bone.WEAPON, Slot.SECONDARY) { at(-0.04f, -0.02f, 0f) { roundedBox(0.26f, 0.13f, 0.09f, 0.04f) } }
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.3f, 0.09f, 0f) { alongX { cylinder(0.045f, 0.22f, 8) } } }
+        a.add(Bone.WEAPON, Slot.SECONDARY, emissive = true) { at(0.98f, 0f, 0f) { octa(0.18f, 0.09f, 0.09f) } }
+        a.add(Bone.WEAPON, Slot.SKIN) { at(0.06f, 0f, 0f) { sphere(0.08f, 8, 10) } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.1f, 0f) { capsule(0.075f, 0.14f) } }
+        a.add(Bone.ARM, Slot.SKIN) { at(0f, -0.26f, 0f) { sphere(0.08f, 8, 10) } }
         return a.build(rig)
     }
 
-    /** Varun, the heavy: a broad gunner in a long coat with a rack of rockets on his back and a launcher in hand. */
+    /** Varun, as he was (restored from the game's history, build 65). */
     private fun buildVarun(): FighterModel {
         val a = Assembler()
-        val rig = Rig(headY = 1.08f, hipY = 0.42f, hipZ = 0.16f, shoulder = floatArrayOf(0.1f, 0.8f, 0.36f), shoulderL = floatArrayOf(0.02f, 0.86f, -0.36f))
+        val rig = Rig(headY = 1.06f, hipY = 0.42f, hipZ = 0.17f, shoulder = floatArrayOf(0.06f, 0.84f, 0.36f), shoulderL = floatArrayOf(0.02f, 0.86f, -0.34f))
         for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
-            a.add(bone, Slot.DARK) { at(0f, -0.14f, 0f) { capsule(0.11f, 0.14f) } }
-            a.add(bone, Slot.DARK) { at(0.05f, -0.38f, 0f) { roundedBox(0.32f, 0.13f, 0.22f, 0.06f) } }
+            a.add(bone, Slot.PRIMARY) { at(0f, -0.15f, 0f) { capsule(0.12f, 0.16f) } }
+            a.add(bone, Slot.SECONDARY) { at(0f, -0.24f, 0f) { cylinder(0.13f, 0.05f, 10) } }
+            a.add(bone, Slot.DARK) { at(0.05f, -0.37f, 0f) { roundedBox(0.34f, 0.14f, 0.22f, 0.06f) } }
         }
-        // A long coat, a bandolier across it, a lit buckle.
-        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.56f, 0f) { cylinder(0.34f, 0.34f, 16, topRadius = 0.3f) } }
-        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.82f, 0f) { roundedBox(0.52f, 0.42f, 0.64f, 0.2f) } }
-        a.add(Bone.BODY, Slot.SECONDARY) { at(0.03f, 0.78f, 0f) { rotate(40f, 1f, 0f, 0f); roundedBox(0.54f, 0.07f, 0.66f, 0.03f) } }
-        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.28f, 0.66f, 0f) { roundedBox(0.04f, 0.08f, 0.12f, 0.015f) } }
-        // The rack on his back: four short rockets in a frame, their tips lit.
-        a.add(Bone.BODY, Slot.METAL) { at(-0.36f, 0.86f, 0f) { roundedBox(0.16f, 0.42f, 0.5f, 0.05f) } }
-        for (yy in listOf(0.76f, 1.0f)) for (z in listOf(0.13f, -0.13f)) {
-            a.add(Bone.BODY, Slot.WHITE) { at(-0.42f, yy, z) { alongX { cylinder(0.065f, 0.26f, 10) } } }
-            a.add(Bone.BODY, Slot.SECONDARY, outline = false, emissive = true) { at(-0.26f, yy, z) { alongX { cylinder(0.065f, 0.1f, 10, topRadius = 0f) } } }
-        }
-        // A broad head with a beard, a band tied round the brow, and narrowed eyes.
-        a.add(Bone.HEAD, Slot.SKIN_BROWN) { at(0f, 0.2f, 0f) { sphere(0.3f) } }
-        a.add(Bone.HEAD, Slot.DARK) { at(0.12f, 0.06f, 0f) { ellipsoid(0.22f, 0.18f, 0.26f, 8, 12) } }
-        a.add(Bone.HEAD, Slot.SECONDARY) { at(0f, 0.34f, 0f) { torus(0.29f, 0.05f, 20, 6) } }
-        a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.32f, 0.32f, 0.05f) { rotate(110f, 0f, 0f, 1f); roundedBox(0.2f, 0.06f, 0.08f, 0.02f) } }
-        a.add(Bone.HEAD, Slot.DARK) { at(-0.02f, 0.44f, 0f) { ellipsoid(0.28f, 0.14f, 0.29f, 8, 14, 0f, 0.5f) } }
-        a.add(Bone.HEAD, Slot.INK, outline = false) { for (z in listOf(0.11f, -0.11f)) at(0.28f, 0.24f, z) { ellipsoid(0.03f, 0.03f, 0.05f, 6, 8) } }
-        // The launcher: a square box of tubes, a grip, a lit sight.
-        a.add(Bone.WEAPON, Slot.SKIN_BROWN) { at(0.02f, 0f, 0f) { sphere(0.095f, 8, 10) } }
-        a.add(Bone.WEAPON, Slot.METAL) { at(0.32f, 0.04f, 0f) { roundedBox(0.5f, 0.24f, 0.26f, 0.05f) } }
-        for (yy in listOf(-0.04f, 0.1f)) for (z in listOf(0.06f, -0.06f)) a.add(Bone.WEAPON, Slot.DARK) { at(0.58f, 0.04f + yy - 0.03f, z) { alongX { cylinder(0.045f, 0.06f, 8) } } }
-        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.3f, 0.19f, 0f) { roundedBox(0.12f, 0.04f, 0.05f, 0.015f) } }
-        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.12f, 0f) { capsule(0.1f, 0.15f) } }
-        a.add(Bone.ARM, Slot.SKIN_BROWN) { at(0f, -0.3f, 0f) { sphere(0.095f, 8, 10) } }
+        // A long turnout coat with two bright bands, and a collar turned up.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.68f, 0f) { roundedBox(0.54f, 0.6f, 0.64f, 0.2f) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { for (y in listOf(0.5f, 0.76f)) at(0f, y, 0f) { roundedBox(0.57f, 0.07f, 0.67f, 0.03f) } }
+        a.add(Bone.BODY, Slot.DARK) { at(0f, 0.96f, 0f) { torus(0.2f, 0.07f) } }
+        // The air tank on his back, with its valve.
+        a.add(Bone.BODY, Slot.METAL) { at(-0.36f, 0.72f, 0f) { capsule(0.13f, 0.26f) } }
+        a.add(Bone.BODY, Slot.ACCENT, emissive = true) { at(-0.36f, 1.0f, 0f) { sphere(0.06f, 6, 8) } }
+        // Head: a helmet with a wide brim swept down at the back, a crest along the top and a badge on the front.
+        a.add(Bone.HEAD, Slot.SKIN_BROWN) { at(0f, 0.2f, 0f) { sphere(0.32f) } }
+        a.add(Bone.HEAD, Slot.DARK, outline = false) { at(0.29f, 0.1f, 0f) { roundedBox(0.08f, 0.06f, 0.3f, 0.025f) } }
+        a.add(Bone.HEAD, Slot.WHITE, outline = false) { for (z in listOf(0.11f, -0.11f)) at(0.31f, 0.23f, z) { sphere(0.04f, 6, 8) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.02f, 0.3f, 0f) { ellipsoid(0.37f, 0.33f, 0.37f, 8, 16, 0f, 0.5f) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.06f, 0.3f, 0f) { rotate(-10f, 0f, 0f, 1f); cylinder(0.5f, 0.04f, 18) } }
+        a.add(Bone.HEAD, Slot.SECONDARY) { at(-0.04f, 0.58f, 0f) { roundedBox(0.56f, 0.12f, 0.08f, 0.03f) } }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.33f, 0.42f, 0f) { roundedBox(0.05f, 0.14f, 0.14f, 0.03f) } }
+        // What is left of the rocket rack on his shoulder: one tube, with a warhead showing in it.
+        a.add(Bone.WEAPON, Slot.METAL) { for (z in listOf(0f)) at(0.3f, 0.04f, z) { alongX { cylinder(0.075f, 0.62f, 10) } } }
+        a.add(Bone.WEAPON, Slot.DARK) { for (x in listOf(0.12f, 0.46f)) at(x, 0.04f, 0f) { roundedBox(0.08f, 0.2f, 0.22f, 0.03f) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.63f, 0.04f, 0f) { sphere(0.065f, 6, 8) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.04f, -0.08f, 0f) { sphere(0.1f, 8, 10) } }
+        a.add(Bone.ARM, Slot.PRIMARY) { at(0f, -0.12f, 0f) { capsule(0.1f, 0.14f) } }
+        a.add(Bone.ARM, Slot.DARK) { at(0f, -0.31f, 0f) { sphere(0.1f, 8, 10) } }
         return a.build(rig)
     }
 
@@ -739,7 +769,7 @@ class FighterModels {
     /** Dimension: one of the forgotten fighters the Void carries, or (with null) the Void itself. */
     fun drawSoul(prog: Program, soul: io.github.projectwip.data.Lore.Soul?, x: Float, z: Float, facing: Float, anim: FighterAnim, pass: Pass, ink: FloatArray = INK) {
         if (soul == null) drawModel(prog, voidModel, VOID_SKIN, x, z, facing, anim, pass, ink, 0L)
-        else drawModel(prog, soulModels.getValue(soul), io.github.projectwip.data.Skin(soul.title, soul.primary, soul.secondary, soul.color, 0), x, z, facing, anim, pass, ink, 0L)
+        else drawModel(prog, soulModels.getValue(soul), io.github.projectwip.data.Skin(soul.title, soul.primary, soul.secondary, soul.accent, 0), x, z, facing, anim, pass, ink, 0L)
     }
 
     private fun drawModel(prog: Program, model: FighterModel, skin: io.github.projectwip.data.Skin, x: Float, z: Float, facing: Float, anim: FighterAnim, pass: Pass, ink: FloatArray, shade: Long) {

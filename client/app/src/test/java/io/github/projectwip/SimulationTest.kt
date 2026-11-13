@@ -1363,7 +1363,14 @@ class SimulationTest {
         assertEquals(B.PORTAL_SHARDS, run.found)
         assertTrue("a taunt for each echo", run.taunt == B.PORTAL_SHARDS - 1)
         assertEquals(io.github.projectwip.sim.PortalState.OPEN, run.state)
-        assertEquals("the way through opens where the captive stood", run.captiveX, run.x, 0f)
+        // The portal is in the very middle (where the bush was), the soul is freed, and they were a walk away from it.
+        assertEquals(w.arena.width / 2f, run.x, 1f)
+        assertEquals(w.arena.height / 2f, run.y, 1f)
+        assertTrue(run.freedAt >= 0f)
+        assertTrue(kotlin.math.hypot(run.captiveX - run.x, run.captiveY - run.y) > 3f)
+        for (dx in -1..1) for (dy in -1..1) assertTrue("no bush under the portal",
+            w.arena[(run.x + dx).toInt(), (run.y + dy).toInt()] != io.github.projectwip.sim.Tile.THICKET)
+        assertEquals("what they say once free", 4, io.github.projectwip.data.Lore.freedLines(io.github.projectwip.data.Lore.captive(1)).size)
         // Stepping in takes the player one dimension deeper, whole again, with new echoes to find.
         m.player.hp = m.player.maxHp / 2
         m.player.x = run.x; m.player.y = run.y

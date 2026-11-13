@@ -60,6 +60,14 @@ class HudSnapshot {
     var captiveName = ""
     var captiveX = 0f
     var captiveZ = 0f
+    /** Dimension: the freed soul following the player, and what they are saying (and for how long so far). */
+    var followerOn = false
+    var followerX = 0f
+    var followerZ = 0f
+    var followerLine: String? = null
+    var followerAge = 0f
+    var followerName = ""
+    var followerColor = 0
     /** The Void's last words, and how long ago they were said (they fade after a few seconds). */
     var voidLine: String? = null
     var voidAge = 99f
@@ -107,6 +115,7 @@ class HudSnapshot {
         portalRun = o.portalRun; portalDimension = o.portalDimension; portalFound = o.portalFound; portalOpen = o.portalOpen; portalTravel = o.portalTravel; voidLine = o.voidLine; voidAge = o.voidAge
         portalTargetOn = o.portalTargetOn; portalTargetX = o.portalTargetX; portalTargetZ = o.portalTargetZ; portalPlayerX = o.portalPlayerX; portalPlayerZ = o.portalPlayerZ
         portalGlitch = o.portalGlitch; voidSoul = o.voidSoul; voidSoulColor = o.voidSoulColor; captiveOn = o.captiveOn; captiveName = o.captiveName; captiveX = o.captiveX; captiveZ = o.captiveZ
+        followerOn = o.followerOn; followerX = o.followerX; followerZ = o.followerZ; followerLine = o.followerLine; followerAge = o.followerAge; followerName = o.followerName; followerColor = o.followerColor
         freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
         stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm
         n = o.n
