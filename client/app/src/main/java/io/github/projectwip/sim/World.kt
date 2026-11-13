@@ -48,6 +48,9 @@ data class MatchRules(
 
 enum class PortalState { ARRIVE, EXPLORE, OPEN, TRAVEL }
 
+/** Dimension: the portal ring spans this many tiles either side of its middle (five across). */
+const val PORTAL_HALF = 2
+
 /**
  * Dimension: which dimension the player is in, the echo shards lying about in it, and where the portal is once they
  * are all found. A lore mode (build 104, the user's decision): there are no enemies, only the world coming apart.
@@ -1334,8 +1337,11 @@ class World(
                         events += GameEvent.ShardFound(run.dimension, run.found, sx, sy)
                     }
                     if (run.found < Balance.PORTAL_SHARDS) return
-                    // The chains break and the soul is free; the portal in the middle of the arena wakes.
+                    // The chains break and the soul is free; the gate in the middle of the arena opens.
                     run.freedAt = run.time
+                    // It wakes: the inside of the ring opens (its two ends, where the ring meets the ground, stay solid).
+                    val gx = kotlin.math.floor(run.x).toInt(); val gy = kotlin.math.floor(run.y).toInt()
+                    for (dx in -(PORTAL_HALF - 1)..(PORTAL_HALF - 1)) arena[gx + dx, gy] = Tile.FLOOR
                     run.state = PortalState.OPEN
                     events += GameEvent.PortalOpened(run.x, run.y)
                     return
@@ -1387,9 +1393,12 @@ class World(
         run.taken.fill(false)
         val start = arena.spawns[0][0]
         run.freedAt = -1f
-        // The portal always stands in the very middle; the chained soul is somewhere round it, a fair walk away.
-        val mid = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 0.9f)
-        run.x = mid.x; run.y = mid.y
+        // The portal always stands in the very middle: a great ring standing upright, five tiles across, solid until the
+        // soul is freed (nobody walks on it or through it). The chained soul is somewhere round it, a fair walk away.
+        val gx = arena.width / 2; val gy = arena.height / 2
+        for (dx in -PORTAL_HALF..PORTAL_HALF) arena[gx + dx, gy] = Tile.GATE
+        run.x = gx + 0.5f; run.y = gy + 0.5f
+        val mid = Spawn(run.x, run.y + 1.5f)
         val ca = rng.nextFloat() * 6.2832f
         val cd = 4f + rng.nextFloat() * 2.5f
         val c = arena.nearestOpen(mid.x + kotlin.math.cos(ca) * cd, mid.y + kotlin.math.sin(ca) * cd, 0.9f)

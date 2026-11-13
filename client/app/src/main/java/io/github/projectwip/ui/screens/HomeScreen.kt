@@ -582,6 +582,7 @@ fun Minimap(arena: Arena, modifier: Modifier = Modifier) {
                 Tile.THICKET -> Color(0xFF3FAE5C)
                 Tile.WATER -> Color(0xFF2CA0DE)
                 Tile.CRATE -> Color(0xFFE08A2E)
+                Tile.GATE -> Color(0xFFB98CFF)
                 Tile.FLOOR -> Color(0xFFDEC492)
             }
             drawRect(c, Offset(x * t, y * t), Size(t + 0.5f, t + 0.5f))

@@ -355,7 +355,7 @@ private fun MatchBody(
         )
         if (intro && match.portalRun) DimensionCutscene(match.world.portal?.entered ?: 0, match.config.playerFighter, match.config.playerSkin, sfx) { intro = false; view?.resumeGame() }
         else if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
-        if (talk >= 0) CaptiveTalk(talk, match.config.playerFighter, match.config.playerSkin, sfx) { talk = -1; view?.resumeGame() }
+        if (talk >= 0) CaptiveTalk(talk, match.config.playerFighter, match.config.playerSkin, io.github.projectwip.data.Balance.PORTAL_SHARDS - (match.world.portal?.found ?: 0), sfx) { talk = -1; view?.resumeGame() }
         if (scene >= 0) DimensionCutscene(scene, match.config.playerFighter, match.config.playerSkin, sfx) { scene = -1; view?.resumeGame() }
         if (paused && !done) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {

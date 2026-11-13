@@ -420,8 +420,8 @@ object Balance {
     /** The pause on arriving in a dimension, and after the last portal before the story ends. */
     const val PORTAL_ARRIVE_SECONDS = 1.2f
     const val PORTAL_TRAVEL_SECONDS = 1.2f
-    /** How close (beyond the fighter's own radius) the portal pulls you in. */
-    const val PORTAL_RADIUS = 1.1f
+    /** How close (beyond the fighter's own radius) to the middle of the open gate takes you through. */
+    const val PORTAL_RADIUS = 0.75f
     /** The chained fighter: how close (beyond the player's radius) counts as being beside them, to talk. */
     const val PORTAL_CAPTIVE_REACH = 1.6f
     /**

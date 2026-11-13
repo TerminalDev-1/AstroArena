@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +59,8 @@ import kotlin.math.sin
 
 /** Seconds of the cut to black, the blinding light and the TV switching off, before the scene. */
 private const val TRANSITION = 1.5f
+/** Seconds of the dive through the portal (going through one; not on arriving in the first dimension). */
+private const val DIVE = 1.8f
 
 private fun ease(x: Float) = x.coerceIn(0f, 1f).let { it * it * (3f - 2f * it) }
 
@@ -94,11 +97,12 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
     val lines = remember(entered, fighter) { Lore.scene(entered, fighter) }
     val mood = MOODS[if (entered < MOODS.size) entered else 1 + (entered - 1) % (MOODS.size - 1)]
     val clock = remember { Animatable(0f) }
+    val dive = if (entered > 0) DIVE else 0f
     LaunchedEffect(Unit) {
         sfx?.play(Sound.PORTAL_ENTER)
-        clock.animateTo(TRANSITION + 0.45f, tween(((TRANSITION + 0.45f) * 1000).toInt(), easing = LinearEasing))
+        clock.animateTo(dive + TRANSITION + 0.45f, tween(((dive + TRANSITION + 0.45f) * 1000).toInt(), easing = LinearEasing))
     }
-    val t = clock.value
+    val t = clock.value - dive
     val sceneIn = ease((t - TRANSITION) / 0.45f)
     var index by remember { mutableIntStateOf(0) }
     var typed by remember { mutableIntStateOf(0) }
@@ -121,7 +125,7 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
     Box(
         Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }.background(Color.Black).pointerInput(Unit) {
             detectTapGestures {
-                if (clock.value < TRANSITION + 0.4f || leaving) return@detectTapGestures
+                if (clock.value < dive + TRANSITION + 0.4f || leaving) return@detectTapGestures
                 val now = lines[index]
                 when {
                     typed < now.text.length -> typed = now.text.length
@@ -143,7 +147,7 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
                         val k = if (voidTalking) 1.04f else 0.95f; scaleX = k; scaleY = k; alpha = if (voidTalking) 1f else 0.55f
                         translationY = 6.dp.toPx() * sin(time * 0.9f)
                     }) {
-                        VoidStage(time, mood, if (voidTalking) line.soul else null, Modifier.fillMaxSize())
+                        VoidStage(time, mood, if (voidTalking) line.soul else null, voidTalking && typed < line.text.length, Modifier.fillMaxSize())
                     }
                     Box(Modifier.fillMaxHeight(0.86f).width(250.dp).graphicsLayer {
                         val k = if (!voidTalking) 1.04f else 0.95f; scaleX = k; scaleY = k; alpha = if (!voidTalking) 1f else 0.55f
@@ -155,7 +159,7 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
                             drawOval(Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent), Offset(size.width / 2, size.height * 0.95f), size.width * 0.42f),
                                 Offset(size.width * 0.08f, size.height * 0.9f), Size(size.width * 0.84f, size.height * 0.1f))
                         }
-                        FighterView(Balance.fighter(fighter), skin, Modifier.fillMaxSize(), pedestal = true)
+                        FighterView(Balance.fighter(fighter), skin, Modifier.fillMaxSize(), pedestal = true, talking = !voidTalking && typed < line.text.length)
                     }
                 }
                 val (name, who) = speakerPlate(line, Balance.fighter(fighter).name, time)
@@ -163,14 +167,12 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
             }
             // ---- The title card: which dimension this is, fading in and then settling small at the top.
             val card = sceneIn
-            Column(Modifier.align(Alignment.TopCenter).padding(top = 30.dp).graphicsLayer { alpha = card }, horizontalAlignment = Alignment.CenterHorizontally) {
-                PlainText("DIMENSION ${entered + 1}", Type.Eyebrow.copy(letterSpacing = Type.Eyebrow.fontSize * 0.6f, color = mood.accent.copy(alpha = 0.8f)))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.width(46.dp).height(1.5.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, mood.glow))))
-                    Spacer(Modifier.width(10.dp))
-                    GameText(Lore.dimensionName(entered + 1).uppercase(), Type.Heading, color = Color.White, outline = 2.dp)
-                    Spacer(Modifier.width(10.dp))
-                    Box(Modifier.width(46.dp).height(1.5.dp).background(Brush.horizontalGradient(listOf(mood.glow, Color.Transparent))))
+            Box(Modifier.align(Alignment.TopCenter).padding(top = 30.dp).graphicsLayer { alpha = card; translationY = (1f - card) * -30f }) {
+                io.github.projectwip.ui.Panel(color = mood.glow.copy(alpha = 1f).let { Color(it.red * 0.45f, it.green * 0.35f, it.blue * 0.6f) }, colorBottom = Color(0xFF120828), cut = 12.dp) {
+                    Column(Modifier.padding(horizontal = 26.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        GameText("DIMENSION ${entered + 1}", Type.Eyebrow.copy(letterSpacing = Type.Eyebrow.fontSize * 0.5f), color = mood.accent, outline = 1.5.dp)
+                        GameText(Lore.dimensionName(entered + 1).uppercase(), Type.Title, color = Color.White, outline = 3.dp)
+                    }
                 }
             }
             // ---- Letterbox bars, and the picture glitching the deeper it is.
@@ -185,7 +187,8 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
             }
         }
         // ---- The way in: black, a blinding light, and the picture switching off like an old TV.
-        if (t < TRANSITION + 0.45f) Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - sceneIn }) {
+        if (t < 0f) PortalDive(clock.value / dive, fighter, skin, time)
+        else if (t < TRANSITION + 0.45f) Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - sceneIn }) {
             drawRect(Color.Black)
             val c = Offset(size.width / 2, size.height / 2)
             when {
@@ -218,52 +221,92 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
     }
 }
 
-/** The words: a lit glass panel with a nameplate for whoever speaks, the line typed out, and how far the scene has got. */
+/**
+ * The words, in the game's own chunky style (the user found the first, flat glass panel poor): a thick plate with an
+ * ink outline, gloss and a lip (`Panel`), a nameplate plate of its own in the speaker's colour, the line typed out in
+ * big outlined type, dots for how far the scene has got, and a chunky prompt.
+ */
 @Composable
 private fun DialoguePanel(line: Lore.Line, typed: Int, index: Int, count: Int, name: String, who: Color, left: Boolean, mood: Mood, time: Float, lastPrompt: String) {
-    val voidTalking = left
     // A chained fighter's scream shakes.
     val scream = line.speaker == Lore.Speaker.CAPTIVE && line.text.contains("HELP")
-    Box(Modifier.fillMaxWidth().height(124.dp)) {
-        Canvas(Modifier.fillMaxSize()) {
-            val cut = 16.dp.toPx()
-            val top = 14.dp.toPx()
-            val shape = Path().apply {
-                moveTo(cut, top); lineTo(size.width - cut, top); lineTo(size.width, top + cut)
-                lineTo(size.width, size.height - cut); lineTo(size.width - cut, size.height); lineTo(cut, size.height)
-                lineTo(0f, size.height - cut); lineTo(0f, top + cut); close()
-            }
-            drawPath(shape, Brush.verticalGradient(listOf(Color(0xE6170C33), Color(0xF00A0519)), top, size.height))
-            // A slow sheen sliding across the glass.
-            val sx = ((time * 0.15f) % 1.6f - 0.3f) * size.width
-            clipPath(shape) {
-                drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.06f), Color.Transparent), Offset(sx - 80.dp.toPx(), 0f), Offset(sx + 80.dp.toPx(), size.height)))
-                drawRect(Brush.verticalGradient(listOf(mood.glow.copy(alpha = 0.22f), Color.Transparent), top, top + 40.dp.toPx()))
-            }
-            drawPath(shape, Brush.horizontalGradient(listOf(who.copy(alpha = 0.9f), mood.glow.copy(alpha = 0.6f), Color.White.copy(alpha = 0.15f))), style = Stroke(2.dp.toPx()))
-            // The nameplate tab.
-            val tabW = 150.dp.toPx(); val tabH = 26.dp.toPx(); val tx = if (voidTalking) 22.dp.toPx() else size.width - 22.dp.toPx() - tabW
-            val tab = Path().apply {
-                moveTo(tx + 8.dp.toPx(), 0f); lineTo(tx + tabW, 0f); lineTo(tx + tabW - 8.dp.toPx(), tabH); lineTo(tx, tabH); close()
-            }
-            drawPath(tab, Brush.horizontalGradient(listOf(who.copy(alpha = 0.85f), who.copy(alpha = 0.45f)), tx, tx + tabW))
-            drawPath(tab, Color.Black.copy(alpha = 0.8f), style = Stroke(2.dp.toPx()))
-            // Which line of the scene this is.
-            for (i in 0 until count) {
-                val r = if (i == index) 4.dp.toPx() else 2.5.dp.toPx()
-                drawCircle(if (i <= index) who else Color.White.copy(alpha = 0.25f), r, Offset(size.width / 2 + (i - (count - 1) / 2f) * 14.dp.toPx(), size.height - 10.dp.toPx()))
+    val voidLine = line.speaker == Lore.Speaker.VOID
+    Box(Modifier.fillMaxWidth().height(136.dp)) {
+        io.github.projectwip.ui.Panel(Modifier.fillMaxWidth().height(116.dp).align(Alignment.BottomCenter),
+            color = Color(0xFF2E1A5E), colorBottom = Color(0xFF150A30), cut = 18.dp) {
+            Box(Modifier.fillMaxSize()) {
+                val caret = if (typed < line.text.length || (time * 2f).toInt() % 2 == 0) "▌" else " "
+                GameText(line.text.take(typed) + caret,
+                    Type.Heading.copy(fontSize = Type.Heading.fontSize * 1.15f, fontStyle = if (voidLine) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal),
+                    color = if (voidLine) Color(0xFFE6DCFF) else Color.White, outline = 3.dp,
+                    modifier = Modifier.padding(start = 26.dp, end = 26.dp, top = 22.dp).graphicsLayer {
+                        if (scream) { translationX = 3.dp.toPx() * sin(time * 53f); translationY = 2.dp.toPx() * sin(time * 41f) }
+                    })
+                Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (i in 0 until count) Box(Modifier.width(if (i == index) 20.dp else 8.dp).height(8.dp)
+                        .background(if (i <= index) who else Color.White.copy(alpha = 0.25f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp)))
+                }
+                if (typed >= line.text.length) Box(Modifier.align(Alignment.BottomEnd).padding(12.dp).graphicsLayer {
+                    val k = 1f + 0.05f * sin(time * 5f); scaleX = k; scaleY = k
+                }) {
+                    io.github.projectwip.ui.Panel(color = Color(0xFFFFB13C), colorBottom = Color(0xFFE0701E), cut = 8.dp) {
+                        GameText(if (index == count - 1) lastPrompt else "TAP ▶", Type.Eyebrow.copy(fontSize = Type.Eyebrow.fontSize * 1.2f), color = Color.White, outline = 2.dp,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
+                    }
+                }
             }
         }
-        PlainText(name, Type.Eyebrow.copy(color = Color.White, letterSpacing = Type.Eyebrow.fontSize * 0.3f),
-            Modifier.align(if (voidTalking) Alignment.TopStart else Alignment.TopEnd).padding(horizontal = 42.dp, vertical = 5.dp))
-        val caret = if (typed < line.text.length || (time * 2f).toInt() % 2 == 0) "▌" else " "
-        PlainText(line.text.take(typed) + caret, Type.Heading.copy(color = if (line.speaker == Lore.Speaker.VOID) Color(0xFFE6DCFF) else Color.White,
-            fontStyle = if (line.speaker == Lore.Speaker.VOID) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal), maxLines = 2,
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 38.dp).graphicsLayer {
-                if (scream) { translationX = 3.dp.toPx() * sin(time * 53f); translationY = 2.dp.toPx() * sin(time * 41f) }
-            })
-        if (typed >= line.text.length) PlainText(if (index == count - 1) lastPrompt else "TAP ▶",
-            Type.Eyebrow.copy(color = Color.White.copy(alpha = 0.5f + 0.5f * sin(time * 4f))), Modifier.align(Alignment.BottomEnd).padding(horizontal = 18.dp, vertical = 12.dp))
+        // The nameplate, standing up out of the panel's top edge on the speaker's side.
+        Box(Modifier.align(if (left) Alignment.TopStart else Alignment.TopEnd).padding(horizontal = 30.dp)) {
+            io.github.projectwip.ui.Panel(color = who, colorBottom = Color(who.red * 0.55f, who.green * 0.55f, who.blue * 0.55f), cut = 10.dp) {
+                GameText(name, Type.Heading, color = Color.White, outline = 2.5.dp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp))
+            }
+        }
+    }
+}
+
+/**
+ * Going through the portal (the user asked for a cutscene of it): the fighter tumbling head over heels down a tunnel
+ * of rainbow rings rushing past, streaks of light, smaller and smaller toward a bright point, until the light takes
+ * everything and the scene cuts to black. [u] runs 0..1 over it.
+ */
+@Composable
+private fun PortalDive(u: Float, fighter: FighterId, skin: Int, time: Float) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        Canvas(Modifier.fillMaxSize()) {
+            val c = Offset(size.width / 2, size.height / 2)
+            val maxR = size.maxDimension * 0.8f
+            // Rings rushing outward from the vanishing point, each a colour of its own, faster as it falls.
+            val speed = 0.9f + 2.2f * u
+            for (k in 0 until 18) {
+                val ph = ((k / 18f) + u * speed) % 1f
+                val r = maxR * ph * ph * ph + 4f
+                val hue = (k / 18f + u * 0.8f) % 1f
+                val col = Color.hsv(hue * 360f, 0.75f, 1f)
+                drawCircle(col.copy(alpha = (0.15f + 0.6f * ph) * (1f - u * 0.3f)), r, c, style = Stroke((2f + 22f * ph * ph).dp.toPx()))
+            }
+            // Streaks of light shooting past.
+            for (k in 0 until 40) {
+                val ang = k * 2.3998f
+                val ph = ((k * 0.137f) + u * speed * 1.3f) % 1f
+                val r0 = maxR * ph * ph; val r1 = maxR * (ph * ph + 0.06f * ph)
+                drawLine(Color.White.copy(alpha = 0.5f * ph), Offset(c.x + kotlin.math.cos(ang) * r0, c.y + kotlin.math.sin(ang) * r0),
+                    Offset(c.x + kotlin.math.cos(ang) * r1, c.y + kotlin.math.sin(ang) * r1), (1f + 3f * ph).dp.toPx())
+            }
+            drawCircle(Brush.radialGradient(listOf(Color.White, Color(0xFFE6DCFF).copy(alpha = 0.6f), Color.Transparent), c, 30.dp.toPx() + 200.dp.toPx() * u * u), 30.dp.toPx() + 200.dp.toPx() * u * u, c)
+        }
+        // The fighter, tumbling, shrinking toward the light.
+        Box(Modifier.align(Alignment.Center).size(220.dp).graphicsLayer {
+            val k = (1f - u).coerceAtLeast(0.02f)
+            scaleX = 0.4f + 0.9f * k; scaleY = 0.4f + 0.9f * k
+            rotationZ = u * 540f
+            alpha = (1f - ((u - 0.75f) / 0.25f).coerceIn(0f, 1f))
+            translationY = -40.dp.toPx() * u
+        }) {
+            FighterView(Balance.fighter(fighter), skin, Modifier.fillMaxSize(), pedestal = false)
+        }
+        // The light takes everything at the end.
+        Canvas(Modifier.fillMaxSize()) { drawRect(Color.White.copy(alpha = ((u - 0.82f) / 0.18f).coerceIn(0f, 1f))) }
     }
 }
 
@@ -386,7 +429,7 @@ private fun DrawScope.drawGlitch(time: Float, k: Float) {
  * voice, that one shows through. Behind it, its glow and a broken halo turning.
  */
 @Composable
-private fun VoidStage(time: Float, mood: Mood, soul: Lore.Soul?, modifier: Modifier) {
+private fun VoidStage(time: Float, mood: Mood, soul: Lore.Soul?, talking: Boolean, modifier: Modifier) {
     Box(modifier) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width; val h = size.height
@@ -400,7 +443,7 @@ private fun VoidStage(time: Float, mood: Mood, soul: Lore.Soul?, modifier: Modif
             drawOval(Brush.radialGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent), Offset(w / 2, h * 0.95f), w * 0.4f),
                 Offset(w * 0.1f, h * 0.9f), Size(w * 0.8f, h * 0.1f))
         }
-        io.github.projectwip.ui.SoulView(Modifier.fillMaxSize(), voidCycle = true, voidSoul = soul)
+        io.github.projectwip.ui.SoulView(Modifier.fillMaxSize(), voidCycle = true, voidSoul = soul, talking = talking)
     }
 }
 
@@ -427,7 +470,7 @@ private fun speakerPlate(line: Lore.Line, fighterName: String, time: Float): Pai
  * (the echoes break the chains). The player stands on the left, the captive on the right, rattling their chains.
  */
 @Composable
-fun CaptiveTalk(dimension: Int, player: FighterId, playerSkin: Int, sfx: Sfx?, onDone: () -> Unit) {
+fun CaptiveTalk(dimension: Int, player: FighterId, playerSkin: Int, chains: Int, sfx: Sfx?, onDone: () -> Unit) {
     val captive = remember(dimension) { Lore.captive(dimension) }
     val lines = remember(captive, player) { Lore.captiveTalk(captive, player) }
     val mood = MOODS[if (dimension - 1 < MOODS.size) dimension - 1 else 1 + (dimension - 2) % (MOODS.size - 1)]
@@ -462,36 +505,16 @@ fun CaptiveTalk(dimension: Int, player: FighterId, playerSkin: Int, sfx: Sfx?, o
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
                 val asking = line.speaker == Lore.Speaker.FIGHTER
                 Box(Modifier.fillMaxHeight(0.86f).width(250.dp).graphicsLayer { alpha = if (asking) 1f else 0.55f }) {
-                    FighterView(Balance.fighter(player), playerSkin, Modifier.fillMaxSize(), pedestal = true)
+                    FighterView(Balance.fighter(player), playerSkin, Modifier.fillMaxSize(), pedestal = true, talking = asking && typed < line.text.length)
                 }
-                Box(Modifier.fillMaxHeight(0.92f).width(280.dp).graphicsLayer {
-                    alpha = if (!asking) 1f else 0.6f
-                    // Struggling against the chains.
-                    translationX = 3.dp.toPx() * sin(time * 23f) * (if (!asking) 1f else 0.3f)
-                }) {
+                Box(Modifier.fillMaxHeight(0.92f).width(300.dp).graphicsLayer { alpha = if (!asking) 1f else 0.7f }) {
                     Canvas(Modifier.fillMaxSize()) {
                         val c = Offset(size.width / 2, size.height * 0.45f)
-                        drawCircle(Brush.radialGradient(listOf(Color(0x66FF4C6A), Color.Transparent), c, size.width * 0.6f), size.width * 0.6f, c)
-                        // The pillar behind them.
-                        drawRect(Brush.verticalGradient(listOf(Color(0xFF2A1F3A), Color(0xFF120C1C)), 0f, size.height), Offset(size.width * 0.42f, 0f), Size(size.width * 0.16f, size.height))
+                        drawCircle(Brush.radialGradient(listOf(Color(captive.color).copy(alpha = 0.35f), Color.Transparent), c, size.width * 0.6f), size.width * 0.6f, c)
                     }
-                    io.github.projectwip.ui.SoulView(Modifier.fillMaxSize(), soul = captive)
-                    // The chains, over them: from the pillar out to their wrists and waist, rattling.
-                    Canvas(Modifier.fillMaxSize()) {
-                        for (k in 0 until 3) {
-                            val y = size.height * (0.4f + 0.12f * k)
-                            val sag = 10.dp.toPx() + 4.dp.toPx() * sin(time * 9f + k)
-                            for (side in floatArrayOf(-1f, 1f)) {
-                                val x0 = size.width / 2; val x1 = size.width / 2 + side * size.width * (0.18f + 0.03f * k)
-                                for (l in 0..7) {
-                                    val u = l / 7f
-                                    val x = x0 + (x1 - x0) * u
-                                    val yy = y + sag * sin(u * 3.14f) + 1.5.dp.toPx() * sin(time * 30f + l)
-                                    drawOval(Color(0xFF9A93A8), Offset(x - 4.dp.toPx(), yy - 3.dp.toPx()), Size(8.dp.toPx(), 6.dp.toPx()), style = Stroke(2.dp.toPx()))
-                                }
-                            }
-                        }
-                    }
+                    // Chained to a pillar, in 3D, the chains rattling as they pull against them.
+                    io.github.projectwip.ui.SoulView(Modifier.fillMaxSize(), soul = captive, chains = chains,
+                        talking = line.speaker == Lore.Speaker.CAPTIVE && typed < line.text.length)
                 }
             }
             val (name, who) = speakerPlate(line, if (line.speaker == Lore.Speaker.CAPTIVE) captive.title else Balance.fighter(player).name, time)

@@ -14,6 +14,11 @@ enum class Tile(val blocksMove: Boolean, val blocksShots: Boolean) {
     WATER(true, false),
     /** Spark Crate: blocks until destroyed, then becomes floor and drops a Power Cell. */
     CRATE(true, true),
+    /**
+     * Dimension's portal (build 107): solid, like a wall, but the arena draws nothing for it, because the portal ring
+     * draws itself over exactly these tiles. Its inside opens when the chained soul is freed.
+     */
+    GATE(true, true),
 }
 
 data class Spawn(val x: Float, val y: Float)

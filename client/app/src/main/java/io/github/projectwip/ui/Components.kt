@@ -414,10 +414,10 @@ fun GameBackground(modifier: Modifier = Modifier, tint: Color = Palette.BgTop) {
  * between itself and them ([voidSoul] is the one whose voice it is speaking with). No pedestal.
  */
 @Composable
-fun SoulView(modifier: Modifier = Modifier, soul: io.github.projectwip.data.Lore.Soul? = null, voidCycle: Boolean = false, voidSoul: io.github.projectwip.data.Lore.Soul? = null) {
+fun SoulView(modifier: Modifier = Modifier, soul: io.github.projectwip.data.Lore.Soul? = null, voidCycle: Boolean = false, voidSoul: io.github.projectwip.data.Lore.Soul? = null, talking: Boolean = false, chains: Int = 0) {
     AndroidView(
         factory = { ctx -> io.github.projectwip.render3d.FighterStageView(ctx) },
-        update = { v -> v.params.pedestal = false; v.params.soul = soul?.ordinal ?: -1; v.params.voidCycle = voidCycle; v.params.voidSoul = voidSoul?.ordinal ?: -1 },
+        update = { v -> v.params.pedestal = false; v.params.soul = soul?.ordinal ?: -1; v.params.voidCycle = voidCycle; v.params.voidSoul = voidSoul?.ordinal ?: -1; v.params.talking = talking; v.params.chains = chains },
         modifier = modifier,
     )
 }
@@ -433,6 +433,8 @@ fun FighterView(
     celebrateKey: Int = 0,
     /** Bumped to have the fighter shake their head (on a pedestal only): see `StageParams.sulkAt`. */
     sulkKey: Int = 0,
+    /** Talking (cutscenes, on a pedestal only): the mouth moves and they gesture. */
+    talking: Boolean = false,
 ) {
     val accent = Color(def.skins[skin.coerceIn(0, def.skins.lastIndex)].secondary)
     Box(modifier) {
@@ -461,7 +463,7 @@ fun FighterView(
             var view by remember { mutableStateOf<FighterStageView?>(null) }
             AndroidView(
                 factory = { ctx -> FighterStageView(ctx).also { view = it } },
-                update = { v -> v.params.fighter = def.id; v.params.skin = skin; v.params.locked = locked },
+                update = { v -> v.params.fighter = def.id; v.params.skin = skin; v.params.locked = locked; v.params.talking = talking },
                 modifier = Modifier.fillMaxSize(),
             )
             val first = remember { booleanArrayOf(true) }

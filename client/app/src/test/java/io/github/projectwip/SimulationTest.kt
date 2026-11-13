@@ -1352,6 +1352,10 @@ class SimulationTest {
         // The echoes lie away from where the player arrives.
         for (i in 0 until B.PORTAL_SHARDS) assertTrue(kotlin.math.hypot(run.shards[i * 2] - m.player.x, run.shards[i * 2 + 1] - m.player.y) > 3f)
         assertTrue("no rifts in the first dimension", w.hazards.isEmpty())
+        // The gate in the middle is solid while the soul is chained: nobody walks on it or through it.
+        val gx = kotlin.math.floor(run.x).toInt(); val gy = kotlin.math.floor(run.y).toInt()
+        for (dx in -2..2) assertEquals(io.github.projectwip.sim.Tile.GATE, w.arena[gx + dx, gy])
+        assertTrue(w.arena[gx, gy].blocksMove)
         fun collect() {
             for (i in 0 until B.PORTAL_SHARDS) {
                 m.player.x = run.shards[i * 2]; m.player.y = run.shards[i * 2 + 1]
@@ -1367,9 +1371,11 @@ class SimulationTest {
         assertEquals(w.arena.width / 2f, run.x, 1f)
         assertEquals(w.arena.height / 2f, run.y, 1f)
         assertTrue(run.freedAt >= 0f)
+        assertEquals("its middle opens once they are free", io.github.projectwip.sim.Tile.FLOOR, w.arena[kotlin.math.floor(run.x).toInt(), kotlin.math.floor(run.y).toInt()])
+        assertEquals("its inside opens", io.github.projectwip.sim.Tile.FLOOR, w.arena[kotlin.math.floor(run.x).toInt() - 1, kotlin.math.floor(run.y).toInt()])
+        assertEquals("its ends stay solid", io.github.projectwip.sim.Tile.GATE, w.arena[kotlin.math.floor(run.x).toInt() - 2, kotlin.math.floor(run.y).toInt()])
         assertTrue(kotlin.math.hypot(run.captiveX - run.x, run.captiveY - run.y) > 3f)
-        for (dx in -1..1) for (dy in -1..1) assertTrue("no bush under the portal",
-            w.arena[(run.x + dx).toInt(), (run.y + dy).toInt()] != io.github.projectwip.sim.Tile.THICKET)
+        for (dx in -1..1) assertTrue("no bush under the portal", w.arena[(run.x + dx).toInt(), (run.y + 1).toInt()] != io.github.projectwip.sim.Tile.THICKET)
         assertEquals("what they say once free", 4, io.github.projectwip.data.Lore.freedLines(io.github.projectwip.data.Lore.captive(1)).size)
         // Stepping in takes the player one dimension deeper, whole again, with new echoes to find.
         m.player.hp = m.player.maxHp / 2

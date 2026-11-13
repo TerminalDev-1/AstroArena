@@ -51,6 +51,10 @@ class StageParams {
      */
     @Volatile var voidCycle = false
     @Volatile var voidSoul = -1
+    /** Talking (cutscenes): the mouth moves and they gesture with the words. */
+    @Volatile var talking = false
+    /** Dimension: chained to a pillar behind them with this many chains (the captive in its talk), rattling. */
+    @Volatile var chains = 0
 }
 
 /**
@@ -77,6 +81,9 @@ class StageScene(private val withPedestal: Boolean) {
     private val lightVP = FloatArray(16)
     private val eye = floatArrayOf(0f, 2.1f, 6.3f)
     private val anim = FighterAnim()
+    private val link: Mesh = MeshBuilder().apply { color(1f, 1f, 1f); torus(0.075f, 0.024f, 12, 6) }.build()
+    private val pillar: Mesh = MeshBuilder().apply { color(1f, 1f, 1f); box(1f, 1f, 1f) }.build()
+    private var talkOpen = 0f
     private var shownYaw = 0f
     private var lastCelebrate = 0L
 
@@ -90,6 +97,43 @@ class StageScene(private val withPedestal: Boolean) {
         Matrix.setLookAtM(lightView, 0, -Toon.LIGHT[0] * 10f, -Toon.LIGHT[1] * 10f, -Toon.LIGHT[2] * 10f, 0f, 0f, 0f, 0f, 1f, 0f)
         Matrix.orthoM(lightProj, 0, -2.5f, 2.5f, -2.5f, 2.5f, 1f, 25f)
         Matrix.multiplyMM(lightVP, 0, lightProj, 0, lightView, 0)
+    }
+
+    private val chainM = FloatArray(16)
+
+    /**
+     * Dimension's captive, in 3D: a dark stone pillar behind them, and [count] chains of real links wrapped round
+     * them from it, at the waist, the chest and the shoulders, rattling, jerking taut when they yank.
+     */
+    private fun drawChains(count: Int, yank: Float, time: Float) {
+        lit.f("uRim", 0.3f)
+        lit.v4("uTint", 0.2f, 0.15f, 0.27f, 1f)
+        Matrix.setIdentityM(chainM, 0); Matrix.translateM(chainM, 0, 0f, 1.25f, -0.62f); Matrix.scaleM(chainM, 0, 0.42f, 2.5f, 0.42f)
+        lit.mat4("uModel", chainM); pillar.draw()
+        lit.f("uRim", 0.5f); lit.f("uGloss", 0.6f)
+        lit.v4("uTint", 0.66f, 0.64f, 0.72f, 1f)
+        for (c in 0 until count) {
+            val h = 0.55f + c * 0.3f
+            val r = 0.4f - c * 0.04f
+            val links = 16
+            for (k in 0 until links) {
+                // Round the front of them from one side of the pillar to the other.
+                val u = k / (links - 1f)
+                val ang = (-200f + 220f * u) * (PI.toFloat() / 180f)
+                val rr = r + 0.015f * sin(time * 20f + k + c) * (1f + 4f * yank)
+                val x = kotlin.math.cos(ang) * rr
+                val z = -kotlin.math.sin(ang) * rr * 1.1f - 0.12f
+                val y = h + 0.02f * sin(time * 13f + k * 0.7f) - 0.05f * kotlin.math.sin(u * PI.toFloat())
+                Matrix.setIdentityM(chainM, 0)
+                Matrix.translateM(chainM, 0, x, y, z)
+                Matrix.rotateM(chainM, 0, -ang * 180f / PI.toFloat() + 90f, 0f, 1f, 0f)
+                Matrix.rotateM(chainM, 0, if (k % 2 == 0) 90f else 0f, 1f, 0f, 0f)
+                lit.mat4("uModel", chainM); link.draw()
+            }
+        }
+        lit.f("uGloss", 0f)
+        lit.v4("uTint", 1f, 1f, 1f, 1f)
+        lit.mat4("uModel", Toon.IDENTITY)
     }
 
     fun render(width: Int, height: Int, p: StageParams, time: Float, dt: Float, framing: Float = 1f, targetFbo: Int = 0) {
@@ -138,6 +182,18 @@ class StageScene(private val withPedestal: Boolean) {
             anim.spin = sin(sulk * 11f) * 22f * k
             anim.jump = -0.05f * sin(minOf(sulk, 0.8f) / 0.8f * PI.toFloat() * 0.5f)
         }
+        // Talking: the mouth opening and closing with the words, a bob and a turn now and then as they say it.
+        val wantOpen = if (p.talking) ((0.5f + 0.5f * sin(time * 17f)) * (0.55f + 0.45f * sin(time * 5.3f))).coerceIn(0f, 1f) else 0f
+        talkOpen += (wantOpen - talkOpen) * (1f - kotlin.math.exp(-dt * 25f))
+        anim.talk = talkOpen
+        if (p.talking) {
+            anim.jump += 0.025f * kotlin.math.abs(sin(time * 9f))
+            anim.spin += 5f * sin(time * 2.3f)
+            anim.recoil = maxOf(anim.recoil, 0.25f * (sin(time * 3.1f) - 0.6f).coerceAtLeast(0f) * 2.5f)
+        }
+        // Chained: pulling against it, a hard yank now and then.
+        val yank = if (p.chains > 0 && (time % 2.4f) < 0.3f) sin((time % 2.4f) / 0.3f * PI.toFloat()) else 0f
+        if (p.chains > 0) { anim.spin += 9f * sin(time * 6f) * (0.4f + yank); anim.moving = 0.15f + 0.4f * yank; anim.walk = time * 7f }
         // Face mostly toward the camera, 3/4 view, with a gentle idle sway.
         val facing = (PI / 2 - 0.62).toFloat() + sin(time * 0.6f) * 0.08f - Math.toRadians(shownYaw.toDouble()).toFloat()
 
@@ -212,6 +268,7 @@ class StageScene(private val withPedestal: Boolean) {
             anim.flash = 0f
         }
         lit.f("uFlash", 0f); lit.f("uEmissive", 0f)
+        if (p.chains > 0) drawChains(p.chains, yank, time)
         GLES30.glEnable(GLES30.GL_CULL_FACE)
         GLES30.glCullFace(GLES30.GL_FRONT)
         lit.i("uMode", 1)

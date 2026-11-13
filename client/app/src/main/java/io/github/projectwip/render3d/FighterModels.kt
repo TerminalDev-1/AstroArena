@@ -14,7 +14,8 @@ enum class Slot { PRIMARY, SECONDARY, ACCENT, SKIN, SKIN_BROWN, DARK, METAL, WHI
 
 /** Simple rig. Every part is attached to exactly one bone. */
 /** [FORE_L] and [FORE_R] are the front legs of a fighter that walks on four. */
-enum class Bone { BODY, HEAD, WEAPON, ARM, LEG_L, LEG_R, FORE_L, FORE_R, FLOAT }
+/** [MOUTH] rides the head at the model's mouth spot and opens as the fighter talks ([FighterAnim.talk]). */
+enum class Bone { BODY, HEAD, WEAPON, ARM, LEG_L, LEG_R, FORE_L, FORE_R, FLOAT, MOUTH }
 
 /** [gloss]: a shiny, chromatic shell (see the lit shader's `uGloss`). */
 class Part(val mesh: Mesh, val slot: Slot, val bone: Bone, val outline: Boolean, val emissive: Boolean, val gloss: Boolean = false)
@@ -32,7 +33,8 @@ class Rig(
     val hindX: Float = 0f,
 )
 
-class FighterModel(val parts: List<Part>, val rig: Rig)
+/** [mouth]: where the mouth sits on the head (head-local x, y, z), for a model that has one. */
+class FighterModel(val parts: List<Part>, val rig: Rig, val mouth: FloatArray? = null)
 
 /** Per-draw animation inputs. */
 class FighterAnim {
@@ -51,6 +53,8 @@ class FighterAnim {
     var swing = 0f
     /** 0..1 through a swing of a blade: the weapon sweeps flat across the front, from one side to the other. Below 0: none. */
     var slash = -1f
+    /** 0..1: how far open the mouth is, while talking (cutscenes); the head nods with it. */
+    var talk = 0f
 }
 
 enum class Pass { SHADOW, COLOR, OUTLINE, SILHOUETTE }
@@ -95,9 +99,15 @@ class FighterModels {
             val key = Triple(bone, slot, (if (outline) 1 else 0) or (if (emissive) 2 else 0) or (if (gloss) 4 else 0))
             builders.getOrPut(key) { MeshBuilder() }.apply { with { block() } }
         }
+        private var mouthAt: FloatArray? = null
+        /** A mouth at head-local ([x], [y], [z]): a dark slit that opens into an oval as the fighter talks. */
+        fun mouth(x: Float, y: Float, z: Float, width: Float = 0.06f) {
+            mouthAt = floatArrayOf(x, y, z)
+            add(Bone.MOUTH, Slot.INK, outline = false) { ellipsoid(0.022f, 0.032f, width, 8, 12) }
+        }
         fun build(rig: Rig) = FighterModel(
             builders.filterValues { !it.isEmpty }.map { (k, b) -> Part(b.build(), k.second, k.first, k.third and 1 != 0, k.third and 2 != 0, k.third and 4 != 0) },
-            rig,
+            rig, mouthAt,
         )
     }
 
@@ -139,8 +149,8 @@ class FighterModels {
                 // (Lashes, flicked out at the corners.)
                 at(0.25f, 0.225f, z * 1.15f) { rotate(if (z > 0f) -18f else 18f, 1f, 0f, 0f); roundedBox(0.02f, 0.016f, 0.08f, 0.006f) }
             }
-            at(0.262f, 0.05f, 0f) { roundedBox(0.02f, 0.014f, 0.07f, 0.006f) }
         }
+        a.mouth(0.255f, 0.05f, 0f, 0.055f)
         a.add(Bone.HEAD, Slot.WHITE, outline = false) { for (z in listOf(0.08f, -0.11f)) at(0.275f, 0.185f, z) { sphere(0.014f, 4, 6) } }
         a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) {
             at(0f, 0.34f, 0f) { rotate(-8f, 0f, 0f, 1f); torus(0.265f, 0.02f, 22, 5) }
@@ -277,6 +287,7 @@ class FighterModels {
         // Head: hair the colour of a flame swept back into two long tails like exhaust plumes, lit at the tips;
         // flying goggles pushed up on her forehead, and a fin on top.
         a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.2f, 0f) { sphere(0.3f) } }
+        a.mouth(0.285f, 0.07f, 0f)
         a.add(Bone.HEAD, Slot.INK, outline = false) {
             for (z in listOf(0.11f, -0.11f)) at(0.27f, 0.2f, z) { ellipsoid(0.04f, 0.06f, 0.04f, 6, 8) }
         }
@@ -348,8 +359,8 @@ class FighterModels {
         for (z in listOf(0.25f, -0.25f)) a.add(Bone.HEAD, Slot.SECONDARY) { at(0.05f, 0.05f, z) { ellipsoid(0.1f, 0.17f, 0.07f, 8, 10) } }
         a.add(Bone.HEAD, Slot.INK, outline = false) {
             for (z in listOf(0.095f, -0.095f)) at(0.245f, 0.15f, z) { ellipsoid(0.035f, 0.062f, 0.047f, 6, 8) }
-            at(0.262f, 0.045f, 0f) { roundedBox(0.02f, 0.014f, 0.06f, 0.006f) }
         }
+        a.mouth(0.255f, 0.045f, 0f, 0.05f)
         a.add(Bone.HEAD, Slot.WHITE, outline = false) { for (z in listOf(0.08f, -0.11f)) at(0.275f, 0.175f, z) { sphere(0.014f, 4, 6) } }
         a.add(Bone.HEAD, Slot.DARK) { at(0.02f, 0.35f, 0f) { rotate(-14f, 0f, 0f, 1f); torus(0.27f, 0.025f, 22, 5) } }
         for (z in listOf(0.11f, -0.11f)) {
@@ -388,6 +399,7 @@ class FighterModels {
         a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.88f, 0f) { ellipsoid(0.26f, 0.16f, 0.3f) } }
         // Head + hood
         a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.16f, 0f) { sphere(0.28f) } }
+        a.mouth(0.265f, 0.03f, 0f, 0.05f)
         a.add(Bone.HEAD, Slot.DARK) { at(-0.05f, 0.19f, 0f) { ellipsoid(0.32f, 0.33f, 0.32f, 8, 16, 0f, 0.55f) } }
         a.add(Bone.HEAD, Slot.INK, outline = false) {
             at(0.255f, 0.15f, 0.09f) { sphere(0.05f, 6, 8) }
@@ -424,7 +436,7 @@ class FighterModels {
         a.add(Bone.BODY, Slot.ACCENT, emissive = true) { at(-0.36f, 1.0f, 0f) { sphere(0.06f, 6, 8) } }
         // Head: a helmet with a wide brim swept down at the back, a crest along the top and a badge on the front.
         a.add(Bone.HEAD, Slot.SKIN_BROWN) { at(0f, 0.2f, 0f) { sphere(0.32f) } }
-        a.add(Bone.HEAD, Slot.DARK, outline = false) { at(0.29f, 0.1f, 0f) { roundedBox(0.08f, 0.06f, 0.3f, 0.025f) } }
+        a.mouth(0.3f, 0.1f, 0f, 0.1f)
         a.add(Bone.HEAD, Slot.WHITE, outline = false) { for (z in listOf(0.11f, -0.11f)) at(0.31f, 0.23f, z) { sphere(0.04f, 6, 8) } }
         a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.02f, 0.3f, 0f) { ellipsoid(0.37f, 0.33f, 0.37f, 8, 16, 0f, 0.5f) } }
         a.add(Bone.HEAD, Slot.PRIMARY) { at(-0.06f, 0.3f, 0f) { rotate(-10f, 0f, 0f, 1f); cylinder(0.5f, 0.04f, 18) } }
@@ -552,6 +564,7 @@ class FighterModels {
         }
         // Head: a pale face, hair down her back, and the hat: a wide brim and a tall crooked point.
         a.add(Bone.HEAD, Slot.SKIN) { at(0f, 0.16f, 0f) { sphere(0.28f) } }
+        a.mouth(0.265f, 0.02f, 0f, 0.05f)
         a.add(Bone.HEAD, Slot.DARK) { at(-0.08f, 0.14f, 0f) { ellipsoid(0.3f, 0.34f, 0.31f, 8, 16, 0f, 0.55f) } }
         a.add(Bone.HEAD, Slot.DARK) { at(-0.22f, -0.08f, 0f) { roundedBox(0.2f, 0.36f, 0.46f, 0.08f) } }
         a.add(Bone.HEAD, Slot.INK, outline = false) {
@@ -794,11 +807,18 @@ class FighterModels {
             if (pass == Pass.SILHOUETTE && p.bone == Bone.FLOAT) continue
             when (p.bone) {
                 Bone.BODY -> System.arraycopy(body, 0, bone, 0, 16)
-                Bone.HEAD -> {
+                Bone.HEAD, Bone.MOUTH -> {
                     System.arraycopy(body, 0, bone, 0, 16)
                     Matrix.translateM(bone, 0, 0f, rig.headY, 0f)
                     Matrix.rotateM(bone, 0, sin(t * 1.3f) * 3f * (1 - mv), 0f, 1f, 0f)
                     Matrix.rotateM(bone, 0, sin(anim.walk * 2) * 2f * mv, 1f, 0f, 0f)
+                    // (Talking: a little nod and tilt with the words.)
+                    if (anim.talk > 0f) Matrix.rotateM(bone, 0, sin(t * 9f) * 4f * anim.talk, 0f, 0f, 1f)
+                    if (p.bone == Bone.MOUTH) {
+                        val m = model.mouth ?: continue
+                        Matrix.translateM(bone, 0, m[0], m[1], m[2])
+                        Matrix.scaleM(bone, 0, 1f, 0.22f + 1.5f * anim.talk, 1f + 0.2f * anim.talk)
+                    }
                 }
                 Bone.WEAPON -> {
                     System.arraycopy(body, 0, bone, 0, 16)

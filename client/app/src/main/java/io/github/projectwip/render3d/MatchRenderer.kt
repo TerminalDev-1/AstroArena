@@ -94,10 +94,8 @@ class MatchRenderer(
     private lateinit var cell: Mesh
     private lateinit var cellCaps: Mesh
     private lateinit var stormFloor: Mesh
-    /** Dimension: the portal's stone base, its ring, and an echo shard and the beam over one. */
-    private lateinit var portalBase: Mesh
+    /** Dimension: the gate's ring, and an echo shard and the beam over one. */
     private lateinit var portalRing: Mesh
-    private lateinit var portalInner: Mesh
     private lateinit var shardGem: Mesh
     private lateinit var beam: Mesh
     /** One clump of the poison smoke: a few low, overlapping puffs, about two tiles across. */
@@ -217,13 +215,7 @@ class MatchRenderer(
             color(0.66f, 0.98f, 0.46f); with { translate(0.35f, 0.18f, -0.25f); ellipsoid(0.5f, 0.4f, 0.5f, 6, 9) }
         }.build()
         stormFloor = MeshBuilder().apply { color(1f, 1f, 1f); ring(1f, 6f, 72) }.build()
-        portalBase = MeshBuilder().apply {
-            // A low round dais of stone, stepped, that the ring floats over.
-            color(1f, 1f, 1f); with { translate(0f, 0.06f, 0f); cylinder(2.25f, 0.12f, 40) }
-            color(0.85f, 0.85f, 0.85f); with { translate(0f, 0.15f, 0f); cylinder(1.95f, 0.08f, 40) }
-        }.build()
         portalRing = MeshBuilder().apply { color(1f, 1f, 1f); torus(1.62f, 0.15f, 48, 10) }.build()
-        portalInner = MeshBuilder().apply { color(1f, 1f, 1f); torus(1.4f, 0.05f, 40, 6) }.build()
         shardGem = MeshBuilder().apply {
             color(1f, 1f, 1f); ellipsoid(0.26f, 0.62f, 0.26f, 2, 4)
             with { translate(0.26f, -0.2f, 0.05f); rotate(25f, 0f, 0f, 1f); ellipsoid(0.11f, 0.28f, 0.11f, 2, 4) }
@@ -724,47 +716,58 @@ class MatchRenderer(
     }
     private val hueOut = FloatArray(3)
 
+    /** Like [setModel], but stands a ground-plane mesh up to face the camera (+Z), turned by [rollDeg] in that plane. */
+    private fun setModelUpright(x: Float, y: Float, z: Float, sx: Float, sy: Float, sz: Float, rollDeg: Float = 0f) {
+        Matrix.setIdentityM(model, 0)
+        Matrix.translateM(model, 0, x, y, z)
+        if (rollDeg != 0f) Matrix.rotateM(model, 0, rollDeg, 0f, 0f, 1f)
+        Matrix.rotateM(model, 0, 90f, 1f, 0f, 0f)
+        Matrix.scaleM(model, 0, sx, sy, sz)
+        lit.mat4("uModel", model)
+    }
+
+    /** How open the gate is (0 shut, 1 fully awake), from when the chained soul was freed. */
+    private fun gateWake(run: io.github.projectwip.sim.PortalRun): Float =
+        if (run.state == io.github.projectwip.sim.PortalState.OPEN && run.freedAt >= 0f) ((run.time - run.freedAt) / 1.2f).coerceIn(0f, 1f) else 0f
+
     /**
-     * Dimension's portal (the user's design, build 106): a 3D structure standing in the very middle of every level
-     * where the centre bush was: a stepped stone dais, a ring of standing stones each crowned with a crystal, and a
-     * great stone ring floating flat over it. It sits dark until the chains are broken; then the ring lights up and
-     * turns through purple and every colour of the rainbow, its crystals blaze, and a vortex opens inside it.
+     * Dimension's portal (the user's design, build 107): a great ring standing upright in the very middle of every
+     * level, wider than it is tall, facing the camera, its ends on exactly the five tiles it blocks (`Tile.GATE`). It is
+     * a portal, not a gate: just the ring, with lights set all round it. Asleep (until all three echoes are found) it
+     * is dark, its lights dim, a glassy dark barrier inside it, and nobody walks on it or through it; awake, the ring
+     * and its lights chase round through every colour of the rainbow and a vortex swirls inside, and you can walk in.
      */
     private fun drawPortalStructure() {
         val run = world.portal ?: return
         val x = run.x; val z = run.y
         if (!inView(x, z)) return
-        val open = run.state == io.github.projectwip.sim.PortalState.OPEN
-        val wake = if (open && run.freedAt >= 0f) ((run.time - run.freedAt) / 1.2f).coerceIn(0f, 1f) else 0f
+        val wake = gateWake(run)
         val dl = dimensionLight(run.dimension)
-        lit.f("uRim", 0.35f)
-        lit.v4("uTint", 0.42f * dl[0], 0.4f * dl[1], 0.5f * dl[2], 1f)
-        setModel(x, 0f, z, 1f, 1f, 1f); portalBase.draw()
-        // The standing stones round it, and the crystal on each.
-        for (k in 0 until 6) {
-            val ang = k * 1.0472f + 0.26f
-            val px = x + cos(ang) * 2.05f; val pz = z + sin(ang) * 2.05f
-            lit.v4("uTint", 0.3f * dl[0], 0.28f * dl[1], 0.38f * dl[2], 1f)
-            setModel(px, 0.55f, pz, 0.28f, 1.1f, 0.28f, ang * 57.3f + 45f); bit.draw()
-            val c = hue(time * 0.25f + k / 6f)
-            val glow = 0.25f + 0.75f * wake
-            lit.f("uEmissive", 0.3f + 0.6f * wake)
-            lit.v4("uTint", lerp(0.45f, c[0], wake), lerp(0.3f, c[1], wake), lerp(0.75f, c[2], wake), 1f)
-            setModel(px, 1.35f + 0.08f * sin(time * 2f + k), pz, 0.14f * (0.8f + 0.2f * glow), 0.3f, 0.14f, time * 60f + k * 30f); octa.draw()
-            lit.f("uEmissive", 0f)
+        // The ring itself.
+        if (wake > 0f) {
+            val c = hue(time * 0.22f)
+            lit.f("uEmissive", 0.35f + 0.45f * wake)
+            lit.v4("uTint", lerp(0.3f, 0.45f + 0.55f * c[0], wake), lerp(0.25f, 0.3f + 0.6f * c[1], wake), lerp(0.45f, 0.6f + 0.4f * c[2], wake), 1f)
+        } else { lit.f("uEmissive", 0.05f); lit.v4("uTint", 0.34f * dl[0], 0.28f * dl[1], 0.5f * dl[2], 1f) }
+        lit.f("uRim", 0.5f)
+        setModelUpright(x, PORTAL_CY, z, PORTAL_RX / 1.62f, 2.2f, PORTAL_RY / 1.62f); portalRing.draw()
+        // A second, thinner ring just inside it, turning the other way round the colours.
+        if (wake > 0f) {
+            val c = hue(time * 0.22f + 0.5f)
+            lit.f("uEmissive", 0.8f * wake)
+            lit.v4("uTint", 0.4f + 0.6f * c[0], 0.3f + 0.7f * c[1], 0.5f + 0.5f * c[2], 1f)
+            setModelUpright(x, PORTAL_CY, z + 0.08f, PORTAL_RX * 0.88f / 1.62f, 0.8f, PORTAL_RY * 0.88f / 1.62f); portalRing.draw()
         }
-        // The ring, floating flat over the dais, bobbing; dark stone, or lit and turning through the colours.
-        val y = 0.55f + 0.06f * sin(time * 1.4f)
-        if (wake > 0f) {
-            val c = hue(time * 0.18f)
-            lit.f("uEmissive", 0.45f + 0.35f * wake)
-            lit.v4("uTint", lerp(0.35f, 0.55f + 0.45f * c[0], wake), lerp(0.3f, 0.3f + 0.5f * c[1], wake), lerp(0.45f, 0.75f + 0.25f * c[2], wake), 1f)
-        } else lit.v4("uTint", 0.35f * dl[0], 0.32f * dl[1], 0.45f * dl[2], 1f)
-        setModel(x, y, z, 1f, 1f, 1f, time * 12f); portalRing.draw()
-        if (wake > 0f) {
-            val c = hue(time * 0.18f + 0.5f)
-            lit.v4("uTint", c[0], c[1], c[2], 1f)
-            setModel(x, y + 0.02f, z, 1f, 1f, 1f, -time * 40f); portalInner.draw()
+        // Lights set all round the ring: dim violet asleep; awake, a rainbow chasing round it.
+        val n = 30
+        for (k in 0 until n) {
+            val ang = k * (6.2832f / n)
+            val c = hue(k.toFloat() / n - time * 0.35f)
+            val pulse = 0.5f + 0.5f * sin(time * 6f - k * 0.6f)
+            lit.f("uEmissive", 0.35f + 0.65f * wake)
+            lit.v4("uTint", lerp(0.4f, c[0], wake), lerp(0.28f, c[1], wake), lerp(0.75f, c[2], wake), 1f)
+            val sz = 0.09f + 0.05f * pulse * wake
+            setModel(x + cos(ang) * PORTAL_RX, PORTAL_CY + sin(ang) * PORTAL_RY, z + 0.2f, sz, sz * 1.6f, sz, ang * 57.3f + time * 90f); octa.draw()
         }
         lit.f("uEmissive", 0f)
         lit.v4("uTint", 1f, 1f, 1f, 1f)
@@ -772,40 +775,41 @@ class MatchRenderer(
         lit.mat4("uModel", identity)
     }
 
-    /** The inside of the portal (decal pass): still and dark while it sleeps; a swirling rainbow vortex once it wakes. */
+    /** The inside of the ring (decal pass): a dark glassy barrier while it sleeps; a swirling rainbow vortex once awake. */
     private fun drawPortal() {
         val run = world.portal ?: return
         if (!inView(run.x, run.y)) return
-        val open = run.state == io.github.projectwip.sim.PortalState.OPEN
-        val wake = if (open && run.freedAt >= 0f) ((run.time - run.freedAt) / 1.2f).coerceIn(0f, 1f) else 0f
-        val r = 1.45f
-        lit.v4("uTint", 0.04f, 0.02f, 0.09f, 0.9f)
-        setModel(run.x, 0.2f, run.y, r, 1f, r); sector(360f).draw()
-        if (wake <= 0f) {
-            lit.v4("uTint", 0.4f, 0.25f, 0.7f, 0.15f + 0.05f * sin(time * 2f))
-            setModel(run.x, 0.205f, run.y, r * 0.8f, 1f, r * 0.8f, time * 10f); arc(300f, 0.04f).draw()
-            return
+        val wake = gateWake(run)
+        val x = run.x; val y = PORTAL_CY; val z = run.y + 0.02f
+        val sx = PORTAL_RX * 0.92f; val sz = PORTAL_RY * 0.92f
+        if (wake < 1f) {
+            lit.v4("uTint", 0.07f, 0.03f, 0.14f, 0.9f * (1f - wake))
+            setModelUpright(x, y, z, sx, 1f, sz); sector(360f).draw()
+            lit.v4("uTint", 0.5f, 0.35f, 0.85f, (0.2f + 0.06f * sin(time * 2f)) * (1f - wake))
+            setModelUpright(x, y, z + 0.01f, sx * 0.8f, 1f, sz * 0.8f, time * 12f); arc(280f, 0.03f).draw()
         }
+        if (wake <= 0f) return
+        lit.v4("uTint", 0.04f, 0.01f, 0.08f, 0.95f * wake)
+        setModelUpright(x, y, z, sx, 1f, sz); sector(360f).draw()
         // Arms of colour winding in toward the middle, each a different hue, the whole wheel turning.
-        for (k in 0 until 7) {
-            val rr = r * (1f - k * 0.13f)
-            val c = hue(time * 0.3f + k * 0.14f)
-            lit.v4("uTint", 0.35f + 0.65f * c[0], 0.2f + 0.6f * c[1], 0.55f + 0.45f * c[2], (0.95f - k * 0.08f) * wake)
-            setModel(run.x, 0.21f + k * 0.003f, run.y, rr, 1f, rr, time * (if (k % 2 == 0) 110f else -150f) + k * 40f)
-            arc(220f, 0.14f).draw()
+        for (k in 0 until 8) {
+            val rr = 1f - k * 0.11f
+            val c = hue(time * 0.3f + k * 0.125f)
+            lit.v4("uTint", 0.35f + 0.65f * c[0], 0.2f + 0.6f * c[1], 0.55f + 0.45f * c[2], (0.95f - k * 0.07f) * wake)
+            setModelUpright(x, y, z + 0.01f + k * 0.004f, sx * rr, 1f, sz * rr, time * (if (k % 2 == 0) 110f else -150f) + k * 40f)
+            arc(220f, 0.13f).draw()
         }
         lit.v4("uTint", 1f, 0.95f, 1f, 0.9f * wake)
-        setModel(run.x, 0.24f, run.y, 0.22f + 0.04f * sin(time * 6f), 1f, 0.22f + 0.04f * sin(time * 6f)); sector(360f).draw()
-        // A column of light rising out of it, and motes drawn in from all round.
+        setModelUpright(x, y, z + 0.05f, 0.24f + 0.05f * sin(time * 6f), 1f, 0.18f + 0.04f * sin(time * 6f)); sector(360f).draw()
+        // A rainbow glow on the ground in front of it, and motes drawn into it.
         val c = hue(time * 0.2f)
-        lit.v4("uTint", 0.6f + 0.4f * c[0], 0.5f + 0.4f * c[1], 1f, 0.1f * wake)
-        setModel(run.x, 0.2f, run.y, r * 0.75f, 6f, r * 0.75f); beam.draw()
-        repeat(2) {
+        lit.v4("uTint", 0.6f + 0.4f * c[0], 0.5f + 0.4f * c[1], 1f, 0.22f * wake)
+        setModel(x, 0.3f, run.y + 1.1f, PORTAL_RX * 0.9f, 1f, 0.9f); sector(360f).draw()
+        repeat(3) {
             val a = rng.nextFloat() * 6.283f
-            val d = r * (1.1f + rng.nextFloat() * 0.6f)
             val cc = hue(rng.nextFloat())
             val col = (0xFF shl 24) or ((cc[0] * 255).toInt() shl 16) or ((cc[1] * 255).toInt() shl 8) or (cc[2] * 255).toInt()
-            particles.spawn(run.x + cos(a) * d, 0.4f, run.y + sin(a) * d, -cos(a) * d * 1.4f - sin(a) * 1.5f, 0.4f, -sin(a) * d * 1.4f + cos(a) * 1.5f, 0.6f, 0.1f, col, 0.9f)
+            particles.spawn(x + cos(a) * PORTAL_RX * 1.15f, y + sin(a) * PORTAL_RY * 1.15f, z + 0.1f, -cos(a) * 2.2f, -sin(a) * 1.5f, 0f, 0.6f, 0.1f, col, 0.9f)
         }
     }
 
@@ -831,7 +835,7 @@ class MatchRenderer(
         }
         // (The Void waiting at the portal is drawn with the fighters: [drawWorldVoid].) Wisps of dark off its hem.
         if (run.state == io.github.projectwip.sim.PortalState.OPEN && depth >= 2 && rng.nextFloat() < 0.5f) {
-            val vx = run.x + 2.6f; val vz = run.y + 1.2f
+            val vx = run.x + 3.3f; val vz = run.y + 1.2f
             particles.spawn(vx + (rng.nextFloat() - 0.5f) * 1.2f, 0.3f, vz + (rng.nextFloat() - 0.5f) * 1.2f,
                 0f, 0.8f + rng.nextFloat(), 0f, 1.1f, 0.22f, if (rng.nextFloat() < 0.3f) 0xFF8E5BFF.toInt() else 0xFF241040.toInt(), 0.7f)
         }
@@ -863,7 +867,7 @@ class MatchRenderer(
     private fun drawWorldVoid(pass: Pass) {
         val run = world.portal ?: return
         if (run.state != io.github.projectwip.sim.PortalState.OPEN || run.dimension < 2) return
-        val vx = run.x + 2.6f; val vz = run.y + 1.2f
+        val vx = run.x + 3.3f; val vz = run.y + 1.2f
         if (!inView(vx, vz)) return
         val p = match.player
         val souls = io.github.projectwip.data.Lore.Soul.entries
@@ -2368,12 +2372,12 @@ class MatchRenderer(
             s.portalGlitch = dimGlitch
             s.captiveName = io.github.projectwip.data.Lore.captive(run.dimension).title
             s.captiveOn = run.state == io.github.projectwip.sim.PortalState.EXPLORE || run.state == io.github.projectwip.sim.PortalState.ARRIVE
-            s.followerOn = run.freedAt >= 0f && run.state == io.github.projectwip.sim.PortalState.OPEN && run.time - run.freedAt > 1.2f
+            s.followerOn = run.freedAt >= 0f && run.state == io.github.projectwip.sim.PortalState.OPEN && run.time - run.freedAt > FOLLOW_TALK_AFTER
             s.followerX = followX; s.followerZ = followZ
             if (s.followerOn) {
                 val soul = io.github.projectwip.data.Lore.captive(run.dimension)
                 val lines = io.github.projectwip.data.Lore.freedLines(soul)
-                val t = run.time - run.freedAt - 1.2f
+                val t = run.time - run.freedAt - FOLLOW_TALK_AFTER
                 val i = (t / FOLLOW_LINE_SECONDS).toInt()
                 s.followerLine = if (i < lines.size) lines[i] else null
                 s.followerAge = t - i * FOLLOW_LINE_SECONDS
@@ -2469,8 +2473,14 @@ class MatchRenderer(
         const val SLASH_SECONDS = 0.26f
         /** The shadows of a realm: what they look like, and how long one takes to lunge in and back as it strikes. */
         const val SHADOW_SHADE = 0xFF1C1024L
+        /** Dimension's portal ring: its half-width and half-height, and how high its middle stands. */
+        const val PORTAL_RX = 2.15f
+        const val PORTAL_RY = 1.4f
+        const val PORTAL_CY = 1.45f
         /** How long each thing a freed soul says stays up. */
         const val FOLLOW_LINE_SECONDS = 4.2f
+        /** A freed soul starts talking once the Void's taunt at the moment of freeing has faded (it lasts 5 s). */
+        const val FOLLOW_TALK_AFTER = 5.2f
         const val SHADOW_LUNGE = 0.3f
     }
 

@@ -243,9 +243,18 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   player a step behind (`MatchRenderer.drawFollower`, client-side only) and tell them, in speech bubbles, who the
   Void really is: an evil demon that took the removed fighters and wears them (the user's lore; `Lore.freedLines`).
   The portal always stands in the very middle of the arena, where the centre bush was (`Arenas.dimension()`, Foundry
-  Yard with that bush cleared), as a 3D structure the user asked for: a stone dais, standing stones crowned with
-  crystals and a great ring floating flat over it (`drawPortalStructure`), dark until the soul is freed, then lit
-  and turning through purple and the rainbow with a swirling vortex inside (`drawPortal`). From the second dimension the ground tears open near the player now
+  Yard with that bush cleared). Since build 107 it is a great ring standing upright, wider than tall, facing the
+  camera (`drawPortalStructure`, `PORTAL_RX/RY/CY`), with lights all round it, over exactly the five tiles it blocks
+  (`Tile.GATE`, `PORTAL_HALF`): solid, nobody walks on it or through it, until all three echoes are found; then its
+  inside opens, the ring and lights chase through the rainbow and a vortex swirls in it (`drawPortal`), and walking in
+  plays the dive (`PortalDive` in `DimensionCutscene`: tumbling down a tunnel of rainbow rings) before the Void's scene.
+  **It is a portal, not a gate**: build 107's first try was a stone gate with pillars and a lintel, and the user
+  rejected it ("you have ruined the portal"). Keep the ring shape, big, in the middle.
+  In cutscenes the speakers talk: models have mouths (`Bone.MOUTH`, `Assembler.mouth`, `FighterModel.mouth`) that
+  open with `FighterAnim.talk`, with a nod and gestures (`StageParams.talking`; `FighterView`/`SoulView` `talking`),
+  and the captive in its talk is chained in 3D on the stage (`StageParams.chains`, `StageScene.drawChains`); the user
+  called the drawn 2D chains, and Byte with no mouth, poor. The cutscenes' panels are the game's chunky `Panel`
+  plates, not flat glass. From the second dimension the ground tears open near the player now
   and then (`HazardKind.RIFT`, `stepRifts`): one life, so a rift can end the run.
   The lore is the user's: **the Void carries the souls of every fighter removed from the game** (`Lore.Soul`:
   Byte, Rocket, Spark, Mira, Varun) **and glitches between them**. Each has its own original 3D model (`FighterModels.drawSoul`:
@@ -446,23 +455,24 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - **Never commit changes the user made on their own.** Commit only what you changed in this task, file by file
   (`git add <path>`, never `git add -A` or `git commit -a`). Anything else that shows up in `git status`, such as
   an edited `.cfg` on the live server, is the user's: leave it uncommitted and untouched, and mention it.
-- **The version is "1.0".** AstroArena came out of Beta in build 103, by the user's decision: `versionName = "1.0"` is
-  what players see (it was "Beta" until then). Underneath, the build number (`BuildConfig.BUILD`) is what the updater
+- **The version is "1.1"** (since build 107, by the user's decision; 1.0 was builds 103 to 106). AstroArena came out
+  of Beta in build 103: `versionName` is what players see (it was "Beta" until then). Underneath, the build number (`BuildConfig.BUILD`) is what the updater
   and the server's version gate compare, so tags stay `vN.0` with N the build number (v103.0 for 1.0): a `v1.0` tag
   would look older than every build before it and nobody would update.
-- **Updates to 1.0 replace the 1.0 release, by the user's decision (build 104).** Don't publish a new release: edit
-  the existing "AstroArena 1.0" release, replace its APK with the new build's, and move its tag to the new build
-  (`gh release edit <old tag> --tag vN.0`, after pushing tag `vN.0` on the new commit). `versionName` stays "1.0";
-  the build number still goes up, and the tag must carry it, because the updater only offers a tag newer than the
-  installed build.
+- **Updates within a version replace that version's release, by the user's decision (build 104).** A new version
+  (1.0 -> 1.1, when the user names one) gets a release of its own, "AstroArena 1.1". After that, don't publish a new
+  release for each update: edit the existing "AstroArena 1.1" release, replace its APK with the new build's, and
+  move its tag to the new build (`gh release edit <old tag> --tag vN.0`, after pushing tag `vN.0` on the new commit).
+  `versionName` stays; the build number still goes up, and the tag must carry it, because the updater only offers a
+  tag newer than the installed build.
 - **No long-term support, by the user's decision.** Every build is replaced by the next: the update screen has no
   way past it, and nothing on the server is kept for the sake of an older build. Build 46 shipped with a LATER
   button, so the server refuses it (`versions_not_supported.cfg`); keep that rule. Don't add an update-later option.
 - **Non-negotiable: release without being asked.** The user must never have to say "release". When a task that
   changed the client is finished, verified and pushed, release it: add one to `versionCode` (unless that build
   number has not been released yet), commit, tag `vN.0` (N = the build number), push the tag, and publish a GitHub
-  release titled "AstroArena 1.0" (it was a pre-release titled "AstroArena Beta" until build 103) with the release APK
-  attached (`AstroArena-1.0-N.apk`). The build number is
+  release titled "AstroArena 1.1" (see the rule above: updates within 1.1 replace that release) with the release APK
+  attached (`AstroArena-1.1-N.apk`). The build number is
   `build` in `client/app/build.gradle.kts` (`BuildConfig.BUILD`): it can be a point release such as "94.1" (tag
   `v94.1`) when the user asks for one; Android's `versionCode` is made from it (major * 100 + minor). One release per
   finished task, not one per checkpoint commit; server-only or docs-only work needs none. The tag keeps the
