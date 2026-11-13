@@ -53,14 +53,11 @@ import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import io.github.projectwip.data.CapsuleResult
-import io.github.projectwip.data.CapsuleTier
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.GameRepository
 import io.github.projectwip.data.MatchRewards
 import io.github.projectwip.data.Reward
 import io.github.projectwip.sim.MatchConfig
-import io.github.projectwip.ui.screens.CapsuleOpenOverlay
 import io.github.projectwip.ui.screens.CupTrackScreen
 import io.github.projectwip.ui.screens.FightersScreen
 import io.github.projectwip.ui.screens.HomeScreen
@@ -124,22 +121,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         )
     }
     var reveal by remember { mutableStateOf<RewardReveal?>(null) }
-    /** The Spark Capsule being opened, if any. Its reward is already saved by the time this is set. */
-    var capsule by remember {
-        // Debug: `--es screen capsule3` previews opening a box whose best item is tier 3 (`capsule3s`: a full box of eight) without touching the save.
-        mutableStateOf(startScreen?.takeIf { it.startsWith("capsule") }?.let {
-            val tier = CapsuleTier.entries[(it.removePrefix("capsule").trimEnd('s', 'f', 'b').toIntOrNull() ?: 0).coerceIn(0, CapsuleTier.entries.lastIndex)]
-            // Suffixes: s = a full box, f = a fighter comes out, b = a bundle comes out.
-            val reward = when {
-                it.endsWith("f") -> Reward.UnlockFighter(FighterId.KITO)
-                it.endsWith("b") -> Reward.Bundle(listOf(Reward.SkinReward(FighterId.BRAKK, 1), Reward.Prisms(150), Reward.Bolts(800)))
-                else -> Reward.Bolts(100 * (tier.ordinal + 1))
-            }
-            val count = if (it.endsWith("s")) io.github.projectwip.data.SparkCapsules.MAX_ITEMS else io.github.projectwip.data.SparkCapsules.BOX_ITEMS
-            CapsuleResult(List(count - 1) { i -> io.github.projectwip.data.BoxItem(CapsuleTier.entries[i % (tier.ordinal + 1)], if (i % 2 == 0) Reward.Bolts(180 + 60 * i) else Reward.Credits(120 + 40 * i)) } + io.github.projectwip.data.BoxItem(tier, reward))
-        })
-    }
-
     // ---- start-up: connect to the game server, ask GitHub whether a newer release exists, load sounds and music
     val serverStatus by server.status.collectAsState()
     val account = serverStatus.account
@@ -293,56 +274,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     /** A match has just ended and the server is replaying it to decide the result. */
     var judging by remember { mutableStateOf(false) }
     val ask = remember { ServerCall(scope, server, local, repo, sfx) { toast = it } }
-    // Arena Boxes are opened by the server: it rolls the drop, the game shows what came out. (Offline they are the
-    // offline profile's, and are rolled on the device.)
-    val openCapsule: () -> Unit = {
-        if (!opening) {
-            if (repo.offlineMode) repo.save.value.settings.let { local.openDrop(it.debugLuck, it.debugInfiniteCapsules) }.let { if (it != null) capsule = it else toast = "No Arena Boxes to open." }
-            else if (!serverStatus.online) toast = "Couldn't reach the server. Try again in a moment."
-            else {
-                opening = true
-                scope.launch {
-                    val cheats = repo.save.value.settings
-                    val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        server.openDrop(if (dev) cheats.debugLuck else 0f, dev && cheats.debugInfiniteCapsules)
-                    }
-                    opening = false
-                    server.status.value.account?.let { repo.sync(it) }
-                    if (result != null) { repo.dropOpened(); capsule = result }
-                    else toast = if (server.status.value.online) "No Arena Boxes to open." else "Couldn't reach the server. Try again in a moment."
-                }
-            }
-        }
-    }
-    /** Everything that came out of an "open all", while it is being shown. Like [capsule], it is already saved. */
-    var haul by remember {
-        // Debug: `--es screen haul` previews it with made-up drops, without touching the save.
-        mutableStateOf(if (startScreen == "haul") io.github.projectwip.ui.screens.previewHaul() else null)
-    }
-    // Opens every drop that is left. [first] is the one on screen, when its own reveal is being skipped.
-    val openAll: (CapsuleResult?) -> Unit = { first ->
-        if (!opening) {
-            if (repo.offlineMode) repo.save.value.settings.let { local.openAllDrops(it.debugLuck, it.debugInfiniteCapsules) }.let { if (it != null) { capsule = null; haul = (listOfNotNull(first) + it).flatMap { box -> box.items } } else toast = "No Arena Boxes to open." }
-            else if (!serverStatus.online) toast = "Couldn't reach the server. Try again in a moment."
-            else {
-                opening = true
-                scope.launch {
-                    val luck = if (dev) repo.save.value.settings.debugLuck else 0f
-                    val rest = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server.openAllDrops(luck) }
-                    opening = false
-                    server.status.value.account?.let { repo.sync(it) }
-                    if (rest != null) { repo.dropOpened(rest.size); capsule = null; haul = (listOfNotNull(first) + rest).flatMap { box -> box.items } }
-                    else toast = if (server.status.value.online) "No Arena Boxes to open." else "Couldn't reach the server. Try again in a moment."
-                }
-            }
-        }
-    }
-
     BackHandler(enabled = screen !is Screen.Home && screen !is Screen.Match) {
         screen = Screen.Home
     }
-    BackHandler(enabled = capsule != null) { capsule = null }
-    BackHandler(enabled = haul != null) { haul = null }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Palette.BgBottom)) {
         // Uniform UI scale so tablets get bigger, more legible UI — layouts then use the extra room
@@ -364,8 +298,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            // The menu steps aside while a capsule is being opened, so nothing sits on top of the 3D capsule.
-            val menuAlpha by androidx.compose.animation.core.animateFloatAsState(if (capsule != null || haul != null) 0f else 1f, tween(160), label = "menu")
+            val menuAlpha = 1f
             AnimatedContent(
                 modifier = Modifier.graphicsLayer { alpha = menuAlpha }.then(if (screen is Screen.Match) Modifier else Modifier.windowInsetsPadding(cutout)),
                 targetState = screen,
@@ -387,7 +320,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 label = "screens",
             ) { s ->
                 CompositionLocalProvider(LocalScreen provides s) { when (s) {
-                    Screen.Home -> HomeScreen(save, repo, go, showReward, openCapsule)
+                    Screen.Home -> HomeScreen(save, repo, go, showReward)
                     is Screen.Fighters -> FightersScreen(save, repo, s.focus, go)
                     Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
                     Screen.Leaderboard -> io.github.projectwip.ui.screens.LeaderboardScreen(save, go)
@@ -474,12 +407,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             if (needsName) io.github.projectwip.ui.screens.NameScreen { name ->
                 repo.updateSettings { it.copy(playerName = name, nameChosen = true) }
                 needsName = false
-            }
-            AnimatedVisibility(capsule != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                capsule?.let { CapsuleOpenOverlay(it, if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, save.bolts, save.prisms, roadNow(save), roadGoal(save), onNext = openCapsule, onOpenAll = openAll, onDone = { capsule = null }) }
-            }
-            AnimatedVisibility(haul != null, enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
-                haul?.let { io.github.projectwip.ui.screens.DropHaulOverlay(it, save.bolts, save.prisms, roadNow(save), roadGoal(save)) { haul = null } }
             }
         }
     }

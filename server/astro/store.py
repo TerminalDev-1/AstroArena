@@ -140,6 +140,8 @@ class Store:
             for name, definition in MATCH_COLUMNS:
                 if name not in have:
                     self._db.execute("ALTER TABLE matches ADD COLUMN %s %s" % (name, definition))
+            # Arena Boxes were removed in 1.3: whatever anyone still held is wiped (the owner's decision).
+            self._db.execute("UPDATE players SET drops = 0 WHERE drops != 0")
 
     def close(self) -> None:
         with self._lock:
@@ -178,7 +180,7 @@ class Store:
         """Developer hand-outs."""
         with self._lock, self._db:
             self._db.execute(
-                "UPDATE players SET cups = MAX(0, cups + ?), drops = MAX(0, drops + ?) WHERE id = ?", (int(cups), int(drops), player_id)
+                "UPDATE players SET cups = MAX(0, cups + ?) WHERE id = ?", (int(cups), player_id)  # (no boxes: removed in 1.3)
             )
             profile = self._profile(player_id)
             profile["bolts"] = max(0, profile["bolts"] + int(bolts))
@@ -219,7 +221,7 @@ class Store:
             if row is None:
                 return False
             cups = number(change.get("cups", row["cups"]))
-            drops = number(change.get("drops", row["drops"]))
+            drops = 0  # Arena Boxes were removed in 1.3: accounts.cfg can't give any back
             # Disabling marks the account and nothing more; a reason and an end only mean something while it is disabled.
             disabled = bool(change.get("disabled", row["disabled"]))
             reason = " ".join(str(change.get("disabled_reason", row["disabled_reason"])).split())[:200] if disabled else ""

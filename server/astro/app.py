@@ -307,10 +307,9 @@ def make_handler(game: Game, quiet: bool = False):
             m = _MATCH_RESULT.match(url.path)
             if m:
                 return self._finish_match(int(m.group(1)))
-            if url.path == "/v1/drops/open":
-                return self._open_drop()
-            if url.path == "/v1/drops/open-all":
-                return self._act(self._open_all_drops)
+            if url.path in ("/v1/drops/open", "/v1/drops/open-all"):
+                # Arena Boxes were removed in 1.3: there are none to open.
+                return self._act(self._no_boxes)
             if url.path == "/v1/dev/grant":
                 return self._act(lambda p, d: game.store.grant(
                     p["id"], int(d.get("cups") or 0), int(d.get("drops") or 0), int(d.get("bolts") or 0), int(d.get("prisms") or 0),
@@ -371,6 +370,9 @@ def make_handler(game: Game, quiet: bool = False):
                 raise Refused(403, "the server doesn't allow that difficulty")
             game.store.set_difficulty(player["id"], wanted)
             return {"ok": True}
+
+        def _no_boxes(self, player, data):
+            raise Refused(410, "Arena Boxes were removed")
 
         def _open_all_drops(self, player, data):
             # Luck is the debug menu's, so only a developer's counts.

@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         // The graphics preset and frame rate follow the settings (App calls this again when they change).
         applyGraphics(repo.save.value.settings)
 
-        // Debug builds accept `--es screen match|fighters|shop|track|settings|capsuleN` for automated testing.
+        // Debug builds accept `--es screen match|fighters|shop|track|settings` for automated testing.
         val start = if (BuildConfig.DEBUG) intent?.getStringExtra("screen") else null
         // Debug: `--es screen crash` crashes the game on purpose, to try the crash reporter.
         if (start == "crash") window.decorView.postDelayed({ throw IllegalStateException("A test crash, asked for with --es screen crash") }, 1500)

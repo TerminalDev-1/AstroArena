@@ -77,9 +77,9 @@ data class CapsuleResult(val items: List<BoxItem>) {
  */
 object SparkCapsules {
     /** Capsules that can be earned per calendar day. */
-    const val PER_DAY = 3
+    const val PER_DAY = 0  // Arena Boxes were removed in 1.3
     /** Every save starts with one, so the first open doesn't have to be earned. */
-    const val STARTING = 1
+    const val STARTING = 0
 
     /** Highest luck the debug menu offers (shown as x15). */
     const val MAX_LUCK = 14f

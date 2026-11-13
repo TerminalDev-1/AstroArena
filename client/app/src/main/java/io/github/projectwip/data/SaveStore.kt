@@ -179,7 +179,8 @@ class SaveStore(context: Context, name: String = "save.json") {
                 matchesPlayed = o.optInt("matchesPlayed", 0),
                 victories = o.optInt("victories", 0),
                 totalKos = o.optInt("totalKos", 0),
-                capsules = o.optInt("capsules", d.capsules).coerceAtLeast(0),
+                // Arena Boxes were removed in 1.3: any still held are wiped (the owner's decision).
+                capsules = 0,
                 capsuleDay = o.optLong("capsuleDay", -1),
                 capsulesEarnedToday = o.optInt("capsulesEarnedToday", 0).coerceAtLeast(0),
                 capsulesOpened = o.optInt("capsulesOpened", 0).coerceAtLeast(0),

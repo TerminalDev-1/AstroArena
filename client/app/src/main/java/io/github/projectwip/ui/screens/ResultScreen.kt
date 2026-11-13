@@ -271,23 +271,15 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                                 if (row++ < rowsShown) RewardTile(IconKind.BOLT, "+${rewards.bolts}", Palette.Orange)
                                 if (rewards.credits > 0 && row++ < rowsShown) RewardTile(IconKind.CREDIT, "+${rewards.credits}", Palette.Gold)
                                 if (rewards.firstWinPrisms > 0 && row++ < rowsShown) RewardTile(IconKind.PRISM, "+${rewards.firstWinPrisms}", Palette.Prism)
-                                if (rewards.capsuleEarned && row++ < rowsShown) RewardTile(IconKind.CAPSULE, "+1", Palette.Cyan)
                             }
                             if (rewards.unlocked.isNotEmpty() && row++ < rowsShown) for (f in rewards.unlocked) {
                                 Badge("${Balance.fighter(f).name.substringBefore(' ').uppercase()} UNLOCKED ON THE SPARK ROAD!", Modifier.arrive(0, 0f, 20f), color = Palette.GoldDeep)
                             }
                             if (rewards.mvpCups > 0 && row++ < rowsShown) Badge("MVP · +${rewards.mvpCups} CUPS", Modifier.arrive(0, 0f, 20f), color = Palette.GoldDeep)
                         }
-                        val dropsHere = r.mode != io.github.projectwip.data.GameMode.BOSS && r.mode != io.github.projectwip.data.GameMode.DUEL && rewards.online
                         // Everything a match is worth is awarded by the server; without it a match is practice.
                         if (r.mode == io.github.projectwip.data.GameMode.DUEL && !rewards.online) PlainText("This 1v1 wasn't settled by the server · nothing is earned", Type.Small, color = Palette.Gold)
                         else if (!rewards.online) PlainText("The server couldn't be reached · this match wasn't counted", Type.Small, color = Palette.Gold)
-                        if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday <= 0) {
-                            PlainText("All of today's Arena Boxes are earned · more tomorrow", Type.Small, color = Palette.Text)
-                        }
-                        if (dropsHere && !rewards.capsuleEarned && rewards.capsulesLeftToday > 0) {
-                            PlainText("${if (ffa) "Finish top 4" else "Win"} to earn an Arena Box · ${rewards.capsulesLeftToday} left today", Type.Small, color = Palette.Text)
-                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))

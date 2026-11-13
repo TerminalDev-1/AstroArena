@@ -406,8 +406,6 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   (drop luck, free drops, upgrade cost, no level cap, hand-outs) and is always on for them: there is no "D" button
   and no switch any more. Only they can make shop deals (the in-game Offer Creator) or reset an account. The server
   ignores luck, free drops, free upgrades and hand-outs from anyone else.
-- Settings > Modes has "Arena Boxes only", for everyone: the home screen becomes just the Arena Box button, with
-  no fights. It is a layout choice kept on the device; the drops are still the server's.
 - `server/accounts.cfg` is the owner's hand on every account (`astro/accounts.py`): the server writes it from the
   database, leaderboard first, and forces whatever value the owner changes in it (`Store.force`). It holds player
   ids and names, so it is gitignored: never commit it. `disabled = yes` there marks an account (never deletes it),
@@ -458,16 +456,15 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   6,500, Legendary 7,000: the user removed the Ultra rarity and made Buddy Legendary), and the moment they cover it the server unlocks that fighter
   (`economy.fill_road`), with the leftover carried on: there is nothing to claim. A reward that unlocked someone
   comes back as a bundle (the Credits and the fighter), and a match's verdict lists them in `unlocked`. Once every
-  fighter is unlocked Credits are paid as Upgrade Credits. Arena Boxes are the main source of Credits: every
-  Credit amount a drop gives is multiplied by `CREDIT_BUFF` in `rules.py`.
-- Arena Boxes replaced Glitch Drops, by the user's decision; a drop a player still held became a box, one for one
-  (it is the same counter: `drops` on the server, `capsules` in the save). A box holds several items
-  (`BOX_ITEMS`, sometimes more, up to `MAX_ITEMS`, in `rules.py` and `SparkCapsules`), each rolled on the tier table
-  for a reward of its own. The tiers are only the luck behind the roll: by the user's decision a box has no rarity and
-  the game never shows one (items are "Item 1", "Item 2"... and anything past the third is a "Bonus item"). One item is one thing: no roll
-  gives a bundle, the jackpot included (a bundle only appears when Credits unlock a fighter); the opening screen shows them one at a time with an "items remaining"
-  counter (`CapsuleOpen.kt`). Boxes don't split: that was the drops' mechanic and it is gone. The idea of a box of
-  several random items is a familiar one; the name, the crate, the tiers and the screen are ours and must stay so.
+  fighter is unlocked Credits are paid as Upgrade Credits.
+- **There are no Arena Boxes (removed in 1.3, build 110, by the user's decision: "they have no use in the game";
+  held boxes "just wiped").** The server wipes every account's `drops` to 0 when it starts and nothing pays one
+  (`earns_drop` is False, `STARTING_DROPS` 0, imports bring none, `/v1/drops/open*` answer 410); the client's saves
+  load with `capsules = 0` and the offline economy mirrors it. The home screen's box button, the opening and "open
+  all" screens (`CapsuleOpen.kt`, `DropHaul.kt`, deleted), the "Arena Boxes only" layout, the Chaos box tweaks and
+  the result screen's box lines are gone. The `drops`/`capsules` counters stay in the database, the API and the save
+  (always 0), and the roll tables (`TIERS`, `open_box`, `SparkCapsules`, `Economy.openDrops`) and `Capsule3D` are kept
+  with nothing using them. Don't bring boxes back unless the user asks.
 - There is no Glory and no Spark Pass: both were removed on purpose (stored Glory was paid out as Upgrade Credits,
   `economy.complete`). Don't bring them back.
 - The Spark Road screen is 3D: `LobbyShot.ROAD` draws a road in the lobby scene (`render3d/Lobby.kt`, off at

@@ -328,11 +328,11 @@ class Api(unittest.TestCase):
         status, body = self.call("PUT", "/v1/save", {"save": save}, me["token"])
         self.assertEqual((status, body["revision"]), (200, 1))
         # The first save sets the account's starting Cups and drops...
-        self.assertEqual((body["account"]["cups"], body["account"]["drops"]), (321, 4))
+        self.assertEqual((body["account"]["cups"], body["account"]["drops"]), (321, 0))
         # ...and after that a save can't change them.
         cheat = {**save, "cups": 99999, "capsules": 500}
         body = self.call("PUT", "/v1/save", {"save": cheat}, me["token"])[1]
-        self.assertEqual((body["revision"], body["account"]["cups"], body["account"]["drops"]), (2, 321, 4))
+        self.assertEqual((body["revision"], body["account"]["cups"], body["account"]["drops"]), (2, 321, 0))
         _, stored = self.call("GET", "/v1/save", token=me["token"])
         self.assertEqual(stored["save"], cheat)
         # One player can't read another's save.
@@ -839,22 +839,22 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("POST", path, win, other["token"])[0], 409)  # not their match
         status, body = self.call("POST", path, win, me["token"])
         self.assertEqual(status, 200)
-        self.assertEqual((body["cupDelta"], body["cups"], body["drop"]), (25, 25, True))  # 1st place, whatever the difficulty
+        self.assertEqual((body["cupDelta"], body["cups"], body["drop"]), (25, 25, False))  # 1st place; no Arena Box (removed in 1.3)
         # Bolts and the first-win Prisms are the server's to give too: (30 + 2 x 4 KOs) x 0.75 on Easy.
         self.assertEqual((body["bolts"], body["firstWinPrisms"]), (29, 10))
         self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (60 + 29, 10))
         self.assertEqual(body["account"]["profile"]["bestCups"], 25)
-        self.assertEqual((body["account"]["drops"], body["account"]["dropsLeftToday"]), (2, 2))
+        self.assertEqual((body["account"]["drops"], body["account"]["dropsLeftToday"]), (0, 0))
         self.assertEqual(self.call("POST", path, win, me["token"])[0], 409)  # only once
-        # Three drops a day: the fourth good finish earns Cups but no drop.
-        for expected_drop in (True, True, False):
+        # Good finishes earn Cups, never an Arena Box.
+        for expected_drop in (False, False, False):
             _, plan = self.call("POST", "/v1/matches", {"mode": "KNOCKOUT_RUSH"}, me["token"])
             self.assertEqual(len(plan["botNames"]), 5)
             self.age_matches()
             _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], {**win, "placement": 0, "mvp": True}, me["token"])
             self.assertEqual((body["cupDelta"], body["drop"]), (10, expected_drop))
             self.assertEqual(body["firstWinPrisms"], 0)  # only the first win of the day
-        self.assertEqual((body["account"]["cups"], body["account"]["drops"], body["account"]["dropsLeftToday"]), (55, 4, 0))
+        self.assertEqual((body["account"]["cups"], body["account"]["drops"], body["account"]["dropsLeftToday"]), (55, 0, 0))
         _, board = self.call("GET", "/v1/leaderboard")
         self.assertEqual((board["players"][0]["name"], board["players"][0]["cups"]), ("Player", 55))
         # The leaderboard is the real accounts and nobody else, and each account knows its place on it.
@@ -873,7 +873,7 @@ class Api(unittest.TestCase):
         self.assertIn("faster", body["error"])
         self.assertEqual(self.call("POST", path, win, me["token"])[0], 409)  # and the match is closed
         account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]
-        self.assertEqual((account["cups"], account["drops"]), (0, 1))
+        self.assertEqual((account["cups"], account["drops"]), (0, 0))
         self.assertEqual(self.store.player(me["id"])["flags"], 1)
         # A result for a match the server never planned gets nothing either.
         self.assertEqual(self.call("POST", "/v1/matches/9999/result", win, me["token"])[0], 409)
@@ -891,28 +891,22 @@ class Api(unittest.TestCase):
         _, plan = self.call("POST", "/v1/matches", {"mode": "BOSS", "boss": "STAMPEDE"}, token)
         self.assertEqual(self.store.open_match(me["id"], plan["matchId"])["boss"], "STAMPEDE")
 
-    def test_the_server_opens_drops(self):
-        save = {"cups": 0, "capsules": 2, "bolts": 100, "prisms": 10}
-        me = self.player(save=save)
-        status, first = self.call("POST", "/v1/drops/open", {"luck": 14, "free": True}, me["token"])
-        self.assertEqual(status, 200)
-        self.assertTrue(rules.BOX_ITEMS <= len(first["items"]) <= rules.MAX_ITEMS)
-        self.assertTrue(all(i["tier"] in [name for name, _ in rules.TIERS] for i in first["items"]))
-        # `free` was ignored: this player is no developer, so the box was used up.
-        self.assertEqual(first["account"]["drops"], 1)
-        # The reward went into the profile the server keeps; the uploaded save is left as it was.
-        expected = economy.profile_from_save(save)
-        for reward in (i["reward"] for i in first["items"]):
-            for item in reward.get("items", [reward]):
-                if item["type"] != "fighter":
-                    economy.grant(expected, item)
-        self.assertEqual(first["account"]["profile"], expected)
-        self.assertEqual(self.call("GET", "/v1/save", token=me["token"])[1]["save"], save)
-        # Open until there are none left; then the server says no.
-        left = first["account"]["drops"]
-        while left > 0:
-            left = self.call("POST", "/v1/drops/open", {}, me["token"])[1]["account"]["drops"]
-        self.assertEqual(self.call("POST", "/v1/drops/open", {}, me["token"])[0], 409)
+    def test_arena_boxes_are_gone(self):
+        # Arena Boxes were removed in 1.3: a save that held some brings none in, and neither way of opening works.
+        me = self.player(save={"cups": 0, "capsules": 5, "bolts": 100, "prisms": 10})
+        self.assertEqual(self.call("GET", "/v1/me", token=me["token"])[1]["account"]["drops"], 0)
+        self.assertEqual(self.call("POST", "/v1/drops/open", {"luck": 14, "free": True}, me["token"])[0], 410)
+        self.assertEqual(self.call("POST", "/v1/drops/open-all", {}, me["token"])[0], 410)
+
+    def test_boxes_held_before_are_wiped(self):
+        # Whatever was in the database when the server starts is wiped (the owner's decision).
+        me = self.player()
+        with self.store._db:
+            self.store._db.execute("UPDATE players SET drops = 7 WHERE id = ?", (me["id"],))
+        from astro.store import Store
+        again = Store(os.path.join(self.dir, "astroarena.db"))
+        self.assertEqual(again.player(me["id"])["drops"], 0)
+        again.close()
 
     def test_credits_unlock_fighters_along_the_spark_road(self):
         me = self.player()
@@ -1086,28 +1080,6 @@ class Api(unittest.TestCase):
         self.assertTrue(amounts and all(96 <= a <= 168 and a % rules.CREDIT_BUFF == 0 for a in amounts))
         self.assertEqual(rules.CREDIT_BUFF, 12)
 
-    def test_the_server_opens_every_drop_at_once(self):
-        save = {"cups": 0, "capsules": 5, "bolts": 0, "prisms": 0}
-        me = self.player(save=save)
-        status, body = self.call("POST", "/v1/drops/open-all", {"luck": 14}, me["token"])
-        self.assertEqual(status, 200)
-        results = body["results"]
-        # `luck` was ignored (no developer): the five boxes they held were opened, and at full luck every one
-        # would have been full.
-        self.assertEqual(len(results), 5)
-        self.assertTrue(any(len(r["items"]) < rules.MAX_ITEMS for r in results))
-        self.assertEqual(body["account"]["drops"], 0)
-        # Everything that came out is in the profile the server keeps.
-        # (A drop never holds a fighter: one in a result is the fighter its Credits unlocked on the Spark Road, and
-        # putting the Credits back on the road unlocks it again.)
-        expected = economy.profile_from_save(save)
-        for reward in (i["reward"] for r in results for i in r["items"]):
-            for item in reward.get("items", [reward]):
-                if item["type"] != "fighter":
-                    economy.grant(expected, item)
-        self.assertEqual(body["account"]["profile"], expected)
-        self.assertEqual(self.call("POST", "/v1/drops/open-all", {}, me["token"])[0], 409)
-
     def test_drops_pay_three_times_over(self):
         rng = random.Random(5)
         for _ in range(200):
@@ -1124,11 +1096,7 @@ class Api(unittest.TestCase):
         self.make_developer(me["id"])
         self.assertTrue(self.call("GET", "/v1/me", token=me["token"])[1]["account"]["developer"])
         _, body = self.call("POST", "/v1/dev/grant", {"cups": 500, "drops": 5}, me["token"])
-        self.assertEqual((body["account"]["cups"], body["account"]["drops"]), (500, 6))
-        # A developer can open drops for free with luck.
-        _, drop = self.call("POST", "/v1/drops/open", {"luck": 14, "free": True}, me["token"])
-        self.assertEqual(drop["account"]["drops"], 6)  # free: none used up
-        self.assertEqual(len(drop["items"]), rules.MAX_ITEMS)  # and full luck fills the box
+        self.assertEqual((body["account"]["cups"], body["account"]["drops"]), (500, 0))  # no boxes, even for developers
         # Someone else is still an ordinary player.
         other = self.player("Other")
         self.assertFalse(self.call("GET", "/v1/me", token=other["token"])[1]["account"]["developer"])
@@ -1300,7 +1268,7 @@ class Api(unittest.TestCase):
             row = store.player("abc")
             self.assertEqual((row["cups"], row["drops"], row["imported"]), (40, rules.STARTING_DROPS, 0))
             store.put_save("abc", {"cups": 70, "capsules": 3})
-            self.assertEqual((store.player("abc")["cups"], store.player("abc")["drops"]), (70, 3))
+            self.assertEqual((store.player("abc")["cups"], store.player("abc")["drops"]), (70, 0))
         finally:
             store.close()
 
@@ -1407,7 +1375,7 @@ class Refereed(Api):
         self.assertEqual(status, 422)
         self.assertIn("more match than time", body["error"])
         account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]
-        self.assertEqual((account["cups"], account["drops"], account["profile"]["bolts"]), (0, 1, 60))
+        self.assertEqual((account["cups"], account["drops"], account["profile"]["bolts"]), (0, 0, 60))
         self.assertEqual(self.store.player(me["id"])["flags"], 3)
 
     def test_boss_mode_pays_what_trophies_cfg_says(self):

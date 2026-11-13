@@ -234,9 +234,10 @@ class EconomyTest {
         assertEquals(6, Economy.matchCredits(GameMode.LAST_SPARK, MatchOutcome.DEFEAT, 4))
         assertEquals(2, Economy.matchCredits(GameMode.LAST_SPARK, MatchOutcome.DEFEAT, 5))
         assertEquals(1, Economy.matchCredits(GameMode.BOSS, MatchOutcome.DEFEAT, 0))
-        assertTrue(Economy.earnsDrop(GameMode.LAST_SPARK, MatchOutcome.DEFEAT, 4))
-        assertFalse(Economy.earnsDrop(GameMode.LAST_SPARK, MatchOutcome.VICTORY, 5))
-        assertTrue(Economy.earnsDrop(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, 0))
+        // Arena Boxes were removed in 1.3: nothing earns one.
+        assertFalse(Economy.earnsDrop(GameMode.LAST_SPARK, MatchOutcome.DEFEAT, 4))
+        assertFalse(Economy.earnsDrop(GameMode.LAST_SPARK, MatchOutcome.VICTORY, 1))
+        assertFalse(Economy.earnsDrop(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, 0))
         assertFalse(Economy.earnsDrop(GameMode.BOSS, MatchOutcome.VICTORY, 0))
     }
 
@@ -248,9 +249,9 @@ class EconomyTest {
         assertEquals(10, v.cupDelta)
         assertEquals(110, v.cups)
         assertEquals(2, v.mvpCups)
-        assertTrue(v.drop)
-        assertEquals(2, v.drops)
-        assertEquals(SparkCapsules.PER_DAY - 1, v.dropsLeftToday)
+        assertFalse(v.drop)  // no Arena Boxes since 1.3
+        assertEquals(0, v.drops)
+        assertEquals(0, v.dropsLeftToday)
         assertEquals(28, v.bolts)
         assertEquals(10, v.firstWinPrisms)
         assertEquals(6, v.credits)
@@ -266,7 +267,7 @@ class EconomyTest {
         val (after, rewards) = Progression.applyMatch(done.save, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, mvp = true), day, v)
         assertEquals(110, after.cups)
         assertEquals(110, after.bestCups)
-        assertEquals(2, after.capsules)
+        assertEquals(0, after.capsules)
         assertEquals(listOf<Int>(), rewards.newlyReachedMilestones.map { it.cups })
         // Training changes nothing but the count.
         val training = Economy.settleMatch(before, report(GameMode.TRAINING, MatchOutcome.VICTORY), day)
@@ -274,15 +275,13 @@ class EconomyTest {
         assertEquals(0, training.value.cupDelta)
     }
 
-    @Test fun aDayHoldsAtMostThreeDropsAndLosingNeverGoesBelowZero() {
+    @Test fun winsPayNoBoxesAndLosingNeverGoesBelowZero() {
         val day = 9L
-        val full = SaveData(capsuleDay = day, capsulesEarnedToday = SparkCapsules.PER_DAY, capsules = 2)
-        val won = Economy.settleMatch(full, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY), day)
+        val held = SaveData(capsules = 2)
+        val won = Economy.settleMatch(held, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY), day)
         assertFalse(won.value.drop)
-        assertEquals(0, won.value.dropsLeftToday)
-        assertEquals(2, won.value.drops)
-        val yesterday = Economy.settleMatch(full, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY), day + 1)
-        assertTrue("a new day opens the cap again", yesterday.value.drop)
+        assertEquals("boxes held before 1.3 are wiped", 0, won.value.drops)
+        assertFalse(Economy.settleMatch(held, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY), day + 1).value.drop)
         val beginner = Economy.settleMatch(SaveData(cups = 3, bestCups = 3), report(GameMode.KNOCKOUT_RUSH, MatchOutcome.DEFEAT), day)
         assertEquals("beginners lose nothing", 3 to 0, beginner.value.cups to beginner.value.cupDelta)
         val veteran = Economy.settleMatch(SaveData(cups = 500, bestCups = 500), report(GameMode.KNOCKOUT_RUSH, MatchOutcome.DEFEAT), day)
@@ -349,7 +348,7 @@ class EconomyTest {
         val s = Economy.devGrant(SaveData(cups = 10, bestCups = 10), cups = 500, drops = 5, bolts = 1000, prisms = 100, credits = 100)
         assertEquals(510, s.cups)
         assertEquals(510, s.bestCups)
-        assertEquals(SparkCapsules.STARTING + 5, s.capsules)
+        assertEquals("no boxes, even as a hand-out", 0, s.capsules)
         assertEquals(Balance.STARTING_BOLTS + 1000, s.bolts)
         assertEquals(100, s.prisms)
         assertEquals(100, s.credits)

@@ -83,7 +83,7 @@ import io.github.projectwip.ui.startMatchConfig
 @Composable
 fun HomeScreen(
     save: SaveData, repo: GameRepository, go: (Screen) -> Unit,
-    @Suppress("UNUSED_PARAMETER") showReward: (RewardReveal) -> Unit, openCapsule: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") showReward: (RewardReveal) -> Unit,
 ) {
     val ui = LocalUi.current
     val serverStatus = io.github.projectwip.ui.LocalServer.current?.status?.collectAsState()?.value
@@ -144,9 +144,8 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.Bottom,
                         horizontalAlignment = Alignment.End,
                     ) {
-                        val dropsOnly = save.settings.glitchDropsOnly
                         // Boss Mode or 3v3 with one or two real players, by team code.
-                        if (!dropsOnly && !io.github.projectwip.ui.LocalOfflineMode.current) {
+                        if (!io.github.projectwip.ui.LocalOfflineMode.current) {
                             ChunkyButton({ go(Screen.Team) }, Modifier.fillMaxWidth().height(48.dp).enterFrom(120, dx = 24.dp, dy = 0.dp), ButtonStyle.GLASS, lip = 4.dp, cut = 10.dp) {
                                 Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                                     GameIcon(IconKind.FIGHTERS, Modifier.size(26.dp))
@@ -158,17 +157,10 @@ fun HomeScreen(
                             }
                             Spacer(Modifier.height(10.dp))
                         }
-                        CapsuleButton(
-                            if (save.settings.debugInfiniteCapsules) Int.MAX_VALUE else save.capsules, Progression.capsulesLeftToday(save, repo.today),
-                            online || io.github.projectwip.ui.LocalOfflineMode.current, dropsOnly, Modifier.enterFrom(170, dx = 24.dp, dy = 0.dp), openCapsule,
-                        )
-                        // Arena Boxes only: no fights, just drops.
-                        if (!dropsOnly) {
-                            Spacer(Modifier.height(10.dp))
-                            ModeChip(save.selectedMode, save.settings.botDifficulty, Modifier.enterFrom(220, dx = 24.dp, dy = 0.dp)) { picking = true }
-                            Spacer(Modifier.height(12.dp))
-                            PlayButton(Modifier.enterFrom(280, dx = 24.dp, dy = 0.dp)) { go(Screen.Match(startMatchConfig(save))) }
-                        }
+                        // (Arena Boxes were removed in 1.3, the owner's decision: no box button here any more.)
+                        ModeChip(save.selectedMode, save.settings.botDifficulty, Modifier.enterFrom(220, dx = 24.dp, dy = 0.dp)) { picking = true }
+                        Spacer(Modifier.height(12.dp))
+                        PlayButton(Modifier.enterFrom(280, dx = 24.dp, dy = 0.dp)) { go(Screen.Match(startMatchConfig(save))) }
                     }
                 }
             }
@@ -357,37 +349,6 @@ private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) 
                     }
                 }
             }
-        }
-    }
-}
-
-/** Arena Boxes waiting to be opened, or how to earn the next one. [canOpen]: the server is there to open them, or the game is on its offline profile, which opens its own. */
-@Composable
-private fun CapsuleButton(count: Int, leftToday: Int, canOpen: Boolean, big: Boolean, modifier: Modifier, onOpen: () -> Unit) {
-    Box(modifier) {
-        ChunkyButton(onOpen, Modifier.fillMaxWidth().height(if (big) 150.dp else 62.dp), ButtonStyle.CYAN, enabled = count > 0, cut = 12.dp, lip = 4.dp) {
-            Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                // A drop waiting to be opened glitches, like the real thing does when it is.
-                if (count > 0) io.github.projectwip.ui.GlitchIcon(IconKind.CAPSULE, Modifier.size(if (big) 84.dp else 44.dp), tint = Palette.Gold)
-                else GameIcon(IconKind.CAPSULE, Modifier.size(44.dp), tint = Palette.Grey)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    GameText(if (count > 0) "OPEN BOX" else "ARENA BOXES", Type.Heading, outline = 2.dp)
-                    PlainText(
-                        when {
-                            !canOpen -> if (count > 0) "Opens when you're back online" else "Earned and opened online"
-                            count > 0 -> "Tap to see what is inside"
-                            leftToday > 0 -> "Win or top 4 earns one · $leftToday left today"
-                            else -> "Today's are all earned · more tomorrow"
-                        },
-                        Type.Small, color = Color.White, maxLines = 1,
-                    )
-                }
-            }
-        }
-        if (count > 0) {
-            val pulse by rememberInfiniteTransition(label = "drops").animateFloat(1f, 1.15f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
-            Badge(if (count > 999) "∞" else count.toString(), Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).graphicsLayer { scaleX = pulse; scaleY = pulse })
         }
     }
 }

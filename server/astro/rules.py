@@ -74,19 +74,17 @@ def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, tab
 
 # ---------------------------------------------------------------------------- Arena Boxes ("drops" in the code and the API): earning
 
-DROPS_PER_DAY = 3
-STARTING_DROPS = 1
-MAX_IMPORTED_DROPS = 50
+# Arena Boxes were removed in 1.3 (build 110), by the owner's decision ("they have no use in the game"): every box a
+# player held was wiped (Store wipes them on start), nothing pays one any more, and none can be opened. The counter is
+# still in the database and the API (always 0) so older code reading it doesn't break. The roll tables further down
+# are kept with nothing using them.
+DROPS_PER_DAY = 0
+STARTING_DROPS = 0
+MAX_IMPORTED_DROPS = 0
 
 
 def earns_drop(mode: str, outcome: str, placement: int) -> bool:
-    """A win in team modes, or a top-4 finish in free-for-all."""
-    if mode == "LAST_SPARK":
-        return 1 <= placement <= 4
-    if mode == "KNOCKOUT_RUSH":
-        return outcome == "VICTORY"
-    if mode == "PORTAL":
-        return False
+    """Nothing earns an Arena Box any more: they were removed in 1.3."""
     return False
 
 

@@ -239,14 +239,9 @@ object Economy {
         else -> if (good(mode, outcome, placement)) 6 else 2
     }
 
-    /** A win in Knockout Rush, a top-4 finish in Last Spark, earns an Arena Box (Dimension never does). */
-    fun earnsDrop(mode: GameMode, outcome: MatchOutcome, placement: Int): Boolean = when (mode) {
-        GameMode.LAST_SPARK -> placement in 1..4
-        GameMode.KNOCKOUT_RUSH -> outcome == MatchOutcome.VICTORY
-        // Dimension earns nothing (the user's decision, build 104): it is a story, not a contest.
-        GameMode.PORTAL -> false
-        else -> false
-    }
+    /** Nothing earns an Arena Box any more: they were removed in 1.3 (as `earns_drop` in rules.py). */
+    @Suppress("UNUSED_PARAMETER")
+    fun earnsDrop(mode: GameMode, outcome: MatchOutcome, placement: Int): Boolean = false
 
     /**
      * Settles a finished match: what it pays in Bolts, Arena Crystals, Credits and Spark Pass points goes into the save,
@@ -270,9 +265,9 @@ object Economy {
             fighters = save.fighters + (report.fighter to save.progress(report.fighter).copy(cups = fighterAfter)),
         )
         val paid = grant(s, Reward.Credits(matchCredits(mode, report.outcome, report.placement))).also { s = it.save }.value
-        val drops = save.capsules + if (drop) 1 else 0
+        // (Arena Boxes were removed in 1.3: none are paid, and nobody holds any.)
         return Done(s, ServerVerdict(
-            cupDelta = cups - save.cups, cups = cups, drop = drop, drops = drops, dropsLeftToday = SparkCapsules.PER_DAY - earnedToday - if (drop) 1 else 0,
+            cupDelta = cups - save.cups, cups = cups, drop = drop, drops = 0, dropsLeftToday = 0,
             bolts = bolts + ((paid as? Reward.Bolts)?.amount ?: 0), firstWinPrisms = prisms, credits = creditsIn(paid), unlocked = fightersIn(paid),
             fighterCupsBefore = fighterBefore, fighterCups = fighterAfter, mvpCups = mvpCups,
         ))
@@ -359,7 +354,7 @@ object Economy {
     fun devGrant(save: SaveData, cups: Int = 0, drops: Int = 0, bolts: Int = 0, prisms: Int = 0, credits: Int = 0): SaveData {
         val newCups = (save.cups + cups).coerceAtLeast(0)
         val base = save.copy(
-            cups = newCups, bestCups = maxOf(save.bestCups, newCups), capsules = (save.capsules + drops).coerceAtLeast(0),
+            cups = newCups, bestCups = maxOf(save.bestCups, newCups), capsules = 0, // (no boxes: removed in 1.3)
             bolts = (save.bolts + bolts).coerceAtLeast(0), prisms = (save.prisms + prisms).coerceAtLeast(0),
         )
         return if (credits > 0) grant(base, Reward.Credits(credits)).save else base
