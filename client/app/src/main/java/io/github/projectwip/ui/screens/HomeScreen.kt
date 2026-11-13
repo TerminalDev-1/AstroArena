@@ -417,6 +417,7 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty?, modifier: Modifier, onCl
                 PlainText("GAME MODE", Type.Eyebrow, maxLines = 1)
                 GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.dp)
                 if (mode == GameMode.DUEL) PlainText("Against a real player", Type.Small, color = Palette.Positive, maxLines = 1)
+                else if (mode == GameMode.PORTAL) PlainText("A story mode · you and the Void", Type.Small, color = androidx.compose.ui.graphics.Color(0xFFC9A6FF), maxLines = 1)
                 else if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
                     PlainText("${mode.tagline.substringBefore(" ·")} · Bots ", Type.Small, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     PlainText(d.label, Type.Label, color = difficultyColor(d), maxLines = 1)
@@ -514,7 +515,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 }
                 Spacer(Modifier.height(6.dp))
             }
-            PlainText("${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
+            PlainText(if (m == GameMode.PORTAL) "${arena.name} · just you" else "${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
             PlainText(
                 when (m) {
                     GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the poison smoke. The higher you finish, the more Cups."
