@@ -69,9 +69,8 @@ fun EntityHijack(fighter: FighterId, skin: Int, index: Int, sfx: Sfx?, onDone: (
     var done by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         sfx?.play(Sound.VOID)
-        kotlinx.coroutines.delay((TAKE_HOLD * 1000).toLong())
-        if (!done) sfx?.play(Sound.GLITCH)
-        kotlinx.coroutines.delay(((BURST - TAKE_HOLD) * 1000).toLong())
+        // (No glitch blip as it takes hold, or when the Entity flickers into another soul: the user hated it.)
+        kotlinx.coroutines.delay((BURST * 1000).toLong())
         if (!done) sfx?.play(Sound.WHOOSH)
         kotlinx.coroutines.delay(((HIJACK_SECONDS - BURST) * 1000).toLong())
         if (!done) { done = true; onDone() }

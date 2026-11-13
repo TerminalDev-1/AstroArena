@@ -163,6 +163,8 @@ class Match(val config: MatchConfig) {
      */
     private val entityBrains = HashMap<Int, BotBrain>()
     private val entityProfile = BotProfile.builtIn(BotDifficulty.ELITE)
+    /** The way the Entity's tornado is heading as it passes through someone (see [autoFight]). */
+    private val entityHeading = HashMap<Int, FloatArray>()
 
     /** What the player's control held on every tick so far: the record the server replays to judge the match. */
     val inputs = InputLog()
@@ -261,8 +263,13 @@ class Match(val config: MatchConfig) {
         val dx = t.x - f.x; val dy = t.y - f.y
         val d = kotlin.math.hypot(dx, dy).coerceAtLeast(0.001f)
         if (f.inTempest) {
-            // The Entity drives the tornado flat out, straight through whoever it is after and on past them.
-            c.moveX = dx / d; c.moveY = dy / d
+            // The Entity drives the tornado flat out, straight through whoever it is after and on past them. Close in,
+            // it holds the heading it came in on (turning to face them there flipped it every tick: the tornado
+            // jerked about violently on top of them), and turns back once it is clear.
+            val close = f.radius + t.radius + TEMPEST_PASS
+            val h = entityHeading.getOrPut(f.id) { floatArrayOf(dx / d, dy / d) }
+            if (d > close) { h[0] = dx / d; h[1] = dy / d }
+            c.moveX = h[0]; c.moveY = h[1]
             c.aimX = dx; c.aimY = dy; c.aiming = true
             return
         }
@@ -318,6 +325,8 @@ class Match(val config: MatchConfig) {
     }
 
     companion object {
+        /** How far past someone's edge the Entity's tornado keeps its heading through them. */
+        const val TEMPEST_PASS = 1.2f
         const val STEP = 1f / 60f
         /** How much more health a boss has for every player in a team beyond the first. */
         const val TEAM_BOSS_HEALTH = 1f

@@ -1459,6 +1459,26 @@ class SimulationTest {
             assertTrue("she lands well clear of ${o.name}", kotlin.math.hypot(p.x - o.x, p.y - o.y) >= p.radius + o.radius + io.github.projectwip.data.Balance.TEMPEST_LANDING_GAP - 0.001f)
     }
 
+    @Test fun theEntitysTornadoDrivesThroughADummyWithoutJerking() {
+        // On top of a dummy it used to turn to face it every tick, flipping back and forth: a violent jerk.
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, humanPlayer = false, seed = 9L))
+        repeat(60 * 6) { m.step(Match.STEP) }
+        val p = m.player
+        val dummy = m.world.fighters.first { it.team != p.team && it.alive }
+        p.x = dummy.x + 1.5f; p.y = dummy.y; p.prevX = p.x; p.prevY = p.y
+        p.tempestLeft = 6f
+        p.glitchLeft = 6f
+        var lastDx = 0f; var lastDy = 0f; var flips = 0
+        repeat(60) {
+            val x0 = p.x; val y0 = p.y
+            m.step(Match.STEP)
+            val dx = p.x - x0; val dy = p.y - y0
+            if (dx * lastDx + dy * lastDy < 0f) flips++
+            if (dx != 0f || dy != 0f) { lastDx = dx; lastDy = dy }
+        }
+        assertTrue("the tornado turned back $flips times in a second", flips <= 2)
+    }
+
     @Test fun theEntityTakesOverAgainAndAgainInAMatch() {
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
             mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, seed = 12L))

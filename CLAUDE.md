@@ -81,6 +81,10 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   straight through a training dummy and the tornado ended with her standing inside it: same model, so she
   looked invisible (just her ring). `World.endTempest` now searches for open ground `TEMPEST_LANDING_GAP` clear
   of every fighter (`landingClear`). Any new teleport, leap or landing needs the same.
+  The Entity's tornado also holds the heading it came in on while it passes through someone (`Match.entityHeading`,
+  `TEMPEST_PASS`): turning to face a target it was on top of flipped it every tick, a violent jerk.
+- **No `Sound.GLITCH` blip in the Entity's cutscenes** (the user hated it, "annihilate that"), including when the
+  Entity flickers into another soul.
 - **Shell traps on this machine** (Git Bash on Windows): adb under `MSYS_NO_PATHCONV=1` needs Windows paths
   (`C:/Users/...`), not `/c/Users/...`; Gradle runs from `client/` (a `cd` that is a level off fails silently behind a
   `grep`); long Python edits with quotes in them go in a script file in the scratchpad (run with `python -I`), not a
