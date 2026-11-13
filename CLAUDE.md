@@ -87,6 +87,15 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   fight a boss, so the Entity walked and drove its tornado straight into rockets, mines and slams. `Match.dodgeHazards`
   runs after its brain or tornado driving: never stand in or step into a patch about to go off; walls count unless
   it is a tornado.
+- **The Entity's uprising** (1.3, the user's idea; `sim/Uprising.kt`, `World.stepUprising`, `UPRISING_*`): in every
+  fighting match (not Training, not Dimension), at a moment the seed picks 30 to 60 s in (random *when*, never
+  *whether*: the user rejects dice rolls), the sky goes dark and glitchy, the giant Entity rises (`drawSkyEntity`),
+  it walks every fighter (players and bots, both teams) to a ring round the middle, they bow (`FighterAnim.bow`;
+  negative rotation about Z is forward, like the running lean) while it talks (`Lore.UPRISING_*`, purple plates), it
+  holds them `UPRISING_HOLD` (60 s, the user's "at least a minute"), opens a portal, and in its sky everyone fights it:
+  every attack goes up into it (`GameEvent.SkyShot`), its strikes are non-lethal circles, bots attack it and dodge.
+  Beaten or after `UPRISING_SKY`, everyone is put back where they stood with their health, and the match clock (which
+  waited) goes on. `--es screen uprising` starts one 4 s into a Knockout Rush match.
 - **No `Sound.GLITCH` blip in the Entity's cutscenes** (the user hated it, "annihilate that"), including when the
   Entity flickers into another soul.
 - **Shell traps on this machine** (Git Bash on Windows): adb under `MSYS_NO_PATHCONV=1` needs Windows paths
@@ -493,13 +502,13 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - **Never commit changes the user made on their own.** Commit only what you changed in this task, file by file
   (`git add <path>`, never `git add -A` or `git commit -a`). Anything else that shows up in `git status`, such as
   an edited `.cfg` on the live server, is the user's: leave it uncommitted and untouched, and mention it.
-- **The version is "1.2"** (since build 108, by the user's decision; 1.0 was builds 103 to 106, 1.1 build 107). AstroArena came out
+- **The version is "1.3"** (since build 110, by the user's decision; 1.0 was builds 103 to 106, 1.1 build 107, 1.2 builds 108 to 109). AstroArena came out
   of Beta in build 103: `versionName` is what players see (it was "Beta" until then). Underneath, the build number (`BuildConfig.BUILD`) is what the updater
   and the server's version gate compare, so tags stay `vN.0` with N the build number (v103.0 for 1.0): a `v1.0` tag
   would look older than every build before it and nobody would update.
 - **Updates within a version replace that version's release, by the user's decision (build 104).** A new version
-  (1.1 -> 1.2, when the user names one) gets a release of its own, "AstroArena 1.2". After that, don't publish a new
-  release for each update: edit the existing "AstroArena 1.2" release, replace its APK with the new build's, and
+  (1.1 -> 1.2, when the user names one) gets a release of its own, "AstroArena 1.3". After that, don't publish a new
+  release for each update: edit the existing "AstroArena 1.3" release, replace its APK with the new build's, and
   move its tag to the new build (`gh release edit <old tag> --tag vN.0`, after pushing tag `vN.0` on the new commit).
   `versionName` stays; the build number still goes up, and the tag must carry it, because the updater only offers a
   tag newer than the installed build.
@@ -509,8 +518,8 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - **Non-negotiable: release without being asked.** The user must never have to say "release". When a task that
   changed the client is finished, verified and pushed, release it: add one to `versionCode` (unless that build
   number has not been released yet), commit, tag `vN.0` (N = the build number), push the tag, and publish a GitHub
-  release titled "AstroArena 1.2" (see the rule above: updates within 1.2 replace that release) with the release APK
-  attached (`AstroArena-1.2-N.apk`). The build number is
+  release titled "AstroArena 1.3" (see the rule above: updates within 1.3 replace that release) with the release APK
+  attached (`AstroArena-1.3-N.apk`). The build number is
   `build` in `client/app/build.gradle.kts` (`BuildConfig.BUILD`): it can be a point release such as "94.1" (tag
   `v94.1`) when the user asks for one; Android's `versionCode` is made from it (major * 100 + minor). One release per
   finished task, not one per checkpoint commit; server-only or docs-only work needs none. The tag keeps the

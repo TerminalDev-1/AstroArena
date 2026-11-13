@@ -97,6 +97,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 // portal3 starts in the third dimension; portal3o also with its portal open (debug previews).
                 in Regex("portal[1-9][oc]?").let { r -> listOfNotNull(startScreen?.takeIf { r.matches(it) }) } -> Screen.Match(startMatchConfig(repo.save.value).copy(
                     mode = io.github.projectwip.data.GameMode.PORTAL, portalStart = startScreen!![6].digitToInt(), portalOpen = startScreen.endsWith("o"), portalCaptiveNear = startScreen.endsWith("c")))
+                // The Entity's uprising, four seconds into a Knockout Rush match.
+                "uprising" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, uprisingAt = 4f))
                 "lastspark" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.LAST_SPARK))
                 "duel" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.DUEL, boss = null))
                 "train" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.TRAINING))

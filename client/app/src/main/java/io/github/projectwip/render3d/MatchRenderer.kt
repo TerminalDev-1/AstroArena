@@ -260,7 +260,12 @@ class MatchRenderer(
         renderShadows(alpha)
         GLES30.glViewport(0, 0, width, height)
         val sky = world.portal?.let { dimensionSky(it.dimension) }
-        if (sky != null) GLES30.glClearColor(sky[0], sky[1], sky[2], 1f) else GLES30.glClearColor(0.15f, 0.11f, 0.3f, 1f)
+        if (sky != null) GLES30.glClearColor(sky[0], sky[1], sky[2], 1f)
+        else {
+            // (The Entity's uprising darkens the sky toward the void's own colour, flickering when it glitches.)
+            val g = if (dimGlitch > 0f && (time * 30f).toInt() % 2 == 0) 0.06f else 0f
+            GLES30.glClearColor(lerp(0.15f, 0.035f + g, upDark), lerp(0.11f, 0.01f, upDark), lerp(0.3f, 0.09f + g, upDark), 1f)
+        }
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         renderScene(alpha)
         publishHud(alpha)
@@ -319,6 +324,29 @@ class MatchRenderer(
             camUp[0] = px; camUp[1] = 3.4f; camUp[2] = pz + 4.6f
             camAt[0] = px; camAt[1] = 1f; camAt[2] = pz
         }
+        // The Entity's uprising has the camera (smoothly): up at it as it rises, then over everyone gathered below
+        // it, into its portal, and in its sky low behind the player looking up at it.
+        val upr = world.uprising
+        val upWant = if (upr != null && upr.active && upr.phase != io.github.projectwip.sim.UprisingPhase.RETURN) 1f else 0f
+        upCamW += (upWant - upCamW) * (1f - exp(-dt * 2.5f))
+        if (upr != null && upCamW > 0.001f) {
+            entityPoint(upr)
+            val ex = entityAt[0]; val ey = entityAt[1]; val ez = entityAt[2]
+            val head = ENTITY_SCALE * 1.4f
+            when (upr.phase) {
+                io.github.projectwip.sim.UprisingPhase.GAZE -> { upWantEye(px, 1.7f, pz + 6.5f); upWantAt(ex, ey + head, ez) }
+                io.github.projectwip.sim.UprisingPhase.MARCH, io.github.projectwip.sim.UprisingPhase.BOW -> { upWantEye(upr.cx, 6.5f, upr.cy + 12f); upWantAt(upr.cx, 4f, upr.cy - 3f) }
+                io.github.projectwip.sim.UprisingPhase.ENTER -> { upWantEye(upr.cx, 3.2f, upr.cy + 7f); upWantAt(upr.cx, 1.4f, upr.cy) }
+                io.github.projectwip.sim.UprisingPhase.SKY -> { upWantEye(px, 1.6f, pz + 6f); upWantAt(lerp(px, ex, 0.7f), ey + head * 0.55f, lerp(pz, ez, 0.7f)) }
+                else -> Unit
+            }
+            // (The first frame jumps straight there; after that it eases.)
+            val k = if (upCamFresh) 1f else 1f - exp(-dt * 3f)
+            upCamFresh = false
+            for (i in 0..2) { upEye[i] += (upEyeWant[i] - upEye[i]) * k; upAt[i] += (upAtWant[i] - upAt[i]) * k }
+            for (i in 0..2) { camUp[i] = lerp(camUp[i], upEye[i], if (w > 0f) upCamW else 1f); camAt[i] = lerp(camAt[i], upAt[i], if (w > 0f) upCamW else 1f) }
+            w = maxOf(w, upCamW)
+        } else upCamFresh = true
         lookUp = w
         val pitch = Math.toRadians(PITCH.toDouble())
         eyeX = lerp(camX + sx, camUp[0], w)
@@ -356,6 +384,155 @@ class MatchRenderer(
         val x1 = x0 + cos(sideAng) * 0.8f; val z1 = z0 - (if (big) 2.5f else 2f); val y1 = if (big) 16f else 8f
         val u = (age / (if (big) 0.55f else 0.28f)).coerceIn(0f, 1f)
         out[0] = x0 + (x1 - x0) * u; out[1] = y0 + (y1 - y0) * u; out[2] = z0 + (z1 - z0) * u
+    }
+
+    // ------------------------------------------------------------------ the Entity's uprising
+
+    /** How far the world has gone over to the Entity's dark (0..1), the camera's share of its shots, and its poses. */
+    private var upDark = 0f
+    private var upCamW = 0f
+    private var upCamFresh = true
+    private val upEye = FloatArray(3)
+    private val upAt = FloatArray(3)
+    private val upEyeWant = FloatArray(3)
+    private val upAtWant = FloatArray(3)
+    private val entityAt = FloatArray(3)
+    private val entityAnim = FighterAnim()
+    private var upGlitchIn = 1f
+    private var upGlitchLeft = 0f
+    /** Strikes flying up into it: x, z, when, super (1/0), facing. */
+    private val skyShots = ArrayList<FloatArray>()
+    private val shotOut = FloatArray(3)
+
+    private fun upWantEye(x: Float, y: Float, z: Float) { upEyeWant[0] = x; upEyeWant[1] = y; upEyeWant[2] = z }
+    private fun upWantAt(x: Float, y: Float, z: Float) { upAtWant[0] = x; upAtWant[1] = y; upAtWant[2] = z }
+
+    /**
+     * Where the Entity stands in the sky (its feet): behind the middle of the arena, high up, rising out of the dark
+     * as it comes (the first seconds), and in its own sky over everyone, nearer and bigger, the only thing up there.
+     */
+    private fun entityPoint(u: io.github.projectwip.sim.Uprising) {
+        val sky = u.phase == io.github.projectwip.sim.UprisingPhase.SKY
+        val rise = if (u.phase == io.github.projectwip.sim.UprisingPhase.GAZE) smooth(u.t / 3.5f) else 1f
+        entityAt[0] = u.cx
+        entityAt[1] = lerp(-24f, if (sky) 3f else 5f, rise) + 0.4f * sin(time * 0.9f)
+        entityAt[2] = u.cy - (if (sky) 20f else 26f)
+    }
+
+    /** The light and the sky while the Entity is up: dark and violet, glitching now and then (often, in its sky). */
+    private fun stepUprisingLook() {
+        if (world.portal != null) return
+        val u = world.uprising
+        val on = u != null && u.active && u.phase != io.github.projectwip.sim.UprisingPhase.RETURN
+        upDark += ((if (on) 1f else 0f) - upDark) * (1f - exp(-frameDt * (if (on) 1.2f else 2.5f)))
+        val sky = u?.phase == io.github.projectwip.sim.UprisingPhase.SKY
+        val want0 = lerp(1f, if (sky) 0.5f else 0.62f, upDark); val want1 = lerp(1f, if (sky) 0.4f else 0.5f, upDark); val want2 = lerp(1f, if (sky) 0.75f else 0.8f, upDark)
+        dimLight[0] = want0; dimLight[1] = want1; dimLight[2] = want2
+        if (upDark > 0.05f) {
+            upGlitchIn -= frameDt
+            if (upGlitchIn <= 0f) { upGlitchLeft = 0.15f + rng.nextFloat() * 0.35f; upGlitchIn = (if (sky) 1.2f else 2.2f) + rng.nextFloat() * 2f }
+            upGlitchLeft -= frameDt
+            dimGlitch = if (upGlitchLeft > 0f) 0.55f * upDark else 0f
+            dimWarp = 0.06f * upDark
+        } else { dimGlitch = 0f; dimWarp = 0f }
+    }
+
+    /** The Entity itself, enormous in the sky, glitching into the souls it carries now and then. */
+    private fun drawSkyEntity(pass: Pass) {
+        val u = world.uprising ?: return
+        if (!u.active || u.phase == io.github.projectwip.sim.UprisingPhase.RETURN || upDark < 0.05f) return
+        entityPoint(u)
+        val souls = io.github.projectwip.data.Lore.Soul.entries
+        val soul = if (upGlitchLeft > 0f && (time * 18f).toInt() % 3 != 0) souls[(time * 0.7f).toInt() % souls.size] else null
+        entityAnim.time = time; entityAnim.walk = 0f; entityAnim.moving = 0f; entityAnim.recoil = 0f; entityAnim.spin = 0f; entityAnim.bow = 0f
+        entityAnim.flash = if (upGlitchLeft > 0f) 0.4f else 0f
+        entityAnim.talk = if (u.phase == io.github.projectwip.sim.UprisingPhase.MARCH || u.phase == io.github.projectwip.sim.UprisingPhase.BOW) 0.5f + 0.5f * sin(time * 9f) else 0f
+        entityAnim.jump = entityAt[1]
+        entityAnim.scale = ENTITY_SCALE * (if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) 1.25f else 1f)
+        if (pass == Pass.COLOR) { lit.f("uRim", 0.9f); lit.f("uEmissive", 0.15f * upDark) }
+        // (It looks down at everyone: straight toward the camera's side of the arena.)
+        models.drawSoul(lit, soul, entityAt[0], entityAt[2], 1.5707964f, entityAnim, pass)
+        if (pass == Pass.COLOR) { lit.f("uRim", 0.45f); lit.f("uGloss", 0f); lit.f("uEmissive", 0f); lit.f("uFlash", 0f); lit.v4("uTint", 1f, 1f, 1f, 1f); lit.mat4("uModel", identity) }
+    }
+
+    /** How far [f] is bent in its bow to the Entity (degrees). */
+    private fun uprisingBow(f: io.github.projectwip.sim.Fighter): Float {
+        val u = world.uprising ?: return 0f
+        if (f.id !in u.members || f.def.boss != null) return 0f
+        return when (u.phase) {
+            io.github.projectwip.sim.UprisingPhase.BOW -> 40f * smooth(u.t / 0.9f)
+            io.github.projectwip.sim.UprisingPhase.ENTER -> 40f * (1f - smooth(u.t / 0.6f))
+            else -> 0f
+        }
+    }
+
+    /** Through the Entity's portal: someone who has walked into it is gone from sight. */
+    private fun intoPortal(f: io.github.projectwip.sim.Fighter): Boolean {
+        val u = world.uprising ?: return false
+        return u.phase == io.github.projectwip.sim.UprisingPhase.ENTER && f.id in u.members && hypot(f.x - u.cx, f.y - u.cy) < 1f
+    }
+
+    /** The uprising's glow: its portal, the light round the Entity, the strikes flying up into it. */
+    private fun addUprisingSprites() {
+        val u = world.uprising
+        if (u != null && u.active) {
+            // Its portal in the middle, standing up, rainbow round a violet vortex: from the last seconds of the bow
+            // until everyone is through.
+            val open = when (u.phase) {
+                io.github.projectwip.sim.UprisingPhase.BOW -> smooth((u.heldFor - (io.github.projectwip.data.Balance.UPRISING_HOLD - io.github.projectwip.data.Balance.UPRISING_ENTER - 3f)) / 2f)
+                io.github.projectwip.sim.UprisingPhase.ENTER -> 1f
+                else -> 0f
+            }
+            if (open > 0.01f) {
+                val rx = 1.7f * open; val ry = 1.35f * open; val cy = 1.45f
+                for (k in 0 until 64) {
+                    val a = k * (6.2831855f / 64) + time * 1.5f
+                    val col = hue(k / 64f + time * 0.25f)
+                    sprites.add(u.cx + cos(a) * rx, cy + sin(a) * ry, u.cy, 0.42f, col[0], col[1], col[2], 0.75f * open)
+                }
+                for (k in 0 until 40) {
+                    val r = (k / 40f)
+                    val a = -time * 3f + r * 9f
+                    sprites.add(u.cx + cos(a) * rx * r, cy + sin(a) * ry * r, u.cy + 0.02f, 0.5f * (1.2f - r), 0.55f, 0.25f, 1f, 0.35f * open)
+                }
+                sprites.add(u.cx, cy, u.cy, 2.6f * open, 0.6f, 0.3f, 1f, 0.35f * open)
+            }
+            // A cold light round the Entity, so its shape reads against the dark.
+            if (u.phase != io.github.projectwip.sim.UprisingPhase.RETURN && upDark > 0.05f) {
+                entityPoint(u)
+                val big = ENTITY_SCALE * (if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) 1.25f else 1f)
+                sprites.add(entityAt[0], entityAt[1] + big * 1.1f, entityAt[2] - 0.5f, big * 3.2f, 0.35f, 0.2f, 0.9f, 0.22f * upDark)
+                sprites.add(entityAt[0], entityAt[1] + big * 1.4f, entityAt[2] + 0.5f, big * 0.9f, 0.6f, 0.85f, 1f, 0.25f * upDark)
+            }
+        }
+        // Strikes up into it: a comet from the shoulder, a flash where it lands.
+        var i = 0
+        while (i < skyShots.size) {
+            val st = skyShots[i]
+            val age = time - st[2]
+            val big = st[3] >= 1f
+            val life = if (big) 0.65f else 0.42f
+            if (age > life + 0.3f || u == null) { skyShots.removeAt(i); continue }
+            i++
+            entityPoint(u)
+            val tx = entityAt[0]; val ty = entityAt[1] + ENTITY_SCALE * 1.25f * 1.1f; val tz = entityAt[2] + 0.8f
+            val sx = st[0] + cos(st[4]) * 0.3f; val sy = 1.3f; val sz = st[1] + sin(st[4]) * 0.3f
+            val head = (age / life).coerceAtMost(1f)
+            if (head < 1f) {
+                for (k in 0..14) {
+                    val u2 = (head - k * 0.035f).coerceAtLeast(0f)
+                    val e = u2 * u2
+                    shotOut[0] = sx + (tx - sx) * u2; shotOut[1] = sy + (ty - sy) * e; shotOut[2] = sz + (tz - sz) * u2
+                    val fade = 1f - k / 15f
+                    sprites.add(shotOut[0], shotOut[1], shotOut[2], (if (big) 0.55f else 0.28f) * (0.4f + 0.6f * fade), 0.4f + 0.5f * fade, 0.75f + 0.25f * fade, 1f, 0.15f + 0.55f * fade)
+                }
+                val e = head * head
+                sprites.add(sx + (tx - sx) * head, sy + (ty - sy) * e, sz + (tz - sz) * head, if (big) 1.3f else 0.6f, 0.85f, 0.95f, 1f, 0.9f)
+            } else {
+                val f = 1f - (age - life) / 0.3f
+                sprites.add(tx + (siteHash(st[2].toRawBits(), 1, 3) - 0.5f) * 2f, ty + (siteHash(st[2].toRawBits(), 2, 3) - 0.5f) * 2f, tz, (if (big) 3.5f else 1.6f) * (1.4f - f * 0.4f), 0.7f, 0.9f, 1f, 0.6f * f)
+            }
+        }
     }
 
     // ------------------------------------------------------------------ the Entity's hijack
@@ -471,6 +648,7 @@ class MatchRenderer(
             glitchLeft -= frameDt
             dimGlitch = if (glitchLeft > 0f) minOf(0.7f, 0.3f + 0.06f * depth) else 0f
         }
+        stepUprisingLook()
         lit.f("uWarp", dimWarp)
         lit.f("uGlitch", dimGlitch)
         lit.f("uGlitchF", dimGlitch)
@@ -511,6 +689,7 @@ class MatchRenderer(
         forEachRealmShadow(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR, shade = SHADOW_SHADE) }
         drawCaptive(Pass.COLOR)
         drawWorldVoid(Pass.COLOR)
+        drawSkyEntity(Pass.COLOR)
         lit.f("uFlash", 0f)
         lit.f("uEmissive", 0f)
 
@@ -530,6 +709,7 @@ class MatchRenderer(
         forEachRealmShadow(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
         drawCaptive(Pass.OUTLINE)
         drawWorldVoid(Pass.OUTLINE)
+        drawSkyEntity(Pass.OUTLINE)
         lit.f("uOutline", 0f)
         lit.i("uMode", 0)
         GLES30.glDisable(GLES30.GL_CULL_FACE)
@@ -662,6 +842,7 @@ class MatchRenderer(
         anim.flash = (f.hitFlash / 0.12f).coerceIn(0f, 1f) * 0.8f
         anim.time = time + i * 0.7f
         anim.jump = if (f.isDashing) 0.12f else 0f
+        anim.bow = uprisingBow(f)
         anim.spin = 0f; anim.swing = 0f; anim.throwL = 0f; anim.throwR = 0f; anim.slash = -1f
         // A sword swing: the blade sweeps across, and he turns into it and steps up off the ground a little.
         if (f.def.attack.shape == AttackShape.SLASH && f.sinceAttack < SLASH_SECONDS) {
@@ -771,7 +952,7 @@ class MatchRenderer(
             shownMoving[i] += (speed - shownMoving[i]) * km
             // Appear quickly, slip away a little slower; a respawn starts solid.
             // (Whoever is in a realm the player isn't in can't be seen from here, and the other way round.)
-            val vis = f.alive && f.realm == match.player.realm && world.isVisibleTo(f, match.player.team)
+            val vis = f.alive && f.realm == match.player.realm && world.isVisibleTo(f, match.player.team) && !intoPortal(f)
             shownVis[i] = if (!f.alive) 1f
                 else if (vis) min(1f, shownVis[i] + dt / VIS_FADE_IN) else max(0f, shownVis[i] - dt / VIS_FADE_OUT)
             if (f.isDashing && rng.nextFloat() < 0.8f) {
@@ -1358,13 +1539,15 @@ class MatchRenderer(
      * wall, the fighter) hides them on their way up.
      */
     private fun addSkyStreaks() {
+        addUprisingSprites()
         // Stars come out over the arena while the camera is looking up.
-        if (lookUp > 0.01f) for (i in 0 until 90) {
+        val starsOut = maxOf(lookUp, upDark)
+        if (starsOut > 0.01f) for (i in 0 until 90) {
             val x = camX + (siteHash(i, 1, 7) - 0.5f) * 80f
             val y = 20f + siteHash(i, 2, 7) * 24f
             val z = camZ - 6f - siteHash(i, 3, 7) * 40f
             val tw = 0.65f + 0.35f * sin(time * (1.5f + siteHash(i, 4, 7) * 3f) + i)
-            sprites.add(x, y, z, 0.2f + 0.35f * siteHash(i, 5, 7), 0.8f, 0.88f, 1f, lookUp * 0.75f * tw)
+            sprites.add(x, y, z, 0.2f + 0.35f * siteHash(i, 5, 7), 0.8f, 0.88f, 1f, starsOut * 0.75f * tw)
         }
         // The Entity's comet, on its way up and back down into the player.
         if (runner.hijack == 1) {
@@ -2434,7 +2617,7 @@ class MatchRenderer(
         }
         particles.emit(sprites, true)
         sprites.flush()
-        if (skyStreaks.isNotEmpty() || lookUp > 0.01f || runner.hijack == 1) {
+        if (skyStreaks.isNotEmpty() || lookUp > 0.01f || runner.hijack == 1 || upDark > 0.01f || skyShots.isNotEmpty()) {
             GLES30.glDisable(GLES30.GL_DEPTH_TEST)
             sprites.begin()
             addSkyStreaks()
@@ -2733,6 +2916,14 @@ class MatchRenderer(
                 }
                 if (e.targetId == pid) shake = max(shake, 0.12f)
             }
+            is GameEvent.SkyShot -> {
+                // Up into the Entity: a comet from their shoulder to it (and the attack glitches them, as always).
+                energyFlare(e.fighterId, if (e.isSuper) 1f else 0.4f, sky = true)
+                world.fighter(e.fighterId)?.let { f -> skyShots += floatArrayOf(f.x, f.y, time, if (e.isSuper) 1f else 0f, shownFacing[f.id]) }
+            }
+            is GameEvent.Uprising -> {
+                if (e.phase == io.github.projectwip.sim.UprisingPhase.SKY.ordinal || e.phase == io.github.projectwip.sim.UprisingPhase.RETURN.ordinal) shake = max(shake, 0.4f)
+            }
             is GameEvent.Glitched -> {
                 if (e.fighterId == pid) startHijack() else energyFlare(e.fighterId, 1f, sky = false)
             }
@@ -2793,6 +2984,9 @@ class MatchRenderer(
         System.arraycopy(viewProj, 0, s.viewProj, 0, 16)
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
         s.freeForAll = w.rules.freeForAll
+        val upr = w.uprising
+        s.uprisingPhase = if (upr != null && upr.active) upr.phase.ordinal else -1
+        s.uprisingT = upr?.t ?: 0f; s.uprisingHp = upr?.hp ?: 0; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
         s.bossMode = w.rules.boss
         val run = w.portal
         s.portalRun = run != null
@@ -2923,6 +3117,8 @@ class MatchRenderer(
         const val HIJACK_HIT = 2.0f
         const val HIJACK_LEN = 2.9f
         const val HIJACK_APEX = 15f
+        /** How big the Entity stands in the sky in its uprising (a fighter is FIGHTER_SCALE). */
+        const val ENTITY_SCALE = 6f
         /** Where along a streak line it reaches the shoulder, and where it has gone round it (see `streakPoint`). */
         const val CONVERGE = 0.3f
         const val AROUND = 0.45f

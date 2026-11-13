@@ -36,6 +36,8 @@ data class MatchConfig(
     val portalOpen: Boolean = false,
     /** Debug preview: the chained fighter stands a step from where the player starts. */
     val portalCaptiveNear: Boolean = false,
+    /** Debug preview: the Entity's uprising begins this many seconds into play (below 0: when the seed says). */
+    val uprisingAt: Float = -1f,
 )
 
 /** One real player in a team. */
@@ -166,6 +168,14 @@ class Match(val config: MatchConfig) {
     /** The way the Entity's tornado is heading as it passes through someone (see [autoFight]). */
     private val entityHeading = HashMap<Int, FloatArray>()
 
+    init {
+        // The Entity's uprising comes in every fighting match (not in the Training Area or Dimension): only when is
+        // the seed's (the user's rule: it happens, it isn't a roll).
+        if (config.uprisingAt >= 0f) world.uprising = Uprising(config.uprisingAt)
+        else if (config.mode != GameMode.TRAINING && config.mode != GameMode.PORTAL)
+            world.uprising = Uprising(Balance.UPRISING_EARLIEST + Random(config.seed xor 0x0B5E55EDL).nextFloat() * Balance.UPRISING_SPREAD)
+    }
+
     /** What the player's control held on every tick so far: the record the server replays to judge the match. */
     val inputs = InputLog()
 
@@ -182,6 +192,16 @@ class Match(val config: MatchConfig) {
         val warmingUp = world.phase == Phase.PLAYING && world.phaseTime < Balance.BOT_WARMUP_SECONDS
         for (f in world.fighters) if (f.isBot && f.def.boss == null && (warmingUp || f.shield > 0f)) {
             f.control.attack = false; f.control.superAttack = false; f.control.hyper = false
+        }
+        // In the Entity's sky (its uprising) bots fight it and nobody else: they keep striking at it, spend their
+        // powers on it and step out of its strikes. (While it holds everyone, World moves them itself.)
+        val up = world.uprising
+        if (up != null && up.phase == UprisingPhase.SKY) for (f in world.fighters) {
+            if (!f.isBot || !f.alive || f.def.boss != null) continue
+            val c = f.control
+            c.moveX = 0f; c.moveY = 0f; c.aiming = false
+            c.attack = true; c.superAttack = f.superReady; c.hyper = f.hyperReady
+            dodgeHazards(f)
         }
         // A glitching fighter fights on its own: the Entity is in control (the user's lore).
         for (f in world.fighters) if (f.glitchCooldown > 0f) f.glitchCooldown = maxOf(0f, f.glitchCooldown - dt)
@@ -216,7 +236,7 @@ class Match(val config: MatchConfig) {
         // Using its power draws the Entity in (the user's lore): its pull fills with every attack, super and
         // hypercharge, and with time once a fighter has started fighting; full, the fighter glitches. It is sure, not a
         // roll, and it happens as many times as the pull fills: never just once in a match.
-        if (!portalRun) {
+        if (!portalRun && world.uprising?.active != true) {
             for (i in seen until world.events.size) {
                 val e = world.events[i]
                 val (id, pull) = when (e) {

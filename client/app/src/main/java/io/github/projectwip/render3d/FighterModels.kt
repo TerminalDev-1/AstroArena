@@ -37,6 +37,9 @@ class Rig(
 class FighterModel(val parts: List<Part>, val rig: Rig, val mouth: FloatArray? = null)
 
 /** Per-draw animation inputs. */
+/** How high the hips are in a model, where a bow bends it ([FighterAnim.bow]). */
+const val BOW_PIVOT = 0.55f
+
 class FighterAnim {
     var walk = 0f        // walk cycle phase (radians)
     var moving = 0f      // 0..1 how much the fighter is moving
@@ -45,6 +48,7 @@ class FighterAnim {
     var time = 0f
     var jump = 0f        // extra height (menu celebrations)
     var spin = 0f        // extra yaw degrees (menu celebrations)
+    var bow = 0f         // degrees bent forward from the hips (bowing to the Entity in its uprising)
     var scale = 1f
     /** 0..1: a front leg flung forward (a fighter on four legs throwing something). */
     var throwL = 0f
@@ -794,6 +798,8 @@ class FighterModels {
         Matrix.translateM(root, 0, x, anim.jump, z)
         Matrix.rotateM(root, 0, -Math.toDegrees(facing.toDouble()).toFloat() + anim.spin, 0f, 1f, 0f)
         Matrix.scaleM(root, 0, anim.scale, anim.scale, anim.scale)
+        // A bow: bent forward from the hips.
+        if (anim.bow != 0f) { Matrix.translateM(root, 0, 0f, BOW_PIVOT, 0f); Matrix.rotateM(root, 0, -anim.bow, 0f, 0f, 1f); Matrix.translateM(root, 0, 0f, -BOW_PIVOT, 0f) }
 
         val bob = abs(sin(anim.walk)) * 0.07f * mv + sin(t * 2.4f) * 0.012f * (1 - mv)
         val breathe = 1f + sin(t * 2.4f) * 0.018f * (1 - mv)

@@ -1499,6 +1499,57 @@ class SimulationTest {
 
     @Test fun theEntityDrivesTheTornadoOutOfABossCircle() = entityEscapesAMarkedCircle(tornado = true)
 
+    @Test fun everyFightingMatchHasTheEntitysUprising() {
+        for (mode in listOf(GameMode.KNOCKOUT_RUSH, GameMode.LAST_SPARK, GameMode.BOSS, GameMode.DUEL)) {
+            val u = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = mode, seed = 77L)).world.uprising
+            assertTrue("$mode has one", u != null)
+            assertTrue("$mode: between 30 and 60 s in", u!!.startAt in 30f..60f)
+        }
+        assertEquals(null, Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.TRAINING, seed = 77L)).world.uprising)
+        assertEquals(null, Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.PORTAL, seed = 77L)).world.uprising)
+        // Only the moment is the seed's.
+        val a = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 1L)).world.uprising!!.startAt
+        val b = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 2L)).world.uprising!!.startAt
+        assertTrue(a != b)
+    }
+
+    @Test fun theEntitysUprisingTakesEveryoneToItsSkyAndBack() {
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 21L, uprisingAt = 2f))
+        val w = m.world
+        val u = w.uprising!!
+        val seen = LinkedHashSet<io.github.projectwip.sim.UprisingPhase>()
+        var before: Map<Int, Pair<Float, Float>> = emptyMap()
+        var clockAtStart = 0f
+        var bowedTogether = false
+        var skyHits = 0
+        var hurtEachOther = false
+        var t = 0
+        while (u.phase != io.github.projectwip.sim.UprisingPhase.DONE && t < 60 * 400) {
+            val wasWaiting = u.phase == io.github.projectwip.sim.UprisingPhase.WAITING
+            if (wasWaiting) { before = w.fighters.filter { it.alive }.associate { it.id to (it.x to it.y) }; clockAtStart = w.timeLeft }
+            m.step(Match.STEP); t++
+            seen += u.phase
+            if (u.phase == io.github.projectwip.sim.UprisingPhase.BOW)
+                bowedTogether = u.members.all { id -> w.fighter(id)!!.let { kotlin.math.hypot(it.x - u.slotX.getValue(id), it.y - u.slotY.getValue(id)) < 0.2f } }
+            for (e in w.events) {
+                if (e is io.github.projectwip.sim.GameEvent.SkyShot) skyHits++
+                if (e is io.github.projectwip.sim.GameEvent.Hit && u.phase == io.github.projectwip.sim.UprisingPhase.SKY && e.sourceId >= 0) hurtEachOther = true
+            }
+        }
+        assertEquals(listOf("GAZE", "MARCH", "BOW", "ENTER", "SKY", "RETURN", "DONE"), seen.map { it.name }.filter { it != "WAITING" })
+        assertTrue("everyone came", u.members.size == before.size && u.members.size >= 4)
+        assertTrue("everyone stood in their place round it, bowing", bowedTogether)
+        assertTrue("it held them at least a minute", u.heldFor >= Balance.UPRISING_HOLD - 0.1f)
+        assertTrue("the bots struck it in the sky ($skyHits)", skyHits > 10)
+        assertFalse("nobody hurt anybody else up there", hurtEachOther)
+        assertTrue("the match clock waited", w.timeLeft >= clockAtStart - 0.1f)
+        for ((id, at) in before) {
+            val f = w.fighter(id)!!
+            assertEquals("${f.name} is back where they stood", at.first, f.x, 0.01f)
+            assertEquals(at.second, f.y, 0.01f)
+        }
+    }
+
     @Test fun theEntityTakesOverAgainAndAgainInAMatch() {
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
             mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, seed = 12L))
@@ -1513,7 +1564,9 @@ class SimulationTest {
             val e = m.world.fighters.firstOrNull { it.team != p.team && it.alive }
             if (e != null) { p.control.aimX = e.x - p.x; p.control.aimY = e.y - p.y; p.control.aiming = true }
             p.control.attack = true
-            m.step(io.github.projectwip.sim.Match.STEP); ticks++
+            m.step(io.github.projectwip.sim.Match.STEP)
+            // (Only ordinary play counts: the Entity's uprising holds everyone for a minute or more.)
+            if (m.world.uprising?.active != true) ticks++
             val now = p.glitchLeft > 0f
             if (now && !was) glitches++
             was = now

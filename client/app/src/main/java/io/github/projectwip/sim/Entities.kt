@@ -251,6 +251,10 @@ class Pickup(val x: Float, val y: Float) {
 }
 
 sealed interface GameEvent {
+    /** The Entity's uprising moved on to [phase] (an `UprisingPhase` ordinal). */
+    data class Uprising(val phase: Int) : GameEvent
+    /** In the Entity's sky, [fighterId] struck it for [damage] (a super: [isSuper]). */
+    data class SkyShot(val fighterId: Int, val isSuper: Boolean, val damage: Int) : GameEvent
     data class Shot(val fighterId: Int, val isSuper: Boolean, val x: Float, val y: Float, val dirX: Float, val dirY: Float) : GameEvent
     data class Hit(val targetId: Int, val sourceId: Int, val damage: Int, val x: Float, val y: Float, val isSuper: Boolean) : GameEvent
     data class Blocked(val x: Float, val y: Float) : GameEvent

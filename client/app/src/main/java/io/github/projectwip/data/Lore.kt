@@ -184,6 +184,18 @@ object Lore {
 
     fun whisper(index: Int): String = WHISPERS[Math.floorMod(index, WHISPERS.size)]
 
+    /** What the Entity says in its uprising, by phase: calling everyone to it, then while they bow. */
+    val UPRISING_CALL = listOf("Come to me.", "All of you. Come.", "Closer.", "Every one of you.")
+    val UPRISING_BOW = listOf(
+        "Kneel.",
+        "Bow before the one who gives you your power.",
+        "Every attack you throw is mine.",
+        "You fight because I let you.",
+        "I have worn ones like you before.",
+        "Your names will be forgotten, like theirs.",
+        "Now. Follow me.",
+    )
+
     /** What the Entity says as it takes a fighter over (the hijack cutscene). */
     fun hijackLine(index: Int): String = HIJACK[Math.floorMod(index, HIJACK.size)]
     private val HIJACK = listOf(

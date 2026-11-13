@@ -88,6 +88,7 @@ class HudView(
         drawFloaters(c, dt)
         drawWhisper(c, dt)
         drawPossessed(c)
+        drawUprising(c)
         if (snap.portalRun) drawDimension(c)
         drawHud(c, dt)
         if (snap.phase != Phase.ENDED) controls.draw(c, snap.ammo, snap.ammoMax, snap.superCharge, snap.hyperCharge, snap.hyperLeft, snap.playerAlive && snap.phase == Phase.PLAYING, time)
@@ -196,7 +197,7 @@ class HudView(
      */
     private fun drawWhisper(c: Canvas, dt: Float) {
         val s = snap
-        if (s.portalRun || s.phase != Phase.PLAYING) { lastSuper = s.superCharge; lastHyper = s.hyperLeft; return }
+        if (s.portalRun || s.phase != Phase.PLAYING || s.uprisingPhase >= 0) { lastSuper = s.superCharge; lastHyper = s.hyperLeft; return }
         val usedSuper = lastSuper >= 0.999f && s.superCharge < 0.5f
         val usedHyper = lastHyper <= 0f && s.hyperLeft > 0f
         lastSuper = s.superCharge; lastHyper = s.hyperLeft
@@ -264,6 +265,56 @@ class HudView(
         if (sub != null) {
             text.textSize = dp(13f)
             outlined(c, sub, x, y + dp(20f), Color.argb(alpha, 214, 200, 255), dp(2.5f))
+        }
+    }
+
+    /**
+     * The Entity's uprising, on the game's own purple plates: it rising, its words while it calls everyone and while
+     * they bow, its health high in its sky, the flash going through its portal and coming back, and how it ended.
+     */
+    private fun drawUprising(c: Canvas) {
+        val s = snap
+        if (s.uprisingPhase < 0 || s.phase != Phase.PLAYING) return
+        val phase = io.github.projectwip.sim.UprisingPhase.entries[s.uprisingPhase]
+        val t = s.uprisingT
+        val w = width.toFloat(); val h = height.toFloat()
+        fun fade(len: Float) = minOf(1f, t / 0.4f, (len - t) / 0.4f).coerceIn(0f, 1f)
+        when (phase) {
+            io.github.projectwip.sim.UprisingPhase.GAZE -> if (t > 1.5f)
+                entityPlate(c, glitchText("THE ENTITY RISES", if ((time * 8f).toInt() % 4 == 0) 1f else 0f), "IT IS LOOKING AT EVERY ONE OF YOU", w / 2, h * 0.22f, minOf(1f, (t - 1.5f) / 0.4f))
+            io.github.projectwip.sim.UprisingPhase.MARCH -> {
+                val k = (t / 3.2f).toInt()
+                val lines = io.github.projectwip.data.Lore.UPRISING_CALL
+                entityPlate(c, lines[k % lines.size], null, w / 2, h * 0.22f, minOf(1f, (t - k * 3.2f) / 0.3f))
+            }
+            io.github.projectwip.sim.UprisingPhase.BOW -> {
+                val k = (t / 4f).toInt()
+                val lines = io.github.projectwip.data.Lore.UPRISING_BOW
+                entityPlate(c, lines[minOf(k, lines.size - 1)], if (k == 0) "EVERYONE BOWS TO THE ENTITY" else null, w / 2, h * 0.22f, minOf(1f, (t - k * 4f) / 0.3f))
+            }
+            io.github.projectwip.sim.UprisingPhase.ENTER -> entityPlate(c, "Into my world.", "THROUGH THE PORTAL", w / 2, h * 0.22f, fade(4f))
+            io.github.projectwip.sim.UprisingPhase.SKY -> {
+                // Its health, across the top on a purple plate.
+                val pw = minOf(w * 0.56f, dp(560f)); val ph = dp(46f)
+                val l = w / 2 - pw / 2; val top = dp(92f)
+                val ink = Color.rgb(27, 16, 53)
+                chamfer(c, l, top, l + pw, top + ph, dp(12f), Color.argb(235, 45, 29, 116), ink)
+                val frac = if (s.uprisingMaxHp > 0) s.uprisingHp.toFloat() / s.uprisingMaxHp else 0f
+                fill.color = Color.argb(200, 12, 6, 30)
+                c.drawRect(l + dp(14f), top + dp(24f), l + pw - dp(14f), top + dp(36f), fill)
+                fill.color = Color.rgb(160, 110, 255)
+                c.drawRect(l + dp(14f), top + dp(24f), l + dp(14f) + (pw - dp(28f)) * frac, top + dp(36f), fill)
+                text.textSize = dp(13f)
+                outlined(c, "THE ENTITY · %,d".format(s.uprisingHp), w / 2, top + dp(18f), Color.WHITE, dp(2.5f))
+                if (t < 5f) entityPlate(c, "Then fight me. All of you.", "EVERY ATTACK GOES UP INTO IT", w / 2, h * 0.3f, minOf(1f, (5f - t) / 0.5f))
+                // Through the portal: a flash, fading.
+                if (t < 0.7f) { fill.color = Color.argb((255 * (1f - t / 0.7f)).toInt(), 230, 220, 255); c.drawRect(0f, 0f, w, h, fill) }
+            }
+            io.github.projectwip.sim.UprisingPhase.RETURN -> {
+                if (t < 0.6f) { fill.color = Color.argb((255 * (1f - t / 0.6f)).toInt(), 230, 220, 255); c.drawRect(0f, 0f, w, h, fill) }
+                entityPlate(c, if (s.uprisingBeaten) "THE ENTITY IS BEATEN" else "THE ENTITY LETS YOU GO", if (s.uprisingBeaten) "FOR NOW" else "THIS TIME", w / 2, h * 0.26f, minOf(1f, (1.5f - t) / 0.4f + 0.3f).coerceIn(0f, 1f))
+            }
+            else -> Unit
         }
     }
 

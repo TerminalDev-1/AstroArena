@@ -118,6 +118,8 @@ class World(
     val pickups = ArrayList<Pickup>()
     /** Marked patches of ground waiting to go off (Boss Mode). */
     val hazards = ArrayList<Hazard>()
+    /** The Entity's uprising in this match (see `Uprising`), or null where it doesn't come. */
+    var uprising: Uprising? = null
     /** Rockets stuck in the ground (or on their way there), waiting for whoever planted them to set them off. */
     val planted = ArrayList<Planted>()
     /** Stars in the air (`AttackShape.STAR`), each on its way to burst where it was thrown. */
@@ -200,6 +202,12 @@ class World(
             Phase.PLAYING -> Unit
         }
 
+        // The Entity's uprising: while it lasts, it is all that happens (the clock, the smoke and the boss wait).
+        uprising?.let { u ->
+            if (u.phase == UprisingPhase.WAITING && phaseTime >= u.startAt) beginUprising(u)
+            if (u.active) { stepUprising(u, dt); return }
+        }
+
         for (f in fighters) stepFighter(f, dt)
         if (rules.boss) for (f in fighters) if (f.def.boss != null && f.alive && !f.enthralled && !f.heldInRealm) bossScripts.getOrPut(f.id) { BossScript(this, f) }.step(dt)
         stepConcealment(dt)
@@ -216,6 +224,168 @@ class World(
             timeLeft = 0f
             end(if (score[0] > score[1]) 0 else if (score[1] > score[0]) 1 else -1)
         }
+    }
+
+    // ------------------------------------------------------------------ the Entity's uprising
+
+    private fun uprisingPhase(u: Uprising, phase: UprisingPhase) {
+        u.phase = phase
+        u.t = 0f
+        events += GameEvent.Uprising(phase.ordinal)
+    }
+
+    private fun beginUprising(u: Uprising) {
+        // Everyone comes: whoever was waiting to come back is brought back now.
+        for (f in fighters) if (!f.alive && !f.eliminated && f.def.boss == null) respawn(f)
+        projectiles.clear(); hazards.clear(); lobs.clear()
+        val centre = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 1f)
+        u.cx = centre.x; u.cy = centre.y
+        u.members.clear()
+        for (f in fighters) if (f.alive) {
+            u.members += f.id
+            u.saved[f.id] = floatArrayOf(f.x, f.y, f.hp.toFloat())
+            // Whatever they were in the middle of ends.
+            f.tempestLeft = 0f; f.dashTime = 0f; f.leapTime = 0f
+            f.hexes.clear(); f.poisonBy = -1
+            f.glitchLeft = 0f
+            f.control.clear()
+        }
+        // Each has a place on a ring round the middle, facing in.
+        val n = u.members.size
+        val ring = 2.2f + 0.25f * n
+        for ((k, id) in u.members.withIndex()) {
+            val a = k * (6.2831855f / n) - 1.5707964f
+            val spot = arena.nearestOpen(u.cx + cos(a) * ring, u.cy + sin(a) * ring, fighter(id)?.radius ?: 0.4f)
+            u.slotX[id] = spot.x; u.slotY[id] = spot.y
+        }
+        uprisingPhase(u, UprisingPhase.GAZE)
+    }
+
+    private fun stepUprising(u: Uprising, dt: Float) {
+        u.t += dt
+        if (u.phase != UprisingPhase.SKY && u.phase != UprisingPhase.RETURN) u.heldFor += dt
+        if (u.phase != UprisingPhase.SKY) for (f in fighters) { f.prevX = f.x; f.prevY = f.y; f.control.clear() }
+        when (u.phase) {
+            UprisingPhase.GAZE -> {
+                for (id in u.members) fighter(id)?.let { it.vx = 0f; it.vy = 0f; it.facing = -1.5707964f }
+                if (u.t >= Balance.UPRISING_GAZE) uprisingPhase(u, UprisingPhase.MARCH)
+            }
+            UprisingPhase.MARCH -> {
+                var all = true
+                for (id in u.members) {
+                    val f = fighter(id) ?: continue
+                    if (!walkTo(f, u.slotX.getValue(id), u.slotY.getValue(id), dt, drag = u.t >= Balance.UPRISING_PULL)) all = false
+                    else f.facing = atan2(u.cy - f.y, u.cx - f.x)
+                }
+                if (all || u.t >= Balance.UPRISING_MARCH) {
+                    for (id in u.members) fighter(id)?.let { f -> f.x = u.slotX.getValue(id); f.y = u.slotY.getValue(id) }
+                    uprisingPhase(u, UprisingPhase.BOW)
+                }
+            }
+            UprisingPhase.BOW -> {
+                for (id in u.members) fighter(id)?.let { f -> f.vx = 0f; f.vy = 0f; f.facing = atan2(u.cy - f.y, u.cx - f.x) }
+                if (u.heldFor >= Balance.UPRISING_HOLD - Balance.UPRISING_ENTER) uprisingPhase(u, UprisingPhase.ENTER)
+            }
+            UprisingPhase.ENTER -> {
+                for (id in u.members) fighter(id)?.let { f -> walkTo(f, u.cx, u.cy, dt, drag = true) }
+                if (u.t >= Balance.UPRISING_ENTER) beginSky(u)
+            }
+            UprisingPhase.SKY -> stepSky(u, dt)
+            UprisingPhase.RETURN -> if (u.t >= Balance.UPRISING_RETURN) {
+                projectiles.clear(); hazards.clear()
+                uprisingPhase(u, UprisingPhase.DONE)
+            }
+            UprisingPhase.WAITING, UprisingPhase.DONE -> Unit
+        }
+    }
+
+    /**
+     * Walks [f] toward (x, y) at its own pace, sliding along walls; with [drag] the Entity pulls it straight there,
+     * through anything. True once it is there.
+     */
+    private fun walkTo(f: Fighter, x: Float, y: Float, dt: Float, drag: Boolean): Boolean {
+        val dx = x - f.x; val dy = y - f.y
+        val d = hypot(dx, dy)
+        if (d < 0.08f) { f.vx = 0f; f.vy = 0f; return true }
+        val step = minOf(d, f.def.moveSpeed * (if (drag) 1.6f else 1f) * dt)
+        if (drag) { f.x += dx / d * step; f.y += dy / d * step }
+        else { arena.moveCircle(f.x, f.y, f.radius, dx / d * step, dy / d * step, tmp); f.x = tmp[0]; f.y = tmp[1] }
+        f.walkCycle += hypot(f.x - f.prevX, f.y - f.prevY) * 3.2f
+        f.facing = atan2(dy, dx)
+        f.vx = (f.x - f.prevX) / dt; f.vy = (f.y - f.prevY) / dt
+        return false
+    }
+
+    private fun beginSky(u: Uprising) {
+        // Through the portal: set down round the middle of its dimension, spread out.
+        val n = u.members.size
+        var hp = 0
+        for ((k, id) in u.members.withIndex()) {
+            val f = fighter(id) ?: continue
+            val a = k * (6.2831855f / n) - 1.5707964f
+            val spot = arena.nearestOpen(u.cx + cos(a) * 3.5f, u.cy + sin(a) * 3.5f, f.radius)
+            f.x = spot.x; f.y = spot.y; f.prevX = f.x; f.prevY = f.y; f.vx = 0f; f.vy = 0f
+            if (f.def.boss == null) hp += f.attackDamage * maxOf(1, f.def.attack.projectiles)
+        }
+        u.maxHp = maxOf(1, hp * Balance.UPRISING_HP_SHOTS)
+        u.hp = u.maxHp
+        u.strikeIn = Balance.UPRISING_STRIKE_GAP
+        uprisingPhase(u, UprisingPhase.SKY)
+    }
+
+    private fun stepSky(u: Uprising, dt: Float) {
+        for (id in u.members) {
+            val f = fighter(id) ?: continue
+            if (!f.alive) continue
+            if (f.def.boss != null) { f.prevX = f.x; f.prevY = f.y; f.control.clear(); continue }
+            // Every attack goes up, into the Entity: nobody can hurt anybody else in here.
+            val c = f.control
+            val volley = f.attackDamage * maxOf(1, f.def.attack.projectiles)
+            if (c.attack && f.ammo >= 1f && f.sinceAttack >= Balance.UPRISING_ATTACK_GAP) {
+                f.ammo -= 1f
+                f.sinceAttack = 0f
+                strikeEntity(u, f, volley, false)
+                f.superCharge = minOf(1f, f.superCharge + 0.08f)
+            }
+            if (c.superAttack && f.superReady) {
+                f.superCharge = 0f
+                strikeEntity(u, f, volley * Balance.UPRISING_SUPER_SHOTS, true)
+            }
+            c.attack = false; c.superAttack = false; c.detonate = false
+            stepFighter(f, dt)
+        }
+        stepHazards(dt)
+        // It strikes back: marked circles under a few of them at a time, in turn, that never knock anyone out.
+        u.strikeIn -= dt
+        if (u.strikeIn <= 0f) {
+            u.strikeIn = Balance.UPRISING_STRIKE_GAP
+            val alive = u.members.mapNotNull { fighter(it) }.filter { it.alive && it.def.boss == null }
+            if (alive.isNotEmpty()) for (j in 0 until 1 + alive.size / 3) {
+                val f = alive[(u.strikes + j) % alive.size]
+                hazards += Hazard(-1, -1, f.x + f.vx * 0.4f, f.y + f.vy * 0.4f, Balance.UPRISING_STRIKE_RADIUS, Balance.UPRISING_STRIKE_DELAY,
+                    Balance.UPRISING_STRIKE_DAMAGE, HazardKind.RIFT, lethal = false)
+            }
+            u.strikes++
+        }
+        if (u.hp <= 0 || u.t >= Balance.UPRISING_SKY) {
+            u.beaten = u.hp <= 0
+            // Back where they were, as they were.
+            projectiles.clear(); hazards.clear()
+            for (id in u.members) {
+                val f = fighter(id) ?: continue
+                val s = u.saved[id] ?: continue
+                f.x = s[0]; f.y = s[1]; f.prevX = f.x; f.prevY = f.y; f.vx = 0f; f.vy = 0f
+                if (f.alive) f.hp = s[2].toInt().coerceIn(1, f.maxHp)
+            }
+            uprisingPhase(u, UprisingPhase.RETURN)
+        }
+    }
+
+    private fun strikeEntity(u: Uprising, f: Fighter, damage: Int, isSuper: Boolean) {
+        val dealt = minOf(damage, u.hp)
+        u.hp -= dealt
+        f.damageDealt += dealt
+        events += GameEvent.SkyShot(f.id, isSuper, dealt)
     }
 
     /** [team] gives up (in a 1v1: its player left): the other team wins on the spot. */
@@ -242,6 +412,7 @@ class World(
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(lobs.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
         portal?.let { mix(it.dimension); mix(it.found); mix(it.state.ordinal) }
+        uprising?.let { mix(it.phase.ordinal); mix(it.hp) }
         return h
     }
 

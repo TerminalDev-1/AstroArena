@@ -98,6 +98,7 @@ class MatchRunner(
     /** Until the tempest's wind is played again. */
     private var windLeft = 0f
     private var airLeft = 0.5f
+    private var upAirLeft = 0f
 
     private fun tick() {
         val p = match.player
@@ -214,6 +215,14 @@ class MatchRunner(
                 sfx.play(Sound.TEMPEST_WIND, (if (storm.id == p.id) 0.8f else 0.6f) / (1f + hypot(storm.x - p.x, storm.y - p.y) * 0.15f), 0.95f + (storm.tempestLeft % 0.1f))
             }
         } else windLeft = 0.5f
+
+        // The Entity's uprising: the air of its world for as long as it lasts.
+        match.world.uprising?.let { u ->
+            if (u.active && u.phase != io.github.projectwip.sim.UprisingPhase.RETURN) {
+                upAirLeft -= Match.STEP
+                if (upAirLeft <= 0f) { upAirLeft += 1.8f; sfx.play(Sound.DIM_AIR, 0.7f, 0.75f) }
+            } else upAirLeft = 0f
+        }
 
         // Dimension: the air of the place, lower and stranger the deeper the player is.
         match.world.portal?.let { run ->
@@ -333,6 +342,15 @@ class MatchRunner(
         val pid = match.player.id
         val world = match.world
         when (e) {
+            is GameEvent.Uprising -> when (io.github.projectwip.sim.UprisingPhase.entries[e.phase]) {
+                io.github.projectwip.sim.UprisingPhase.GAZE -> { sfx.play(Sound.THUNDER, 1f, 0.7f); sfx.play(Sound.VOID, 1f) }
+                io.github.projectwip.sim.UprisingPhase.BOW -> sfx.play(Sound.VOID, 1f, 0.85f)
+                io.github.projectwip.sim.UprisingPhase.ENTER -> sfx.play(Sound.PORTAL_OPEN, 1f)
+                io.github.projectwip.sim.UprisingPhase.SKY -> { sfx.play(Sound.PORTAL_ENTER, 1f); sfx.play(Sound.THUNDER, 0.8f, 0.6f) }
+                io.github.projectwip.sim.UprisingPhase.RETURN -> sfx.play(Sound.WHOOSH, 1f, 0.7f)
+                else -> Unit
+            }
+            is GameEvent.SkyShot -> if (e.fighterId == pid) sfx.play(if (e.isSuper) Sound.SHOCK else Sound.WHOOSH, if (e.isSuper) 0.9f else 0.45f, 1.3f)
             is GameEvent.Shot -> {
                 if (e.isSuper && e.fighterId == pid) say(VoiceCue.SUPER)
                 val f = world.fighter(e.fighterId) ?: return
