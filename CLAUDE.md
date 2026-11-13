@@ -241,7 +241,10 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   every attack, super and hypercharge and with time once they've fought (`GLITCH_PULL_*`); full, they glitch, for sure
   (`GameEvent.Glitched`), again every time it fills, with only a short breather (`GLITCH_COOLDOWN`) between. It is
   never a dice roll and never capped: the user rejected glitches that happened once a match ("does the entity go on a
-  beach day?"). For `GLITCH_SECONDS` (4) the Entity fights through
+  beach day?"). Normal attacks fill most of it, so it comes mid-fight and not only with a super (the user
+  complained it did). A takeover during Swish's tornado lasts the whole tornado, and the Entity drives it flat out
+  straight through enemies. Now and then (`SKY_LOOK_CHANCE`) a plain attack's streak gets a big one and the camera
+  bobs up after it with a silly side-to-side wobble (`skyLookSilly`), the user's request. For `GLITCH_SECONDS` (4) the Entity fights through
   them (`Fighter.glitchLeft`, `Match.autoFight` overrides the control, deterministic, so the referee replays it); the
   player sees "THE ENTITY HAS YOU" (`HudView.drawPossessed`) and the fighter jolts (`glitchJolt`). Outside Dimension
   the Entity whispers to the player now and then and when they use a super or a hypercharge (`HudView.drawWhisper`,

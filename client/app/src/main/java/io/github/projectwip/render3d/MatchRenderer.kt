@@ -288,9 +288,14 @@ class MatchRenderer(
         val sz = if (shake > 0f) (rng.nextFloat() - 0.5f) * shake * 0.9f else 0f
         // After the player's super the camera eases back and tilts up for a moment, to watch the streak it fires go up
         // into the sky (the user's idea), then settles again.
+        // Now and then a plain attack's streak gets the same look, shorter and sillier: a quick bob up after it with
+        // the camera wobbling side to side like it can't believe it (the user asked for that).
         val sl = time - skyLookAt
-        val sky = when { sl < 0f || sl > SKY_STREAK_SUPER -> 0f; sl < 0.35f -> sl / 0.35f; sl < 1.25f -> 1f; else -> 1f - (sl - 1.25f) / (SKY_STREAK_SUPER - 1.25f) }
-        val e = sky * sky * (3f - 2f * sky)
+        val len = skyLookLen
+        val hold = len * 0.62f
+        val sky = when { sl < 0f || sl > len -> 0f; sl < 0.35f -> sl / 0.35f; sl < hold -> 1f; else -> 1f - (sl - hold) / (len - hold) }
+        val e = sky * sky * (3f - 2f * sky) * skyLookPower
+        val wobble = if (skyLookSilly && sky > 0f) sin(sl * 15f) * 0.14f * sky else 0f
         // (Looking up with the streak as it climbs: lower and further back, aimed up into the air above the fighter.)
         val climb = (sl / 0.55f).coerceIn(0f, 1f)
         val pitch = Math.toRadians((PITCH - 30f * e).toDouble())
@@ -298,7 +303,7 @@ class MatchRenderer(
         eyeX = camX + sx
         eyeY = (d2 * sin(pitch)).toFloat()
         eyeZ = camZ + (d2 * cos(pitch)).toFloat() + sz
-        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, camX + sx, (3f + 4f * climb) * e, camZ + sz - 1.5f * e, 0f, 1f, 0f)
+        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, camX + sx, (3f + 4f * climb) * e, camZ + sz - 1.5f * e, wobble, 1f, 0f)
         Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
 
         // Shadow camera follows the view target.
@@ -311,6 +316,10 @@ class MatchRenderer(
     private fun distance() = CAMERA_DISTANCE
     /** When the player last fired a super (the camera's look up to the sky, see [updateCamera]). */
     private var skyLookAt = -100f
+    /** How long that look lasts, how far it goes, and whether it is the silly wobbling one (after a plain attack). */
+    private var skyLookLen = SKY_STREAK_SUPER
+    private var skyLookPower = 1f
+    private var skyLookSilly = false
 
     // ------------------------------------------------------------------ passes
 
@@ -1064,7 +1073,14 @@ class MatchRenderer(
         if (id !in flare.indices) return
         flare[id] = maxOf(flare[id], amount)
         if (sky) { attackGlitchAt[id] = time; attackGlitchSize[id] = amount }
-        if (sky && amount >= 1f && id == match.player.id) skyLookAt = time
+        var bigStreak = amount >= 1f
+        if (sky && id == match.player.id) {
+            if (amount >= 1f) { skyLookAt = time; skyLookLen = SKY_STREAK_SUPER; skyLookPower = 1f; skyLookSilly = false }
+            else if (time - skyLookAt > SKY_LOOK_GAP && rng.nextFloat() < SKY_LOOK_CHANCE) {
+                // Some of the time a plain attack's streak is a big one too, and the camera bobs up after it.
+                skyLookAt = time; skyLookLen = 1.5f; skyLookPower = 0.7f; skyLookSilly = true; bigStreak = true
+            }
+        }
         val f = world.fighter(id) ?: return
         if (!inView(f.x, f.y)) return
         // The flare bursts out of the streaks themselves: sparks thrown off along the four lines.
@@ -1078,7 +1094,7 @@ class MatchRenderer(
                 if (k % 3 == 0) 0xFFFFFFFF.toInt() else 0xFF5CC8FF.toInt(), 1f)
         }
         // And a streak fires up into the sky (the user's idea), from a shoulder, bigger for a super.
-        if (sky) skyStreaks += floatArrayOf(f.x, f.y, time, amount, if (rng.nextBoolean()) 1f else -1f, shownFacing[id])
+        if (sky) skyStreaks += floatArrayOf(f.x, f.y, time, if (bigStreak) 1f else amount, if (rng.nextBoolean()) 1f else -1f, shownFacing[id])
     }
 
     /**
@@ -2781,6 +2797,9 @@ class MatchRenderer(
         const val PORTAL_LEAN = 30f
         /** How long a super's streak into the sky lasts (and the camera's look up to it). */
         const val SKY_STREAK_SUPER = 2.0f
+        /** The chance a plain attack gets the camera's silly look up, and the least time between two looks. */
+        const val SKY_LOOK_CHANCE = 0.25f
+        const val SKY_LOOK_GAP = 6f
         /** Where along a streak line it reaches the shoulder, and where it has gone round it (see `streakPoint`). */
         const val CONVERGE = 0.3f
         const val AROUND = 0.45f

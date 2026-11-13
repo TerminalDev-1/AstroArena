@@ -413,14 +413,14 @@ object Balance {
      */
     const val GLITCH_SECONDS = 4f
     /**
-     * The Entity's pull (`Fighter.entityPull`) fills by these: a little every second, more for every attack, a lot for a
-     * super or a hypercharge. Full, the fighter glitches, every time, as often as it fills: about every 20 to 30
+     * The Entity's pull (`Fighter.entityPull`) fills by these: a little every second, more for every attack, a bit more for
+     * a super or a hypercharge (not so much that it only ever comes with a super: the user wants it mid-fight). Full, the fighter glitches, every time, as often as it fills: about every 20 to 30
      * seconds of fighting.
      */
-    const val GLITCH_PULL_PER_SECOND = 1f / 40f
-    const val GLITCH_PULL_ATTACK = 0.05f
-    const val GLITCH_PULL_SUPER = 0.45f
-    const val GLITCH_PULL_HYPER = 0.45f
+    const val GLITCH_PULL_PER_SECOND = 1f / 30f
+    const val GLITCH_PULL_ATTACK = 0.1f
+    const val GLITCH_PULL_SUPER = 0.15f
+    const val GLITCH_PULL_HYPER = 0.15f
     /** The breather after a glitch before the pull starts filling again. */
     const val GLITCH_COOLDOWN = 4f
 

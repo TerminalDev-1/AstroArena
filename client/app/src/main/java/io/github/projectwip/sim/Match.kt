@@ -202,8 +202,9 @@ class Match(val config: MatchConfig) {
                 if (f.entityPull > 0f) f.entityPull += Balance.GLITCH_PULL_PER_SECOND * dt
                 if (f.entityPull >= 1f) {
                     f.entityPull = 0f
-                    f.glitchLeft = Balance.GLITCH_SECONDS
-                    f.glitchCooldown = Balance.GLITCH_SECONDS + Balance.GLITCH_COOLDOWN
+                    // (In a tornado the Entity keeps it to the end: four seconds of it was too little.)
+                    f.glitchLeft = maxOf(Balance.GLITCH_SECONDS, f.tempestLeft)
+                    f.glitchCooldown = f.glitchLeft + Balance.GLITCH_COOLDOWN
                     world.events += GameEvent.Glitched(f.id)
                 }
             }
@@ -230,8 +231,14 @@ class Match(val config: MatchConfig) {
         if (t == null) { c.moveX = 0f; c.moveY = 0f; c.aiming = false; return }
         val dx = t.x - f.x; val dy = t.y - f.y
         val d = kotlin.math.hypot(dx, dy).coerceAtLeast(0.001f)
+        if (f.inTempest) {
+            // The Entity drives the tornado flat out, straight through whoever it is after and on past them.
+            c.moveX = dx / d; c.moveY = dy / d
+            c.aimX = dx; c.aimY = dy; c.aiming = true
+            return
+        }
         val reach = f.def.attack.range * 0.85f
-        if (d > reach) { c.moveX = dx / d; c.moveY = dy / d } else { c.moveX = -dy / d * 0.4f; c.moveY = dx / d * 0.4f }
+        if (d > reach) { c.moveX = dx / d; c.moveY = dy / d } else { c.moveX = -dy / d * 0.8f; c.moveY = dx / d * 0.8f }
         c.aimX = dx; c.aimY = dy; c.aiming = true
         c.attack = d <= f.def.attack.range
         if (f.superCharge >= 1f && d <= f.def.attack.range) c.superAttack = true
