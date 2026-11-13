@@ -72,6 +72,11 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   screen says why it is offline (`GameServer.unreachable`, or that the player chose Offline mode). Ask for the shared
   report before guessing at a crash on someone else's phone. `--es server http://192.168.1.103:9999` fakes an
   unreachable server (this PC's firewall drops that port, so it times out); `--es server default` undoes it.
+- **A shader change can only be tested on the device.** JVM tests can't compile GLSL, and a shader that fails to
+  compile leaves matches (and the 3D stage, which shares `LIT_FS`) black, with the error only in the saved crash
+  report (`run-as io.github.projectwip cat files/crash.json`). Build 104's first try read `uTime` in the fragment
+  shader, where only the vertex shader declares it. A uniform both stages need gets its own name in each (the
+  stages' default precisions differ, and a shared uniform must match). Open a match on the tablet after any shader edit.
 - **Shell traps on this machine** (Git Bash on Windows): adb under `MSYS_NO_PATHCONV=1` needs Windows paths
   (`C:/Users/...`), not `/c/Users/...`; Gradle runs from `client/` (a `cd` that is a level off fails silently behind a
   `grep`); long Python edits with quotes in them go in a script file in the scratchpad (run with `python -I`), not a
@@ -97,7 +102,7 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|lastspark|portal|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `crash` crashes the game on purpose to try the crash reporter;
+  (`match|boss|lastspark|portal|portalN|portalNo|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `portal3` starts Dimension three deep, `portal3o` with its portal already open; `crash` crashes the game on purpose to try the crash reporter;
   `result` (first in Last Spark), `result3`, `resultwin` and `resultloss` preview the end of a match, reveal first;
   `tryswish` / `tryspark` are the Training Area as Swish / Spark; `roster` is the fighter grid with every model shown unlocked, `tryspark` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - Crashes on players' devices: `net/CrashReporter.kt` saves a crash (and, on Android 11+, Android's record of a native
