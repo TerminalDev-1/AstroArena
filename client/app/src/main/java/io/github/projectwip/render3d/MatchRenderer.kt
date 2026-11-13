@@ -349,6 +349,7 @@ class MatchRenderer(
         lit.f("uWarp", dimWarp)
         lit.f("uGlitch", dimGlitch)
         lit.f("uGlitchF", dimGlitch)
+        lit.f("uGlitchClock", time)
         val er = lerp(1f, 0.2f, realmFade) * dimLight[0]
         val eg = lerp(1f, 0.15f, realmFade) * dimLight[1]
         val eb = lerp(1f, 0.46f, realmFade) * dimLight[2]
@@ -741,7 +742,7 @@ class MatchRenderer(
         }
         // The Void, waiting at the portal: hovering a little, swaying, its eyes lit.
         if (run.state == io.github.projectwip.sim.PortalState.OPEN && depth >= 2) {
-            val vx = run.x + 1.9f; val vz = run.y - 0.9f
+            val vx = run.x + 2.1f; val vz = run.y + 0.6f
             val hover = 0.25f + 0.12f * sin(time * 1.3f)
             val p = match.player
             val face = Math.toDegrees(atan2((p.x - vx).toDouble(), (p.y - vz).toDouble())).toFloat()
@@ -2221,13 +2222,13 @@ class MatchRenderer(
 /** Dimension: the light each dimension is drawn in, from the first (the arena as it is) down to the bottom. */
 private val DIMENSION_LIGHT = arrayOf(
     floatArrayOf(1f, 1f, 1f),
-    floatArrayOf(0.8f, 0.64f, 1.1f),
-    floatArrayOf(0.5f, 0.88f, 1.05f),
-    floatArrayOf(1.1f, 0.72f, 0.45f),
-    floatArrayOf(1.15f, 1.08f, 0.95f),
-    floatArrayOf(0.55f, 1.1f, 0.6f),
-    floatArrayOf(1.2f, 0.45f, 0.75f),
-    floatArrayOf(0.42f, 0.38f, 0.6f),
+    floatArrayOf(0.78f, 0.6f, 1.12f),
+    floatArrayOf(0.42f, 0.8f, 1.1f),
+    floatArrayOf(1.15f, 0.62f, 0.36f),
+    floatArrayOf(1.2f, 1.12f, 0.62f),
+    floatArrayOf(0.42f, 1.12f, 0.5f),
+    floatArrayOf(1.25f, 0.36f, 0.72f),
+    floatArrayOf(0.36f, 0.32f, 0.56f),
 )
 
 /** Dimension: what is beyond the edge of the arena in each one. */

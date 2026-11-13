@@ -295,7 +295,7 @@ private fun MatchBody(
     var intro by remember { mutableStateOf(!match.practice) }
     /** Dimension: the scene showing (portals entered when it began), or -1. The match is paused behind it. */
     var scene by remember { mutableStateOf(-1) }
-    var seenPortals by remember { mutableStateOf(0) }
+    var seenPortals by remember { mutableStateOf(match.world.portal?.entered ?: 0) }
     if (match.portalRun) androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
             androidx.compose.runtime.withFrameNanos { }
@@ -342,7 +342,7 @@ private fun MatchBody(
             },
             modifier = Modifier.fillMaxSize(),
         )
-        if (intro && match.portalRun) DimensionCutscene(0, match.config.playerFighter, match.config.playerSkin, sfx) { intro = false; view?.resumeGame() }
+        if (intro && match.portalRun) DimensionCutscene(match.world.portal?.entered ?: 0, match.config.playerFighter, match.config.playerSkin, sfx) { intro = false; view?.resumeGame() }
         else if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
         if (scene >= 0) DimensionCutscene(scene, match.config.playerFighter, match.config.playerSkin, sfx) { scene = -1; view?.resumeGame() }
         if (paused && !done) {

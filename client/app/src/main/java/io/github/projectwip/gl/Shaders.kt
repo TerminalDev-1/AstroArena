@@ -123,6 +123,7 @@ uniform int uMode;
 uniform vec3 uReveal[3];
 uniform float uRevealOn;
 uniform float uGlitchF;
+uniform float uGlitchClock;
 in vec3 vNormal;
 in vec4 vColor;
 in vec4 vLightPos;
@@ -180,7 +181,7 @@ void main() {
     if (uGlitchF > 0.0) {
         // Dimension: rows of the picture splitting into their colours, and a faint scanline.
         float row = floor(gl_FragCoord.y / 5.0);
-        float n = fract(sin(row * 12.9898 + floor(uTime * 14.0) * 78.233) * 43758.5453);
+        float n = fract(sin(row * 12.9898 + floor(uGlitchClock * 14.0) * 78.233) * 43758.5453);
         if (n > 1.0 - uGlitchF * 0.1) col = col.brg * 1.25;
         col *= 1.0 - uGlitchF * 0.18 * step(0.5, fract(gl_FragCoord.y * 0.5));
     }

@@ -31,6 +31,9 @@ data class MatchConfig(
     val duel: DuelSetup? = null,
     /** Boss Mode or Knockout Rush with a team of real players: who they are, and which of them this device plays. */
     val team: TeamSetup? = null,
+    /** Debug previews of Dimension: start in this dimension, and with its echoes already found (the portal open). */
+    val portalStart: Int = 1,
+    val portalOpen: Boolean = false,
 )
 
 /** One real player in a team. */
@@ -131,6 +134,11 @@ class Match(val config: MatchConfig) {
         for (b in brains) b.others = brains
         // In the Training Area the super is there to be tried straight away.
         if (practice) player.superCharge = 1f
+        world.portal?.let { run ->
+            if (config.portalStart > 1) { run.dimension = config.portalStart; run.entered = config.portalStart - 1 }
+            // The echoes laid where the player starts, so they are found at once and the portal opens.
+            if (config.portalOpen) for (i in 0 until Balance.PORTAL_SHARDS) { run.shards[i * 2] = player.x; run.shards[i * 2 + 1] = player.y }
+        }
     }
 
     private fun botFighter(id: Int, team: Int, name: String): Fighter {

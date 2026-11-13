@@ -137,7 +137,7 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
                 drawBackdrop(time, mood, entered)
             }
             // ---- The two of them, on the stage.
-            Column(Modifier.fillMaxSize().padding(horizontal = 28.dp).padding(top = 34.dp, bottom = 30.dp)) {
+            Column(Modifier.fillMaxSize().padding(horizontal = 28.dp).padding(top = 84.dp, bottom = 30.dp)) {
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
                     Box(Modifier.fillMaxHeight().width(320.dp).graphicsLayer {
                         val k = if (voidTalking) 1.04f else 0.95f; scaleX = k; scaleY = k; alpha = if (voidTalking) 1f else 0.55f
@@ -162,7 +162,7 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
             }
             // ---- The title card: which dimension this is, fading in and then settling small at the top.
             val card = sceneIn
-            Column(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).graphicsLayer { alpha = card }, horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.align(Alignment.TopCenter).padding(top = 30.dp).graphicsLayer { alpha = card }, horizontalAlignment = Alignment.CenterHorizontally) {
                 PlainText(if (final) "THE END OF THE WAY DOWN" else "DIMENSION ${entered + 1}", Type.Eyebrow.copy(letterSpacing = Type.Eyebrow.fontSize * 0.6f, color = mood.accent.copy(alpha = 0.8f)))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.width(46.dp).height(1.5.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, mood.glow))))
