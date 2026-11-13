@@ -1479,6 +1479,26 @@ class SimulationTest {
         assertTrue("the tornado turned back $flips times in a second", flips <= 2)
     }
 
+    private fun entityEscapesAMarkedCircle(tornado: Boolean) {
+        // The user found the Entity standing in a boss's marked circles: it has to get out before they go off.
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, seed = 9L))
+        repeat(60 * 6) { m.step(Match.STEP) }
+        val p = m.player
+        val enemy = m.world.fighters.first { it.team != p.team && it.alive }
+        p.glitchLeft = 6f
+        if (tornado) p.tempestLeft = 6f
+        val h = io.github.projectwip.sim.Hazard(enemy.id, enemy.team, p.x, p.y, 1.25f, 1.15f, 1375, io.github.projectwip.sim.HazardKind.ROCKET)
+        m.world.hazards += h
+        var t = 0f
+        while (t < 1.1f) { m.step(Match.STEP); t += Match.STEP }
+        assertTrue("out of the circle before it goes off (tornado=$tornado): ${kotlin.math.hypot(p.x - h.x, p.y - h.y)}",
+            kotlin.math.hypot(p.x - h.x, p.y - h.y) >= h.radius + p.radius)
+    }
+
+    @Test fun theEntityWalksOutOfABossCircle() = entityEscapesAMarkedCircle(tornado = false)
+
+    @Test fun theEntityDrivesTheTornadoOutOfABossCircle() = entityEscapesAMarkedCircle(tornado = true)
+
     @Test fun theEntityTakesOverAgainAndAgainInAMatch() {
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
             mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, seed = 12L))

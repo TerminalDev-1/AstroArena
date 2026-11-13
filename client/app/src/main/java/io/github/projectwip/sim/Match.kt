@@ -188,7 +188,7 @@ class Match(val config: MatchConfig) {
         for (f in world.fighters) if (f.glitchLeft > 0f) {
             f.glitchLeft = maxOf(0f, f.glitchLeft - dt)
             if (!f.alive || f.def.boss != null) continue
-            if (f.inTempest) autoFight(f)
+            if (f.inTempest) { autoFight(f); dodgeHazards(f) }
             else if (!f.isBot) {
                 val c = f.control
                 c.attack = false; c.superAttack = false; c.hyper = false
@@ -208,6 +208,7 @@ class Match(val config: MatchConfig) {
                         if (f.superReady && !c.superAttack) { c.aimX = near.x - f.x; c.aimY = near.y - f.y; c.aiming = true; c.superAttack = true }
                     }
                 }
+                dodgeHazards(f)
             }
         }
         val seen = world.events.size
@@ -241,6 +242,42 @@ class Match(val config: MatchConfig) {
             }
         }
         if (isOver) overFor += dt
+    }
+
+    /**
+     * The Entity sees what's coming (the user asked for it in Boss Mode): a marked patch of ground about to go off (a
+     * boss's rockets, mines and slams, a brew) is never stood in or walked into. Standing in one, it takes the way out
+     * that's clear soonest, leaning toward where it wanted to go; about to step into one, it goes round. Walking, walls
+     * count; as a tornado it flies over them. Runs after its brain or its tornado driving, and only changes the move.
+     */
+    private fun dodgeHazards(f: Fighter) {
+        if (world.hazards.isEmpty()) return
+        val c = f.control
+        val margin = f.radius + HAZARD_MARGIN
+        fun danger(x: Float, y: Float): Boolean {
+            for (h in world.hazards) if (h.team != f.team && h.age < h.delay && kotlin.math.hypot(h.x - x, h.y - y) < h.radius + margin) return true
+            return false
+        }
+        val wantX = c.moveX; val wantY = c.moveY
+        val inside = danger(f.x, f.y)
+        if (!inside && (wantX == 0f && wantY == 0f || !danger(f.x + wantX * HAZARD_LOOKAHEAD, f.y + wantY * HAZARD_LOOKAHEAD))) return
+        var best = -Float.MAX_VALUE; var bx = 0f; var by = 0f
+        for (k in 0 until 24) {
+            val a = k * (6.2831855f / 24)
+            val dx = kotlin.math.cos(a); val dy = kotlin.math.sin(a)
+            var clearAt = -1
+            for (step in 1..12) {
+                val d = step * 0.35f
+                val x = f.x + dx * d; val y = f.y + dy * d
+                if (!f.inTempest && world.arena.circleBlocked(x, y, f.radius)) break
+                if (!danger(x, y)) { clearAt = step; break }
+            }
+            if (clearAt < 0) continue
+            val score = -clearAt + 0.6f * (dx * wantX + dy * wantY)
+            if (score > best) { best = score; bx = dx; by = dy }
+        }
+        if (best > -Float.MAX_VALUE) { c.moveX = bx; c.moveY = by }
+        else if (!inside) { c.moveX = 0f; c.moveY = 0f }
     }
 
     /**
@@ -327,6 +364,9 @@ class Match(val config: MatchConfig) {
     companion object {
         /** How far past someone's edge the Entity's tornado keeps its heading through them. */
         const val TEMPEST_PASS = 1.2f
+        /** How far clear of a marked patch's edge the Entity keeps, and how far ahead it looks for one. */
+        const val HAZARD_MARGIN = 0.35f
+        const val HAZARD_LOOKAHEAD = 0.9f
         const val STEP = 1f / 60f
         /** How much more health a boss has for every player in a team beyond the first. */
         const val TEAM_BOSS_HEALTH = 1f

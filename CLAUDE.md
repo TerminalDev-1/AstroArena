@@ -83,6 +83,10 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   of every fighter (`landingClear`). Any new teleport, leap or landing needs the same.
   The Entity's tornado also holds the heading it came in on while it passes through someone (`Match.entityHeading`,
   `TEMPEST_PASS`): turning to face a target it was on top of flipped it every tick, a violent jerk.
+- **The Entity sees a boss's marked circles** (build 110, the user's request for Boss Mode): bot brains never had to
+  fight a boss, so the Entity walked and drove its tornado straight into rockets, mines and slams. `Match.dodgeHazards`
+  runs after its brain or tornado driving: never stand in or step into a patch about to go off; walls count unless
+  it is a tornado.
 - **No `Sound.GLITCH` blip in the Entity's cutscenes** (the user hated it, "annihilate that"), including when the
   Entity flickers into another soul.
 - **Shell traps on this machine** (Git Bash on Windows): adb under `MSYS_NO_PATHCONV=1` needs Windows paths
