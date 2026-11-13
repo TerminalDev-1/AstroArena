@@ -247,10 +247,10 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
     /** One real player against another, each on their own device. Nothing is earned in it yet. */
     DUEL("1v1", "You against one real player · first to 3 knockouts", 2),
     /**
-     * Dimension (1.0, the user's idea; a lore mode since build 104): find the echoes in each dimension, step through the
-     * portal they open into a stranger one, and go down to the bottom. The Void speaks each time you go through.
+     * Dimension (1.0, the user's idea; a lore mode since build 104): in each dimension a fighter is chained up; find
+     * the echoes to break the chains, and a portal opens into a stranger one. It goes on forever. Nothing is won.
      */
-    PORTAL("Dimension", "A story mode · you and the Void · find the echoes, step through the portal", 1),
+    PORTAL("Dimension", "A story mode · you and the Void · free the chained, go deeper, forever", 1),
 }
 
 object Balance {
@@ -422,8 +422,8 @@ object Balance {
     const val PORTAL_TRAVEL_SECONDS = 1.2f
     /** How close (beyond the fighter's own radius) the portal pulls you in. */
     const val PORTAL_RADIUS = 1.1f
-    /** Portals to the bottom, where the story ends: the run's best placement. */
-    const val PORTAL_DEPTH = 7
+    /** The chained fighter: how close (beyond the player's radius) counts as being beside them, to talk. */
+    const val PORTAL_CAPTIVE_REACH = 1.6f
     /**
      * Glitch rifts: from the second dimension on the world tears open near the player now and then. A rift is marked
      * for [PORTAL_RIFT_DELAY] seconds and then takes [PORTAL_RIFT_SHARE] of their health if they are still in it.
@@ -431,7 +431,7 @@ object Balance {
     const val PORTAL_RIFT_DELAY = 1.3f
     const val PORTAL_RIFT_SHARE = 0.2f
     /** Seconds between rifts in [dimension] (none in the first). */
-    fun portalRiftEvery(dimension: Int) = if (dimension < 2) Float.MAX_VALUE else maxOf(1.7f, 5.2f - 0.6f * (dimension - 2))
+    fun portalRiftEvery(dimension: Int) = if (dimension < 2) Float.MAX_VALUE else maxOf(2.2f, 5.5f - 0.5f * (dimension - 2))
     fun portalRiftRadius(dimension: Int) = minOf(1.6f, 0.9f + 0.1f * dimension)
 
     const val STORM_DELAY_SECONDS = 25f

@@ -24,8 +24,7 @@ DEFAULT_CUPS = {
     "BOSS": {"win": 5},
     # 1v1, against another real player (the lobby replays it and says who won: duel.py).
     "DUEL": {"win": 8, "draw": 0, "max_loss": 6, "loss_step": 80},
-    # Portal Run pays by depth: Cups for every portal stepped through (the match's placement), up to max_portals.
-    "PORTAL": {"per_portal": 4, "max_portals": 10},
+    # (Dimension, "PORTAL", pays nothing: it is a story, not a contest, by the user's decision in build 104.)
 }
 # The Training Area is never played for Cups (nothing referees it), whatever trophies.cfg says.
 CUP_MODES = tuple(DEFAULT_CUPS)
@@ -87,7 +86,7 @@ def earns_drop(mode: str, outcome: str, placement: int) -> bool:
     if mode == "KNOCKOUT_RUSH":
         return outcome == "VICTORY"
     if mode == "PORTAL":
-        return placement >= 2
+        return False
     return False
 
 
@@ -98,8 +97,6 @@ MIN_GOOD_RESULT_SECONDS = 20.0
 MAX_MATCH_SECONDS = 3600.0
 _MAX_KOS = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 40, "BOSS": 80, "DUEL": 40, "TRAINING": 100000, "PORTAL": 0}
 _MAX_DAMAGE = 3_000_000
-# Portals from the first dimension down to the bottom of Dimension (Balance.PORTAL_DEPTH in the game).
-PORTAL_DEPTH = 7
 
 
 def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: int, deaths: int, damage: int) -> str | None:
@@ -127,8 +124,8 @@ def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: i
         if placement == 1 and kos == 0 and damage == 0:
             return "a win without a fight"
     if mode == "PORTAL":
-        # Dimension is a lore mode (build 104): no enemies, seven portals down to the bottom, one life.
-        if not 0 <= placement <= PORTAL_DEPTH:
+        # Dimension is a lore mode (build 104): no enemies, no bottom (it goes on forever), one life.
+        if not 0 <= placement <= 100_000:
             return "placement out of range"
         if deaths > 1:
             return "more than one life in Dimension"

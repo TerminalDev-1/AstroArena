@@ -58,6 +58,9 @@ class PortalRun {
     var entered = 0
     var state = PortalState.ARRIVE
     var timer = Balance.PORTAL_ARRIVE_SECONDS
+    /** Where this dimension's chained fighter stands (the portal opens there once the chains break). */
+    var captiveX = 0f
+    var captiveY = 0f
     /** Where this dimension's shards lie (x, y pairs), which are found, and how many. */
     val shards = FloatArray(Balance.PORTAL_SHARDS * 2)
     val taken = BooleanArray(Balance.PORTAL_SHARDS)
@@ -70,8 +73,6 @@ class PortalRun {
     var time = 0f
     var tauntAt = -100f
     var taunt = -1
-    /** True once the bottom is reached: the run ends when the last journey does. */
-    val atBottom get() = entered >= Balance.PORTAL_DEPTH
 }
 
 /** The Static Storm: a circle that waits, then shrinks; standing outside hurts more the longer it runs. */
@@ -1331,9 +1332,8 @@ class World(
                         events += GameEvent.ShardFound(run.dimension, run.found, sx, sy)
                     }
                     if (run.found < Balance.PORTAL_SHARDS) return
-                    // The way down opens at the middle of the arena: wherever the player is, they walk back to it.
-                    val spot = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 0.8f)
-                    run.x = spot.x; run.y = spot.y
+                    // The chains break, and the way down opens where the chained fighter stood.
+                    run.x = run.captiveX; run.y = run.captiveY
                     run.state = PortalState.OPEN
                     events += GameEvent.PortalOpened(run.x, run.y)
                     return
@@ -1348,19 +1348,15 @@ class World(
                 if (player.inTempest) endTempest(player)
                 if (player.inRealm) closeRealm(player.realm)
                 player.hp = player.maxHp
-                if (!run.atBottom) {
-                    run.dimension++
-                    placeAtSpawn(player)
-                    player.shield = Balance.SPAWN_SHIELD_SECONDS
-                    scatterShards(run)
-                }
+                run.dimension++
+                placeAtSpawn(player)
+                player.shield = Balance.SPAWN_SHIELD_SECONDS
+                scatterShards(run)
                 events += GameEvent.PortalEntered(run.dimension, run.entered)
             }
             PortalState.TRAVEL -> {
                 run.timer -= dt
                 if (run.timer > 0f) return
-                // At the bottom the story is over: the run ends there, as deep as it goes.
-                if (run.atBottom) { if (phase == Phase.PLAYING) end(0); return }
                 run.state = PortalState.ARRIVE
                 run.timer = Balance.PORTAL_ARRIVE_SECONDS
             }
@@ -1380,18 +1376,23 @@ class World(
         hazards += Hazard(-1, 1, spot.x, spot.y, r, Balance.PORTAL_RIFT_DELAY, (player.maxHp * Balance.PORTAL_RIFT_SHARE).toInt(), HazardKind.RIFT)
     }
 
-    /** Lays this dimension's echoes on open ground, far from where the player arrives and from each other. */
+    /**
+     * Sets up a dimension: the chained fighter somewhere toward the middle, and the echoes on open ground, far from
+     * where the player arrives, from the captive and from each other.
+     */
     private fun scatterShards(run: PortalRun) {
         run.found = 0
         run.taken.fill(false)
         val start = arena.spawns[0][0]
+        val c = arena.nearestOpen(arena.width * (0.3f + 0.4f * rng.nextFloat()), arena.height * (0.35f + 0.3f * rng.nextFloat()), 0.9f)
+        run.captiveX = c.x; run.captiveY = c.y
         for (i in 0 until Balance.PORTAL_SHARDS) {
             var best = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 0.6f)
             var bestScore = -1f
             // A dozen tries; keep the spot furthest from where the player starts and from the shards already placed.
             for (k in 0 until 12) {
                 val c = arena.nearestOpen(2f + rng.nextFloat() * (arena.width - 4f), 2f + rng.nextFloat() * (arena.height - 4f), 0.6f)
-                var near = hypot(c.x - start.x, c.y - start.y)
+                var near = minOf(hypot(c.x - start.x, c.y - start.y), hypot(c.x - run.captiveX, c.y - run.captiveY))
                 for (j in 0 until i) near = minOf(near, hypot(c.x - run.shards[j * 2], c.y - run.shards[j * 2 + 1]))
                 if (near > bestScore) { bestScore = near; best = c }
                 if (near >= Balance.PORTAL_SHARD_SPREAD * 1.6f) break

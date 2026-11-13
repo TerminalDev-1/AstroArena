@@ -77,6 +77,12 @@ class MatchRenderer(
     private val dimLight = floatArrayOf(1f, 1f, 1f)
     private var dimWarp = 0f
     private var dimGlitch = 0f
+    /** Dimension: seconds until the next glitch moment, and how long the current one has left. */
+    private var glitchIn = 6f
+    private var glitchLeft = 0f
+    private var frameDt = 0f
+    /** Dimension: the chained fighter's pose. */
+    private val captiveAnim = FighterAnim()
     private lateinit var disc: Mesh
     private lateinit var ring: Mesh
     private lateinit var dashRing: Mesh
@@ -244,6 +250,7 @@ class MatchRenderer(
 
     override fun onFrame(dt: Float) {
         time += dt
+        frameDt = dt
         fpsFrames++; fpsTime += dt
         if (fpsTime >= 0.5f) { fps = (fpsFrames / fpsTime).toInt(); fpsFrames = 0; fpsTime = 0f }
 
@@ -261,7 +268,7 @@ class MatchRenderer(
 
         renderShadows(alpha)
         GLES30.glViewport(0, 0, width, height)
-        val sky = world.portal?.let { DIMENSION_SKY[(it.dimension - 1).coerceIn(0, DIMENSION_SKY.lastIndex)] }
+        val sky = world.portal?.let { dimensionSky(it.dimension) }
         if (sky != null) GLES30.glClearColor(sky[0], sky[1], sky[2], 1f) else GLES30.glClearColor(0.15f, 0.11f, 0.3f, 1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         renderScene(alpha)
@@ -339,12 +346,19 @@ class MatchRenderer(
 
         // Environment. In a realm the whole arena goes dark and violet: only the fighters keep their colours.
         world.portal?.let { run ->
-            val want = DIMENSION_LIGHT[(run.dimension - 1).coerceIn(0, DIMENSION_LIGHT.lastIndex)]
+            val want = dimensionLight(run.dimension)
             for (i in 0..2) dimLight[i] += (want[i] - dimLight[i]) * 0.03f
-            // Every dimension down bends and tears the world a little more (none in the first).
+            // Deeper down the world bends a little (never much), and now and then it glitches for a moment: rare,
+            // short and quiet, creepy rather than loud (the user found constant glitching too much).
             val depth = (run.dimension - 1).toFloat()
-            dimWarp += (depth * 0.07f - dimWarp) * 0.03f
-            dimGlitch += (minOf(1f, depth / 6f) - dimGlitch) * 0.03f
+            dimWarp += (minOf(0.16f, depth * 0.03f) - dimWarp) * 0.03f
+            glitchIn -= frameDt
+            if (glitchIn <= 0f && run.dimension >= 2) {
+                glitchLeft = 0.18f + rng.nextFloat() * 0.3f
+                glitchIn = maxOf(4f, 13f - depth) + rng.nextFloat() * 6f
+            }
+            glitchLeft -= frameDt
+            dimGlitch = if (glitchLeft > 0f) minOf(0.55f, 0.18f + 0.05f * depth) else 0f
         }
         lit.f("uWarp", dimWarp)
         lit.f("uGlitch", dimGlitch)
@@ -383,6 +397,7 @@ class MatchRenderer(
         lit.f("uRim", 0.45f)
         forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR) }
         forEachRealmShadow(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.COLOR, shade = SHADOW_SHADE) }
+        drawCaptive(Pass.COLOR)
         lit.f("uFlash", 0f)
         lit.f("uEmissive", 0f)
 
@@ -400,6 +415,7 @@ class MatchRenderer(
         lit.f("uOutline", FighterModels.OUTLINE)
         forEachSolidFighter(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
         forEachRealmShadow(alpha) { f, x, z, facing -> models.draw(lit, f.def, f.skin, x, z, facing, anim, Pass.OUTLINE) }
+        drawCaptive(Pass.OUTLINE)
         lit.f("uOutline", 0f)
         lit.i("uMode", 0)
         GLES30.glDisable(GLES30.GL_CULL_FACE)
@@ -747,7 +763,11 @@ class MatchRenderer(
             val p = match.player
             val face = Math.toDegrees(atan2((p.x - vx).toDouble(), (p.y - vz).toDouble())).toFloat()
             lit.f("uRim", 0.9f)
-            lit.v4("uTint", 1f, 1f, 1f, 1f)
+            // During a glitch it flickers into one of the souls it carries: their colour runs through it.
+            if (glitchLeft > 0f) {
+                val soul = io.github.projectwip.data.Lore.Soul.entries[((time * 3f).toInt() + run.dimension) % io.github.projectwip.data.Lore.Soul.entries.size].color.toInt()
+                lit.v4("uTint", 0.6f + 1.6f * r(soul), 0.6f + 1.6f * g(soul), 0.6f + 1.6f * b(soul), 1f)
+            } else lit.v4("uTint", 1f, 1f, 1f, 1f)
             setModel(vx, hover, vz, 1f, 1f, 1f, face); voidBody.draw()
             lit.f("uEmissive", 1f)
             val blink = if ((time % 4.3f) > 4.15f) 0.2f else 1f
@@ -761,13 +781,13 @@ class MatchRenderer(
         }
         // Debris hanging in the air: more of it the deeper the dimension, turning slowly, some of it flickering.
         if (depth >= 2) {
-            val count = (depth - 1) * 6
-            val tint = DIMENSION_LIGHT[(depth - 1).coerceIn(0, DIMENSION_LIGHT.lastIndex)]
+            val count = minOf(18, (depth - 1) * 4)
+            val tint = dimensionLight(depth)
             for (i in 0 until count) {
                 val x = siteHash(i, depth, 1) * world.arena.width
                 val z = siteHash(i, depth, 2) * world.arena.height
                 if (!inView(x, z)) continue
-                if (depth >= 4 && siteHash(i, (time * 8f).toInt(), 3) < 0.04f * depth) continue
+                if (glitchLeft > 0f && siteHash(i, (time * 8f).toInt(), 3) < 0.3f) continue
                 val y = 2.4f + siteHash(i, depth, 4) * 3.5f + 0.3f * sin(time * 0.8f + i)
                 val s = 0.25f + siteHash(i, depth, 5) * 0.7f
                 val shade = 0.35f + 0.4f * siteHash(i, depth, 6)
@@ -778,6 +798,65 @@ class MatchRenderer(
             lit.v4("uTint", 1f, 1f, 1f, 1f)
         }
         lit.mat4("uModel", identity)
+    }
+
+    /**
+     * Dimension's chained fighter (the user's idea): one of the roster, chained to a dark stone pillar, struggling,
+     * one chain for each echo still to find (each echo breaks one). Gone once the chains are all broken: the portal
+     * opens where they stood.
+     */
+    private fun drawCaptive(pass: Pass) {
+        val run = world.portal ?: return
+        if (run.state != io.github.projectwip.sim.PortalState.EXPLORE && run.state != io.github.projectwip.sim.PortalState.ARRIVE) return
+        val x = run.captiveX; val z = run.captiveY
+        if (!inView(x, z)) return
+        val id = io.github.projectwip.data.Lore.captive(run.dimension, match.config.playerFighter)
+        val def = io.github.projectwip.data.Balance.fighter(id)
+        val p = match.player
+        val facing = atan2(p.y - z, p.x - x)
+        // Struggling: pulling one way and the other, now and then a hard yank.
+        val yank = if ((time % 2.6f) < 0.35f) sin((time % 2.6f) / 0.35f * 3.14f) else 0f
+        captiveAnim.time = time
+        captiveAnim.walk = time * 7f
+        captiveAnim.moving = 0.25f + 0.5f * yank
+        captiveAnim.recoil = 0.3f * yank
+        captiveAnim.flash = 0f
+        captiveAnim.jump = 0f
+        captiveAnim.spin = 8f * sin(time * 5f) * (0.4f + yank)
+        captiveAnim.scale = FIGHTER_SCALE
+        if (pass == Pass.COLOR) {
+            // The pillar behind them, and the chains from it to them.
+            lit.f("uRim", 0.3f)
+            lit.v4("uTint", 0.16f, 0.12f, 0.22f, 1f)
+            setModel(x, 1.3f, z - 0.75f, 0.42f, 2.6f, 0.42f, 45f); bit.draw()
+            lit.v4("uTint", 0.3f, 0.22f, 0.4f, 1f)
+            setModel(x, 2.7f, z - 0.75f, 0.55f, 0.18f, 0.55f, 45f); bit.draw()
+            val chains = io.github.projectwip.data.Balance.PORTAL_SHARDS - run.found
+            lit.f("uEmissive", 0.35f)
+            lit.v4("uTint", 0.7f, 0.68f, 0.78f, 1f)
+            for (c in 0 until chains) {
+                // From the pillar at three heights, out to their middle, sagging, rattling as they pull.
+                val y0 = 0.7f + c * 0.55f
+                val ex = x + (c - 1) * 0.25f + 0.05f * sin(time * 9f + c) * (1f + 3f * yank)
+                val ez = z - 0.1f
+                val links = 6
+                for (k in 0..links) {
+                    val u = k / links.toFloat()
+                    val lx = lerp(x + (c - 1) * 0.12f, ex, u)
+                    val lz = lerp(z - 0.62f, ez, u)
+                    val ly = lerp(y0, 0.8f, u) - 0.18f * sin(u * 3.14f)
+                    setModel(lx, ly, lz, 0.11f, 0.11f, 0.16f, (k % 2) * 90f + 20f); bit.draw()
+                }
+            }
+            lit.f("uEmissive", 0f)
+            lit.f("uRim", 0.45f)
+            lit.v4("uTint", 0.85f, 0.85f, 0.95f, 1f)
+            models.draw(lit, def, 0, x + 0.04f * sin(time * 11f) * yank, z, facing, captiveAnim, Pass.COLOR)
+            lit.v4("uTint", 1f, 1f, 1f, 1f)
+            lit.mat4("uModel", identity)
+        } else {
+            models.draw(lit, def, 0, x + 0.04f * sin(time * 11f) * yank, z, facing, captiveAnim, Pass.OUTLINE)
+        }
     }
 
     /** Dimension: a beam of light over each echo still to find, and a ring on the ground under it (decal pass). */
@@ -2127,7 +2206,15 @@ class MatchRenderer(
             s.portalFound = run.found
             s.portalOpen = run.state == io.github.projectwip.sim.PortalState.OPEN
             s.portalTravel = run.state == io.github.projectwip.sim.PortalState.TRAVEL
-            s.voidLine = if (run.taunt >= 0) io.github.projectwip.data.Lore.taunt(run.taunt) else null
+            val taunt = if (run.taunt >= 0) io.github.projectwip.data.Lore.taunt(run.taunt) else null
+            s.voidLine = taunt?.text
+            s.voidSoul = taunt?.soul?.title
+            s.voidSoulColor = taunt?.soul?.color?.toInt() ?: 0
+            s.portalGlitch = dimGlitch
+            val captive = io.github.projectwip.data.Lore.captive(run.dimension, match.config.playerFighter)
+            s.captiveName = io.github.projectwip.data.Balance.fighter(captive).name
+            s.captiveOn = run.state == io.github.projectwip.sim.PortalState.EXPLORE || run.state == io.github.projectwip.sim.PortalState.ARRIVE
+            s.captiveX = run.captiveX; s.captiveZ = run.captiveY
             s.voidAge = run.time - run.tauntAt
             val px = lerp(p.prevX, p.x, alpha); val pz = lerp(p.prevY, p.y, alpha)
             s.portalPlayerX = px; s.portalPlayerZ = pz
@@ -2219,28 +2306,47 @@ class MatchRenderer(
         const val SHADOW_LUNGE = 0.3f
     }
 
-/** Dimension: the light each dimension is drawn in, from the first (the arena as it is) down to the bottom. */
+/**
+ * Dimension: the light each dimension is drawn in. Dark and moody (the user asked for darker dimensions), each a
+ * different cast; past the end of the table they go round again, a little darker each time, for ever.
+ */
 private val DIMENSION_LIGHT = arrayOf(
-    floatArrayOf(1f, 1f, 1f),
-    floatArrayOf(0.78f, 0.6f, 1.12f),
-    floatArrayOf(0.42f, 0.8f, 1.1f),
-    floatArrayOf(1.15f, 0.62f, 0.36f),
-    floatArrayOf(1.2f, 1.12f, 0.62f),
-    floatArrayOf(0.42f, 1.12f, 0.5f),
-    floatArrayOf(1.25f, 0.36f, 0.72f),
-    floatArrayOf(0.36f, 0.32f, 0.56f),
+    floatArrayOf(0.84f, 0.82f, 0.92f),
+    floatArrayOf(0.56f, 0.46f, 0.78f),
+    floatArrayOf(0.36f, 0.56f, 0.72f),
+    floatArrayOf(0.66f, 0.44f, 0.34f),
+    floatArrayOf(0.6f, 0.58f, 0.5f),
+    floatArrayOf(0.34f, 0.58f, 0.42f),
+    floatArrayOf(0.62f, 0.32f, 0.46f),
+    floatArrayOf(0.4f, 0.38f, 0.58f),
+    floatArrayOf(0.5f, 0.52f, 0.6f),
+    floatArrayOf(0.5f, 0.38f, 0.3f),
 )
 
-/** Dimension: what is beyond the edge of the arena in each one. */
+/** Dimension: what is beyond the edge of the arena in each one: always near-black, with a cast. */
 private val DIMENSION_SKY = arrayOf(
-    floatArrayOf(0.15f, 0.11f, 0.3f),
-    floatArrayOf(0.1f, 0.05f, 0.2f),
-    floatArrayOf(0.02f, 0.08f, 0.14f),
-    floatArrayOf(0.16f, 0.07f, 0.03f),
-    floatArrayOf(0.78f, 0.74f, 0.68f),
-    floatArrayOf(0.03f, 0.1f, 0.05f),
-    floatArrayOf(0.85f, 0.9f, 0.7f),
-    floatArrayOf(0f, 0f, 0f),
+    floatArrayOf(0.1f, 0.07f, 0.18f),
+    floatArrayOf(0.06f, 0.03f, 0.12f),
+    floatArrayOf(0.01f, 0.05f, 0.09f),
+    floatArrayOf(0.08f, 0.03f, 0.02f),
+    floatArrayOf(0.07f, 0.07f, 0.06f),
+    floatArrayOf(0.02f, 0.06f, 0.03f),
+    floatArrayOf(0.08f, 0.01f, 0.05f),
+    floatArrayOf(0.02f, 0.02f, 0.05f),
+    floatArrayOf(0.04f, 0.05f, 0.07f),
+    floatArrayOf(0.05f, 0.03f, 0.02f),
 )
+
+private fun dimensionLight(dimension: Int): FloatArray {
+    if (dimension <= 1) return DIMENSION_LIGHT[0]
+    // Past the first, the world is dimmed further (the fighters keep their own colours, so they stand out in it).
+    val round = (dimension - 2) / (DIMENSION_LIGHT.size - 1)
+    val base = DIMENSION_LIGHT[1 + (dimension - 2) % (DIMENSION_LIGHT.size - 1)]
+    val k = 0.7f * maxOf(0.75f, 1f - 0.06f * round)
+    return floatArrayOf(base[0] * k, base[1] * k, base[2] * k)
+}
+
+private fun dimensionSky(dimension: Int): FloatArray =
+    if (dimension <= DIMENSION_SKY.size) DIMENSION_SKY[(dimension - 1).coerceAtLeast(0)] else DIMENSION_SKY[1 + (dimension - 2) % (DIMENSION_SKY.size - 1)]
 
 }

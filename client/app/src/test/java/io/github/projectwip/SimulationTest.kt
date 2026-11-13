@@ -1337,7 +1337,7 @@ class SimulationTest {
         assertEquals("she reloads in 1.2 seconds", 1.2f, kira.def.reloadSeconds, 0f)
     }
 
-    @Test fun dimensionIsALoreModeOfEchoesPortalsAndRiftsDownToTheBottom() {
+    @Test fun dimensionIsAnEndlessLoreModeOfCaptivesEchoesPortalsAndRifts() {
         val B = io.github.projectwip.data.Balance
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
             mode = io.github.projectwip.data.GameMode.PORTAL, seed = 42L))
@@ -1347,6 +1347,8 @@ class SimulationTest {
         fun stepFor(seconds: Float) { repeat((seconds * 60).toInt()) { m.step(io.github.projectwip.sim.Match.STEP) } }
         stepFor(3f + B.PORTAL_ARRIVE_SECONDS + 0.2f)
         assertEquals(io.github.projectwip.sim.PortalState.EXPLORE, run.state)
+        // Someone is chained up somewhere away from the start, and the echoes lie away from both.
+        assertTrue(kotlin.math.hypot(run.captiveX - m.player.x, run.captiveY - m.player.y) > 2f)
         // The echoes lie away from where the player arrives.
         for (i in 0 until B.PORTAL_SHARDS) assertTrue(kotlin.math.hypot(run.shards[i * 2] - m.player.x, run.shards[i * 2 + 1] - m.player.y) > 3f)
         assertTrue("no rifts in the first dimension", w.hazards.isEmpty())
@@ -1361,6 +1363,7 @@ class SimulationTest {
         assertEquals(B.PORTAL_SHARDS, run.found)
         assertTrue("a taunt for each echo", run.taunt == B.PORTAL_SHARDS - 1)
         assertEquals(io.github.projectwip.sim.PortalState.OPEN, run.state)
+        assertEquals("the way through opens where the captive stood", run.captiveX, run.x, 0f)
         // Stepping in takes the player one dimension deeper, whole again, with new echoes to find.
         m.player.hp = m.player.maxHp / 2
         m.player.x = run.x; m.player.y = run.y
@@ -1374,19 +1377,23 @@ class SimulationTest {
         stepFor(B.portalRiftEvery(2) + 0.1f)
         assertTrue("a rift", w.hazards.any { it.kind == io.github.projectwip.sim.HazardKind.RIFT })
         assertEquals(1, m.placement)
-        assertEquals(io.github.projectwip.data.MatchOutcome.VICTORY, m.report().outcome)
-        // All the way down: the story ends at the bottom, and the run with it.
-        while (run.entered < B.PORTAL_DEPTH) {
+        assertEquals("nothing is won in Dimension", io.github.projectwip.data.MatchOutcome.DRAW, m.report().outcome)
+        // It has no bottom: ten portals down it is still going.
+        while (run.entered < 10) {
             m.player.hp = m.player.maxHp; m.player.shield = 99f
             stepFor(B.PORTAL_TRAVEL_SECONDS + B.PORTAL_ARRIVE_SECONDS + 0.2f)
             collect()
             m.player.x = run.x; m.player.y = run.y
             stepFor(0.05f)
         }
-        stepFor(B.PORTAL_TRAVEL_SECONDS + 0.2f)
-        assertTrue(m.isOver)
-        assertEquals(B.PORTAL_DEPTH, m.placement)
-        assertEquals(io.github.projectwip.data.MatchOutcome.VICTORY, m.report().outcome)
+        stepFor(B.PORTAL_TRAVEL_SECONDS + B.PORTAL_ARRIVE_SECONDS + 0.2f)
+        assertFalse(m.isOver)
+        assertEquals(11, run.dimension)
+        assertEquals(10, m.placement)
+        assertEquals(io.github.projectwip.sim.PortalState.EXPLORE, run.state)
+        // Whoever is chained up is never the player's own fighter.
+        for (d in 1..30) assertTrue(io.github.projectwip.data.Lore.captive(d, FighterId.KIRA) != FighterId.KIRA)
+        assertTrue(io.github.projectwip.data.Lore.dimensionName(57).startsWith("The "))
     }
 
     @Test fun aRiftCanEndADimensionRun() {
@@ -1401,7 +1408,7 @@ class SimulationTest {
         while (!m.isOver && t < 60 * 30) { m.player.hp = minOf(m.player.hp, 5); m.player.shield = 0f; m.step(io.github.projectwip.sim.Match.STEP); t++ }
         assertTrue("one life: a rift ended it", m.isOver)
         assertEquals(0, m.placement)
-        assertEquals(io.github.projectwip.data.MatchOutcome.DEFEAT, m.report().outcome)
+        assertEquals(io.github.projectwip.data.MatchOutcome.DRAW, m.report().outcome)
     }
 
 }

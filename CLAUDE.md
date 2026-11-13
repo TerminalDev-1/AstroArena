@@ -102,7 +102,7 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|lastspark|portal|portalN|portalNo|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `portal3` starts Dimension three deep, `portal3o` with its portal already open; `crash` crashes the game on purpose to try the crash reporter;
+  (`match|boss|lastspark|portal|portalN|portalNo|portalNc|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `portal3` starts Dimension three deep, `portal3o` with its portal already open, `portal3c` with the chained fighter beside you; `crash` crashes the game on purpose to try the crash reporter;
   `result` (first in Last Spark), `result3`, `resultwin` and `resultloss` preview the end of a match, reveal first;
   `tryswish` / `tryspark` are the Training Area as Swish / Spark; `roster` is the fighter grid with every model shown unlocked, `tryspark` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - Crashes on players' devices: `net/CrashReporter.kt` saves a crash (and, on Android 11+, Android's record of a native
@@ -229,26 +229,27 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   With nobody on the line he leaps anyway and the super is spent: a miss. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
 - Dimension (`GameMode.PORTAL` in the code, "Dimension" to players: the user rejected "Portal Run"; 1.0) is the user's
-  idea, and since build 104 it is **primarily a lore mode, not a fighting mode** (the user's words). There are no
-  enemies (the roster is the player alone). Each dimension hides `PORTAL_SHARDS` echo shards (`PortalRun.shards`,
-  `scatterShards`, far from the start and each other); finding them all opens the portal at the middle
-  (`stepPortal`, `GameEvent.ShardFound/PortalOpened/PortalEntered`). From the second dimension the world tears open
-  near the player now and then (`HazardKind.RIFT`, `stepRifts`, `portalRiftEvery`): a marked patch that then takes
-  `PORTAL_RIFT_SHARE` of their health; one life, so a rift can end the run. `PORTAL_DEPTH` (7) portals reach the
-  bottom, where the story ends and the run with it (a victory). Placement is portals entered; it pays `per_portal`
-  Cups each (`trophies.cfg`, mirrored in `Economy.kt`); two deep earns an Arena Box. The server's `PORTAL_DEPTH` in
-  `rules.py` caps the placement.
-  The user asked for: every dimension weirder than the last, glitching artifacts that grow with depth, the Void
-  taunting the fighter all the way and standing at every portal after the first, and richer cutscenes. So:
-  `DIMENSION_LIGHT`/`DIMENSION_SKY` and the debris in `MatchRenderer.drawDimensionSolids`; the lit shader's `uWarp`
-  (the arena bending) and `uGlitch`/`uGlitchF` (bands of world jumping, colour-split rows), both 0 outside
-  Dimension; HUD glitches, the echo pointer and the Void's taunts (`Lore.taunt`) in `HudView.drawDimension`; the Void
-  as a 3D figure beside the open portal (`voidBody`); sounds `SHARD` (a chime), `RIFT` and `DIM_AIR` (the air,
-  replayed lower the deeper). `DimensionCutscene` (the user's design: cut to black, a blinding light, an old-TV
-  switch-off, then the Void and the fighter talking, tap to go on) is a staged scene: letterbox, a title card with
-  the dimension's name (`Lore.DIMENSIONS`), a sky of its own `Mood`, nebulae, shafts, a vortex, debris, a floor,
-  the Void with tendrils and orbiting shards, a glass dialogue panel, and glitches with depth. Each fighter answers
-  in their own voice (`Lore.REPLIES`, one line a dimension); the last scene is at the bottom. Eerie, never gory.
+  idea, and since build 104 it is **a lore mode, not a fighting mode, that goes on forever, and nothing is won in
+  it** (the user's words: "I don't want it to win anything in the dimension"). A run's outcome is always a DRAW;
+  it pays no Cups and no Arena Box (`rules.py`, `Economy.kt`); the result says how deep it went ("DEPTH N"), never
+  VICTORY or DEFEAT (`ResultReveal`, `ResultScreen`). There are no enemies (the roster is the player alone) and no
+  bottom: dimensions go on, their names, light and moods made past the end of the tables (`Lore.dimensionName`,
+  `dimensionLight`). In each one a fighter is chained to a pillar (the user's idea: `Lore.captive`, never the
+  player's own fighter; `PortalRun.captiveX/Y`; `MatchRenderer.drawCaptive`, "HELP!" over them in `HudView`):
+  walking up to them pauses the match for a talk (`CaptiveTalk`, `Lore.captiveTalk`): the player asks what needs
+  doing, they scream for help and say it. Each of the `PORTAL_SHARDS` echoes breaks one chain; when all are found
+  the portal opens where the captive stood. From the second dimension the ground tears open near the player now
+  and then (`HazardKind.RIFT`, `stepRifts`): one life, so a rift can end the run.
+  The lore is the user's: **the Void carries the souls of every fighter removed from the game** (`Lore.Soul`:
+  Byte, Rocket, Spark, Mira, Varun) **and glitches between them**: their figures flicker through its robe in the
+  cutscene, it turns their colour in the world during a glitch, and some of its lines are spoken in their voices
+  (the nameplate reads "THE VOID · SPARK"). It stands beside every portal after the first.
+  The look the user asked for: darker dimensions, each different, and **creepy but not horror, not constantly
+  glitchy** (the first version of build 104 glitched all the time and the user called it "all glitchy"). So the
+  world is dimmed with a cast per dimension, a vignette closes in with depth, and glitches are rare short moments
+  (`glitchIn`/`glitchLeft` in `MatchRenderer`, `uGlitch` in the shader, `portalGlitch` on the HUD). Keep them rare.
+  `DimensionCutscene` (the user's design: cut to black, a blinding light, an old-TV switch-off, then the Void and
+  the fighter talking, tap to go on) is a staged scene with a `Mood` per dimension. Eerie, never gory.
 - Bots hold fire for `BOT_WARMUP_SECONDS` at the start of a match and while their spawn shield is up (`Match.step`),
   because the user found them beating him up too early.
 - The results screen's team lists have fixed-height rows from the top, one line each when many have to fit

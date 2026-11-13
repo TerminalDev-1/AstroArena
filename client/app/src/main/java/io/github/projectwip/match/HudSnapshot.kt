@@ -51,6 +51,15 @@ class HudSnapshot {
     var portalTargetZ = 0f
     var portalPlayerX = 0f
     var portalPlayerZ = 0f
+    /** Dimension: how hard the picture is glitching right now (0 nearly always), and whose soul the Void speaks with. */
+    var portalGlitch = 0f
+    var voidSoul: String? = null
+    var voidSoulColor = 0
+    /** Dimension: the chained fighter, while they are still chained. */
+    var captiveOn = false
+    var captiveName = ""
+    var captiveX = 0f
+    var captiveZ = 0f
     /** The Void's last words, and how long ago they were said (they fade after a few seconds). */
     var voidLine: String? = null
     var voidAge = 99f
@@ -97,6 +106,7 @@ class HudSnapshot {
         bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
         portalRun = o.portalRun; portalDimension = o.portalDimension; portalFound = o.portalFound; portalOpen = o.portalOpen; portalTravel = o.portalTravel; voidLine = o.voidLine; voidAge = o.voidAge
         portalTargetOn = o.portalTargetOn; portalTargetX = o.portalTargetX; portalTargetZ = o.portalTargetZ; portalPlayerX = o.portalPlayerX; portalPlayerZ = o.portalPlayerZ
+        portalGlitch = o.portalGlitch; voidSoul = o.voidSoul; voidSoulColor = o.voidSoulColor; captiveOn = o.captiveOn; captiveName = o.captiveName; captiveX = o.captiveX; captiveZ = o.captiveZ
         freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
         stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm
         n = o.n

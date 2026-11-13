@@ -85,6 +85,8 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     val sfx = LocalSfx.current
     val ffa = r.mode == io.github.projectwip.data.GameMode.LAST_SPARK
     val (label, color) = when {
+        // Dimension is a story: nothing is won or lost, it only says how deep the run went.
+        r.mode == io.github.projectwip.data.GameMode.PORTAL -> Pair("DIMENSION ${r.placement + 1}", Color(0xFFC9A6FF))
         ffa && r.placement == 1 -> Pair("VICTORY! #1", Palette.Gold)
         ffa -> Pair("#${r.placement} PLACE", if (r.placement <= 4) Palette.Cyan else Palette.Red)
         r.outcome == MatchOutcome.VICTORY -> Pair("VICTORY!", Palette.Gold)
@@ -188,11 +190,11 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                                 io.github.projectwip.data.GameMode.BOSS -> "Boss Mode · Proving Ground · ${r.difficulty.label} boss"
                                 io.github.projectwip.data.GameMode.TRAINING -> "Training Area"
                                 io.github.projectwip.data.GameMode.DUEL -> "1v1 · Proving Ground"
-                                io.github.projectwip.data.GameMode.PORTAL -> "Dimension · " + (if (r.placement >= io.github.projectwip.data.Balance.PORTAL_DEPTH) "reached the bottom" else "${r.placement} portal${if (r.placement == 1) "" else "s"} deep")
+                                io.github.projectwip.data.GameMode.PORTAL -> io.github.projectwip.data.Lore.dimensionName(r.placement + 1) + " · ${r.placement} portal${if (r.placement == 1) "" else "s"} deep"
                             }, Type.Label, color = Palette.TextDim)
                     }
                 }
-                if (!ffa) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.arrive(0, 0f, -30f)) {
+                if (!ffa && r.mode != io.github.projectwip.data.GameMode.PORTAL) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.arrive(0, 0f, -30f)) {
                     GameText(r.blueScore.let { if (summary.playerTeam == 0) it else r.redScore }.toString(), Type.Display, color = Palette.Ally, outline = 4.dp)
                     GameText("  –  ", Type.Title, outline = 3.dp)
                     GameText(r.redScore.let { if (summary.playerTeam == 0) it else r.blueScore }.toString(), Type.Display, color = Palette.Enemy, outline = 4.dp)

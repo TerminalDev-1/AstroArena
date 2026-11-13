@@ -295,12 +295,23 @@ private fun MatchBody(
     var intro by remember { mutableStateOf(!match.practice) }
     /** Dimension: the scene showing (portals entered when it began), or -1. The match is paused behind it. */
     var scene by remember { mutableStateOf(-1) }
+    /** Dimension: the talk with the chained fighter showing (its dimension), or -1; and the last dimension talked in. */
+    var talk by remember { mutableStateOf(-1) }
+    var talkedIn by remember { mutableStateOf(0) }
     var seenPortals by remember { mutableStateOf(match.world.portal?.entered ?: 0) }
     if (match.portalRun) androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
             androidx.compose.runtime.withFrameNanos { }
             val entered = match.world.portal?.entered ?: 0
             if (entered > seenPortals && scene < 0) { seenPortals = entered; scene = entered; view?.paused = true }
+            // Walking up to the chained fighter: the match pauses and they talk (once a dimension).
+            val run = match.world.portal
+            if (run != null && scene < 0 && talk < 0 && talkedIn != run.dimension && !paused && run.state == io.github.projectwip.sim.PortalState.EXPLORE) {
+                val p = match.player
+                if (p.alive && kotlin.math.hypot(p.x - run.captiveX, p.y - run.captiveY) < p.radius + io.github.projectwip.data.Balance.PORTAL_CAPTIVE_REACH) {
+                    talkedIn = run.dimension; talk = run.dimension; view?.paused = true
+                }
+            }
         }
     }
     val context = LocalContext.current
@@ -344,6 +355,7 @@ private fun MatchBody(
         )
         if (intro && match.portalRun) DimensionCutscene(match.world.portal?.entered ?: 0, match.config.playerFighter, match.config.playerSkin, sfx) { intro = false; view?.resumeGame() }
         else if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
+        if (talk >= 0) CaptiveTalk(talk, match.config.playerFighter, match.config.playerSkin, sfx) { talk = -1; view?.resumeGame() }
         if (scene >= 0) DimensionCutscene(scene, match.config.playerFighter, match.config.playerSkin, sfx) { scene = -1; view?.resumeGame() }
         if (paused && !done) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {

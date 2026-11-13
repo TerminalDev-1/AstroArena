@@ -92,8 +92,7 @@ private val MOODS = listOf(
 @Composable
 fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, onDone: () -> Unit) {
     val lines = remember(entered, fighter) { Lore.scene(entered, fighter) }
-    val mood = MOODS[entered.coerceIn(0, MOODS.lastIndex)]
-    val final = entered >= Balance.PORTAL_DEPTH
+    val mood = MOODS[if (entered < MOODS.size) entered else 1 + (entered - 1) % (MOODS.size - 1)]
     val clock = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         sfx?.play(Sound.PORTAL_ENTER)
@@ -116,7 +115,8 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
     LaunchedEffect(leaving) { if (leaving) { fade.animateTo(0f, tween(450)); onDone() } }
     val time by rememberAnimTime()
     val voidTalking = line.speaker == Lore.Speaker.VOID
-    val glitch = (entered / Balance.PORTAL_DEPTH.toFloat()).coerceIn(0f, 1f)
+    // Past the first dimension the picture glitches now and then, for a moment: creepy, not constant.
+    val glitch = if (entered >= 1 && ((time + entered * 1.7f) % 6.5f) < 0.22f) 0.5f else 0f
 
     Box(
         Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }.background(Color.Black).pointerInput(Unit) {
@@ -143,7 +143,7 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
                         val k = if (voidTalking) 1.04f else 0.95f; scaleX = k; scaleY = k; alpha = if (voidTalking) 1f else 0.55f
                         translationY = 6.dp.toPx() * sin(time * 0.9f)
                     }) {
-                        VoidPortrait(time, voidTalking && typed < line.text.length, mood, glitch, Modifier.fillMaxSize())
+                        VoidPortrait(time, voidTalking && typed < line.text.length, mood, glitch, if (voidTalking) line.soul else null, Modifier.fillMaxSize())
                     }
                     Box(Modifier.fillMaxHeight(0.86f).width(250.dp).graphicsLayer {
                         val k = if (!voidTalking) 1.04f else 0.95f; scaleX = k; scaleY = k; alpha = if (!voidTalking) 1f else 0.55f
@@ -158,16 +158,17 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
                         FighterView(Balance.fighter(fighter), skin, Modifier.fillMaxSize(), pedestal = true)
                     }
                 }
-                DialoguePanel(line, typed, index, lines.size, fighter, mood, time, final)
+                val (name, who) = speakerPlate(line, Balance.fighter(fighter).name, time)
+                DialoguePanel(line, typed, index, lines.size, name, who, voidTalking, mood, time, "TAP TO STEP IN")
             }
             // ---- The title card: which dimension this is, fading in and then settling small at the top.
             val card = sceneIn
             Column(Modifier.align(Alignment.TopCenter).padding(top = 30.dp).graphicsLayer { alpha = card }, horizontalAlignment = Alignment.CenterHorizontally) {
-                PlainText(if (final) "THE END OF THE WAY DOWN" else "DIMENSION ${entered + 1}", Type.Eyebrow.copy(letterSpacing = Type.Eyebrow.fontSize * 0.6f, color = mood.accent.copy(alpha = 0.8f)))
+                PlainText("DIMENSION ${entered + 1}", Type.Eyebrow.copy(letterSpacing = Type.Eyebrow.fontSize * 0.6f, color = mood.accent.copy(alpha = 0.8f)))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.width(46.dp).height(1.5.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, mood.glow))))
                     Spacer(Modifier.width(10.dp))
-                    GameText(Lore.DIMENSIONS[entered.coerceIn(0, Lore.DIMENSIONS.lastIndex)].uppercase(), Type.Heading, color = Color.White, outline = 2.dp)
+                    GameText(Lore.dimensionName(entered + 1).uppercase(), Type.Heading, color = Color.White, outline = 2.dp)
                     Spacer(Modifier.width(10.dp))
                     Box(Modifier.width(46.dp).height(1.5.dp).background(Brush.horizontalGradient(listOf(mood.glow, Color.Transparent))))
                 }
@@ -218,9 +219,10 @@ fun DimensionCutscene(entered: Int, fighter: FighterId, skin: Int, sfx: Sfx?, on
 
 /** The words: a lit glass panel with a nameplate for whoever speaks, the line typed out, and how far the scene has got. */
 @Composable
-private fun DialoguePanel(line: Lore.Line, typed: Int, index: Int, count: Int, fighter: FighterId, mood: Mood, time: Float, final: Boolean) {
-    val voidTalking = line.speaker == Lore.Speaker.VOID
-    val who = if (voidTalking) Color(0xFFB98CFF) else Palette.Gold
+private fun DialoguePanel(line: Lore.Line, typed: Int, index: Int, count: Int, name: String, who: Color, left: Boolean, mood: Mood, time: Float, lastPrompt: String) {
+    val voidTalking = left
+    // A chained fighter's scream shakes.
+    val scream = line.speaker == Lore.Speaker.CAPTIVE && line.text.contains("HELP")
     Box(Modifier.fillMaxWidth().height(124.dp)) {
         Canvas(Modifier.fillMaxSize()) {
             val cut = 16.dp.toPx()
@@ -251,14 +253,15 @@ private fun DialoguePanel(line: Lore.Line, typed: Int, index: Int, count: Int, f
                 drawCircle(if (i <= index) who else Color.White.copy(alpha = 0.25f), r, Offset(size.width / 2 + (i - (count - 1) / 2f) * 14.dp.toPx(), size.height - 10.dp.toPx()))
             }
         }
-        val name = if (voidTalking) "THE VOID" else Balance.fighter(fighter).name.uppercase()
         PlainText(name, Type.Eyebrow.copy(color = Color.White, letterSpacing = Type.Eyebrow.fontSize * 0.3f),
             Modifier.align(if (voidTalking) Alignment.TopStart else Alignment.TopEnd).padding(horizontal = 42.dp, vertical = 5.dp))
         val caret = if (typed < line.text.length || (time * 2f).toInt() % 2 == 0) "▌" else " "
-        PlainText(line.text.take(typed) + caret, Type.Heading.copy(color = if (voidTalking) Color(0xFFE6DCFF) else Color.White,
-            fontStyle = if (voidTalking) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal), maxLines = 2,
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 38.dp))
-        if (typed >= line.text.length) PlainText(if (index == count - 1) (if (final) "TAP TO WAKE" else "TAP TO STEP IN") else "TAP ▶",
+        PlainText(line.text.take(typed) + caret, Type.Heading.copy(color = if (line.speaker == Lore.Speaker.VOID) Color(0xFFE6DCFF) else Color.White,
+            fontStyle = if (line.speaker == Lore.Speaker.VOID) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal), maxLines = 2,
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 38.dp).graphicsLayer {
+                if (scream) { translationX = 3.dp.toPx() * sin(time * 53f); translationY = 2.dp.toPx() * sin(time * 41f) }
+            })
+        if (typed >= line.text.length) PlainText(if (index == count - 1) lastPrompt else "TAP ▶",
             Type.Eyebrow.copy(color = Color.White.copy(alpha = 0.5f + 0.5f * sin(time * 4f))), Modifier.align(Alignment.BottomEnd).padding(horizontal = 18.dp, vertical = 12.dp))
     }
 }
@@ -383,7 +386,7 @@ private fun DrawScope.drawGlitch(time: Float, k: Float) {
  * deeper down, ghosts of it in split colour. Its eyes brighten while it speaks, and it blinks now and then.
  */
 @Composable
-private fun VoidPortrait(time: Float, speaking: Boolean, mood: Mood, glitch: Float, modifier: Modifier) {
+private fun VoidPortrait(time: Float, speaking: Boolean, mood: Mood, glitch: Float, soul: Lore.Soul?, modifier: Modifier) {
     Canvas(modifier) {
         val w = size.width; val h = size.height
         val cx = w / 2; val headY = h * 0.3f
@@ -437,10 +440,10 @@ private fun VoidPortrait(time: Float, speaking: Boolean, mood: Mood, glitch: Flo
             cubicTo(cx - w * 0.26f, h * 0.3f, cx - w * 0.2f, h * 0.08f, cx, h * 0.08f)
             close()
         }
-        if (glitch > 0f && hash((time * 8f).toInt(), 5) < 0.2f + 0.5f * glitch) {
-            val off = (3f + 8f * glitch).dp.toPx()
-            drawPath(robe, Color(0xFFFF2A6A).copy(alpha = 0.35f), blendMode = BlendMode.Plus)
-            translateBy(off) { drawPath(robe, Color(0xFF2AE6FF).copy(alpha = 0.3f), blendMode = BlendMode.Plus) }
+        if (glitch > 0f) {
+            val off = 4.dp.toPx()
+            drawPath(robe, Color(0xFF8E5BFF).copy(alpha = 0.25f), blendMode = BlendMode.Plus)
+            translateBy(off) { drawPath(robe, Color(0xFF5CE1FF).copy(alpha = 0.18f), blendMode = BlendMode.Plus) }
         }
         drawPath(robe, Brush.verticalGradient(listOf(Color(0xFF1C0C38), Color(0xFF0A0418), Color(0xFF05020C)), 0f, h))
         clipPath(robe) {
@@ -456,6 +459,20 @@ private fun VoidPortrait(time: Float, speaking: Boolean, mood: Mood, glitch: Flo
             }
         }
         drawPath(robe, Brush.verticalGradient(listOf(mood.accent.copy(alpha = 0.8f), mood.glow.copy(alpha = 0.3f), Color.Transparent), 0f, h), style = Stroke(2.dp.toPx()))
+        // The souls it carries (the user's lore: every fighter removed from the game). Now and then, for a blink, one
+        // of them shows through: a figure in their colour inside the robe. While it speaks with one's voice, that one
+        // keeps flickering through.
+        val showing = if (soul != null && (time * 3f).toInt() % 3 == 0) soul
+            else if ((time % 4.7f) < 0.2f || glitch > 0f) Lore.Soul.entries[((time / 4.7f).toInt()) % Lore.Soul.entries.size] else null
+        if (showing != null) clipPath(robe) {
+            val c = Color(showing.color)
+            val jx = 3.dp.toPx() * sin(time * 37f)
+            val by = h * 0.5f
+            drawCircle(Brush.radialGradient(listOf(c.copy(alpha = 0.45f), Color.Transparent), Offset(cx + jx, by), w * 0.4f), w * 0.4f, Offset(cx + jx, by))
+            // Head and shoulders, the shape of a fighter.
+            drawCircle(c.copy(alpha = 0.55f), w * 0.09f, Offset(cx + jx, by - h * 0.1f))
+            drawRoundRect(c.copy(alpha = 0.45f), Offset(cx + jx - w * 0.15f, by - h * 0.03f), Size(w * 0.3f, h * 0.24f), androidx.compose.ui.geometry.CornerRadius(w * 0.08f))
+        }
         // The hollow where a face should be.
         val fw = w * 0.3f; val fh = h * 0.17f
         drawOval(Color.Black, Offset(cx - fw / 2, headY - fh / 2), Size(fw, fh))
@@ -492,4 +509,95 @@ private inline fun DrawScope.translateBy(x: Float, block: DrawScope.() -> Unit) 
     drawContext.transform.translate(x, 0f)
     block()
     drawContext.transform.translate(-x, 0f)
+}
+
+/** The nameplate for a line: the Void (flickering to the soul whose voice it is using), or the fighter. */
+private fun speakerPlate(line: Lore.Line, fighterName: String, time: Float): Pair<String, Color> = when (line.speaker) {
+    Lore.Speaker.VOID -> {
+        val soul = line.soul
+        if (soul != null && (time * 2.5f).toInt() % 3 != 0) "THE VOID · ${soul.title.uppercase()}" to Color(soul.color)
+        else "THE VOID" to Color(0xFFB98CFF)
+    }
+    Lore.Speaker.CAPTIVE -> fighterName.uppercase() to Color(0xFFFF8A8A)
+    Lore.Speaker.FIGHTER -> fighterName.uppercase() to Palette.Gold
+}
+
+/**
+ * Talking to Dimension's chained fighter (the user's idea): when the player walks up to them the match pauses, the
+ * world dims, and the player asks what needs to be done; the captive, in chains, screams for help and then says
+ * (the echoes break the chains). The player stands on the left, the captive on the right, rattling their chains.
+ */
+@Composable
+fun CaptiveTalk(dimension: Int, player: FighterId, playerSkin: Int, sfx: Sfx?, onDone: () -> Unit) {
+    val captive = remember(dimension, player) { Lore.captive(dimension, player) }
+    val lines = remember(captive, player) { Lore.captiveTalk(captive, player) }
+    val mood = MOODS[if (dimension - 1 < MOODS.size) dimension - 1 else 1 + (dimension - 2) % (MOODS.size - 1)]
+    var index by remember { mutableIntStateOf(0) }
+    var typed by remember { mutableIntStateOf(0) }
+    var leaving by remember { mutableStateOf(false) }
+    val fade = remember { Animatable(0f) }
+    val time by rememberAnimTime()
+    val line = lines[index]
+    LaunchedEffect(Unit) { fade.animateTo(1f, tween(300)) }
+    LaunchedEffect(index) {
+        typed = 0
+        if (line.speaker == Lore.Speaker.CAPTIVE && line.text.contains("HELP")) sfx?.play(Sound.RIFT, 0.5f, 0.7f)
+        if (line.speaker == Lore.Speaker.CAPTIVE && captive == FighterId.BUDDY) sfx?.say(line.text, VoiceStyle.MACHINE)
+        if (line.speaker == Lore.Speaker.FIGHTER && player == FighterId.BUDDY) sfx?.say(line.text, VoiceStyle.MACHINE)
+        while (typed < line.text.length) { kotlinx.coroutines.delay(if (line.speaker == Lore.Speaker.CAPTIVE) 22L else 28L); typed++ }
+    }
+    LaunchedEffect(leaving) { if (leaving) { fade.animateTo(0f, tween(300)); onDone() } }
+    Box(
+        Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }.background(Color.Black.copy(alpha = 0.72f)).pointerInput(Unit) {
+            detectTapGestures {
+                if (leaving) return@detectTapGestures
+                val now = lines[index]
+                when {
+                    typed < now.text.length -> typed = now.text.length
+                    index < lines.lastIndex -> index++
+                    else -> leaving = true
+                }
+            }
+        },
+    ) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 28.dp).padding(top = 30.dp, bottom = 30.dp)) {
+            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                val asking = line.speaker == Lore.Speaker.FIGHTER
+                Box(Modifier.fillMaxHeight(0.86f).width(250.dp).graphicsLayer { alpha = if (asking) 1f else 0.55f }) {
+                    FighterView(Balance.fighter(player), playerSkin, Modifier.fillMaxSize(), pedestal = true)
+                }
+                Box(Modifier.fillMaxHeight(0.92f).width(280.dp).graphicsLayer {
+                    alpha = if (!asking) 1f else 0.6f
+                    // Struggling against the chains.
+                    translationX = 3.dp.toPx() * sin(time * 23f) * (if (!asking) 1f else 0.3f)
+                }) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val c = Offset(size.width / 2, size.height * 0.45f)
+                        drawCircle(Brush.radialGradient(listOf(Color(0x66FF4C6A), Color.Transparent), c, size.width * 0.6f), size.width * 0.6f, c)
+                        // The pillar behind them.
+                        drawRect(Brush.verticalGradient(listOf(Color(0xFF2A1F3A), Color(0xFF120C1C)), 0f, size.height), Offset(size.width * 0.42f, 0f), Size(size.width * 0.16f, size.height))
+                    }
+                    FighterView(Balance.fighter(captive), 0, Modifier.fillMaxSize(), pedestal = true)
+                    // The chains, over them: from the pillar out to their wrists and waist, rattling.
+                    Canvas(Modifier.fillMaxSize()) {
+                        for (k in 0 until 3) {
+                            val y = size.height * (0.4f + 0.12f * k)
+                            val sag = 10.dp.toPx() + 4.dp.toPx() * sin(time * 9f + k)
+                            for (side in floatArrayOf(-1f, 1f)) {
+                                val x0 = size.width / 2; val x1 = size.width / 2 + side * size.width * (0.18f + 0.03f * k)
+                                for (l in 0..7) {
+                                    val u = l / 7f
+                                    val x = x0 + (x1 - x0) * u
+                                    val yy = y + sag * sin(u * 3.14f) + 1.5.dp.toPx() * sin(time * 30f + l)
+                                    drawOval(Color(0xFF9A93A8), Offset(x - 4.dp.toPx(), yy - 3.dp.toPx()), Size(8.dp.toPx(), 6.dp.toPx()), style = Stroke(2.dp.toPx()))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            val (name, who) = speakerPlate(line, Balance.fighter(if (line.speaker == Lore.Speaker.CAPTIVE) captive else player).name, time)
+            DialoguePanel(line, typed, index, lines.size, name, who, line.speaker != Lore.Speaker.CAPTIVE, mood, time, "TAP TO GO")
+        }
+    }
 }

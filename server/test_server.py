@@ -1001,15 +1001,13 @@ class Api(unittest.TestCase):
         self.assertEqual(sorted(old["fighters"]), sorted(rules.FIGHTER_SKINS))
         self.assertEqual(old["fighters"]["BYTE"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
 
-    def test_portal_run_pays_by_depth_and_never_costs_cups(self):
-        self.assertEqual([rules.cup_delta("PORTAL", "DEFEAT", 0, 100, False), rules.cup_delta("PORTAL", "VICTORY", 3, 100, False)], [0, 12])
-        self.assertEqual(rules.cup_delta("PORTAL", "VICTORY", 40, 100, False), 40, "ten portals' worth at most")
-        self.assertEqual([rules.earns_drop("PORTAL", "VICTORY", 1), rules.earns_drop("PORTAL", "VICTORY", 2)], [False, True])
-        # A lore mode since build 104: no enemies to knock out, seven portals to the bottom.
-        self.assertIsNone(rules.check_result("PORTAL", 300, outcome="VICTORY", placement=2, kos=0, deaths=0, damage=0))
-        self.assertIsNone(rules.check_result("PORTAL", 600, outcome="VICTORY", placement=7, kos=0, deaths=0, damage=0))
-        self.assertIsNotNone(rules.check_result("PORTAL", 600, outcome="VICTORY", placement=8, kos=0, deaths=0, damage=0))
-        self.assertIsNotNone(rules.check_result("PORTAL", 300, outcome="VICTORY", placement=5, kos=2, deaths=0, damage=500))
+    def test_dimension_pays_nothing_and_goes_on_forever(self):
+        self.assertEqual([rules.cup_delta("PORTAL", "DRAW", 0, 100, False), rules.cup_delta("PORTAL", "DRAW", 9, 100, False)], [0, 0])
+        self.assertEqual([rules.earns_drop("PORTAL", "DRAW", 1), rules.earns_drop("PORTAL", "DRAW", 30)], [False, False])
+        # A lore mode since build 104: no enemies to knock out, and no bottom.
+        self.assertIsNone(rules.check_result("PORTAL", 300, outcome="DRAW", placement=2, kos=0, deaths=0, damage=0))
+        self.assertIsNone(rules.check_result("PORTAL", 900, outcome="DRAW", placement=40, kos=0, deaths=1, damage=0))
+        self.assertIsNotNone(rules.check_result("PORTAL", 300, outcome="DRAW", placement=5, kos=2, deaths=0, damage=500))
         self.assertIn("PORTAL", rules.MODES)
 
     def test_cpu_chips_become_arena_crystals_at_zero_once(self):

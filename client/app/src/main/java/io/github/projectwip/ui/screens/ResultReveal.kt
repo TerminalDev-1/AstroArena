@@ -76,7 +76,10 @@ fun ResultReveal(summary: MatchSummary, onDone: () -> Unit) {
     val ffa = r.mode == GameMode.LAST_SPARK
     val won = if (ffa) r.placement == 1 else r.outcome == MatchOutcome.VICTORY
     val podium = ffa && r.placement in 2..4
+    val dimension = r.mode == GameMode.PORTAL
     val (word, color) = when {
+        // Dimension is a story, not a contest (the user's decision): no victory, no defeat, only how deep it went.
+        dimension -> "DEPTH ${r.placement + 1}" to Color(0xFFC9A6FF)
         ffa -> ordinal(r.placement) to when {
             r.placement == 1 -> Palette.Gold
             r.placement <= 4 -> Palette.Cyan
@@ -87,6 +90,8 @@ fun ResultReveal(summary: MatchSummary, onDone: () -> Unit) {
         else -> "DEFEAT" to Palette.Red
     }
     val line = when {
+        dimension && r.deaths > 0 -> "THE VOID KEEPS WHAT IT CATCHES"
+        dimension -> "YOU FOUND YOUR WAY BACK"
         ffa && r.placement == 1 -> "YOU ARE FIRST!"
         ffa -> "YOU PLACED ${ordinal(r.placement)}"
         r.mode == GameMode.BOSS && won -> "THE BOSS IS DOWN!"
@@ -140,7 +145,8 @@ fun ResultReveal(summary: MatchSummary, onDone: () -> Unit) {
             delay(1100)
             if (won) { celebrate++; sfx?.play(Sound.CHING, 0.8f, 1.25f); delay(900) }
         } else {
-            sulk++
+            // (After a Dimension run the fighter just stands there: there was nothing to win or lose.)
+            if (!dimension) sulk++
             delay(1500)
         }
         // Away it all goes, to the stats.

@@ -239,11 +239,12 @@ object Economy {
         else -> if (good(mode, outcome, placement)) 6 else 2
     }
 
-    /** A win in Knockout Rush, a top-4 finish in Last Spark, or two portals deep in Portal Run earns an Arena Box. */
+    /** A win in Knockout Rush, a top-4 finish in Last Spark, earns an Arena Box (Dimension never does). */
     fun earnsDrop(mode: GameMode, outcome: MatchOutcome, placement: Int): Boolean = when (mode) {
         GameMode.LAST_SPARK -> placement in 1..4
         GameMode.KNOCKOUT_RUSH -> outcome == MatchOutcome.VICTORY
-        GameMode.PORTAL -> placement >= 2
+        // Dimension earns nothing (the user's decision, build 104): it is a story, not a contest.
+        GameMode.PORTAL -> false
         else -> false
     }
 
@@ -374,8 +375,7 @@ object Trophies {
         GameMode.LAST_SPARK to Pays(places = listOf(25, 22, 20, 17, 14, 12, 7, 3, 0, 0)),
         GameMode.KNOCKOUT_RUSH to Pays(win = 8, mvpBonus = 2, draw = 1, maxLoss = 6, lossStep = 80),
         GameMode.BOSS to Pays(win = 5),
-        // Portal Run: Cups for every portal stepped through (the placement), up to ten of them; a run never costs any.
-        GameMode.PORTAL to Pays(perPortal = 4, maxPortals = 10),
+        // (Dimension pays no Cups: nothing is won in it.)
     )
 
     /** How a match changes a player's Cups. Never takes them below zero. */
