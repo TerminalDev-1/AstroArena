@@ -435,6 +435,8 @@ fun FighterView(
     sulkKey: Int = 0,
     /** Talking (cutscenes, on a pedestal only): the mouth moves and they gesture. */
     talking: Boolean = false,
+    /** The Entity's hijack (its cutscene): when it began, or 0. See `StageParams.hijackAt`. */
+    hijackAt: Long = 0L,
 ) {
     val accent = Color(def.skins[skin.coerceIn(0, def.skins.lastIndex)].secondary)
     Box(modifier) {
@@ -463,7 +465,7 @@ fun FighterView(
             var view by remember { mutableStateOf<FighterStageView?>(null) }
             AndroidView(
                 factory = { ctx -> FighterStageView(ctx).also { view = it } },
-                update = { v -> v.params.fighter = def.id; v.params.skin = skin; v.params.locked = locked; v.params.talking = talking },
+                update = { v -> v.params.fighter = def.id; v.params.skin = skin; v.params.locked = locked; v.params.talking = talking; v.params.hijackAt = hijackAt },
                 modifier = Modifier.fillMaxSize(),
             )
             val first = remember { booleanArrayOf(true) }

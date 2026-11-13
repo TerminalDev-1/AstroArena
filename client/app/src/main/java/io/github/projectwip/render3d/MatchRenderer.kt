@@ -1,5 +1,6 @@
 package io.github.projectwip.render3d
 
+import io.github.projectwip.audio.Sound
 import android.opengl.GLES30
 import android.opengl.Matrix
 import android.util.Log
@@ -251,6 +252,7 @@ class MatchRenderer(
             if (fpsTime == 0f) { Log.i("Perf", "sim worst=${"%.1f".format(simWorst)}ms"); simWorst = 0f }
         }
         for (e in runner.frameEvents) onEvent(e)
+        stepHijack()
         particles.update(dt)
         updateFighterAnims(dt)
         updateCamera(dt, alpha)
@@ -286,24 +288,43 @@ class MatchRenderer(
         shake = max(0f, shake - dt)
         val sx = if (shake > 0f) (rng.nextFloat() - 0.5f) * shake * 0.9f else 0f
         val sz = if (shake > 0f) (rng.nextFloat() - 0.5f) * shake * 0.9f else 0f
-        // After the player's super the camera eases back and tilts up for a moment, to watch the streak it fires go up
-        // into the sky (the user's idea), then settles again.
-        // Now and then a plain attack's streak gets the same look, shorter and sillier: a quick bob up after it with
-        // the camera wobbling side to side like it can't believe it (the user asked for that).
+        // The camera's look up into the sky (the user's idea): after the player's super, and now and then after a plain
+        // attack, it drops low behind the fighter and turns straight up to watch the streak climb, then settles back.
+        var w = 0f
+        val px = lerp(p.prevX, p.x, alpha); val pz = lerp(p.prevY, p.y, alpha)
+        val st = skyLookStreak
         val sl = time - skyLookAt
-        val len = skyLookLen
-        val hold = len * 0.62f
-        val sky = when { sl < 0f || sl > len -> 0f; sl < 0.35f -> sl / 0.35f; sl < hold -> 1f; else -> 1f - (sl - hold) / (len - hold) }
-        val e = sky * sky * (3f - 2f * sky) * skyLookPower
-        val wobble = if (skyLookSilly && sky > 0f) sin(sl * 15f) * 0.14f * sky else 0f
-        // (Looking up with the streak as it climbs: lower and further back, aimed up into the air above the fighter.)
-        val climb = (sl / 0.55f).coerceIn(0f, 1f)
-        val pitch = Math.toRadians((PITCH - 30f * e).toDouble())
-        val d2 = dist + 7f * e
-        eyeX = camX + sx
-        eyeY = (d2 * sin(pitch)).toFloat()
-        eyeZ = camZ + (d2 * cos(pitch)).toFloat() + sz
-        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, camX + sx, (3f + 4f * climb) * e, camZ + sz - 1.5f * e, wobble, 1f, 0f)
+        if (st != null && sl >= 0f && sl <= skyLookLen) {
+            val hold = skyLookLen * 0.62f
+            w = smooth(when { sl < 0.35f -> sl / 0.35f; sl < hold -> 1f; else -> 1f - (sl - hold) / (skyLookLen - hold) })
+            skyHead(st, sl, camAt)
+            camUp[0] = st[0]; camUp[1] = 1.7f; camUp[2] = st[1] + 6.5f
+        }
+        // The Entity's hijack (the user's sequence): the same look up, following its comet into the sky and back down
+        // into the fighter; then in close on them while it takes hold (the cutscene plays over that), then back out.
+        val ht = time - hijackAt
+        if (runner.hijack != 0) {
+            if (ht < HIJACK_HIT) {
+                w = smooth(ht / 0.4f)
+                hijackComet(ht, px, pz, camAt)
+                camUp[0] = px; camUp[1] = 1.7f; camUp[2] = pz + 6.5f
+            } else {
+                w = 1f
+                val k = smooth((ht - HIJACK_HIT) / 0.45f)
+                camUp[0] = px; camUp[1] = lerp(1.7f, 3.4f, k); camUp[2] = pz + lerp(6.5f, 4.6f, k)
+                camAt[0] = px; camAt[1] = 1f; camAt[2] = pz
+            }
+        } else if (time - hijackBackAt < 0.8f) {
+            w = 1f - smooth((time - hijackBackAt) / 0.8f)
+            camUp[0] = px; camUp[1] = 3.4f; camUp[2] = pz + 4.6f
+            camAt[0] = px; camAt[1] = 1f; camAt[2] = pz
+        }
+        lookUp = w
+        val pitch = Math.toRadians(PITCH.toDouble())
+        eyeX = lerp(camX + sx, camUp[0], w)
+        eyeY = lerp((dist * sin(pitch)).toFloat(), camUp[1], w)
+        eyeZ = lerp(camZ + (dist * cos(pitch)).toFloat() + sz, camUp[2], w)
+        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, lerp(camX + sx, camAt[0], w), lerp(0f, camAt[1], w), lerp(camZ + sz, camAt[2], w), 0f, 1f, 0f)
         Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
 
         // Shadow camera follows the view target.
@@ -318,8 +339,90 @@ class MatchRenderer(
     private var skyLookAt = -100f
     /** How long that look lasts, how far it goes, and whether it is the silly wobbling one (after a plain attack). */
     private var skyLookLen = SKY_STREAK_SUPER
-    private var skyLookPower = 1f
-    private var skyLookSilly = false
+    /** The streak the camera is watching. */
+    private var skyLookStreak: FloatArray? = null
+    /** Where the camera goes and what it looks at while it looks up, and how far it has (0..1). */
+    private val camUp = FloatArray(3)
+    private val camAt = FloatArray(3)
+    private var lookUp = 0f
+
+    private fun smooth(x: Float) = x.coerceIn(0f, 1f).let { it * it * (3f - 2f * it) }
+
+    /** Where a sky streak's head is [age] seconds after it was fired (the same path [addSkyStreaks] draws). */
+    private fun skyHead(st: FloatArray, age: Float, out: FloatArray) {
+        val big = st[3] >= 1f
+        val sideAng = st[5] + st[4] * 1.5708f
+        val x0 = st[0] + cos(sideAng) * 0.38f; val z0 = st[1] + sin(sideAng) * 0.38f; val y0 = 1.25f
+        val x1 = x0 + cos(sideAng) * 0.8f; val z1 = z0 - (if (big) 2.5f else 2f); val y1 = if (big) 16f else 8f
+        val u = (age / (if (big) 0.55f else 0.28f)).coerceIn(0f, 1f)
+        out[0] = x0 + (x1 - x0) * u; out[1] = y0 + (y1 - y0) * u; out[2] = z0 + (z1 - z0) * u
+    }
+
+    // ------------------------------------------------------------------ the Entity's hijack
+
+    /**
+     * The Entity taking the player over (the user's sequence): a comet leaves them, climbs into the sky with the
+     * camera looking up after it, turns over and comes straight back down into their torso; the match is held still
+     * (unless other real players are in it) and the camera closes in while they glitch; then `MatchScreen` plays the
+     * hijack cutscene, and play goes on with the Entity at the controls.
+     */
+    private var hijackAt = -100f
+    private var hijackHit = false
+    private var hijackBackAt = -100f
+    private var hijackWas = 0
+    private val hijackOut = FloatArray(3)
+
+    private fun startHijack() {
+        hijackAt = time; hijackHit = false
+        if (!runner.shared) runner.paused = true
+        runner.hijack = 1
+        runner.sound(Sound.WHOOSH, 1f)
+    }
+
+    /** Where the comet is [t] seconds in: up from the shoulder into the sky, over, and straight down into the torso. */
+    private fun hijackComet(t: Float, px: Float, pz: Float, out: FloatArray) {
+        if (t < HIJACK_TOP) {
+            val u = 1f - (1f - (t / HIJACK_TOP).coerceIn(0f, 1f)).let { it * it }
+            out[0] = px + 0.3f + 0.9f * u + sin(u * 3.1416f) * 1.2f
+            out[1] = 1.3f + (HIJACK_APEX - 1.3f) * u
+            out[2] = pz - 3f * u
+        } else {
+            val u = ((t - HIJACK_TOP) / (HIJACK_HIT - HIJACK_TOP)).coerceIn(0f, 1f).let { it * it }
+            out[0] = px + 1.2f * (1f - u) - sin(u * 3.1416f) * 0.8f
+            out[1] = HIJACK_APEX + (0.95f - HIJACK_APEX) * u
+            out[2] = pz - 3f * (1f - u)
+        }
+    }
+
+    private fun stepHijack() {
+        if (hijackWas == 2 && runner.hijack == 0) hijackBackAt = time
+        hijackWas = runner.hijack
+        if (runner.hijack == 0) return
+        val p = match.player
+        val pid = p.id
+        val t = time - hijackAt
+        if (!hijackHit && t >= HIJACK_HIT) {
+            hijackHit = true
+            energyFlare(pid, 1f, sky = false)
+            shake = max(shake, 0.45f)
+            runner.sound(Sound.SHOCK, 1f)
+            repeat(60) {
+                val a = rng.nextFloat() * 6.283f; val sp = 2f + rng.nextFloat() * 5f
+                particles.spawn(p.x, 1f, p.y, cos(a) * sp, 1f + rng.nextFloat() * 5f, sin(a) * sp, 0.7f, 0.12f, if (it % 3 == 0) 0xFFFFFFFF.toInt() else 0xFF7FC8FF.toInt(), 1f)
+            }
+            particles.spawn(p.x, 1f, p.y, 0f, 0f, 0f, 0.5f, 4f, 0xFFBFE4FF.toInt(), 0.9f)
+        }
+        // Once it is in them, they glitch hard until the Entity lets go of the camera.
+        if (hijackHit && pid in attackGlitchAt.indices) { attackGlitchAt[pid] = time; attackGlitchSize[pid] = 1f }
+        if (runner.hijack != 1) return
+        if (!hijackHit && rng.nextFloat() < 0.7f) {
+            hijackComet(t, p.x, p.y, hijackOut)
+            particles.spawn(hijackOut[0], hijackOut[1], hijackOut[2], (rng.nextFloat() - 0.5f) * 3f, (rng.nextFloat() - 0.5f) * 3f, (rng.nextFloat() - 0.5f) * 3f, 0.7f, 0.12f, 0xFF8FD8FF.toInt(), 1f)
+        }
+        if (t >= HIJACK_LEN) {
+            if (runner.shared) { runner.hijack = 0; hijackBackAt = time; hijackWas = 0 } else runner.hijack = 2
+        }
+    }
 
     // ------------------------------------------------------------------ passes
 
@@ -1073,14 +1176,8 @@ class MatchRenderer(
         if (id !in flare.indices) return
         flare[id] = maxOf(flare[id], amount)
         if (sky) { attackGlitchAt[id] = time; attackGlitchSize[id] = amount }
-        var bigStreak = amount >= 1f
-        if (sky && id == match.player.id) {
-            if (amount >= 1f) { skyLookAt = time; skyLookLen = SKY_STREAK_SUPER; skyLookPower = 1f; skyLookSilly = false }
-            else if (time - skyLookAt > SKY_LOOK_GAP && rng.nextFloat() < SKY_LOOK_CHANCE) {
-                // Some of the time a plain attack's streak is a big one too, and the camera bobs up after it.
-                skyLookAt = time; skyLookLen = 1.5f; skyLookPower = 0.7f; skyLookSilly = true; bigStreak = true
-            }
-        }
+        // (No streak into the sky and no look up for an attack or a super: the user wants those only for the Entity's
+        // takeover, its comet up and back down into the player, see [startHijack].)
         val f = world.fighter(id) ?: return
         if (!inView(f.x, f.y)) return
         // The flare bursts out of the streaks themselves: sparks thrown off along the four lines.
@@ -1094,7 +1191,7 @@ class MatchRenderer(
                 if (k % 3 == 0) 0xFFFFFFFF.toInt() else 0xFF5CC8FF.toInt(), 1f)
         }
         // And a streak fires up into the sky (the user's idea), from a shoulder, bigger for a super.
-        if (sky) skyStreaks += floatArrayOf(f.x, f.y, time, if (bigStreak) 1f else amount, if (rng.nextBoolean()) 1f else -1f, shownFacing[id])
+
     }
 
     /**
@@ -1261,6 +1358,31 @@ class MatchRenderer(
      * wall, the fighter) hides them on their way up.
      */
     private fun addSkyStreaks() {
+        // Stars come out over the arena while the camera is looking up.
+        if (lookUp > 0.01f) for (i in 0 until 90) {
+            val x = camX + (siteHash(i, 1, 7) - 0.5f) * 80f
+            val y = 20f + siteHash(i, 2, 7) * 24f
+            val z = camZ - 6f - siteHash(i, 3, 7) * 40f
+            val tw = 0.65f + 0.35f * sin(time * (1.5f + siteHash(i, 4, 7) * 3f) + i)
+            sprites.add(x, y, z, 0.2f + 0.35f * siteHash(i, 5, 7), 0.8f, 0.88f, 1f, lookUp * 0.75f * tw)
+        }
+        // The Entity's comet, on its way up and back down into the player.
+        if (runner.hijack == 1) {
+            val t = time - hijackAt
+            if (t < HIJACK_HIT + 0.04f) {
+                val px = match.player.x; val pz = match.player.y
+                for (k in 40 downTo 1) {
+                    val tt = t - k * 0.018f
+                    if (tt < 0f) continue
+                    hijackComet(tt, px, pz, hijackOut)
+                    val fade = 1f - k / 41f
+                    sprites.add(hijackOut[0], hijackOut[1], hijackOut[2], 0.25f + 0.8f * fade, 0.3f + 0.5f * fade, 0.6f + 0.35f * fade, 1f, 0.12f + 0.55f * fade)
+                }
+                hijackComet(t.coerceAtMost(HIJACK_HIT), px, pz, hijackOut)
+                sprites.add(hijackOut[0], hijackOut[1], hijackOut[2], 2.6f, 0.35f, 0.7f, 1f, 0.5f)
+                sprites.add(hijackOut[0], hijackOut[1], hijackOut[2], 1.0f, 0.85f, 0.95f, 1f, 0.95f)
+            }
+        }
         // Streaks fired into the sky: a bolt of blue light leaving the shoulder and rising almost straight up, a bright
         // head and a long tail, sparks shed along it (the user's idea; the camera looks up to it after a super).
         var i = 0
@@ -2312,7 +2434,7 @@ class MatchRenderer(
         }
         particles.emit(sprites, true)
         sprites.flush()
-        if (skyStreaks.isNotEmpty()) {
+        if (skyStreaks.isNotEmpty() || lookUp > 0.01f || runner.hijack == 1) {
             GLES30.glDisable(GLES30.GL_DEPTH_TEST)
             sprites.begin()
             addSkyStreaks()
@@ -2612,8 +2734,7 @@ class MatchRenderer(
                 if (e.targetId == pid) shake = max(shake, 0.12f)
             }
             is GameEvent.Glitched -> {
-                energyFlare(e.fighterId, 1f, sky = false)
-                if (e.fighterId == pid) shake = max(shake, 0.3f)
+                if (e.fighterId == pid) startHijack() else energyFlare(e.fighterId, 1f, sky = false)
             }
             is GameEvent.ShardFound -> {
                 particles.spawn(e.x, 1f, e.y, 0f, 0f, 0f, 0.4f, 3f, 0xFFBFF6FF.toInt(), 0.9f)
@@ -2797,9 +2918,11 @@ class MatchRenderer(
         const val PORTAL_LEAN = 30f
         /** How long a super's streak into the sky lasts (and the camera's look up to it). */
         const val SKY_STREAK_SUPER = 2.0f
-        /** The chance a plain attack gets the camera's silly look up, and the least time between two looks. */
-        const val SKY_LOOK_CHANCE = 0.25f
-        const val SKY_LOOK_GAP = 6f
+        /** The hijack comet's timing: at the top of its climb, into the fighter, and the close-up after it. */
+        const val HIJACK_TOP = 1.1f
+        const val HIJACK_HIT = 2.0f
+        const val HIJACK_LEN = 2.9f
+        const val HIJACK_APEX = 15f
         /** Where along a streak line it reaches the shoulder, and where it has gone round it (see `streakPoint`). */
         const val CONVERGE = 0.3f
         const val AROUND = 0.45f

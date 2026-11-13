@@ -16,7 +16,7 @@ enum class Sound {
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
-    PORTAL_OPEN, PORTAL_ENTER, VOID, SHARD, RIFT, DIM_AIR,
+    PORTAL_OPEN, PORTAL_ENTER, VOID, SHARD, RIFT, DIM_AIR, SHOCK,
 }
 
 /**
@@ -42,6 +42,7 @@ object SfxSynth {
         Sound.TEMPEST -> tempestRise().finish(0.9f)
         Sound.TEMPEST_HIT -> tempestHit().finish(0.7f)
         Sound.THUNDER -> thunder().finish(0.9f)
+        Sound.SHOCK -> shock().finish(0.9f)
         Sound.TEMPEST_WIND -> tempestWind().finish(0.7f)
         Sound.PORTAL_OPEN -> portalOpen().finish(0.8f)
         Sound.PORTAL_ENTER -> portalEnter().finish(0.9f)
@@ -712,6 +713,29 @@ object SfxSynth {
             hold(t, 0.08f, 0.45f, 1f) * roll * 0.75f
         })
         echo(0.14f, 0.3f, 0.2f)
+    }
+
+    /**
+     * The Entity's comet driving into a fighter (the hijack): an electric shock. A hard crack as it lands, a jolt
+     * through the body, then a sizzle of current buzzing at mains rate and dozens of tiny arcs snapping off it, thinning
+     * out as it dies away. All noise, shaped: no tones (the user wanted it to sound like being electrocuted).
+     */
+    private fun shock() = Clip(1.1f).apply {
+        noise(301, 0f, 0.05f, Band.HIGH, { 2600f }, 0.7f, { perc(it, 0.0003f, 0.012f) * 1f })
+        noise(302, 0f, 0.35f, Band.LOW, { glide(it, 0.25f, 900f, 90f) }, 0.8f, { perc(it, 0.002f, 0.12f) * 0.85f })
+        noise(303, 0.01f, 0.95f, Band.BAND, { t -> 3400f + 600f * sin(t * TAU * 7f) }, 1.2f, { t ->
+            val buzz = abs(sin(t * TAU * 110f))
+            val flutter = 0.6f + 0.4f * sin(t * TAU * 23f + 1f) * sin(t * TAU * 9f)
+            hold(t, 0.01f, 0.25f, 0.65f) * (0.35f + 0.65f * buzz) * flutter * 0.5f
+        })
+        noise(304, 0.01f, 0.9f, Band.HIGH, { 6500f }, 0.7f, { t -> hold(t, 0.005f, 0.15f, 0.6f) * 0.18f * (0.5f + 0.5f * abs(sin(t * TAU * 110f))) })
+        val r = kotlin.random.Random(311)
+        for (k in 0 until 46) {
+            val at = (r.nextFloat().let { it * it }) * 0.85f
+            val f = 2500f + 5000f * r.nextFloat(); val decay = 0.006f + 0.01f * r.nextFloat(); val amp = (0.25f + 0.45f * r.nextFloat()) * (1f - at)
+            noise(320 + k, at, 0.03f, Band.BAND, { f }, 2f, { perc(it, 0.0003f, decay) * amp })
+        }
+        echo(0.06f, 0.18f, 0.15f)
     }
 
     /** The tempest hitting someone: a gust slamming into them, a thump, and grit. */

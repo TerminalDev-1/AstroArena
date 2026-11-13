@@ -1426,7 +1426,7 @@ class SimulationTest {
     }
 
 
-    @Test fun aGlitchingFighterFightsOnItsOwnForFourSeconds() {
+    @Test fun aGlitchingFighterFightsOnItsOwnForAWhile() {
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
             mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, seed = 11L))
         repeat(60 * 6) { m.step(io.github.projectwip.sim.Match.STEP) }
@@ -1435,10 +1435,13 @@ class SimulationTest {
         // Put an enemy in plain sight, in reach, and let the Entity take over: the player does nothing themselves.
         enemy.x = p.x + 3f; enemy.y = p.y; enemy.prevX = enemy.x; enemy.prevY = enemy.y
         p.glitchLeft = io.github.projectwip.data.Balance.GLITCH_SECONDS
+        p.superCharge = 1f
         val dealt = p.damageDealt
-        repeat(60 * 2) { m.step(io.github.projectwip.sim.Match.STEP) }
+        var usedSuper = false
+        repeat(60 * 2) { m.step(io.github.projectwip.sim.Match.STEP); if (p.inTempest) usedSuper = true }
+        assertTrue("the Entity spent the ready super", usedSuper)
         assertTrue("it fought: ${p.damageDealt} vs $dealt", p.damageDealt > dealt || !enemy.alive)
-        repeat(60 * 3) { m.step(io.github.projectwip.sim.Match.STEP) }
+        repeat((60 * (io.github.projectwip.data.Balance.GLITCH_SECONDS - 1f)).toInt()) { m.step(io.github.projectwip.sim.Match.STEP) }
         assertEquals("and it wears off", 0f, p.glitchLeft, 0f)
     }
 

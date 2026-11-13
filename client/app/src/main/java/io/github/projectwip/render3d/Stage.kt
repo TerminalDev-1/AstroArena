@@ -55,6 +55,11 @@ class StageParams {
     @Volatile var talking = false
     /** Dimension: chained to a pillar behind them with this many chains (the captive in its talk), rattling. */
     @Volatile var chains = 0
+    /**
+     * The Entity taking them over (the hijack cutscene): when it began (System.currentTimeMillis), or 0. Its comets
+     * stream in from the left, in 3D like a match's, into their chest, which glows brighter as it takes hold.
+     */
+    @Volatile var hijackAt = 0L
 }
 
 /**
@@ -162,6 +167,40 @@ class StageScene(private val withPedestal: Boolean) {
             sprites.add(cp[0], cp[1], cp[2], 0.32f, 0.3f, 0.6f, 1f, 0.13f + 0.1f * boost)
             sprites.add(cp[0], cp[1], cp[2], 0.12f, 0.75f, 0.92f, 1f, 0.4f)
         }
+    }
+
+    /**
+     * The Entity's comets pouring into the fighter (the hijack cutscene): six streams from off to the left, arcing in,
+     * each a run of bright blue heads with white-hot cores and fading tails, the same glow as the comets in a match;
+     * where they go in, the chest blazes, more and more as it takes hold.
+     */
+    private fun addHijackComets(e: Float) {
+        if (e < 0.4f) return
+        val reach = smooth((e - 0.4f) / 0.8f)
+        val hold = smooth((e - 0.4f) / 2.2f)
+        val tx = 0.05f; val ty = 1.05f; val tz = 0.3f
+        for (i in 0 until 6) {
+            val sx = -5.2f; val sy = 0.6f + 0.42f * i; val sz = -1.2f + 0.5f * (i % 3)
+            val cx = -2.2f; val cy = 2.6f - 0.25f * i + 0.2f * sin(e * 2f + i); val cz = 1.2f - 0.3f * (i % 2)
+            for (n in 0 until 2) {
+                val head = ((e * 0.85f + i * 0.17f + n * 0.5f) % 1f) * reach
+                for (k in 0..9) {
+                    val u = (head - k * 0.025f)
+                    if (u < 0f) break
+                    val a = (1 - u) * (1 - u); val b = 2 * (1 - u) * u; val c = u * u
+                    val x = a * sx + b * cx + c * tx; val y = a * sy + b * cy + c * ty; val z = a * sz + b * cz + c * tz
+                    val fade = 1f - k / 10f
+                    sprites.add(x, y, z, 0.1f + 0.18f * fade, 0.35f + 0.4f * fade, 0.7f + 0.25f * fade, 1f, 0.08f + 0.3f * fade)
+                    if (k == 0) {
+                        sprites.add(x, y, z, 0.42f, 0.3f, 0.6f, 1f, 0.22f)
+                        sprites.add(x, y, z, 0.15f, 0.8f, 0.94f, 1f, 0.6f)
+                    }
+                }
+            }
+        }
+        // Where they go in.
+        sprites.add(tx, ty, tz, 0.5f + 0.9f * hold, 0.3f, 0.6f, 1f, (0.18f + 0.3f * hold) * reach)
+        sprites.add(tx, ty, tz, 0.2f + 0.3f * hold, 0.85f, 0.95f, 1f, (0.3f + 0.4f * hold) * reach)
     }
 
     private val chainM = FloatArray(16)
@@ -362,7 +401,8 @@ class StageScene(private val withPedestal: Boolean) {
         sprites.begin()
         particles.emit(sprites, true)
         // The Entity's energy in them here too (the user's lore): comets on their streaks, as in a match.
-        if (withPedestal && !special && !p.locked && def.boss == null) addComets(facing, time, p.talking)
+        if (withPedestal && !special && !p.locked && def.boss == null) addComets(facing, time, p.talking || p.hijackAt > 0L)
+        if (p.hijackAt > 0L) addHijackComets((now - p.hijackAt) / 1000f)
         sprites.flush()
         GLES30.glDepthMask(true)
         GLES30.glDisable(GLES30.GL_BLEND)

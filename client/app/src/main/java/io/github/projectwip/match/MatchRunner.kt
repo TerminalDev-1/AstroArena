@@ -62,6 +62,14 @@ class MatchRunner(
     val frameEvents = ArrayList<GameEvent>()
     val hudEvents = ConcurrentLinkedQueue<HudEvent>()
     @Volatile var paused = false
+    /**
+     * The Entity's hijack of the player (the user's sequence): 0 none, 1 its comet is playing (`MatchRenderer`), 2 the
+     * cutscene is wanted (`MatchScreen` plays it, then sets this back to 0 and resumes).
+     */
+    @Volatile var hijack = 0
+    /** Other real players are in this match: it can't be held still for one of them. */
+    val shared: Boolean get() = duel != null || team != null
+    fun sound(s: Sound, gain: Float) = sfx.play(s, gain)
     private var acc = 0f
     private var finished = false
     /** Who a tap on the attack stick would hit right now (drawn as a marker). */

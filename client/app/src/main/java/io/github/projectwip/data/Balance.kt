@@ -411,7 +411,7 @@ object Balance {
      * The Entity's glitch (the user's lore, build 108): after using a super or a hypercharge, a fighter may glitch, and
      * for [GLITCH_SECONDS] it fights on its own (the Entity fighting through them).
      */
-    const val GLITCH_SECONDS = 4f
+    const val GLITCH_SECONDS = 7f
     /**
      * The Entity's pull (`Fighter.entityPull`) fills by these: a little every second, more for every attack, a bit more for
      * a super or a hypercharge (not so much that it only ever comes with a super: the user wants it mid-fight). Full, the fighter glitches, every time, as often as it fills: about every 20 to 30

@@ -236,15 +236,21 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   blinding blue streaks (tubes, not flat triangles), thin feeders converging into four lines that go into the
   shoulders, round them, and swirl down round the torso clear of the body (`MatchRenderer.drawEnergyStreaks`,
   `streakPoint`, `tubeSegment`). They flare, throwing sparks off the streaks, when a power is used (`energyFlare` on
-  `Shot`/`Hyper`), brighten in a hypercharge, and every attack or super fires a streak up into the sky
-  (`skyStreaks`). **Glitching is gameplay** (the user's mechanic): the Entity's pull on a fighter (`Fighter.entityPull`) fills with
+  `Shot`/`Hyper`), brighten in a hypercharge, and every attack or super glitches the fighter for a moment (cyan and magenta
+  copies torn apart, `drawGlitchGhosts`). Attacks and supers fire **no** streak into the sky and move no camera:
+  the user wants that only for the Entity's takeover. **Glitching is gameplay** (the user's mechanic): the Entity's pull on a fighter (`Fighter.entityPull`) fills with
   every attack, super and hypercharge and with time once they've fought (`GLITCH_PULL_*`); full, they glitch, for sure
   (`GameEvent.Glitched`), again every time it fills, with only a short breather (`GLITCH_COOLDOWN`) between. It is
   never a dice roll and never capped: the user rejected glitches that happened once a match ("does the entity go on a
   beach day?"). Normal attacks fill most of it, so it comes mid-fight and not only with a super (the user
   complained it did). A takeover during Swish's tornado lasts the whole tornado, and the Entity drives it flat out
-  straight through enemies. Now and then (`SKY_LOOK_CHANCE`) a plain attack's streak gets a big one and the camera
-  bobs up after it with a silly side-to-side wobble (`skyLookSilly`), the user's request. For `GLITCH_SECONDS` (4) the Entity fights through
+  straight through enemies. A takeover is a sequence (the user's design): a comet leaves the player, climbs
+  into the sky while the camera drops low and looks straight up after it (stars come out), turns over and comes
+  straight down into their torso (`startHijack`, `hijackComet`, `MatchRunner.hijack`); the match is held still
+  unless other real players are in it, the camera closes in, then `EntityHijack` (the Entity leaning in, streaks
+  into the fighter, a line on a purple plate, the fighter bursting out) plays and play goes on with the Entity
+  driving, through an ELITE bot brain of its own (`Match.entityBrains`). The Entity's HUD words are on the game's
+  purple plates (`HudView.entityPlate`). For `GLITCH_SECONDS` (7) the Entity fights through
   them (`Fighter.glitchLeft`, `Match.autoFight` overrides the control, deterministic, so the referee replays it); the
   player sees "THE ENTITY HAS YOU" (`HudView.drawPossessed`) and the fighter jolts (`glitchJolt`). Outside Dimension
   the Entity whispers to the player now and then and when they use a super or a hypercharge (`HudView.drawWhisper`,

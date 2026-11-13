@@ -111,6 +111,15 @@ class MatchView(
         thread = null
     }
 
+    /** The Entity's hijack (see `MatchRunner.hijack`): 2 when its cutscene should play. */
+    val hijack: Int get() = runner.hijack
+
+    /** The hijack cutscene is over: play goes on, with the Entity at the controls. */
+    fun endHijack() {
+        runner.hijack = 0
+        resumeGame()
+    }
+
     fun resumeGame() {
         controls.reset()
         runner.paused = false

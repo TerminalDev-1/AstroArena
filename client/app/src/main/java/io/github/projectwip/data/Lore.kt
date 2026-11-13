@@ -183,6 +183,17 @@ object Lore {
     )
 
     fun whisper(index: Int): String = WHISPERS[Math.floorMod(index, WHISPERS.size)]
+
+    /** What the Entity says as it takes a fighter over (the hijack cutscene). */
+    fun hijackLine(index: Int): String = HIJACK[Math.floorMod(index, HIJACK.size)]
+    private val HIJACK = listOf(
+        "Sit back. I'll drive.",
+        "Your hands. My fight.",
+        "You used my power. Now I use you.",
+        "Shh. Watch how it's done.",
+        "Let go. I've got this one.",
+        "Mine again. Just for a while.",
+    )
     fun powerWhisper(index: Int): String = WHISPERS_POWER[Math.floorMod(index, WHISPERS_POWER.size)]
 
     // ------------------------------------------------------------------ the chained fighters

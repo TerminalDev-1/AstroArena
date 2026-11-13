@@ -156,6 +156,14 @@ class Match(val config: MatchConfig) {
     /** In a 1v1, the other fighter. */
     val opponent: Fighter? get() = if (config.mode == GameMode.DUEL) world.fighters.firstOrNull { it !== player } else null
 
+    /**
+     * The Entity's own brains, one for each real player it takes over (made the first time it does, the same moment on
+     * every device and in the referee): a bot's mind at its sharpest, so a takeover is worth watching. Bots it takes
+     * over keep their own brains. Built-in numbers only, never the server's overrides, so every replay agrees.
+     */
+    private val entityBrains = HashMap<Int, BotBrain>()
+    private val entityProfile = BotProfile.builtIn(BotDifficulty.ELITE)
+
     /** What the player's control held on every tick so far: the record the server replays to judge the match. */
     val inputs = InputLog()
 
@@ -177,7 +185,28 @@ class Match(val config: MatchConfig) {
         for (f in world.fighters) if (f.glitchCooldown > 0f) f.glitchCooldown = maxOf(0f, f.glitchCooldown - dt)
         for (f in world.fighters) if (f.glitchLeft > 0f) {
             f.glitchLeft = maxOf(0f, f.glitchLeft - dt)
-            if (f.alive && f.def.boss == null) autoFight(f)
+            if (!f.alive || f.def.boss != null) continue
+            if (f.inTempest) autoFight(f)
+            else if (!f.isBot) {
+                val c = f.control
+                c.attack = false; c.superAttack = false; c.hyper = false
+                entityBrains.getOrPut(f.id) { BotBrain(f, entityProfile, world, pathfinder, Random(config.seed xor (0x3E7171L + f.id))) }.update(dt)
+                // The Entity spends its powers (the user's rule): a ready super goes at the nearest enemy in reach,
+                // and a ready hypercharge goes on, not saved for later.
+                if (f.superReady || f.hyperReady) {
+                    var near: Fighter? = null
+                    var nd = Float.MAX_VALUE
+                    for (o in world.fighters) {
+                        if (o === f || !o.alive || o.team == f.team || !world.isVisibleTo(o, f.team)) continue
+                        val d = kotlin.math.hypot(o.x - f.x, o.y - f.y)
+                        if (d < nd) { nd = d; near = o }
+                    }
+                    if (near != null && nd <= maxOf(f.def.attack.range, f.def.superSpec.range)) {
+                        if (f.hyperReady) c.hyper = true
+                        if (f.superReady && !c.superAttack) { c.aimX = near.x - f.x; c.aimY = near.y - f.y; c.aiming = true; c.superAttack = true }
+                    }
+                }
+            }
         }
         val seen = world.events.size
         world.step(dt)

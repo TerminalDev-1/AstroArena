@@ -299,6 +299,15 @@ private fun MatchBody(
     var talk by remember { mutableStateOf(-1) }
     var talkedIn by remember { mutableStateOf(0) }
     var seenPortals by remember { mutableStateOf(match.world.portal?.entered ?: 0) }
+    /** The Entity's hijack cutscene is showing (its comet has come down into the player); and how many there have been. */
+    var hijacking by remember { mutableStateOf(false) }
+    var hijacks by remember { mutableStateOf(0) }
+    if (!shared) androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            androidx.compose.runtime.withFrameNanos { }
+            if (!hijacking && view?.hijack == 2) hijacking = true
+        }
+    }
     if (match.portalRun) androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
             androidx.compose.runtime.withFrameNanos { }
@@ -356,6 +365,10 @@ private fun MatchBody(
         if (intro && match.portalRun) DimensionCutscene(match.world.portal?.entered ?: 0, match.config.playerFighter, match.config.playerSkin, sfx) { intro = false; view?.resumeGame() }
         else if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
         if (talk >= 0) CaptiveTalk(talk, match.config.playerFighter, match.config.playerSkin, io.github.projectwip.data.Balance.PORTAL_SHARDS - (match.world.portal?.found ?: 0), sfx) { talk = -1; view?.resumeGame() }
+        if (hijacking) EntityHijack(match.config.playerFighter, match.config.playerSkin, hijacks, sfx) {
+            hijacking = false; hijacks++
+            if (paused) view?.let { v -> v.endHijack(); v.paused = true } else view?.endHijack()
+        }
         if (scene >= 0) DimensionCutscene(scene, match.config.playerFighter, match.config.playerSkin, sfx) { scene = -1; view?.resumeGame() }
         if (paused && !done) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {

@@ -210,13 +210,9 @@ class HudView(
         whisperAge += dt
         if (whisperAge > 3.6f) { whisper = null; return }
         val a = minOf(whisperAge / 0.5f, 1f, (3.6f - whisperAge) / 0.9f).coerceIn(0f, 1f) * 0.85f
-        text.textSize = dp(16f)
-        text.textSkewX = -0.2f; textStroke.textSkewX = -0.2f
+        // On the game's own plate (the user asked): purple, ink outline, white words, a nameplate tab on top.
         val jitter = if ((time * 13f).toInt() % 9 == 0) dp(2f) else 0f
-        outlined(c, glitchText(line, if ((time * 7f).toInt() % 5 == 0) 1f else 0f), width / 2f + jitter, height * 0.3f, withAlpha(Color.rgb(150, 210, 255), a), dp(3f))
-        text.textSize = dp(10f)
-        outlined(c, "THE ENTITY", width / 2f, height * 0.3f - dp(20f), withAlpha(Color.rgb(90, 170, 255), a * 0.8f), dp(2f))
-        text.textSkewX = 0f; textStroke.textSkewX = 0f
+        entityPlate(c, glitchText(line, if ((time * 7f).toInt() % 5 == 0) 1f else 0f), null, width / 2f + jitter, height * 0.3f, a)
     }
 
     /**
@@ -225,9 +221,9 @@ class HudView(
      */
     private fun drawPossessed(c: Canvas) {
         val left = snap.playerGlitch
-        if (left <= 0f || snap.phase != Phase.PLAYING) return
+        if (left <= 0f || snap.phase != Phase.PLAYING || runner.hijack != 0) return
         val w = width.toFloat(); val h = height.toFloat()
-        val a = minOf(1f, left / 0.4f, (io.github.projectwip.data.Balance.GLITCH_SECONDS - left) / 0.25f + 0.3f).coerceIn(0f, 1f)
+        val a = minOf(1f, left / 0.4f).coerceIn(0f, 1f)
         fill.shader = android.graphics.RadialGradient(w / 2, h / 2, maxOf(w, h) * 0.65f, intArrayOf(Color.TRANSPARENT, Color.argb((40 * a).toInt(), 40, 140, 255), Color.argb((170 * a).toInt(), 20, 90, 255)), floatArrayOf(0f, 0.6f, 1f), android.graphics.Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, w, h, fill)
         fill.shader = null
@@ -237,10 +233,38 @@ class HudView(
             fill.color = Color.argb((70 * a).toInt(), 90, 200, 255)
             c.drawRect(0f, y, w, y + dp(3f), fill)
         }
-        text.textSize = dp(22f)
-        outlined(c, glitchText("THE ENTITY HAS YOU", 1f), w / 2 + (if (beat % 4 == 0) dp(3f) else 0f), h * 0.66f, withAlpha(Color.rgb(160, 220, 255), a), dp(4f))
-        text.textSize = dp(13f)
-        outlined(c, "IT FIGHTS FOR YOU · %.1f".format(left), w / 2, h * 0.66f + dp(22f), withAlpha(Color.WHITE, a * 0.9f), dp(3f))
+        entityPlate(c, glitchText("THE ENTITY HAS YOU", 1f), "IT FIGHTS FOR YOU · %.1f".format(left), w / 2 + (if (beat % 4 == 0) dp(3f) else 0f), h * 0.64f, a)
+    }
+
+    /**
+     * The Entity's words on AstroArena's own plate (the user asked for the game's theme): a chamfered purple plate
+     * with a thick ink outline and a gloss, a brighter purple "THE ENTITY" nameplate standing on its top edge, and the
+     * words in white with an ink outline; [sub] is a smaller second line. [y] is the middle of the plate.
+     */
+    private fun entityPlate(c: Canvas, words: String, sub: String?, x: Float, y: Float, a: Float) {
+        if (a <= 0f) return
+        val alpha = (255 * a).toInt().coerceIn(0, 255)
+        text.textSize = dp(20f)
+        val wMain = text.measureText(words)
+        var wSub = 0f
+        if (sub != null) { text.textSize = dp(13f); wSub = text.measureText(sub) }
+        val pw = maxOf(wMain, wSub) + dp(48f)
+        val ph = if (sub != null) dp(62f) else dp(42f)
+        val l = x - pw / 2; val t = y - ph / 2
+        val ink = Color.argb(alpha, 27, 16, 53)
+        chamfer(c, l, t, l + pw, t + ph, dp(11f), Color.argb((235 * a).toInt(), 45, 29, 116), ink)
+        // The nameplate tab.
+        text.textSize = dp(11f)
+        val tag = "THE ENTITY"
+        val tw = text.measureText(tag) + dp(22f)
+        chamfer(c, l + dp(14f), t - dp(12f), l + dp(14f) + tw, t + dp(10f), dp(6f), Color.argb(alpha, 120, 60, 220), ink)
+        outlined(c, tag, l + dp(14f) + tw / 2, t + dp(3f), Color.argb(alpha, 255, 255, 255), dp(2.5f))
+        text.textSize = dp(20f)
+        outlined(c, words, x, if (sub != null) y - dp(2f) else y + dp(7f), Color.argb(alpha, 255, 255, 255), dp(3.5f))
+        if (sub != null) {
+            text.textSize = dp(13f)
+            outlined(c, sub, x, y + dp(20f), Color.argb(alpha, 214, 200, 255), dp(2.5f))
+        }
     }
 
     /** During one of the world's glitch moments, a few letters of a word come out wrong. */
