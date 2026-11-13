@@ -1425,4 +1425,44 @@ class SimulationTest {
         assertEquals(io.github.projectwip.data.MatchOutcome.DRAW, m.report().outcome)
     }
 
+
+    @Test fun aGlitchingFighterFightsOnItsOwnForFourSeconds() {
+        val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
+            mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, seed = 11L))
+        repeat(60 * 6) { m.step(io.github.projectwip.sim.Match.STEP) }
+        val p = m.player
+        val enemy = m.world.fighters.first { it.team != p.team && it.alive }
+        // Put an enemy in plain sight, in reach, and let the Entity take over: the player does nothing themselves.
+        enemy.x = p.x + 3f; enemy.y = p.y; enemy.prevX = enemy.x; enemy.prevY = enemy.y
+        p.glitchLeft = io.github.projectwip.data.Balance.GLITCH_SECONDS
+        val dealt = p.damageDealt
+        repeat(60 * 2) { m.step(io.github.projectwip.sim.Match.STEP) }
+        assertTrue("it fought: ${p.damageDealt} vs $dealt", p.damageDealt > dealt || !enemy.alive)
+        repeat(60 * 3) { m.step(io.github.projectwip.sim.Match.STEP) }
+        assertEquals("and it wears off", 0f, p.glitchLeft, 0f)
+    }
+
+    @Test fun theEntityTakesOverAgainAndAgainInAMatch() {
+        val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
+            mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, seed = 12L))
+        val p = m.player
+        var glitches = 0
+        var was = false
+        var ticks = 0
+        // Up to two minutes of attacking whenever the gun is ready, kept alive: the Entity must take over several times.
+        repeat(60 * 120) {
+            if (m.isOver) return@repeat
+            p.hp = p.maxHp
+            val e = m.world.fighters.firstOrNull { it.team != p.team && it.alive }
+            if (e != null) { p.control.aimX = e.x - p.x; p.control.aimY = e.y - p.y; p.control.aiming = true }
+            p.control.attack = true
+            m.step(io.github.projectwip.sim.Match.STEP); ticks++
+            val now = p.glitchLeft > 0f
+            if (now && !was) glitches++
+            was = now
+        }
+        // (About every 25 seconds of fighting; at least once every 30, and never only once.)
+        assertTrue("the Entity took over $glitches times in ${ticks / 60} s", glitches >= 2 && glitches >= ticks / 60 / 30)
+    }
+
 }

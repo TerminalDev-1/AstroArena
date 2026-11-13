@@ -53,6 +53,8 @@ class HudSnapshot {
     var portalPlayerZ = 0f
     /** Dimension: how hard the picture is glitching right now (0 nearly always), and whose soul the Void speaks with. */
     var portalGlitch = 0f
+    /** Seconds left of the player's glitch (the Entity fighting through them), or 0. */
+    var playerGlitch = 0f
     var voidSoul: String? = null
     var voidSoulColor = 0
     /** Dimension: the chained fighter, while they are still chained. */
@@ -114,7 +116,7 @@ class HudSnapshot {
         bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
         portalRun = o.portalRun; portalDimension = o.portalDimension; portalFound = o.portalFound; portalOpen = o.portalOpen; portalTravel = o.portalTravel; voidLine = o.voidLine; voidAge = o.voidAge
         portalTargetOn = o.portalTargetOn; portalTargetX = o.portalTargetX; portalTargetZ = o.portalTargetZ; portalPlayerX = o.portalPlayerX; portalPlayerZ = o.portalPlayerZ
-        portalGlitch = o.portalGlitch; voidSoul = o.voidSoul; voidSoulColor = o.voidSoulColor; captiveOn = o.captiveOn; captiveName = o.captiveName; captiveX = o.captiveX; captiveZ = o.captiveZ
+        playerGlitch = o.playerGlitch; portalGlitch = o.portalGlitch; voidSoul = o.voidSoul; voidSoulColor = o.voidSoulColor; captiveOn = o.captiveOn; captiveName = o.captiveName; captiveX = o.captiveX; captiveZ = o.captiveZ
         followerOn = o.followerOn; followerX = o.followerX; followerZ = o.followerZ; followerLine = o.followerLine; followerAge = o.followerAge; followerName = o.followerName; followerColor = o.followerColor
         freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
         stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm

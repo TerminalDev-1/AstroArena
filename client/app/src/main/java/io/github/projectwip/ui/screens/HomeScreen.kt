@@ -417,7 +417,7 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty?, modifier: Modifier, onCl
                 PlainText("GAME MODE", Type.Eyebrow, maxLines = 1)
                 GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.dp)
                 if (mode == GameMode.DUEL) PlainText("Against a real player", Type.Small, color = Palette.Positive, maxLines = 1)
-                else if (mode == GameMode.PORTAL) PlainText("A story mode · you and the Void", Type.Small, color = androidx.compose.ui.graphics.Color(0xFFC9A6FF), maxLines = 1)
+                else if (mode == GameMode.PORTAL) PlainText("Into the Entity's world", Type.Small, color = androidx.compose.ui.graphics.Color(0xFFC9A6FF), maxLines = 1)
                 else if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
                     PlainText("${mode.tagline.substringBefore(" ·")} · Bots ", Type.Small, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     PlainText(d.label, Type.Label, color = difficultyColor(d), maxLines = 1)
@@ -501,13 +501,12 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
     val arena = remember(m) { arenaFor(m) }
     ChunkyButton(onClick, modifier.height(if (!showMap) 190.dp else if (short) 268.dp else 330.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, cut = 18.dp, sound = Sound.UI_SELECT) {
         Column(Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                GameIcon(modeIcon(m), Modifier.size(22.dp))
-                Spacer(Modifier.width(5.dp))
-                GameText(m.title.uppercase(), Type.Label.copy(letterSpacing = 0.sp), outline = 2.dp)
-            }
+            // (Six cards share the row: the icon sits over the title, and the title may take two lines, so nothing is cut.)
+            GameIcon(modeIcon(m), Modifier.size(22.dp))
             Spacer(Modifier.height(2.dp))
-            PlainText(m.tagline, Type.Body, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center)
+            GameText(m.title.uppercase(), Type.Label.copy(letterSpacing = 0.sp, lineHeight = Type.Label.fontSize * 1.05f), outline = 2.dp, align = TextAlign.Center, maxLines = 2)
+            Spacer(Modifier.height(2.dp))
+            PlainText(m.tagline, Type.Small.copy(lineHeight = Type.Small.fontSize * 1.2f), color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 4)
             Spacer(Modifier.height(6.dp))
             if (showMap) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -522,10 +521,10 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                     GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win to earn Cups."
                     GameMode.BOSS -> "One of three bosses, each with moves of its own: rockets, sweeping beams, charges. Watch the marked ground. Knock it out to win; you have unlimited lives. Win to earn Cups."
                     GameMode.DUEL -> "Against one real player on this server, each on their own device. First to 3 knockouts, played for Cups. Leaving a match counts as a defeat."
-                    GameMode.PORTAL -> "A story mode: you and the Void. No enemies: find the three echoes hidden in each dimension and a portal opens, with the Void waiting beside it. Every dimension is stranger than the last, and the world starts to come apart. Mind the rifts: one life. Seven portals to the bottom; every one earns Cups."
+                    GameMode.PORTAL -> "Into the Entity's world. No enemies: in each dimension a forgotten fighter is chained up; find three echoes to free them and the portal wakes. Endless, nothing won or lost. One life."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a boss that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },
-                Type.Small, color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 5,
+                Type.Small.copy(fontSize = Type.Small.fontSize * 0.92f, lineHeight = Type.Small.fontSize * 1.1f), color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 11,
             )
         }
     }

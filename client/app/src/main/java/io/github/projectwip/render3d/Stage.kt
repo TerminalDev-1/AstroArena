@@ -66,7 +66,7 @@ class StageScene(private val withPedestal: Boolean) {
     private val sprite = Program(Shaders.SPRITE_VS, Shaders.SPRITE_FS, "stage-sprite")
     private val models = FighterModels()
     private val shadow = ShadowMap(1024)
-    private val sprites = SpriteBatch(256)
+    private val sprites = SpriteBatch(640)
     private val particles = Particles3D(256)
     private val rng = Random(5)
     private val base: Mesh
@@ -97,6 +97,71 @@ class StageScene(private val withPedestal: Boolean) {
         Matrix.setLookAtM(lightView, 0, -Toon.LIGHT[0] * 10f, -Toon.LIGHT[1] * 10f, -Toon.LIGHT[2] * 10f, 0f, 0f, 0f, 0f, 1f, 0f)
         Matrix.orthoM(lightProj, 0, -2.5f, 2.5f, -2.5f, 2.5f, 1f, 25f)
         Matrix.multiplyMM(lightVP, 0, lightProj, 0, lightView, 0)
+    }
+
+    private val cp = FloatArray(3)
+
+    /** A point on one of the four streak lines round the fighter on the stage (as `MatchRenderer.streakPoint`). */
+    private fun streakAt(facing: Float, line: Int, u: Float, time: Float, spread: Float = 0f) {
+        val sc = 1f
+        val side = if (line < 2) 1f else -1f
+        val sub = if (line % 2 == 0) 1f else -1f
+        val f = facing
+        val sideAng = f + side * 1.5708f
+        val sx = kotlin.math.cos(sideAng) * 0.3f * sc; val sz = kotlin.math.sin(sideAng) * 0.3f * sc; val sy = 0.95f * sc
+        val converge = 0.3f; val around = 0.45f
+        when {
+            u <= converge -> {
+                val v = u / converge
+                val back = f + 3.1416f
+                val tx = sx + kotlin.math.cos(sideAng) * 0.12f + kotlin.math.cos(back) * (0.18f + 0.12f * sub)
+                val tz = sz + kotlin.math.sin(sideAng) * 0.12f + kotlin.math.sin(back) * (0.18f + 0.12f * sub)
+                val w = 1f - (1f - v) * (1f - v)
+                val drift = (1f - v) * spread * 0.18f
+                cp[0] = tx + (sx - tx) * w + kotlin.math.cos(f) * drift
+                cp[1] = sy + 1.25f + (0.12f - 1.25f) * v
+                cp[2] = tz + (sz - tz) * w + kotlin.math.sin(f) * drift
+            }
+            u <= around -> {
+                val v = (u - converge) / (around - converge)
+                val a = v * 6.2832f * sub + 1.5708f
+                cp[0] = sx + kotlin.math.cos(f) * kotlin.math.cos(a) * 0.16f
+                cp[1] = sy + kotlin.math.sin(a) * 0.16f
+                cp[2] = sz + kotlin.math.sin(f) * kotlin.math.cos(a) * 0.16f
+            }
+            else -> {
+                val v = (u - around) / (1f - around)
+                val ang = sideAng + sub * v * (7.8f + 0.4f * sin(time * 0.7f + line)) + sub * v * time * 0.35f
+                val r = 0.38f + 0.16f * v
+                cp[0] = kotlin.math.cos(ang) * r
+                cp[1] = sy - v * 0.5f
+                cp[2] = kotlin.math.sin(ang) * r
+            }
+        }
+    }
+
+    /** The streaks and their rising comets round the fighter on the stage: glow, a little brighter while they talk. */
+    private fun addComets(facing: Float, time: Float, talking: Boolean) {
+        val boost = if (talking) 0.25f else 0f
+        for (line in 0..3) {
+            for (k in 0..11) {
+                streakAt(facing, line, 0.1f + 0.9f * k / 11f, time)
+                sprites.add(cp[0], cp[1], cp[2], 0.15f, 0.25f, 0.55f, 1f, 0.08f + 0.12f * boost)
+            }
+            for (fd in floatArrayOf(-1f, 1f)) for (k in 0..2) {
+                streakAt(facing, line, 0.3f * k / 3f, time, fd)
+                sprites.add(cp[0], cp[1], cp[2], 0.09f, 0.3f, 0.6f, 1f, 0.06f)
+            }
+            val head = 1f - ((time * 0.28f + line * 0.25f) % 1f)
+            for (k in 0..7) {
+                streakAt(facing, line, (head + k * 0.03f).coerceAtMost(1f), time)
+                val fade = 1f - k / 8f
+                sprites.add(cp[0], cp[1], cp[2], 0.1f + 0.13f * fade, 0.35f + 0.4f * fade, 0.7f + 0.25f * fade, 1f, 0.07f + 0.2f * fade)
+            }
+            streakAt(facing, line, head, time)
+            sprites.add(cp[0], cp[1], cp[2], 0.32f, 0.3f, 0.6f, 1f, 0.13f + 0.1f * boost)
+            sprites.add(cp[0], cp[1], cp[2], 0.12f, 0.75f, 0.92f, 1f, 0.4f)
+        }
     }
 
     private val chainM = FloatArray(16)
@@ -296,6 +361,8 @@ class StageScene(private val withPedestal: Boolean) {
         sprite.v3("uUp", view[1], view[5], view[9])
         sprites.begin()
         particles.emit(sprites, true)
+        // The Entity's energy in them here too (the user's lore): comets on their streaks, as in a match.
+        if (withPedestal && !special && !p.locked && def.boss == null) addComets(facing, time, p.talking)
         sprites.flush()
         GLES30.glDepthMask(true)
         GLES30.glDisable(GLES30.GL_BLEND)

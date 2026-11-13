@@ -67,6 +67,18 @@ class Fighter(
     var hp = maxHp
     var ammo = def.ammoMax.toFloat()
     var superCharge = 0f
+    /**
+     * Seconds left of a glitch (the user's lore, build 108): the Entity has taken over and the fighter fights on its
+     * own (`Match.step`), whatever its player or brain wants.
+     */
+    var glitchLeft = 0f
+    /** Seconds until this fighter can glitch again (a short breather after each glitch). */
+    var glitchCooldown = 0f
+    /**
+     * The Entity's pull on this fighter, 0..1: it fills with time and with every power used, and when it is full the
+     * fighter glitches, for sure, again and again all match long (the user's rule: never just once, no cap).
+     */
+    var entityPull = 0f
     var alive = true
     var respawnTimer = 0f
     var shield = 0f
@@ -280,6 +292,8 @@ sealed interface GameEvent {
     /** A tempest's lightning bolt comes down at ([x], [y]). */
     data class TempestBolt(val fighterId: Int, val x: Float, val y: Float) : GameEvent
     /** Portal Run: wave [wave] of dimension [dimension] is coming in. */
+    /** The Entity has taken over [fighterId] for a few seconds (it glitched). */
+    data class Glitched(val fighterId: Int) : GameEvent
     /** Dimension: the player found echo shard [found] of [Balance.PORTAL_SHARDS] at ([x], [y]). */
     data class ShardFound(val dimension: Int, val found: Int, val x: Float, val y: Float) : GameEvent
     /** Dimension: every echo is found and the portal has opened at ([x], [y]). */

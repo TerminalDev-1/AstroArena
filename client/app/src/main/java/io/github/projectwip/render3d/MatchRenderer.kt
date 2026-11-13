@@ -160,7 +160,7 @@ class MatchRenderer(
         val t0 = System.nanoTime()
         arena = ArenaModel(world.arena)
         Log.i("MatchRenderer", "arena built in ${(System.nanoTime() - t0) / 1_000_000} ms")
-        sprites = SpriteBatch()
+        sprites = SpriteBatch(4096)
         sphere = MeshBuilder().apply { sphere(1f, 10, 14) }.build()
         octa = MeshBuilder().apply { ellipsoid(1f, 1f, 1f, 2, 4) }.build()
         bit = MeshBuilder().apply { box(1f, 1f, 1f) }.build()
@@ -286,11 +286,19 @@ class MatchRenderer(
         shake = max(0f, shake - dt)
         val sx = if (shake > 0f) (rng.nextFloat() - 0.5f) * shake * 0.9f else 0f
         val sz = if (shake > 0f) (rng.nextFloat() - 0.5f) * shake * 0.9f else 0f
-        val pitch = Math.toRadians(PITCH.toDouble())
+        // After the player's super the camera eases back and tilts up for a moment, to watch the streak it fires go up
+        // into the sky (the user's idea), then settles again.
+        val sl = time - skyLookAt
+        val sky = when { sl < 0f || sl > SKY_STREAK_SUPER -> 0f; sl < 0.35f -> sl / 0.35f; sl < 1.25f -> 1f; else -> 1f - (sl - 1.25f) / (SKY_STREAK_SUPER - 1.25f) }
+        val e = sky * sky * (3f - 2f * sky)
+        // (Looking up with the streak as it climbs: lower and further back, aimed up into the air above the fighter.)
+        val climb = (sl / 0.55f).coerceIn(0f, 1f)
+        val pitch = Math.toRadians((PITCH - 30f * e).toDouble())
+        val d2 = dist + 7f * e
         eyeX = camX + sx
-        eyeY = (dist * sin(pitch)).toFloat()
-        eyeZ = camZ + (dist * cos(pitch)).toFloat() + sz
-        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, camX + sx, 0f, camZ + sz, 0f, 1f, 0f)
+        eyeY = (d2 * sin(pitch)).toFloat()
+        eyeZ = camZ + (d2 * cos(pitch)).toFloat() + sz
+        Matrix.setLookAtM(view, 0, eyeX, eyeY, eyeZ, camX + sx, (3f + 4f * climb) * e, camZ + sz - 1.5f * e, 0f, 1f, 0f)
         Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
 
         // Shadow camera follows the view target.
@@ -301,6 +309,8 @@ class MatchRenderer(
 
     /** Same distance on every device: equal vertical view for fairness; wider screens just see more sideways. */
     private fun distance() = CAMERA_DISTANCE
+    /** When the player last fired a super (the camera's look up to the sky, see [updateCamera]). */
+    private var skyLookAt = -100f
 
     // ------------------------------------------------------------------ passes
 
@@ -413,6 +423,7 @@ class MatchRenderer(
         GLES30.glDisable(GLES30.GL_CULL_FACE)
 
         drawFadingFighters(alpha)
+        drawGlitchGhosts(alpha)
 
         // Projectiles (solid cores)
         drawProjectileCores(alpha)
@@ -487,7 +498,7 @@ class MatchRenderer(
         for (f in world.fighters) {
             if (!f.alive || shownVis[f.id] < 0.999f || !inView(f.x, f.y) || f.inTempest) continue
             poseFor(f)
-            block(f, lerp(f.prevX, f.x, alpha), lerp(f.prevY, f.y, alpha), shownFacing[f.id])
+            block(f, lerp(f.prevX, f.x, alpha) + glitchJolt(f.id), lerp(f.prevY, f.y, alpha), shownFacing[f.id])
         }
     }
 
@@ -726,6 +737,32 @@ class MatchRenderer(
         lit.mat4("uModel", model)
     }
 
+    /**
+     * Like [setModelUpright] for Dimension's portal ring: stood up, its middle [y] above the ground under ([x], [z]),
+     * then leaned back by [PORTAL_LEAN] about that ground line, so that from the game's camera (looking down at
+     * [PITCH]) it faces the player instead of looking squashed (the user found the straight-up ring "too straight and
+     * too down"). [dz] moves it toward the camera before the lean.
+     */
+    private fun setModelPortal(x: Float, y: Float, z: Float, sx: Float, sy: Float, sz: Float, rollDeg: Float = 0f, dz: Float = 0f) {
+        Matrix.setIdentityM(model, 0)
+        Matrix.translateM(model, 0, x, 0f, z)
+        Matrix.rotateM(model, 0, -PORTAL_LEAN, 1f, 0f, 0f)
+        Matrix.translateM(model, 0, 0f, y, dz)
+        if (rollDeg != 0f) Matrix.rotateM(model, 0, rollDeg, 0f, 0f, 1f)
+        Matrix.rotateM(model, 0, 90f, 1f, 0f, 0f)
+        Matrix.scaleM(model, 0, sx, sy, sz)
+        lit.mat4("uModel", model)
+    }
+
+    /** Where a point on the portal's plane ([py] up, [pz] out of it) ends up once the ring is leaned back, as (y, z offset). */
+    private fun leanPoint(py: Float, pz: Float, out: FloatArray = leanOut): FloatArray {
+        val l = Math.toRadians(PORTAL_LEAN.toDouble())
+        out[0] = (py * kotlin.math.cos(l) + pz * kotlin.math.sin(l)).toFloat()
+        out[1] = (-py * kotlin.math.sin(l) + pz * kotlin.math.cos(l)).toFloat()
+        return out
+    }
+    private val leanOut = FloatArray(2)
+
     /** How open the gate is (0 shut, 1 fully awake), from when the chained soul was freed. */
     private fun gateWake(run: io.github.projectwip.sim.PortalRun): Float =
         if (run.state == io.github.projectwip.sim.PortalState.OPEN && run.freedAt >= 0f) ((run.time - run.freedAt) / 1.2f).coerceIn(0f, 1f) else 0f
@@ -750,13 +787,13 @@ class MatchRenderer(
             lit.v4("uTint", lerp(0.3f, 0.45f + 0.55f * c[0], wake), lerp(0.25f, 0.3f + 0.6f * c[1], wake), lerp(0.45f, 0.6f + 0.4f * c[2], wake), 1f)
         } else { lit.f("uEmissive", 0.05f); lit.v4("uTint", 0.34f * dl[0], 0.28f * dl[1], 0.5f * dl[2], 1f) }
         lit.f("uRim", 0.5f)
-        setModelUpright(x, PORTAL_CY, z, PORTAL_RX / 1.62f, 2.2f, PORTAL_RY / 1.62f); portalRing.draw()
+        setModelPortal(x, PORTAL_CY, z, PORTAL_RX / 1.62f, 2.2f, PORTAL_RY / 1.62f); portalRing.draw()
         // A second, thinner ring just inside it, turning the other way round the colours.
         if (wake > 0f) {
             val c = hue(time * 0.22f + 0.5f)
             lit.f("uEmissive", 0.8f * wake)
             lit.v4("uTint", 0.4f + 0.6f * c[0], 0.3f + 0.7f * c[1], 0.5f + 0.5f * c[2], 1f)
-            setModelUpright(x, PORTAL_CY, z + 0.08f, PORTAL_RX * 0.88f / 1.62f, 0.8f, PORTAL_RY * 0.88f / 1.62f); portalRing.draw()
+            setModelPortal(x, PORTAL_CY, z, PORTAL_RX * 0.88f / 1.62f, 0.8f, PORTAL_RY * 0.88f / 1.62f, dz = 0.08f); portalRing.draw()
         }
         // Lights set all round the ring: dim violet asleep; awake, a rainbow chasing round it.
         val n = 30
@@ -767,7 +804,8 @@ class MatchRenderer(
             lit.f("uEmissive", 0.35f + 0.65f * wake)
             lit.v4("uTint", lerp(0.4f, c[0], wake), lerp(0.28f, c[1], wake), lerp(0.75f, c[2], wake), 1f)
             val sz = 0.09f + 0.05f * pulse * wake
-            setModel(x + cos(ang) * PORTAL_RX, PORTAL_CY + sin(ang) * PORTAL_RY, z + 0.2f, sz, sz * 1.6f, sz, ang * 57.3f + time * 90f); octa.draw()
+            val lp = leanPoint(PORTAL_CY + sin(ang) * PORTAL_RY, 0.2f)
+            setModel(x + cos(ang) * PORTAL_RX, lp[0], z + lp[1], sz, sz * 1.6f, sz, ang * 57.3f + time * 90f); octa.draw()
         }
         lit.f("uEmissive", 0f)
         lit.v4("uTint", 1f, 1f, 1f, 1f)
@@ -780,27 +818,27 @@ class MatchRenderer(
         val run = world.portal ?: return
         if (!inView(run.x, run.y)) return
         val wake = gateWake(run)
-        val x = run.x; val y = PORTAL_CY; val z = run.y + 0.02f
+        val x = run.x; val y = PORTAL_CY; val z = run.y
         val sx = PORTAL_RX * 0.92f; val sz = PORTAL_RY * 0.92f
         if (wake < 1f) {
             lit.v4("uTint", 0.07f, 0.03f, 0.14f, 0.9f * (1f - wake))
-            setModelUpright(x, y, z, sx, 1f, sz); sector(360f).draw()
+            setModelPortal(x, y, z, sx, 1f, sz, dz = 0.02f); sector(360f).draw()
             lit.v4("uTint", 0.5f, 0.35f, 0.85f, (0.2f + 0.06f * sin(time * 2f)) * (1f - wake))
-            setModelUpright(x, y, z + 0.01f, sx * 0.8f, 1f, sz * 0.8f, time * 12f); arc(280f, 0.03f).draw()
+            setModelPortal(x, y, z, sx * 0.8f, 1f, sz * 0.8f, time * 12f, dz = 0.03f); arc(280f, 0.03f).draw()
         }
         if (wake <= 0f) return
         lit.v4("uTint", 0.04f, 0.01f, 0.08f, 0.95f * wake)
-        setModelUpright(x, y, z, sx, 1f, sz); sector(360f).draw()
+        setModelPortal(x, y, z, sx, 1f, sz, dz = 0.02f); sector(360f).draw()
         // Arms of colour winding in toward the middle, each a different hue, the whole wheel turning.
         for (k in 0 until 8) {
             val rr = 1f - k * 0.11f
             val c = hue(time * 0.3f + k * 0.125f)
             lit.v4("uTint", 0.35f + 0.65f * c[0], 0.2f + 0.6f * c[1], 0.55f + 0.45f * c[2], (0.95f - k * 0.07f) * wake)
-            setModelUpright(x, y, z + 0.01f + k * 0.004f, sx * rr, 1f, sz * rr, time * (if (k % 2 == 0) 110f else -150f) + k * 40f)
+            setModelPortal(x, y, z, sx * rr, 1f, sz * rr, time * (if (k % 2 == 0) 110f else -150f) + k * 40f, dz = 0.03f + k * 0.004f)
             arc(220f, 0.13f).draw()
         }
         lit.v4("uTint", 1f, 0.95f, 1f, 0.9f * wake)
-        setModelUpright(x, y, z + 0.05f, 0.24f + 0.05f * sin(time * 6f), 1f, 0.18f + 0.04f * sin(time * 6f)); sector(360f).draw()
+        setModelPortal(x, y, z, 0.24f + 0.05f * sin(time * 6f), 1f, 0.18f + 0.04f * sin(time * 6f), dz = 0.07f); sector(360f).draw()
         // A rainbow glow on the ground in front of it, and motes drawn into it.
         val c = hue(time * 0.2f)
         lit.v4("uTint", 0.6f + 0.4f * c[0], 0.5f + 0.4f * c[1], 1f, 0.22f * wake)
@@ -809,7 +847,8 @@ class MatchRenderer(
             val a = rng.nextFloat() * 6.283f
             val cc = hue(rng.nextFloat())
             val col = (0xFF shl 24) or ((cc[0] * 255).toInt() shl 16) or ((cc[1] * 255).toInt() shl 8) or (cc[2] * 255).toInt()
-            particles.spawn(x + cos(a) * PORTAL_RX * 1.15f, y + sin(a) * PORTAL_RY * 1.15f, z + 0.1f, -cos(a) * 2.2f, -sin(a) * 1.5f, 0f, 0.6f, 0.1f, col, 0.9f)
+            val lp = leanPoint(y + sin(a) * PORTAL_RY * 1.15f, 0.1f)
+            particles.spawn(x + cos(a) * PORTAL_RX * 1.15f, lp[0], z + lp[1], -cos(a) * 2.2f, -sin(a) * 1.3f, 0f, 0.6f, 0.1f, col, 0.9f)
         }
     }
 
@@ -959,17 +998,18 @@ class MatchRenderer(
             val dt = frameDt.coerceAtMost(0.05f)
             var speed = 0f
             if (since > 1.2f) {
-                // Keep a step behind the player: walk toward a spot 1.3 tiles back from them, quicker when far.
-                val px = lerp(p.prevX, p.x, 1f); val pz = lerp(p.prevY, p.y, 1f)
+                // Keep a couple of steps behind the player, off to one side: never pressed up against them.
+                val px = lerp(p.prevX, p.x, 1f) - cos(p.facing) * 1.2f + sin(p.facing) * 1.4f
+                val pz = lerp(p.prevY, p.y, 1f) - sin(p.facing) * 1.2f - cos(p.facing) * 1.4f
                 val dx = px - followX; val dz = pz - followZ
                 val d = hypot(dx, dz)
-                if (d > 1.3f) {
-                    val step = minOf(d - 1.3f, (3.2f + d) * dt)
+                if (d > 0.6f) {
+                    val step = minOf(d - 0.6f, (3.2f + d) * dt)
                     followX += dx / d * step; followZ += dz / d * step
                     speed = step / maxOf(dt, 0.001f)
                     followFacing = atan2(dz, dx)
                     followWalk += dt * 9f
-                } else followFacing = atan2(dz, dx)
+                } else followFacing = atan2(p.y - followZ, p.x - followX)
             }
             followSpeed = speed
         }
@@ -1006,6 +1046,252 @@ class MatchRenderer(
     private var followWalk = 0f
     private var followSpeed = 0f
 
+
+    // ------------------------------------------------------------------ the Entity's energy (the user's lore, build 108)
+
+    /** How brightly each fighter's streaks are flaring (1 just after a super or a hypercharge), fading. */
+    private val flare = FloatArray(io.github.projectwip.match.HudSnapshot.MAX)
+    /** Streaks fired up into the sky by an attack or a super: x, z, start time, strength, and the shoulder side. */
+    private val skyStreaks = ArrayList<FloatArray>()
+    /** A round tube along Y (one unit long, one unit across) for the streaks. */
+    private val tube: Mesh by lazy { MeshBuilder().apply { color(1f, 1f, 1f); cylinder(0.5f, 1f, 8) }.build() }
+
+    /** When each fighter last attacked, and how hard (a super is 1): the glitch flicker on every attack. */
+    private val attackGlitchAt = FloatArray(io.github.projectwip.match.HudSnapshot.MAX) { -100f }
+    private val attackGlitchSize = FloatArray(io.github.projectwip.match.HudSnapshot.MAX)
+
+    private fun energyFlare(id: Int, amount: Float, sky: Boolean) {
+        if (id !in flare.indices) return
+        flare[id] = maxOf(flare[id], amount)
+        if (sky) { attackGlitchAt[id] = time; attackGlitchSize[id] = amount }
+        if (sky && amount >= 1f && id == match.player.id) skyLookAt = time
+        val f = world.fighter(id) ?: return
+        if (!inView(f.x, f.y)) return
+        // The flare bursts out of the streaks themselves: sparks thrown off along the four lines.
+        val n = (8 + 22 * amount).toInt()
+        for (k in 0 until n) {
+            streakPoint(f, f.x, f.y, shownFacing[id], k % 4, 0.3f + 0.7f * rng.nextFloat())
+            val ox = streakOut[0] - f.x; val oz = streakOut[2] - f.y
+            val d = hypot(ox, oz).coerceAtLeast(0.01f)
+            val sp = 2f + rng.nextFloat() * 3.5f * amount
+            particles.spawn(streakOut[0], streakOut[1], streakOut[2], ox / d * sp, 0.5f + rng.nextFloat() * 2.5f, oz / d * sp, 0.35f + 0.3f * amount, 0.07f + 0.05f * amount,
+                if (k % 3 == 0) 0xFFFFFFFF.toInt() else 0xFF5CC8FF.toInt(), 1f)
+        }
+        // And a streak fires up into the sky (the user's idea), from a shoulder, bigger for a super.
+        if (sky) skyStreaks += floatArrayOf(f.x, f.y, time, amount, if (rng.nextBoolean()) 1f else -1f, shownFacing[id])
+    }
+
+    /**
+     * How hard a fighter is glitching right now (0..1): every attack (a quarter of a second) and every super (more than
+     * half a second, harder) glitches them, the user's lore; and a fighter the Entity has taken over (`glitchLeft`)
+     * glitches on and off the whole time.
+     */
+    private fun glitchAmount(id: Int): Float {
+        var g = 0f
+        if (id in attackGlitchAt.indices) {
+            val a = time - attackGlitchAt[id]
+            val len = 0.25f + 0.4f * attackGlitchSize[id]
+            if (a in 0f..len) g = (0.55f + 0.45f * attackGlitchSize[id]) * (1f - a / len * 0.5f)
+        }
+        val f = world.fighter(id)
+        if (f != null && f.glitchLeft > 0f && (time * 7f + id).toInt() % 3 != 0) g = maxOf(g, 0.8f)
+        return g
+    }
+
+    /**
+     * The glitch, drawn: the fighter torn into colour, a cyan copy of them pulled one way and a magenta copy the other,
+     * jumping about, for as long as [glitchAmount] says. (Flat see-through silhouettes over the fighter, like the
+     * x-ray pass.)
+     */
+    private fun drawGlitchGhosts(alpha: Float) {
+        var any = false
+        for (f in world.fighters) if (f.alive && glitchAmount(f.id) > 0f) { any = true; break }
+        if (!any) return
+        GLES30.glEnable(GLES30.GL_BLEND)
+        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+        GLES30.glDisable(GLES30.GL_DEPTH_TEST)
+        GLES30.glDepthMask(false)
+        lit.i("uMode", 2)
+        forEachSolidFighter(alpha) { f, x, z, facing ->
+            val g = glitchAmount(f.id)
+            if (g <= 0f) return@forEachSolidFighter
+            val tick = (time * 24f).toInt()
+            val jump = 0.15f + 0.3f * g * siteHash(f.id, tick, 4)
+            val dz = (siteHash(f.id, tick, 5) - 0.5f) * 0.3f * g
+            lit.v4("uTint", 0.1f, 0.9f, 1f, 0.75f * g)
+            models.draw(lit, f.def, f.skin, x + jump, z + dz, facing, anim, Pass.SILHOUETTE)
+            lit.v4("uTint", 1f, 0.15f, 0.8f, 0.7f * g)
+            models.draw(lit, f.def, f.skin, x - jump, z - dz, facing, anim, Pass.SILHOUETTE)
+        }
+        lit.i("uMode", 0)
+        lit.v4("uTint", 1f, 1f, 1f, 1f)
+        GLES30.glDepthMask(true)
+        GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+        GLES30.glDisable(GLES30.GL_BLEND)
+    }
+
+    /** A glitching fighter (the Entity has them, `Fighter.glitchLeft`) jolts sideways, on and off. */
+    private fun glitchJolt(id: Int): Float {
+        // Every attack and super glitches the fighter for a blink (longer for a super): the Entity is in them.
+        if (id in attackGlitchAt.indices) {
+            val a = time - attackGlitchAt[id]
+            val len = 0.25f + 0.4f * attackGlitchSize[id]
+            if (a in 0f..len) return (0.1f + 0.12f * attackGlitchSize[id]) * (if ((a * 30f).toInt() % 2 == 0) 1f else -1f)
+        }
+        val f = world.fighter(id) ?: return 0f
+        if (f.glitchLeft <= 0f) return 0f
+        return if ((time * 9f + id).toInt() % 3 == 0) 0.14f * sin(time * 95f) else 0f
+    }
+
+    private val streakOut = FloatArray(3)
+
+    /**
+     * A point on one of a fighter's four streak lines ([line] 0..3; two to each shoulder), [u] along it (the user's
+     * design): from 0 to [CONVERGE] the line comes down out of the air above them (thin feeder streaks converge into
+     * it there, see [drawEnergyStreaks]) to the top of a shoulder; to [AROUND] it goes once round that shoulder; then
+     * it swirls down round the torso to the waist, wide enough to stay clear of the body. Turns with the fighter.
+     */
+    private fun streakPoint(f: Fighter, x: Float, z: Float, facing: Float, line: Int, u: Float, spread: Float = 0f) {
+        val sc = FIGHTER_SCALE * f.scale
+        val side = if (line < 2) 1f else -1f
+        val sub = if (line % 2 == 0) 1f else -1f
+        val sideAng = facing + side * 1.5708f
+        val sx = x + cos(sideAng) * 0.3f * sc; val sz = z + sin(sideAng) * 0.3f * sc; val sy = 0.95f * sc
+        when {
+            u <= CONVERGE -> {
+                // From high above and out to that side, curving down onto the shoulder.
+                val v = u / CONVERGE
+                val back = facing + 3.1416f
+                val tx = sx + cos(sideAng) * 0.12f * sc + cos(back) * (0.18f + 0.12f * sub) * sc
+                val tz = sz + sin(sideAng) * 0.12f * sc + sin(back) * (0.18f + 0.12f * sub) * sc
+                val ty = sy + 1.25f * sc
+                val w = 1f - (1f - v) * (1f - v)
+                val drift = (1f - v) * spread * 0.18f * sc
+                streakOut[0] = tx + (sx - tx) * w + cos(facing) * drift + 0.03f * sin(time * 2.5f + line + v * 6f)
+                streakOut[1] = ty + (sy + 0.12f * sc - ty) * v
+                streakOut[2] = tz + (sz - tz) * w + sin(facing) * drift
+            }
+            u <= AROUND -> {
+                // Once round the shoulder: a loop about the shoulder's own axis.
+                val v = (u - CONVERGE) / (AROUND - CONVERGE)
+                val a = v * 6.2832f * sub + 1.5708f
+                val r = 0.16f * sc
+                val fx = cos(facing); val fz = sin(facing)
+                streakOut[0] = sx + fx * cos(a) * r + cos(sideAng) * 0.05f * sc
+                streakOut[1] = sy + sin(a) * r
+                streakOut[2] = sz + fz * cos(a) * r + sin(sideAng) * 0.05f * sc
+            }
+            else -> {
+                // Down round the torso, a turn and a quarter, flowing; the shoulder end stays put.
+                val v = (u - AROUND) / (1f - AROUND)
+                val ang = sideAng + sub * v * (7.8f + 0.4f * sin(time * 0.7f + line)) + sub * v * time * 0.35f
+                val r = sc * (0.38f + 0.16f * v) * (1f + 0.03f * sin(time * 3f + v * 10f + line))
+                streakOut[0] = x + cos(ang) * r
+                streakOut[1] = sy - v * 0.5f * sc
+                streakOut[2] = z + sin(ang) * r
+            }
+        }
+    }
+
+    /**
+     * The Entity's energy in every fighter (the user's design), as glow (one additive sprite batch, so it costs next to
+     * nothing): each of the four lines is a trail of soft blue light, two faint feeder streaks converging into it above
+     * the shoulder; and comets ride them, bright blue heads with white-hot cores and fading tails, rising from the waist
+     * round the torso, up through the shoulder and away into the air. They flare when a power is used and blaze while
+     * the fighter is glitching. An attack or a super fires a streak up into the sky.
+     */
+    private fun addEnergySprites(alpha: Float) {
+        val dt = frameDt.coerceAtMost(0.05f)
+        for (i in flare.indices) flare[i] = maxOf(0f, flare[i] - dt * 1.6f)
+        for (f in world.fighters) {
+            if (!f.alive || shownVis[f.id] < 0.5f || f.inTempest || f.isLeaping) continue
+            val x = lerp(f.prevX, f.x, alpha) + glitchJolt(f.id)
+            val z = lerp(f.prevY, f.y, alpha)
+            if (!inView(x, z)) continue
+            val sc = FIGHTER_SCALE * f.scale
+            val glitching = if (f.glitchLeft > 0f) 0.8f + 0.2f * sin(time * 30f) else 0f
+            val boost = maxOf(flare[f.id], if (f.hyperActive) 0.5f else 0f, glitching)
+            val facing = shownFacing[f.id]
+            for (line in 0..3) {
+                // The line: a trail of soft light along the whole path.
+                val n = 11
+                for (k in 0..n) {
+                    val u = CONVERGE * 0.35f + (1f - CONVERGE * 0.35f) * k / n
+                    streakPoint(f, x, z, facing, line, u)
+                    sprites.add(streakOut[0], streakOut[1], streakOut[2], 0.18f * sc, 0.25f, 0.55f, 1f, 0.09f + 0.14f * boost)
+                }
+                // The feeders, converging into it above the shoulder.
+                for (feeder in floatArrayOf(-1f, 1f)) for (k in 0..2) {
+                    streakPoint(f, x, z, facing, line, CONVERGE * k / 3f, feeder)
+                    sprites.add(streakOut[0], streakOut[1], streakOut[2], 0.11f * sc, 0.3f, 0.6f, 1f, 0.07f + 0.12f * boost)
+                }
+                // A comet, rising: from the waist (u = 1) round the body, up through the shoulder and away (u -> 0).
+                val head = 1f - ((time * (0.28f + 0.35f * boost) + line * 0.25f + f.id * 0.17f) % 1f)
+                for (k in 0..7) {
+                    val tu = (head + k * 0.03f).coerceAtMost(1f)
+                    streakPoint(f, x, z, facing, line, tu)
+                    val fade = 1f - k / 8f
+                    sprites.add(streakOut[0], streakOut[1], streakOut[2], (0.12f + 0.16f * fade) * sc, 0.35f + 0.4f * fade, 0.7f + 0.25f * fade, 1f, (0.08f + 0.22f * fade) * (0.8f + 0.2f * boost))
+                }
+                streakPoint(f, x, z, facing, line, head)
+                sprites.add(streakOut[0], streakOut[1], streakOut[2], 0.38f * sc * (1f + 0.3f * boost), 0.3f, 0.6f, 1f, 0.14f + 0.12f * boost)
+                sprites.add(streakOut[0], streakOut[1], streakOut[2], 0.14f * sc, 0.75f, 0.92f, 1f, 0.42f)
+            }
+        }
+    }
+
+    /**
+     * Streaks fired into the sky, drawn in a batch of their own with no depth test, so nothing (Swish's tornado, a
+     * wall, the fighter) hides them on their way up.
+     */
+    private fun addSkyStreaks() {
+        // Streaks fired into the sky: a bolt of blue light leaving the shoulder and rising almost straight up, a bright
+        // head and a long tail, sparks shed along it (the user's idea; the camera looks up to it after a super).
+        var i = 0
+        while (i < skyStreaks.size) {
+            val st = skyStreaks[i]
+            val age = time - st[2]
+            val life = if (st[3] >= 1f) SKY_STREAK_SUPER else 0.7f
+            if (age > life) { skyStreaks.removeAt(i); continue }
+            i++
+            val big = st[3] >= 1f
+            val sideAng = st[5] + st[4] * 1.5708f
+            val x0 = st[0] + cos(sideAng) * 0.38f; val z0 = st[1] + sin(sideAng) * 0.38f; val y0 = 1.25f
+            val top = if (big) 16f else 8f
+            val x1 = x0 + cos(sideAng) * 0.8f; val z1 = z0 - (if (big) 2.5f else 2f); val y1 = top
+            val rise = if (big) 0.55f else 0.28f
+            val headU = (age / rise).coerceAtMost(1f)
+            val tailU = ((age - rise * 0.5f) / (life - rise * 0.5f)).coerceIn(0f, 1f)
+            val a = (1f - ((age - rise) / (life - rise)).coerceIn(0f, 1f) * 0.9f)
+            val segs = if (big) 40 else 18
+            for (k in 0..segs) {
+                val u = tailU + (headU - tailU) * k / segs
+                val nx = x0 + (x1 - x0) * u + 0.08f * sin(u * 18f + st[2] * 5f); val ny = y0 + (y1 - y0) * u; val nz = z0 + (z1 - z0) * u
+                val near = k / segs.toFloat()
+                val w = if (big) 0.45f + 0.5f * near else 0.25f + 0.25f * near
+                sprites.add(nx, ny, nz, w, 0.45f + 0.5f * near, 0.8f + 0.2f * near, 1f, a * (0.35f + 0.65f * near))
+            }
+            // The head.
+            val hx = x0 + (x1 - x0) * headU; val hy = y0 + (y1 - y0) * headU; val hz = z0 + (z1 - z0) * headU
+            sprites.add(hx, hy, hz, if (big) 2.2f else 1f, 0.5f, 0.85f, 1f, a * 0.6f)
+            sprites.add(hx, hy, hz, if (big) 0.8f else 0.4f, 1f, 1f, 1f, a)
+            if (big && headU < 1f && rng.nextFloat() < 0.8f)
+                particles.spawn(hx, hy, hz, (rng.nextFloat() - 0.5f) * 3f, -1f, (rng.nextFloat() - 0.5f) * 3f, 0.8f, 0.12f, 0xFF8FD8FF.toInt(), 1f)
+        }
+    }
+
+    /** A round bar from one point to another (the streaks' segments). */
+    private fun tubeSegment(x0: Float, y0: Float, z0: Float, x1: Float, y1: Float, z1: Float, thick: Float) {
+        val dx = x1 - x0; val dy = y1 - y0; val dz = z1 - z0
+        val len = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz).coerceAtLeast(0.001f)
+        Matrix.setIdentityM(model, 0)
+        Matrix.translateM(model, 0, (x0 + x1) / 2f, (y0 + y1) / 2f, (z0 + z1) / 2f)
+        Matrix.rotateM(model, 0, -Math.toDegrees(atan2(dz.toDouble(), dx.toDouble())).toFloat(), 0f, 1f, 0f)
+        Matrix.rotateM(model, 0, Math.toDegrees(atan2(dy.toDouble(), hypot(dx, dz).toDouble())).toFloat() - 90f, 0f, 0f, 1f)
+        Matrix.scaleM(model, 0, thick, len + thick * 0.8f, thick)
+        lit.mat4("uModel", model)
+        tube.draw()
+    }
 
     /** Dimension: a beam of light over each echo still to find, and a ring on the ground under it (decal pass). */
     private fun drawShardMarks() {
@@ -1979,6 +2265,7 @@ class MatchRenderer(
         }
         for (pk in world.pickups) sprites.add(pk.x, 0.6f + sin(time * 3f + pk.x) * 0.12f, pk.y, 0.9f, 1f, 0.85f, 0.3f, 0.6f)
         for (l in arena.lamps) sprites.add(l[0], l[1], l[2], 1.1f + 0.05f * sin(time * 3f + l[0]), 1f, 0.9f, 0.55f, 0.55f)
+        addEnergySprites(alpha)
         // Super-ready shimmer on the player
         val p = match.player
         if (p.alive && p.superReady) {
@@ -2009,6 +2296,13 @@ class MatchRenderer(
         }
         particles.emit(sprites, true)
         sprites.flush()
+        if (skyStreaks.isNotEmpty()) {
+            GLES30.glDisable(GLES30.GL_DEPTH_TEST)
+            sprites.begin()
+            addSkyStreaks()
+            sprites.flush()
+            GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+        }
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
         sprites.begin()
         particles.emit(sprites, false)
@@ -2044,6 +2338,7 @@ class MatchRenderer(
         val pid = match.player.id
         when (e) {
             is GameEvent.Shot -> {
+                energyFlare(e.fighterId, if (e.isSuper) 1f else 0.4f, sky = true)
                 val f = world.fighter(e.fighterId) ?: return
                 if (e.isSuper && f.def.superSpec.kind == SuperKind.QUAKE) hammerAt[f.id] = time
                 val c = if (e.isSuper) 0xFFFFD640.toInt() else f.def.skins[f.skin].accent.toInt()
@@ -2233,7 +2528,7 @@ class MatchRenderer(
                     particles.spawn(t.x, 0.3f, t.y, cos(a) * 4f, 0.5f, sin(a) * 4f, 0.4f, 0.2f, c, 0.95f)
                 }
             }
-            is GameEvent.Hyper -> world.fighter(e.fighterId)?.let { f ->
+            is GameEvent.Hyper -> world.fighter(e.fighterId)?.also { energyFlare(it.id, 1f, sky = false) }?.let { f ->
                 if (f === match.player) shake = max(shake, 0.12f)
                 // It catches light: a flash, a ring of fire thrown outwards, and a column of flame going up.
                 particles.spawn(f.x, 0.8f, f.y, 0f, 0f, 0f, 0.4f, 4.5f, 0xFFFFE27A.toInt(), 0.9f)
@@ -2299,6 +2594,10 @@ class MatchRenderer(
                     particles.spawn(e.x, 0.5f + rng.nextFloat(), e.y, cos(a) * 3f, 1f, sin(a) * 3f, 0.3f, 0.1f, 0xFFDDF4FF.toInt(), 1f)
                 }
                 if (e.targetId == pid) shake = max(shake, 0.12f)
+            }
+            is GameEvent.Glitched -> {
+                energyFlare(e.fighterId, 1f, sky = false)
+                if (e.fighterId == pid) shake = max(shake, 0.3f)
             }
             is GameEvent.ShardFound -> {
                 particles.spawn(e.x, 1f, e.y, 0f, 0f, 0f, 0.4f, 3f, 0xFFBFF6FF.toInt(), 0.9f)
@@ -2399,6 +2698,7 @@ class MatchRenderer(
                 }
             }
         }
+        s.playerGlitch = p.glitchLeft
         s.timesDown = p.deaths
         s.practice = w.rules.practice
         s.damage = p.damageDealt
@@ -2476,7 +2776,14 @@ class MatchRenderer(
         /** Dimension's portal ring: its half-width and half-height, and how high its middle stands. */
         const val PORTAL_RX = 2.15f
         const val PORTAL_RY = 1.4f
-        const val PORTAL_CY = 1.45f
+        const val PORTAL_CY = 1.42f
+        /** How far the ring leans back from upright, toward the camera's line of sight (it looks down at [PITCH]). */
+        const val PORTAL_LEAN = 30f
+        /** How long a super's streak into the sky lasts (and the camera's look up to it). */
+        const val SKY_STREAK_SUPER = 2.0f
+        /** Where along a streak line it reaches the shoulder, and where it has gone round it (see `streakPoint`). */
+        const val CONVERGE = 0.3f
+        const val AROUND = 0.45f
         /** How long each thing a freed soul says stays up. */
         const val FOLLOW_LINE_SECONDS = 4.2f
         /** A freed soul starts talking once the Void's taunt at the moment of freeing has faded (it lasts 5 s). */

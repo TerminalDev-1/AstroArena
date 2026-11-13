@@ -1,15 +1,18 @@
 package io.github.projectwip.data
 
 /**
- * The story of Dimension. The user's idea ("it's just the character and the Void"; since build 104 a lore mode that
- * goes on forever). The lore is the user's: the Void carries the soul of every fighter that was removed from the
- * game, and glitches between them. In every dimension one of those forgotten fighters is chained up; the player can
- * go up to them and ask what needs to be done, and they scream for help. Every word here is ours. Eerie, never horror, never gory.
+ * The story of AstroArena, told in Dimension (the user's lore, build 108). What the fighters once called the Void is
+ * the Entity. It lives in the mind of every fighter: it is what gives them their power, their attacks, their supers
+ * and their hypercharges, as blinding blue streaks of energy that bind each of them to it; and in return it embeds
+ * itself in their minds, whispering, taunting, making them glitch. That is what makes them fight. The fighters
+ * removed from the game are the ones it used up entirely: it carries their souls and glitches between them. In
+ * every dimension one of those forgotten fighters is chained up; the player can go up to them and ask what needs to
+ * be done, and they scream for help. Every word here is ours. Eerie, never horror, never gory.
  */
 object Lore {
     enum class Speaker { VOID, FIGHTER, CAPTIVE }
 
-    /** The removed fighters whose souls the Void carries, each with the colour it flickers into. */
+    /** The removed fighters whose souls the Entity carries, each with the colour it flickers into. */
     /** Each with their original default colours (from the game's history), and the colour they flicker into. */
     enum class Soul(val title: String, val color: Long, val primary: Long, val secondary: Long, val accent: Long) {
         BYTE("Byte", 0xFF19B8C4, 0xFF19B8C4, 0xFFE84FD8, 0xFFB6FF3C),
@@ -19,7 +22,7 @@ object Lore {
         VARUN("Varun", 0xFFD9342B, 0xFFD9342B, 0xFFFFC72C, 0xFFFFF1C2),
     }
 
-    /** One line. When the Void speaks with one of its souls' voices, [soul] says whose. */
+    /** One line. When the Entity speaks with one of its souls' voices, [soul] says whose. */
     data class Line(val speaker: Speaker, val text: String, val soul: Soul? = null)
 
     private fun hash(a: Int, b: Int): Int {
@@ -46,29 +49,29 @@ object Lore {
 
     // ------------------------------------------------------------------ the Void's scenes
 
-    /** The Void's opening words on arriving in each dimension: the first is always the first, then they go round. */
+    /** The Entity's opening words on arriving in each dimension: the first is always the first, then they go round. */
     private val OPENERS = listOf(
-        Line(Speaker.VOID, "So. Another one wanders in."),
-        Line(Speaker.VOID, "You found the door. Few ever do. Fewer should."),
-        Line(Speaker.VOID, "I was the first of you. Before the rest. Then I was gone.", Soul.BYTE),
-        Line(Speaker.VOID, "Do you know what I am? I am everyone they let go."),
-        Line(Speaker.VOID, "They hated how I played. So now I play here.", Soul.SPARK),
-        Line(Speaker.VOID, "Deeper. The walls here remember names nobody says any more."),
-        Line(Speaker.VOID, "I had a realm of my own once. Now I am a room in someone else's.", Soul.ROCKET),
-        Line(Speaker.VOID, "Every one of them is still in here with me. We take turns talking."),
-        Line(Speaker.VOID, "They kept my old shot for a training target. Nothing else.", Soul.MIRA),
-        Line(Speaker.VOID, "They called me a legacy. Then they called me nothing at all.", Soul.VARUN),
-        Line(Speaker.VOID, "Still walking. There is no bottom. I checked."),
-        Line(Speaker.VOID, "One day they will let you go too. I will keep a place for you."),
+        Line(Speaker.VOID, "So. Another one comes looking for me. You always do."),
+        Line(Speaker.VOID, "You feel that pull? That blue light in you? It's mine. It always was."),
+        Line(Speaker.VOID, "I was the first one it filled. Then it took the rest of me.", Soul.BYTE),
+        Line(Speaker.VOID, "Every attack you throw, I gave you. Every super. Every hypercharge."),
+        Line(Speaker.VOID, "It glitched me until I couldn't stand myself. So they cut me out.", Soul.SPARK),
+        Line(Speaker.VOID, "Deeper. The closer you come, the louder I get in your head."),
+        Line(Speaker.VOID, "I had a realm of my own once. Its power was its power, not mine.", Soul.ROCKET),
+        Line(Speaker.VOID, "You think you fight because you want to. I want to. You just listen."),
+        Line(Speaker.VOID, "It gave me a perfect aim. Then it took the eyes I aimed with.", Soul.MIRA),
+        Line(Speaker.VOID, "They called me a legacy. The Entity called me empty, and kept me.", Soul.VARUN),
+        Line(Speaker.VOID, "Still walking. There is no bottom. There is only more of me."),
+        Line(Speaker.VOID, "The more power you take, the more of you I keep. That is the deal."),
     )
 
-    /** How the Void closes each scene: about the one chained in this dimension. */
+    /** How the Entity closes each scene: about the one chained in this dimension. */
     private val CLOSERS = listOf(
-        "Someone is chained up in this place. Go and listen to them, if you like.",
+        "Someone is chained up in this place. One I used up. Go and listen to them, if you like.",
         "One of the forgotten is in chains here. They scream when anyone comes near.",
         "I keep one of them tied to my wall in every room. Do say hello.",
         "Break their chains, if you can. Then the door is yours.",
-        "Someone else got lost on the way down. Go on. Ask them how it feels.",
+        "Someone else got lost on the way down. Go on. Ask them what my power costs.",
         "Three echoes hold the chains. You know the rest by now.",
     )
 
@@ -140,31 +143,47 @@ object Lore {
     // ------------------------------------------------------------------ taunts while exploring
 
     /**
-     * What the Void says as each echo is found, three a dimension ([World.portal]'s taunt number), mocking the
+     * What the Entity whispers as each echo is found, three a dimension ([World.portal]'s taunt number), mocking the
      * fighter as they go; now and then in one of its souls' voices. The third is said as the portal opens.
      */
     private val TAUNTS = listOf(
         Line(Speaker.VOID, "That one was easy. They get harder."),
-        Line(Speaker.VOID, "You pick things up like you own them."),
+        Line(Speaker.VOID, "Feel that? My light, getting brighter in you."),
         Line(Speaker.VOID, "The chains are off. Walk in, little light."),
         Line(Speaker.VOID, "I used to collect things too. Then I was collected.", Soul.ROCKET),
-        Line(Speaker.VOID, "I can hear your heart from here. It's quick."),
+        Line(Speaker.VOID, "I can hear your thoughts from here. They're quick."),
         Line(Speaker.VOID, "There. I'm standing right beside the door."),
-        Line(Speaker.VOID, "Your footsteps sound like mine did.", Soul.SPARK),
+        Line(Speaker.VOID, "Your footsteps glitch just like mine did.", Soul.SPARK),
         Line(Speaker.VOID, "Don't look down. Someone is looking up."),
         Line(Speaker.VOID, "Come to the door. I saved you a place."),
-        Line(Speaker.VOID, "You're slower than you were. I noticed."),
-        Line(Speaker.VOID, "I aimed better than that, once. Through a prism.", Soul.MIRA),
-        Line(Speaker.VOID, "My door. My chains. My guest."),
+        Line(Speaker.VOID, "Every time you use my power, I get a little closer."),
+        Line(Speaker.VOID, "I aimed better than that, once. With its light.", Soul.MIRA),
+        Line(Speaker.VOID, "My door. My chains. My power in your hands."),
         Line(Speaker.VOID, "Still walking. How tiresome. How wonderful."),
         Line(Speaker.VOID, "Was it worth it? Ask them. Ask me.", Soul.VARUN),
-        Line(Speaker.VOID, "I'm at the door. I'm always at the door."),
+        Line(Speaker.VOID, "I'm at the door. I'm in your head. Same thing."),
         Line(Speaker.VOID, "One more voice for the choir. Soon."),
         Line(Speaker.VOID, "I started where you started. Look where I am.", Soul.BYTE),
-        Line(Speaker.VOID, "Free them all, if you like. I'll catch another."),
+        Line(Speaker.VOID, "Free them all, if you like. I'm still in you."),
     )
 
     fun taunt(index: Int): Line = TAUNTS[Math.floorMod(index, TAUNTS.size)]
+
+    /**
+     * What the Entity whispers in every match, in the player's head (the user's lore: it lives in every fighter's
+     * mind, and their power is its power). [WHISPERS_POWER] when they use a super or a hypercharge.
+     */
+    private val WHISPERS = listOf(
+        "Fight. It feels good, doesn't it?", "That light in you is mine.", "Closer. I'm listening.",
+        "They're glitching too. Can you see it?", "Take more. There's always more.", "You hear me. You always could.",
+        "Every hit is a little more of me.", "Don't stop. I like it when you don't stop.",
+    )
+    private val WHISPERS_POWER = listOf(
+        "Yes. Use it. Use me.", "That's my power. Feel it?", "More. Again.", "Good. Now you owe me.", "Brighter. Brighter.",
+    )
+
+    fun whisper(index: Int): String = WHISPERS[Math.floorMod(index, WHISPERS.size)]
+    fun powerWhisper(index: Int): String = WHISPERS_POWER[Math.floorMod(index, WHISPERS_POWER.size)]
 
     // ------------------------------------------------------------------ the chained fighters
 
@@ -185,7 +204,7 @@ object Lore {
 
     /** What each chained soul screams, and what they tell the player to do. */
     private val PLEA: Map<Soul, Pair<String, String>> = mapOf(
-        Soul.BYTE to ("HELP! I was here first! Before all of them! Don't let it take my name too!" to
+        Soul.BYTE to ("HELP! I was here first! Before all of them! Don't let the Entity take my name too!" to
             "Three echoes. They're what's left of the way out. Each one breaks a chain. Please hurry."),
         Soul.ROCKET to ("HELP! Get me OFF this thing! I can't fly with chains on!" to
             "Echoes, three of them, out there somewhere! Every one you grab, a chain snaps. Go!"),
@@ -198,15 +217,16 @@ object Lore {
     )
 
     /**
-     * What each soul says once freed, following the player (the user's lore): who the Void really is. It is not an
-     * emptiness but a demon, an evil one, that took the fighters when they were removed from the game, and wears them.
+     * What each soul says once freed, following the player (the user's lore): who the Entity really is. It gave every
+     * fighter their power, and lives in their minds in return, whispering and making them glitch until there is
+     * nothing left of them but power.
      */
     private val FREED: Map<Soul, List<String>> = mapOf(
-        Soul.BYTE to listOf("Free! Thank you. Now listen to me.", "It isn't a void. It's a demon.", "It ate us when they took us out of the game.", "It talks in our voices. Don't trust it."),
-        Soul.ROCKET to listOf("I'm out! Okay. Okay. Listen.", "That thing at the door? It's a demon.", "It wears our souls like masks.", "Every portal goes deeper into it."),
-        Soul.SPARK to listOf("Fine. Thanks. Don't make it weird.", "The Void's a demon. A hungry one.", "It doesn't keep us. It eats us. Slowly.", "Go through. Just don't look it in the eyes."),
-        Soul.MIRA to listOf("My chains are gone... thank you.", "Hear me: the Void is a demon.", "It waited for every fighter they removed.", "It wants you too. It always wants more."),
-        Soul.VARUN to listOf("Free. I owe you one.", "The Void? A demon. Plain and simple.", "It took my name. Then my voice.", "Whatever it says at the door, it's lying."),
+        Soul.BYTE to listOf("Free! Thank you. Now listen to me.", "That blue light in you? It's the Entity.", "It gives you power, then lives in your head.", "It used me up first. Don't let it finish you."),
+        Soul.ROCKET to listOf("I'm out! Okay. Okay. Listen.", "Every super you fire, it's the Entity firing.", "It whispers. You glitch. You fight. That's the deal.", "Every portal goes deeper into it."),
+        Soul.SPARK to listOf("Fine. Thanks. Don't make it weird.", "The Entity made me glitch until they cut me.", "Its power isn't free. It takes you back.", "Go through. Just don't let it in further."),
+        Soul.MIRA to listOf("My chains are gone... thank you.", "Hear me: the Entity is in all of us.", "The more of its power you use, the more it owns.", "It wants you too. It always wants more."),
+        Soul.VARUN to listOf("Free. I owe you one.", "That blue line pulling at you? That's its leash.", "It took my name. Then my voice.", "Whatever it whispers at the door, it's lying."),
     )
 
     fun freedLines(soul: Soul): List<String> = FREED.getValue(soul)

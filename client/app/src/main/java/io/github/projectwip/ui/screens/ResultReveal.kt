@@ -90,7 +90,7 @@ fun ResultReveal(summary: MatchSummary, onDone: () -> Unit) {
         else -> "DEFEAT" to Palette.Red
     }
     val line = when {
-        dimension && r.deaths > 0 -> "THE VOID KEEPS WHAT IT CATCHES"
+        dimension && r.deaths > 0 -> "THE ENTITY KEEPS WHAT IT CATCHES"
         dimension -> "YOU FOUND YOUR WAY BACK"
         ffa && r.placement == 1 -> "YOU ARE FIRST!"
         ffa -> "YOU PLACED ${ordinal(r.placement)}"

@@ -250,7 +250,7 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
      * Dimension (1.0, the user's idea; a lore mode since build 104): in each dimension a fighter is chained up; find
      * the echoes to break the chains, and a portal opens into a stranger one. It goes on forever. Nothing is won.
      */
-    PORTAL("Dimension", "A story mode · you and the Void · free the chained, go deeper, forever", 1),
+    PORTAL("Dimension", "The Entity's world · free the chained · go deeper, forever", 1),
 }
 
 object Balance {
@@ -407,6 +407,23 @@ object Balance {
     const val CELL_DAMAGE_BONUS = 0.10f
 
     /** Static Storm: waits, then shrinks to [STORM_FINAL_RADIUS] over [STORM_SHRINK_SECONDS]. */
+    /**
+     * The Entity's glitch (the user's lore, build 108): after using a super or a hypercharge, a fighter may glitch, and
+     * for [GLITCH_SECONDS] it fights on its own (the Entity fighting through them).
+     */
+    const val GLITCH_SECONDS = 4f
+    /**
+     * The Entity's pull (`Fighter.entityPull`) fills by these: a little every second, more for every attack, a lot for a
+     * super or a hypercharge. Full, the fighter glitches, every time, as often as it fills: about every 20 to 30
+     * seconds of fighting.
+     */
+    const val GLITCH_PULL_PER_SECOND = 1f / 40f
+    const val GLITCH_PULL_ATTACK = 0.05f
+    const val GLITCH_PULL_SUPER = 0.45f
+    const val GLITCH_PULL_HYPER = 0.45f
+    /** The breather after a glitch before the pull starts filling again. */
+    const val GLITCH_COOLDOWN = 4f
+
     /** Bots don't attack for this long once a match starts (they also hold fire while their spawn shield is up). */
     const val BOT_WARMUP_SECONDS = 4f
 

@@ -47,6 +47,13 @@ class HudView(
     private val floaters = ArrayList<Floater>()
     private val feed = ArrayList<Feed>()
     private var pop = 0f
+    /** The Entity whispering in the player's head (the user's lore): what, how long ago, and when next. */
+    private var whisper: String? = null
+    private var whisperAge = 0f
+    private var nextWhisper = 25f
+    private var whispers = 0
+    private var lastSuper = 0f
+    private var lastHyper = 0f
     private var bannerStart = -1f
     private var last = 0L
     private var time = 0f
@@ -79,6 +86,8 @@ class HudView(
 
         drawOverheads(c)
         drawFloaters(c, dt)
+        drawWhisper(c, dt)
+        drawPossessed(c)
         if (snap.portalRun) drawDimension(c)
         drawHud(c, dt)
         if (snap.phase != Phase.ENDED) controls.draw(c, snap.ammo, snap.ammoMax, snap.superCharge, snap.hyperCharge, snap.hyperLeft, snap.playerAlive && snap.phase == Phase.PLAYING, time)
@@ -179,6 +188,60 @@ class HudView(
     }
 
     // ------------------------------------------------------------------ Dimension
+
+    /**
+     * The Entity whispering to the player (the user's lore: it lives in every fighter's mind and gives them their
+     * power, and taunts them for it): now and then on its own, and when they use a super or a hypercharge. Faint,
+     * blue, under the top of the screen; a letter or two comes out wrong. Not in Dimension, where it already talks.
+     */
+    private fun drawWhisper(c: Canvas, dt: Float) {
+        val s = snap
+        if (s.portalRun || s.phase != Phase.PLAYING) { lastSuper = s.superCharge; lastHyper = s.hyperLeft; return }
+        val usedSuper = lastSuper >= 0.999f && s.superCharge < 0.5f
+        val usedHyper = lastHyper <= 0f && s.hyperLeft > 0f
+        lastSuper = s.superCharge; lastHyper = s.hyperLeft
+        nextWhisper -= dt
+        if ((usedSuper || usedHyper) && (whisper == null || whisperAge > 2.5f)) {
+            whisper = io.github.projectwip.data.Lore.powerWhisper(whispers++); whisperAge = 0f; nextWhisper = maxOf(nextWhisper, 18f)
+        } else if (nextWhisper <= 0f) {
+            whisper = io.github.projectwip.data.Lore.whisper(whispers++); whisperAge = 0f; nextWhisper = 30f + rng.nextFloat() * 30f
+        }
+        val line = whisper ?: return
+        whisperAge += dt
+        if (whisperAge > 3.6f) { whisper = null; return }
+        val a = minOf(whisperAge / 0.5f, 1f, (3.6f - whisperAge) / 0.9f).coerceIn(0f, 1f) * 0.85f
+        text.textSize = dp(16f)
+        text.textSkewX = -0.2f; textStroke.textSkewX = -0.2f
+        val jitter = if ((time * 13f).toInt() % 9 == 0) dp(2f) else 0f
+        outlined(c, glitchText(line, if ((time * 7f).toInt() % 5 == 0) 1f else 0f), width / 2f + jitter, height * 0.3f, withAlpha(Color.rgb(150, 210, 255), a), dp(3f))
+        text.textSize = dp(10f)
+        outlined(c, "THE ENTITY", width / 2f, height * 0.3f - dp(20f), withAlpha(Color.rgb(90, 170, 255), a * 0.8f), dp(2f))
+        text.textSkewX = 0f; textStroke.textSkewX = 0f
+    }
+
+    /**
+     * The player glitching (the user's lore: the Entity takes over and fights through them for a few seconds): a blue
+     * edge closing in, torn bands, and the Entity's words with the seconds left.
+     */
+    private fun drawPossessed(c: Canvas) {
+        val left = snap.playerGlitch
+        if (left <= 0f || snap.phase != Phase.PLAYING) return
+        val w = width.toFloat(); val h = height.toFloat()
+        val a = minOf(1f, left / 0.4f, (io.github.projectwip.data.Balance.GLITCH_SECONDS - left) / 0.25f + 0.3f).coerceIn(0f, 1f)
+        fill.shader = android.graphics.RadialGradient(w / 2, h / 2, maxOf(w, h) * 0.65f, intArrayOf(Color.TRANSPARENT, Color.argb((40 * a).toInt(), 40, 140, 255), Color.argb((170 * a).toInt(), 20, 90, 255)), floatArrayOf(0f, 0.6f, 1f), android.graphics.Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w, h, fill)
+        fill.shader = null
+        val beat = (time * 12f).toInt()
+        for (i in 0 until 3) {
+            val y = ((beat * 7919 + i * 104729) % 1000) / 1000f * h
+            fill.color = Color.argb((70 * a).toInt(), 90, 200, 255)
+            c.drawRect(0f, y, w, y + dp(3f), fill)
+        }
+        text.textSize = dp(22f)
+        outlined(c, glitchText("THE ENTITY HAS YOU", 1f), w / 2 + (if (beat % 4 == 0) dp(3f) else 0f), h * 0.66f, withAlpha(Color.rgb(160, 220, 255), a), dp(4f))
+        text.textSize = dp(13f)
+        outlined(c, "IT FIGHTS FOR YOU · %.1f".format(left), w / 2, h * 0.66f + dp(22f), withAlpha(Color.WHITE, a * 0.9f), dp(3f))
+    }
 
     /** During one of the world's glitch moments, a few letters of a word come out wrong. */
     private fun glitchText(s: String, glitch: Float): String {
@@ -287,7 +350,7 @@ class HudView(
             text.textSize = dp(11f)
             val soul = s.voidSoul
             val asSoul = soul != null && ((time * 2.5f).toInt() % 3 != 0)
-            outlined(c, if (asSoul) "THE VOID · ${soul!!.uppercase()}" else "THE VOID", w / 2, y - dp(14f),
+            outlined(c, if (asSoul) "THE ENTITY · ${soul!!.uppercase()}" else "THE ENTITY", w / 2, y - dp(14f),
                 withAlpha(if (asSoul) s.voidSoulColor or 0xFF000000.toInt() else Color.rgb(185, 140, 255), a), dp(2.5f))
             text.textSize = dp(19f)
             outlined(c, shown, w / 2, y + dp(7f), withAlpha(Color.rgb(232, 220, 255), a), dp(3.5f))
@@ -396,7 +459,7 @@ class HudView(
             if (s.phase == Phase.PLAYING && !s.portalTravel) {
                 val pulse = 0.75f + 0.25f * sin(time * 4f)
                 text.textSize = dp(17f)
-                outlined(c, if (s.portalOpen) "THE VOID WAITS AT THE PORTAL · STEP INSIDE" else "${s.captiveName.uppercase()} IS CHAINED · FIND THE ECHOES",
+                outlined(c, if (s.portalOpen) "THE ENTITY WAITS AT THE PORTAL · STEP INSIDE" else "${s.captiveName.uppercase()} IS CHAINED · FIND THE ECHOES",
                     cx, top + panelH + dp(30f), withAlpha(Color.rgb(205, 180, 255), if (s.portalOpen) pulse else 0.55f), dp(3.5f))
             }
         } else if (s.bossMode) {
@@ -493,7 +556,7 @@ class HudView(
             text.textSize = dp(96f) * big
             outlined(c, n.toString(), cx, h * 0.45f, Color.WHITE, dp(9f))
             text.textSize = dp(21f)
-            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.portalRun) "DIMENSION · YOU AND THE VOID · ONE LIFE" else if (s.bossMode) "BOSS MODE · KNOCK OUT THE BOSS · UNLIMITED LIVES" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
+            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.portalRun) "DIMENSION · YOU AND THE ENTITY · ONE LIFE" else if (s.bossMode) "BOSS MODE · KNOCK OUT THE BOSS · UNLIMITED LIVES" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
         } else if (s.phase == Phase.PLAYING && s.phaseTime < 0.9f) {
             text.textSize = dp(80f) * big
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))

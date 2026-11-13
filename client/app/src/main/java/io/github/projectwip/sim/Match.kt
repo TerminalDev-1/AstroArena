@@ -173,8 +173,68 @@ class Match(val config: MatchConfig) {
         for (f in world.fighters) if (f.isBot && f.def.boss == null && (warmingUp || f.shield > 0f)) {
             f.control.attack = false; f.control.superAttack = false; f.control.hyper = false
         }
+        // A glitching fighter fights on its own: the Entity is in control (the user's lore).
+        for (f in world.fighters) if (f.glitchCooldown > 0f) f.glitchCooldown = maxOf(0f, f.glitchCooldown - dt)
+        for (f in world.fighters) if (f.glitchLeft > 0f) {
+            f.glitchLeft = maxOf(0f, f.glitchLeft - dt)
+            if (f.alive && f.def.boss == null) autoFight(f)
+        }
+        val seen = world.events.size
         world.step(dt)
+        // Using its power draws the Entity in (the user's lore): its pull fills with every attack, super and
+        // hypercharge, and with time once a fighter has started fighting; full, the fighter glitches. It is sure, not a
+        // roll, and it happens as many times as the pull fills: never just once in a match.
+        if (!portalRun) {
+            for (i in seen until world.events.size) {
+                val e = world.events[i]
+                val (id, pull) = when (e) {
+                    is GameEvent.Shot -> e.fighterId to (if (e.isSuper) Balance.GLITCH_PULL_SUPER else Balance.GLITCH_PULL_ATTACK)
+                    is GameEvent.Hyper -> e.fighterId to Balance.GLITCH_PULL_HYPER
+                    else -> continue
+                }
+                val f = world.fighter(id) ?: continue
+                if (f.glitchLeft > 0f || f.glitchCooldown > 0f) continue
+                f.entityPull += pull
+            }
+            for (f in world.fighters) {
+                if (f.def.boss != null || !f.alive || f.glitchLeft > 0f || f.glitchCooldown > 0f) continue
+                // (Time only adds once a fighter has fought: the Training Area's dummies, who never attack, stay put.)
+                if (f.entityPull > 0f) f.entityPull += Balance.GLITCH_PULL_PER_SECOND * dt
+                if (f.entityPull >= 1f) {
+                    f.entityPull = 0f
+                    f.glitchLeft = Balance.GLITCH_SECONDS
+                    f.glitchCooldown = Balance.GLITCH_SECONDS + Balance.GLITCH_COOLDOWN
+                    world.events += GameEvent.Glitched(f.id)
+                }
+            }
+        }
         if (isOver) overFor += dt
+    }
+
+    /**
+     * What a glitching fighter does: goes for the nearest enemy it can see, closes to its attack's reach, aims at them
+     * and attacks as fast as it can, and fires its super when it has one. Only reads what every device and the referee
+     * share, so a replay goes the same way.
+     */
+    private fun autoFight(f: Fighter) {
+        val c = f.control
+        var best: Fighter? = null
+        var bestD = Float.MAX_VALUE
+        for (o in world.fighters) {
+            if (o === f || !o.alive || o.team == f.team || !world.isVisibleTo(o, f.team)) continue
+            val d = kotlin.math.hypot(o.x - f.x, o.y - f.y)
+            if (d < bestD) { bestD = d; best = o }
+        }
+        c.attack = false; c.superAttack = false; c.hyper = false
+        val t = best
+        if (t == null) { c.moveX = 0f; c.moveY = 0f; c.aiming = false; return }
+        val dx = t.x - f.x; val dy = t.y - f.y
+        val d = kotlin.math.hypot(dx, dy).coerceAtLeast(0.001f)
+        val reach = f.def.attack.range * 0.85f
+        if (d > reach) { c.moveX = dx / d; c.moveY = dy / d } else { c.moveX = -dy / d * 0.4f; c.moveY = dx / d * 0.4f }
+        c.aimX = dx; c.aimY = dy; c.aiming = true
+        c.attack = d <= f.def.attack.range
+        if (f.superCharge >= 1f && d <= f.def.attack.range) c.superAttack = true
     }
 
     /** True once the result is decided for the player. */

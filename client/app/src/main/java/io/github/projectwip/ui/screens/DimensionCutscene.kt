@@ -457,8 +457,8 @@ private inline fun DrawScope.translateBy(x: Float, block: DrawScope.() -> Unit) 
 private fun speakerPlate(line: Lore.Line, fighterName: String, time: Float): Pair<String, Color> = when (line.speaker) {
     Lore.Speaker.VOID -> {
         val soul = line.soul
-        if (soul != null && (time * 2.5f).toInt() % 3 != 0) "THE VOID · ${soul.title.uppercase()}" to Color(soul.color)
-        else "THE VOID" to Color(0xFFB98CFF)
+        if (soul != null && (time * 2.5f).toInt() % 3 != 0) "THE ENTITY · ${soul.title.uppercase()}" to Color(soul.color)
+        else "THE ENTITY" to Color(0xFF8FC8FF)
     }
     Lore.Speaker.CAPTIVE -> fighterName.uppercase() to (line.soul?.let { Color(it.color) } ?: Color(0xFFFF8A8A))
     Lore.Speaker.FIGHTER -> fighterName.uppercase() to Palette.Gold
