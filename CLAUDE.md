@@ -77,6 +77,10 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   report (`run-as io.github.projectwip cat files/crash.json`). Build 104's first try read `uTime` in the fragment
   shader, where only the vertex shader declares it. A uniform both stages need gets its own name in each (the
   stages' default precisions differ, and a shared uniform must match). Open a match on the tablet after any shader edit.
+- **Anything that sets a fighter down must land them clear of everyone.** The Entity drove Swish's tornado
+  straight through a training dummy and the tornado ended with her standing inside it: same model, so she
+  looked invisible (just her ring). `World.endTempest` now searches for open ground `TEMPEST_LANDING_GAP` clear
+  of every fighter (`landingClear`). Any new teleport, leap or landing needs the same.
 - **Shell traps on this machine** (Git Bash on Windows): adb under `MSYS_NO_PATHCONV=1` needs Windows paths
   (`C:/Users/...`), not `/c/Users/...`; Gradle runs from `client/` (a `cd` that is a level off fails silently behind a
   `grep`); long Python edits with quotes in them go in a script file in the scratchpad (run with `python -I`), not a

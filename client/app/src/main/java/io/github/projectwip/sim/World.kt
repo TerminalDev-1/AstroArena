@@ -742,11 +742,39 @@ class World(
         f.tempestLeft = 0f
         f.tempestTick = 0f
         f.tempestBolt = 0f
-        // (She flew: she comes down on open ground.)
-        if (f.alive && arena.circleBlocked(f.x, f.y, f.radius)) {
-            val spot = arena.nearestOpen(f.x, f.y, f.radius)
-            f.x = spot.x; f.y = spot.y; f.prevX = f.x; f.prevY = f.y
+        // (She flew: she comes down on open ground, and never inside another fighter, where she would be hidden in
+        // them: a tornado driven straight through someone used to end with her standing inside them.)
+        if (!f.alive) return
+        if (!landingClear(f, f.x, f.y)) {
+            // The nearest spot round her that is open ground and well clear of everyone (a ring at a time).
+            var found = false
+            var ring = 1
+            while (!found && ring <= 24) {
+                val r = ring * 0.25f
+                val steps = 8 + ring * 2
+                for (k in 0 until steps) {
+                    val a = k * (6.2831855f / steps)
+                    val x = f.x + kotlin.math.cos(a) * r; val y = f.y + kotlin.math.sin(a) * r
+                    if (landingClear(f, x, y)) { f.x = x; f.y = y; found = true; break }
+                }
+                ring++
+            }
+            if (!found && arena.circleBlocked(f.x, f.y, f.radius)) {
+                val spot = arena.nearestOpen(f.x, f.y, f.radius)
+                f.x = spot.x; f.y = spot.y
+            }
         }
+        f.prevX = f.x; f.prevY = f.y
+    }
+
+    /** Open ground for [f] to come down on at (x, y): no wall, and no other fighter close enough to hide her. */
+    private fun landingClear(f: Fighter, x: Float, y: Float): Boolean {
+        if (arena.circleBlocked(x, y, f.radius)) return false
+        for (o in fighters) {
+            if (o === f || !o.alive) continue
+            if (kotlin.math.hypot(o.x - x, o.y - y) < o.radius + f.radius + Balance.TEMPEST_LANDING_GAP) return false
+        }
+        return true
     }
 
     /** The realm [id] opened is over: everyone in it is back in the arena, where they stood. */

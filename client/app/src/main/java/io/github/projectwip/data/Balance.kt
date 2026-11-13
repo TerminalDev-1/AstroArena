@@ -353,6 +353,8 @@ object Balance {
     const val TEMPEST_TICK_SECONDS = 0.4f
     /** ...flies (over walls and water) this many times as fast as the fighter walks... */
     const val TEMPEST_SPEED = 1.6f
+    /** A tornado sets her down at least this far clear of anyone (past both their edges), so nobody hides her. */
+    const val TEMPEST_LANDING_GAP = 0.6f
     /** ...and each of its hits charges the super by only this share of a normal hit, so a tempest doesn't pay for the next one. */
     const val TEMPEST_CHARGE = 0.25f
     /**

@@ -1445,6 +1445,20 @@ class SimulationTest {
         assertEquals("and it wears off", 0f, p.glitchLeft, 0f)
     }
 
+    @Test fun aTornadoNeverEndsWithHerInsideSomeone() {
+        // Driven straight through a training dummy, the tornado used to set her down inside it, hidden in its model.
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, humanPlayer = false, seed = 9L))
+        repeat(60 * 6) { m.step(Match.STEP) }
+        val p = m.player
+        val dummy = m.world.fighters.first { it.team != p.team && it.alive }
+        p.x = dummy.x + 0.05f; p.y = dummy.y; p.prevX = p.x; p.prevY = p.y
+        p.tempestLeft = 0.01f
+        m.step(Match.STEP)
+        assertEquals("the tornado is over", 0f, p.tempestLeft, 0f)
+        for (o in m.world.fighters) if (o !== p && o.alive)
+            assertTrue("she lands well clear of ${o.name}", kotlin.math.hypot(p.x - o.x, p.y - o.y) >= p.radius + o.radius + io.github.projectwip.data.Balance.TEMPEST_LANDING_GAP - 0.001f)
+    }
+
     @Test fun theEntityTakesOverAgainAndAgainInAMatch() {
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
             mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, seed = 12L))
