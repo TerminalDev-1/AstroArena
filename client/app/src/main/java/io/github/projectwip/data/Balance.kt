@@ -247,10 +247,10 @@ enum class GameMode(val title: String, val tagline: String, val players: Int) {
     /** One real player against another, each on their own device. Nothing is earned in it yet. */
     DUEL("1v1", "You against one real player · first to 3 knockouts", 2),
     /**
-     * Portal Run (1.0, the user's idea): clear waves of enemies, step through the portal that opens into the next
-     * dimension, and go as deep as you can. The Void speaks each time you go through. One life.
+     * Dimension (1.0, the user's idea; a lore mode since build 104): find the echoes in each dimension, step through the
+     * portal they open into a stranger one, and go down to the bottom. The Void speaks each time you go through.
      */
-    PORTAL("Dimension", "You and the Void · clear the waves · step through the portal", 1 + Balance.PORTAL_POOL),
+    PORTAL("Dimension", "A story mode · you and the Void · find the echoes, step through the portal", 1),
 }
 
 object Balance {
@@ -410,33 +410,29 @@ object Balance {
     /** Bots don't attack for this long once a match starts (they also hold fire while their spawn shield is up). */
     const val BOT_WARMUP_SECONDS = 4f
 
-    // ---- Portal Run
-    /** Enemies waiting off the board for the waves; a wave never brings in more than this. */
-    const val PORTAL_POOL = 8
-    /** Waves to clear in each dimension before its portal opens. */
-    const val PORTAL_WAVES = 3
-    /** Before the first wave, between waves, and after arriving in a new dimension. */
-    const val PORTAL_FIRST_BREAK = 1.5f
-    const val PORTAL_WAVE_BREAK = 2.5f
-    const val PORTAL_TRAVEL_SECONDS = 3f
+    // ---- Dimension (GameMode.PORTAL): a lore mode, not a fighting one (build 104, the user's decision)
+    /** Echo shards to find in each dimension before its portal opens. */
+    const val PORTAL_SHARDS = 3
+    /** How close (beyond the fighter's own radius) a shard is picked up. */
+    const val PORTAL_SHARD_REACH = 0.7f
+    /** Shards lie at least this far from where the player arrives, and from each other. */
+    const val PORTAL_SHARD_SPREAD = 5f
+    /** The pause on arriving in a dimension, and after the last portal before the story ends. */
+    const val PORTAL_ARRIVE_SECONDS = 1.2f
+    const val PORTAL_TRAVEL_SECONDS = 1.2f
     /** How close (beyond the fighter's own radius) the portal pulls you in. */
     const val PORTAL_RADIUS = 1.1f
-    /** Each dimension deeper, enemies have this much more health and do this much more damage. */
-    const val PORTAL_HEALTH_GROWTH = 0.2f
-    const val PORTAL_DAMAGE_GROWTH = 0.12f
-    /** What the Void says, in turn, each time the player steps through a portal. Eerie, never gory. */
-    val VOID_LINES = listOf(
-        "You found the door. Few ever do.",
-        "Deeper. I have been waiting for you.",
-        "Another world. Another cage. Keep walking.",
-        "You hear me now. You always could.",
-        "The light is behind you. Do not look back.",
-        "Closer. I can almost see your face.",
-        "There is no bottom. There is only me.",
-        "Every door you open, I open with you.",
-    )
-    /** Wave size: [PORTAL_POOL] at most. */
-    fun portalWaveSize(dimension: Int, wave: Int) = minOf(PORTAL_POOL, 1 + wave + dimension)
+    /** Portals to the bottom, where the story ends: the run's best placement. */
+    const val PORTAL_DEPTH = 7
+    /**
+     * Glitch rifts: from the second dimension on the world tears open near the player now and then. A rift is marked
+     * for [PORTAL_RIFT_DELAY] seconds and then takes [PORTAL_RIFT_SHARE] of their health if they are still in it.
+     */
+    const val PORTAL_RIFT_DELAY = 1.3f
+    const val PORTAL_RIFT_SHARE = 0.2f
+    /** Seconds between rifts in [dimension] (none in the first). */
+    fun portalRiftEvery(dimension: Int) = if (dimension < 2) Float.MAX_VALUE else maxOf(1.7f, 5.2f - 0.6f * (dimension - 2))
+    fun portalRiftRadius(dimension: Int) = minOf(1.6f, 0.9f + 0.1f * dimension)
 
     const val STORM_DELAY_SECONDS = 25f
     const val STORM_SHRINK_SECONDS = 100f

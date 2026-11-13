@@ -8,7 +8,8 @@ import kotlin.math.sin
 
 /** What kind of ground attack a [Hazard] is, for drawing it. */
 /** [BREW] is a fighter's flask on its way down: it hurts one side and heals the other. */
-enum class HazardKind { ROCKET, MINE, SLAM, BREW }
+/** [RIFT] is Dimension's glitch in the world: the ground tearing open near the player. */
+enum class HazardKind { ROCKET, MINE, SLAM, BREW, RIFT }
 
 /**
  * A marked patch of ground that goes off after [delay] seconds, hurting everyone of the other team standing in

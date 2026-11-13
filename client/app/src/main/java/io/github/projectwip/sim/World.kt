@@ -28,7 +28,7 @@ data class MatchRules(
     val boss: Boolean = false,
     /** Training Area: no clock and no score to reach, so it only ends when the player leaves. */
     val practice: Boolean = false,
-    /** Portal Run: waves of enemies, portals into deeper dimensions, one life ([World.portal]). */
+    /** Dimension: echoes to find, portals into deeper dimensions, one life ([World.portal]). */
     val portal: Boolean = false,
 ) {
     val respawn get() = !freeForAll
@@ -41,26 +41,37 @@ data class MatchRules(
         /** One against one: first to three knockouts, or whoever is ahead after two minutes. */
         fun duel() = MatchRules(koTarget = 3, durationSeconds = 120f)
         fun training() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, practice = true)
-        /** Portal Run: no clock; one knockout of the player ends the run. */
+        /** Dimension: no clock; one knockout of the player (by a rift) ends the run. */
         fun portal() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = 1, durationSeconds = Float.MAX_VALUE, portal = true)
     }
 }
 
-enum class PortalState { BREAK, WAVE, OPEN, TRAVEL }
+enum class PortalState { ARRIVE, EXPLORE, OPEN, TRAVEL }
 
-/** Portal Run: which dimension the player is in, which wave, and where the portal is once it opens. */
+/**
+ * Dimension: which dimension the player is in, the echo shards lying about in it, and where the portal is once they
+ * are all found. A lore mode (build 104, the user's decision): there are no enemies, only the world coming apart.
+ */
 class PortalRun {
     var dimension = 1
-    var wave = 0
     /** Portals stepped through so far: the run's score. */
     var entered = 0
-    var state = PortalState.BREAK
-    var timer = Balance.PORTAL_FIRST_BREAK
+    var state = PortalState.ARRIVE
+    var timer = Balance.PORTAL_ARRIVE_SECONDS
+    /** Where this dimension's shards lie (x, y pairs), which are found, and how many. */
+    val shards = FloatArray(Balance.PORTAL_SHARDS * 2)
+    val taken = BooleanArray(Balance.PORTAL_SHARDS)
+    var found = 0
     var x = 0f
     var y = 0f
-    /** Seconds since the run began, and when the last portal was entered (for the Void's words on screen). */
+    /** Seconds until the next glitch rift. */
+    var riftIn = Float.MAX_VALUE
+    /** Seconds since the run began; when the Void last spoke on screen, and which of its taunts it was. */
     var time = 0f
-    var enteredAt = -100f
+    var tauntAt = -100f
+    var taunt = -1
+    /** True once the bottom is reached: the run ends when the last journey does. */
+    val atBottom get() = entered >= Balance.PORTAL_DEPTH
 }
 
 /** The Static Storm: a circle that waits, then shrinks; standing outside hurts more the longer it runs. */
@@ -151,8 +162,8 @@ class World(
                 }
             }
         }
-        // Portal Run: the enemies wait off the board until a wave brings them in.
-        if (portal != null) for (f in fighters) if (f.team != 0) { f.alive = false; f.eliminated = true }
+        // Dimension: the first dimension's echoes are scattered before the player arrives.
+        portal?.let { scatterShards(it) }
     }
 
     fun fighter(id: Int): Fighter? = fighters.firstOrNull { it.id == id }
@@ -224,7 +235,7 @@ class World(
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(lobs.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
-        portal?.let { mix(it.dimension); mix(it.wave); mix(it.state.ordinal) }
+        portal?.let { mix(it.dimension); mix(it.found); mix(it.state.ordinal) }
         return h
     }
 
@@ -1232,7 +1243,7 @@ class World(
                 end(winner?.team ?: -1)
             }
         } else if (rules.portal && victim.team != 0) {
-            // Portal Run: a knocked-out enemy goes back to waiting off the board for a later wave.
+            // (Dimension has no enemies now; this stays for anything on the other side.)
             victim.eliminated = true
             score[0]++
         } else {
@@ -1297,60 +1308,95 @@ class World(
 
     private fun stepPortal(run: PortalRun, dt: Float) {
         run.time += dt
-        val enemies = fighters.filter { it.team != 0 }
+        val player = fighters.firstOrNull { it.team == 0 } ?: return
         when (run.state) {
-            PortalState.BREAK, PortalState.TRAVEL -> {
+            PortalState.ARRIVE -> {
                 run.timer -= dt
                 if (run.timer > 0f) return
-                run.wave++
-                run.state = PortalState.WAVE
-                val count = minOf(enemies.size, Balance.portalWaveSize(run.dimension, run.wave))
-                val toughness = 1f + Balance.PORTAL_HEALTH_GROWTH * (run.dimension - 1)
-                for (i in 0 until count) {
-                    val f = enemies[i]
-                    f.eliminated = false
-                    f.maxHp = (f.baseMaxHp * toughness).toInt()
-                    f.dimensionDamage = 1f + Balance.PORTAL_DAMAGE_GROWTH * (run.dimension - 1)
-                    respawn(f)
-                    // Spread them round their side's spawn points, so a wave doesn't arrive in one heap.
-                    val a = i * 2.4f
-                    val spot = arena.nearestOpen(f.x + kotlin.math.cos(a) * 1.3f, f.y + kotlin.math.sin(a) * 1.3f, f.radius)
-                    f.x = spot.x; f.y = spot.y; f.prevX = spot.x; f.prevY = spot.y
-                }
-                events += GameEvent.WaveStarted(run.dimension, run.wave)
+                run.state = PortalState.EXPLORE
+                run.riftIn = Balance.portalRiftEvery(run.dimension)
             }
-            PortalState.WAVE -> {
-                if (enemies.any { !it.eliminated }) return
-                if (run.wave < Balance.PORTAL_WAVES) {
-                    run.state = PortalState.BREAK
-                    run.timer = Balance.PORTAL_WAVE_BREAK
-                } else {
+            PortalState.EXPLORE, PortalState.OPEN -> {
+                stepRifts(run, player, dt)
+                if (!player.alive) return
+                if (run.state == PortalState.EXPLORE) {
+                    for (i in 0 until Balance.PORTAL_SHARDS) {
+                        if (run.taken[i]) continue
+                        val sx = run.shards[i * 2]; val sy = run.shards[i * 2 + 1]
+                        if (hypot(player.x - sx, player.y - sy) >= player.radius + Balance.PORTAL_SHARD_REACH) continue
+                        run.taken[i] = true
+                        run.found++
+                        run.taunt = (run.dimension - 1) * Balance.PORTAL_SHARDS + run.found - 1
+                        run.tauntAt = run.time
+                        events += GameEvent.ShardFound(run.dimension, run.found, sx, sy)
+                    }
+                    if (run.found < Balance.PORTAL_SHARDS) return
+                    // The way down opens at the middle of the arena: wherever the player is, they walk back to it.
                     val spot = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 0.8f)
                     run.x = spot.x; run.y = spot.y
                     run.state = PortalState.OPEN
                     events += GameEvent.PortalOpened(run.x, run.y)
+                    return
                 }
-            }
-            PortalState.OPEN -> {
-                val through = fighters.firstOrNull { it.team == 0 && it.alive && hypot(it.x - run.x, it.y - run.y) < it.radius + Balance.PORTAL_RADIUS } ?: return
-                run.dimension++
+                if (hypot(player.x - run.x, player.y - run.y) >= player.radius + Balance.PORTAL_RADIUS) return
                 run.entered++
-                run.wave = 0
                 run.state = PortalState.TRAVEL
                 run.timer = Balance.PORTAL_TRAVEL_SECONDS
-                run.enteredAt = run.time
-                // A new world: everything in the air is left behind, and the players arrive whole.
+                run.tauntAt = -100f
+                // A new world: everything in the air is left behind, and the player arrives whole.
                 projectiles.clear(); hazards.clear(); lobs.clear(); planted.clear(); pickups.clear()
-                for (f in fighters) if (f.team == 0 && f.alive) {
-                    if (f.inTempest) endTempest(f)
-                    if (f.inRealm) closeRealm(f.realm)
-                    placeAtSpawn(f)
-                    f.hp = f.maxHp
-                    f.shield = Balance.SPAWN_SHIELD_SECONDS
+                if (player.inTempest) endTempest(player)
+                if (player.inRealm) closeRealm(player.realm)
+                player.hp = player.maxHp
+                if (!run.atBottom) {
+                    run.dimension++
+                    placeAtSpawn(player)
+                    player.shield = Balance.SPAWN_SHIELD_SECONDS
+                    scatterShards(run)
                 }
                 events += GameEvent.PortalEntered(run.dimension, run.entered)
-                @Suppress("UNUSED_VARIABLE") val unused = through
             }
+            PortalState.TRAVEL -> {
+                run.timer -= dt
+                if (run.timer > 0f) return
+                // At the bottom the story is over: the run ends there, as deep as it goes.
+                if (run.atBottom) { if (phase == Phase.PLAYING) end(0); return }
+                run.state = PortalState.ARRIVE
+                run.timer = Balance.PORTAL_ARRIVE_SECONDS
+            }
+        }
+    }
+
+    /** The world tearing open now and then near the player, from the second dimension on: a marked patch, then a hit. */
+    private fun stepRifts(run: PortalRun, player: Fighter, dt: Float) {
+        run.riftIn -= dt
+        if (run.riftIn > 0f || !player.alive) return
+        run.riftIn = Balance.portalRiftEvery(run.dimension)
+        val r = Balance.portalRiftRadius(run.dimension)
+        // Near them, a little ahead of where they are going, so standing still and running blind both get caught.
+        val a = rng.nextFloat() * 6.2832f
+        val d = rng.nextFloat() * 1.6f
+        val spot = arena.nearestOpen(player.x + player.vx * 0.5f + cos(a) * d, player.y + player.vy * 0.5f + sin(a) * d, 0.3f)
+        hazards += Hazard(-1, 1, spot.x, spot.y, r, Balance.PORTAL_RIFT_DELAY, (player.maxHp * Balance.PORTAL_RIFT_SHARE).toInt(), HazardKind.RIFT)
+    }
+
+    /** Lays this dimension's echoes on open ground, far from where the player arrives and from each other. */
+    private fun scatterShards(run: PortalRun) {
+        run.found = 0
+        run.taken.fill(false)
+        val start = arena.spawns[0][0]
+        for (i in 0 until Balance.PORTAL_SHARDS) {
+            var best = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 0.6f)
+            var bestScore = -1f
+            // A dozen tries; keep the spot furthest from where the player starts and from the shards already placed.
+            for (k in 0 until 12) {
+                val c = arena.nearestOpen(2f + rng.nextFloat() * (arena.width - 4f), 2f + rng.nextFloat() * (arena.height - 4f), 0.6f)
+                var near = hypot(c.x - start.x, c.y - start.y)
+                for (j in 0 until i) near = minOf(near, hypot(c.x - run.shards[j * 2], c.y - run.shards[j * 2 + 1]))
+                if (near > bestScore) { bestScore = near; best = c }
+                if (near >= Balance.PORTAL_SHARD_SPREAD * 1.6f) break
+            }
+            run.shards[i * 2] = best.x; run.shards[i * 2 + 1] = best.y
         }
     }
 

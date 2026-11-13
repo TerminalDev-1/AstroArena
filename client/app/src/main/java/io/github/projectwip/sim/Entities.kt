@@ -280,10 +280,11 @@ sealed interface GameEvent {
     /** A tempest's lightning bolt comes down at ([x], [y]). */
     data class TempestBolt(val fighterId: Int, val x: Float, val y: Float) : GameEvent
     /** Portal Run: wave [wave] of dimension [dimension] is coming in. */
-    data class WaveStarted(val dimension: Int, val wave: Int) : GameEvent
-    /** Portal Run: the dimension is cleared and its portal has opened at ([x], [y]). */
+    /** Dimension: the player found echo shard [found] of [Balance.PORTAL_SHARDS] at ([x], [y]). */
+    data class ShardFound(val dimension: Int, val found: Int, val x: Float, val y: Float) : GameEvent
+    /** Dimension: every echo is found and the portal has opened at ([x], [y]). */
     data class PortalOpened(val x: Float, val y: Float) : GameEvent
-    /** Portal Run: the player went through, into [dimension]; [entered] portals so far. */
+    /** Dimension: the player went through, into [dimension]; [entered] portals so far. */
     data class PortalEntered(val dimension: Int, val entered: Int) : GameEvent
     /** A rocket went off. */
     data class Burst(val x: Float, val y: Float, val radius: Float) : GameEvent

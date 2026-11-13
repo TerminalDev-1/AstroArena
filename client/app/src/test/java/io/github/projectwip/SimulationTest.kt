@@ -1337,36 +1337,71 @@ class SimulationTest {
         assertEquals("she reloads in 1.2 seconds", 1.2f, kira.def.reloadSeconds, 0f)
     }
 
-    @Test fun portalRunClearsWavesOpensAPortalAndGoesDeeper() {
+    @Test fun dimensionIsALoreModeOfEchoesPortalsAndRiftsDownToTheBottom() {
+        val B = io.github.projectwip.data.Balance
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
             mode = io.github.projectwip.data.GameMode.PORTAL, seed = 42L))
         val w = m.world
         val run = w.portal!!
-        val enemies = w.fighters.filter { it.team != m.player.team }
-        assertEquals(io.github.projectwip.data.Balance.PORTAL_POOL, enemies.size)
-        assertTrue("everyone waits off the board at first", enemies.all { it.eliminated && !it.alive })
+        assertEquals("nobody but the player", 1, w.fighters.size)
         fun stepFor(seconds: Float) { repeat((seconds * 60).toInt()) { m.step(io.github.projectwip.sim.Match.STEP) } }
-        fun clearWave() { for (e in enemies) if (!e.eliminated) { e.alive = false; e.eliminated = true } }
-        stepFor(3f + io.github.projectwip.data.Balance.PORTAL_FIRST_BREAK + 0.2f)
-        for (wave in 1..io.github.projectwip.data.Balance.PORTAL_WAVES) {
-            assertEquals(wave, run.wave)
-            assertEquals(io.github.projectwip.data.Balance.portalWaveSize(1, wave), enemies.count { !it.eliminated })
-            clearWave()
-            stepFor(io.github.projectwip.data.Balance.PORTAL_WAVE_BREAK + 0.2f)
+        stepFor(3f + B.PORTAL_ARRIVE_SECONDS + 0.2f)
+        assertEquals(io.github.projectwip.sim.PortalState.EXPLORE, run.state)
+        // The echoes lie away from where the player arrives.
+        for (i in 0 until B.PORTAL_SHARDS) assertTrue(kotlin.math.hypot(run.shards[i * 2] - m.player.x, run.shards[i * 2 + 1] - m.player.y) > 3f)
+        assertTrue("no rifts in the first dimension", w.hazards.isEmpty())
+        fun collect() {
+            for (i in 0 until B.PORTAL_SHARDS) {
+                m.player.x = run.shards[i * 2]; m.player.y = run.shards[i * 2 + 1]
+                m.player.prevX = m.player.x; m.player.prevY = m.player.y
+                stepFor(0.05f)
+            }
         }
+        collect()
+        assertEquals(B.PORTAL_SHARDS, run.found)
+        assertTrue("a taunt for each echo", run.taunt == B.PORTAL_SHARDS - 1)
         assertEquals(io.github.projectwip.sim.PortalState.OPEN, run.state)
-        // Stepping into it takes the player one dimension deeper, whole again, and the enemies come back tougher.
-        m.player.hp = 10
+        // Stepping in takes the player one dimension deeper, whole again, with new echoes to find.
+        m.player.hp = m.player.maxHp / 2
         m.player.x = run.x; m.player.y = run.y
-        stepFor(0.1f)
+        stepFor(0.05f)
         assertEquals(2, run.dimension)
         assertEquals(1, run.entered)
         assertEquals(m.player.maxHp, m.player.hp)
-        stepFor(io.github.projectwip.data.Balance.PORTAL_TRAVEL_SECONDS + 0.2f)
-        val back = enemies.first { !it.eliminated }
-        assertTrue("tougher a dimension down", back.maxHp > back.baseMaxHp)
+        assertEquals(0, run.found)
+        stepFor(B.PORTAL_TRAVEL_SECONDS + B.PORTAL_ARRIVE_SECONDS + 0.2f)
+        // From the second dimension on, the world tears open near the player now and then.
+        stepFor(B.portalRiftEvery(2) + 0.1f)
+        assertTrue("a rift", w.hazards.any { it.kind == io.github.projectwip.sim.HazardKind.RIFT })
         assertEquals(1, m.placement)
         assertEquals(io.github.projectwip.data.MatchOutcome.VICTORY, m.report().outcome)
+        // All the way down: the story ends at the bottom, and the run with it.
+        while (run.entered < B.PORTAL_DEPTH) {
+            m.player.hp = m.player.maxHp; m.player.shield = 99f
+            stepFor(B.PORTAL_TRAVEL_SECONDS + B.PORTAL_ARRIVE_SECONDS + 0.2f)
+            collect()
+            m.player.x = run.x; m.player.y = run.y
+            stepFor(0.05f)
+        }
+        stepFor(B.PORTAL_TRAVEL_SECONDS + 0.2f)
+        assertTrue(m.isOver)
+        assertEquals(B.PORTAL_DEPTH, m.placement)
+        assertEquals(io.github.projectwip.data.MatchOutcome.VICTORY, m.report().outcome)
+    }
+
+    @Test fun aRiftCanEndADimensionRun() {
+        val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
+            mode = io.github.projectwip.data.GameMode.PORTAL, seed = 7L))
+        val run = m.world.portal!!
+        run.dimension = 6
+        repeat(60 * 4) { m.step(io.github.projectwip.sim.Match.STEP) }
+        m.player.shield = 0f
+        // Stand still with almost no health: the next rift lands on the player.
+        var t = 0
+        while (!m.isOver && t < 60 * 30) { m.player.hp = minOf(m.player.hp, 5); m.player.shield = 0f; m.step(io.github.projectwip.sim.Match.STEP); t++ }
+        assertTrue("one life: a rift ended it", m.isOver)
+        assertEquals(0, m.placement)
+        assertEquals(io.github.projectwip.data.MatchOutcome.DEFEAT, m.report().outcome)
     }
 
 }

@@ -39,12 +39,18 @@ class HudSnapshot {
     var freeForAll = false
     /** Boss Mode: the giant's health and the player's remaining lives go on the HUD instead of a score. */
     var bossMode = false
-    /** Portal Run: the dimension, the wave (0 between dimensions), enemies still up, whether the portal is open. */
+    /** Dimension: which one, echoes found, whether the portal is open or the player is passing through. */
     var portalRun = false
     var portalDimension = 1
-    var portalWave = 0
-    var portalLeft = 0
+    var portalFound = 0
     var portalOpen = false
+    var portalTravel = false
+    /** Where the pointer points (the nearest echo, or the open portal), in world x / z, and where the player is. */
+    var portalTargetOn = false
+    var portalTargetX = 0f
+    var portalTargetZ = 0f
+    var portalPlayerX = 0f
+    var portalPlayerZ = 0f
     /** The Void's last words, and how long ago they were said (they fade after a few seconds). */
     var voidLine: String? = null
     var voidAge = 99f
@@ -89,7 +95,8 @@ class HudSnapshot {
         hyperCharge = o.hyperCharge; hyperLeft = o.hyperLeft; duelNotice = o.duelNotice
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
         bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
-        portalRun = o.portalRun; portalDimension = o.portalDimension; portalWave = o.portalWave; portalLeft = o.portalLeft; portalOpen = o.portalOpen; voidLine = o.voidLine; voidAge = o.voidAge
+        portalRun = o.portalRun; portalDimension = o.portalDimension; portalFound = o.portalFound; portalOpen = o.portalOpen; portalTravel = o.portalTravel; voidLine = o.voidLine; voidAge = o.voidAge
+        portalTargetOn = o.portalTargetOn; portalTargetX = o.portalTargetX; portalTargetZ = o.portalTargetZ; portalPlayerX = o.portalPlayerX; portalPlayerZ = o.portalPlayerZ
         freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
         stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm
         n = o.n

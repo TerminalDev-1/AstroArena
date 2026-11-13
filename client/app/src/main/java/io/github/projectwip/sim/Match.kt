@@ -110,8 +110,7 @@ class Match(val config: MatchConfig) {
             roster += Fighter(id++, Balance.sentry, 1, 1, 1, "Sentry", isBot = true, rooted = true)
             repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true).also { m -> passive += m } }
         } else if (portalRun) {
-            // The enemies the waves are made of, all on the other side, waiting off the board until they are called.
-            repeat(Balance.PORTAL_POOL) { roster += botFighter(id++, 1, names.next()) }
+            // Dimension is a lore mode: the player and the Void, nobody else.
         } else if (bossMode) {
             // One boss, always level 1: its stats are fixed and never follow the player's level.
             val solo = Balance.boss(config.boss ?: Balance.bosses[rng.nextInt(Balance.bosses.size)].boss!!)

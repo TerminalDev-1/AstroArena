@@ -50,7 +50,7 @@ OUTCOMES = ("VICTORY", "DEFEAT", "DRAW")
 BOSSES = ("BARRAGE", "SWEEPER", "STAMPEDE")
 
 # Bots in each mode (the names the server hands out).
-MODES = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 5, "BOSS": 0, "TRAINING": 0, "PORTAL": 8}
+MODES = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 5, "BOSS": 0, "TRAINING": 0, "PORTAL": 0}
 
 
 def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, table: dict | None = None) -> int:
@@ -96,8 +96,10 @@ def earns_drop(mode: str, outcome: str, placement: int) -> bool:
 # Nobody wins a real match faster than this, and a match left open this long is abandoned.
 MIN_GOOD_RESULT_SECONDS = 20.0
 MAX_MATCH_SECONDS = 3600.0
-_MAX_KOS = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 40, "BOSS": 80, "DUEL": 40, "TRAINING": 100000, "PORTAL": 5000}
+_MAX_KOS = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 40, "BOSS": 80, "DUEL": 40, "TRAINING": 100000, "PORTAL": 0}
 _MAX_DAMAGE = 3_000_000
+# Portals from the first dimension down to the bottom of Dimension (Balance.PORTAL_DEPTH in the game).
+PORTAL_DEPTH = 7
 
 
 def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: int, deaths: int, damage: int) -> str | None:
@@ -125,12 +127,11 @@ def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: i
         if placement == 1 and kos == 0 and damage == 0:
             return "a win without a fight"
     if mode == "PORTAL":
-        if not 0 <= placement <= 500:
+        # Dimension is a lore mode (build 104): no enemies, seven portals down to the bottom, one life.
+        if not 0 <= placement <= PORTAL_DEPTH:
             return "placement out of range"
         if deaths > 1:
-            return "more than one life in Portal Run"
-        if placement > 0 and kos < placement:
-            return "a portal without a fight"
+            return "more than one life in Dimension"
     good = outcome == "VICTORY" or (mode == "LAST_SPARK" and placement <= 4)
     # (A 1v1 is won the moment the other player walks out, and it is the lobby that says so, not the device.)
     if good and mode not in ("TRAINING", "DUEL") and elapsed < MIN_GOOD_RESULT_SECONDS:

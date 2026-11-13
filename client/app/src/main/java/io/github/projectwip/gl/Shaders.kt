@@ -65,6 +65,8 @@ uniform mat4 uLightVP;
 uniform float uTime;
 uniform float uSway;
 uniform float uOutline;
+uniform float uWarp;
+uniform float uGlitch;
 out vec3 vNormal;
 out vec4 vColor;
 out vec4 vLightPos;
@@ -75,6 +77,19 @@ void main() {
     float k = aExtra * uSway;
     w.x += sin(uTime * 1.9 + w.z * 0.9 + w.x * 0.4) * 0.09 * k;
     w.z += cos(uTime * 1.4 + w.x * 0.7) * 0.06 * k;
+    if (uWarp > 0.0) {
+        // Dimension: the arena bending. Tall things lean and sway, and the ground rolls a little.
+        float hgt = max(w.y, 0.0);
+        w.x += sin(uTime * 0.7 + w.z * 0.45) * uWarp * hgt * 0.35;
+        w.z += cos(uTime * 0.55 + w.x * 0.4) * uWarp * hgt * 0.2;
+        w.y += sin(uTime * 1.1 + w.x * 0.6 + w.z * 0.5) * uWarp * 0.18;
+    }
+    if (uGlitch > 0.0) {
+        // Dimension: bands of the world jumping sideways for a moment.
+        float tick = floor(uTime * 9.0);
+        float band = fract(sin(floor(w.z * 1.3) * 91.7 + tick * 13.1) * 4375.5);
+        if (band > 1.0 - uGlitch * 0.09) w.x += (fract(sin(tick * 7.3 + floor(w.z)) * 937.0) - 0.5) * 1.4 * uGlitch;
+    }
     vWorld = w.xyz;
     vNormal = mat3(uModel) * aNormal;
     vColor = aColor;
@@ -107,6 +122,7 @@ uniform float uShadowTexel;
 uniform int uMode;
 uniform vec3 uReveal[3];
 uniform float uRevealOn;
+uniform float uGlitchF;
 in vec3 vNormal;
 in vec4 vColor;
 in vec4 vLightPos;
@@ -160,6 +176,13 @@ void main() {
             float d = distance(vWorld.xz, uReveal[i].xz);
             if (uReveal[i].y > 0.5 && d < 1.9) alpha = min(alpha, mix(0.28, 1.0, smoothstep(1.2, 1.9, d)));
         }
+    }
+    if (uGlitchF > 0.0) {
+        // Dimension: rows of the picture splitting into their colours, and a faint scanline.
+        float row = floor(gl_FragCoord.y / 5.0);
+        float n = fract(sin(row * 12.9898 + floor(uTime * 14.0) * 78.233) * 43758.5453);
+        if (n > 1.0 - uGlitchF * 0.1) col = col.brg * 1.25;
+        col *= 1.0 - uGlitchF * 0.18 * step(0.5, fract(gl_FragCoord.y * 0.5));
     }
     o = vec4(col, alpha);
 }

@@ -89,6 +89,7 @@ class MatchRunner(
 
     /** Until the tempest's wind is played again. */
     private var windLeft = 0f
+    private var airLeft = 0.5f
 
     private fun tick() {
         val p = match.player
@@ -205,6 +206,15 @@ class MatchRunner(
                 sfx.play(Sound.TEMPEST_WIND, (if (storm.id == p.id) 0.8f else 0.6f) / (1f + hypot(storm.x - p.x, storm.y - p.y) * 0.15f), 0.95f + (storm.tempestLeft % 0.1f))
             }
         } else windLeft = 0.5f
+
+        // Dimension: the air of the place, lower and stranger the deeper the player is.
+        match.world.portal?.let { run ->
+            airLeft -= Match.STEP
+            if (airLeft <= 0f) {
+                airLeft += 1.8f
+                sfx.play(Sound.DIM_AIR, 0.55f + 0.05f * run.dimension, (1.05f - 0.07f * (run.dimension - 1)).coerceAtLeast(0.6f))
+            }
+        }
 
         if (match.isOver && match.overFor > 2.8f && !finished) {
             finished = true
@@ -371,6 +381,7 @@ class MatchRunner(
                 val near = 1f / (1f + hypot(e.x - p.x, e.y - p.y) * 0.2f)
                 if (e.kind == io.github.projectwip.sim.HazardKind.BREW) { sfx.play(Sound.GLASS, near, 1.2f); sfx.play(Sound.HEX, near * 0.9f, 0.8f) }
                 else if (e.kind == io.github.projectwip.sim.HazardKind.ROCKET) sfx.play(Sound.ROCKET_BOOM, near, 0.9f)
+                else if (e.kind == io.github.projectwip.sim.HazardKind.RIFT) sfx.play(Sound.RIFT, near)
                 else { sfx.play(Sound.CRATE_BREAK, near, 0.7f); sfx.play(Sound.SHOOT_HEAVY, near * 0.8f, 0.6f) }
             }
             is GameEvent.SuperReady -> if (e.fighterId == pid) { sfx.play(Sound.SUPER_READY); sfx.buzz(25, 120) }
@@ -458,7 +469,7 @@ class MatchRunner(
             is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
             is GameEvent.Eliminated -> if (e.fighterId == pid) sfx.play(Sound.DEFEAT)
             is GameEvent.PortalOpened -> sfx.play(Sound.PORTAL_OPEN)
-            is GameEvent.WaveStarted -> sfx.play(Sound.BANNER, 0.7f)
+            is GameEvent.ShardFound -> { sfx.play(Sound.SHARD); sfx.play(Sound.VOID, 0.5f, 1.1f) }
             // (Going through a portal: the scene with the Void plays over the paused match, DimensionCutscene.)
             is GameEvent.StormHit -> if (e.targetId == pid) {
                 sfx.play(Sound.HURT, 0.6f, 0.8f); sfx.buzz(20, 90)

@@ -16,7 +16,7 @@ enum class Sound {
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
-    PORTAL_OPEN, PORTAL_ENTER, VOID,
+    PORTAL_OPEN, PORTAL_ENTER, VOID, SHARD, RIFT, DIM_AIR,
 }
 
 /**
@@ -46,6 +46,9 @@ object SfxSynth {
         Sound.PORTAL_OPEN -> portalOpen().finish(0.8f)
         Sound.PORTAL_ENTER -> portalEnter().finish(0.9f)
         Sound.VOID -> voidBreath().finish(0.75f)
+        Sound.SHARD -> shardChime().finish(0.7f)
+        Sound.RIFT -> riftTear().finish(0.8f)
+        Sound.DIM_AIR -> dimensionAir().finish(0.6f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -659,6 +662,34 @@ object SfxSynth {
         noise(422, 0.2f, 2.2f, Band.BAND, { t -> 1900f + 500f * sin(t * TAU * 0.6f) }, 5f, { t -> hold(t, 0.6f, 0.9f, 0.6f) * (0.5f + 0.5f * sin(t * TAU * 1.1f)) * 0.08f })
         noise(423, 0.3f, 2.1f, Band.BAND, { t -> 420f + 120f * sin(t * TAU * 0.4f + 1f) }, 2.5f, { hold(it, 0.6f, 0.8f, 0.6f) * 0.18f })
         echo(0.25f, 0.4f, 0.25f)
+    }
+
+    /** Finding an echo: a glassy chime (a chime really is tonal), bell partials ringing out over a breath of air. */
+    private fun shardChime() = Clip(1.6f).apply {
+        for ((k, ratio) in floatArrayOf(1f, 2.76f, 5.4f, 1.5f).withIndex()) {
+            osc(Wave.SINE, k * 0.04f, 1.5f, { 880f * ratio }, { perc(it, 0.002f, 0.5f - k * 0.08f) * (0.32f - k * 0.06f) })
+        }
+        noise(431, 0f, 0.9f, Band.HIGH, { glide(it, 0.6f, 3000f, 7000f) }, 0.8f, { swell(it, 0.8f) * 0.08f })
+        echo(0.18f, 0.4f, 0.3f)
+    }
+
+    /** A glitch rift going off: the ground tearing, a crackle of breaking stuff, and a low thud under it. */
+    private fun riftTear() = Clip(0.9f).apply {
+        noise(441, 0f, 0.5f, Band.BAND, { glide(it, 0.4f, 2600f, 500f) }, 1.2f, { perc(it, 0.004f, 0.18f) * 0.6f })
+        val r = kotlin.random.Random(91)
+        for (k in 0 until 9) noise(450 + k, r.nextFloat() * 0.3f, 0.04f, Band.BAND, { 1500f + 2500f * r.nextFloat() }, 1.5f, { perc(it, 0.0005f, 0.01f) * 0.35f })
+        noise(442, 0f, 0.6f, Band.LOW, { glide(it, 0.5f, 240f, 60f) }, 0.8f, { perc(it, 0.003f, 0.2f) * 0.7f })
+        echo(0.09f, 0.3f, 0.2f)
+    }
+
+    /**
+     * The air of a dimension, laid down again and again while the player is in one: a low, hollow wind with a thin
+     * whistle drifting in it. It is played slower (lower) the deeper they go, so each dimension sounds stranger.
+     */
+    private fun dimensionAir() = Clip(2.5f).apply {
+        noise(461, 0f, 2.5f, Band.LOW, { t -> 85f + 20f * sin(t * TAU * 0.4f) }, 0.7f, { hold(it, 0.7f, 1.3f, 0.45f) * 0.5f })
+        noise(462, 0f, 2.5f, Band.BAND, { t -> 640f + 200f * sin(t * TAU * 0.33f + 0.5f) }, 2.2f, { hold(it, 0.7f, 1.3f, 0.45f) * 0.16f })
+        noise(463, 0.3f, 2.1f, Band.BAND, { t -> 2300f + 600f * sin(t * TAU * 0.5f) }, 9f, { t -> hold(t, 0.6f, 0.9f, 0.45f) * (0.5f + 0.5f * sin(t * TAU * 0.9f)) * 0.05f })
     }
 
     /** The tempest's wind, played over and over while it lasts: a gusting roar with a howl riding on it. */

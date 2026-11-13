@@ -79,6 +79,7 @@ class HudView(
 
         drawOverheads(c)
         drawFloaters(c, dt)
+        if (snap.portalRun) drawDimension(c)
         drawHud(c, dt)
         if (snap.phase != Phase.ENDED) controls.draw(c, snap.ammo, snap.ammoMax, snap.superCharge, snap.hyperCharge, snap.hyperLeft, snap.playerAlive && snap.phase == Phase.PLAYING, time)
         drawCoach(c)
@@ -177,6 +178,125 @@ class HudView(
         }
     }
 
+    // ------------------------------------------------------------------ Dimension
+
+    /** The deeper the dimension, the more of a word comes out wrong for a moment. */
+    private fun glitchText(s: String, dimension: Int): String {
+        if (dimension < 3) return s
+        val beat = (time * 9f).toInt()
+        if (((beat * 7919 + dimension * 31) % 23) > dimension) return s
+        val glyphs = "#%&?/\\|*01"
+        val b = StringBuilder(s)
+        for (k in 0 until minOf(dimension - 2, s.length / 2)) {
+            val i = ((beat * 31 + k * 17) and 0x7FFF) % b.length
+            if (b[i] != ' ') b.setCharAt(i, glyphs[(beat + k * 5) % glyphs.length])
+        }
+        return b.toString()
+    }
+
+    /**
+     * Dimension's layer over the world: a pointer toward the nearest echo (or the open portal), the Void's taunts, and
+     * the picture breaking up more the deeper the player goes (torn bands, colour split, blocks of noise, scanlines,
+     * a flicker now and then). Eerie, never gory.
+     */
+    private fun drawDimension(c: Canvas) {
+        val s = snap
+        val w = width.toFloat(); val h = height.toFloat()
+        val depth = s.portalDimension
+
+        // The pointer: an arrow at the edge of a ring round the player, toward the target, while it is off to one side.
+        if (s.portalTargetOn && s.phase == Phase.PLAYING && project(s.portalPlayerX, 0.6f, s.portalPlayerZ)) {
+            val px = o4[0]; val py = o4[1]
+            if (project(s.portalTargetX, 0.6f, s.portalTargetZ)) {
+                val tx = o4[0]; val ty = o4[1]
+                val dx = tx - px; val dy = ty - py
+                val d = kotlin.math.hypot(dx, dy)
+                if (d > dp(120f)) {
+                    val ux = dx / d; val uy = dy / d
+                    val r = dp(78f) + dp(6f) * sin(time * 5f)
+                    val ax = px + ux * r; val ay = py + uy * r
+                    val path = android.graphics.Path().apply {
+                        moveTo(ax + ux * dp(14f), ay + uy * dp(14f))
+                        lineTo(ax - uy * dp(9f) - ux * dp(6f), ay + ux * dp(9f) - uy * dp(6f))
+                        lineTo(ax - ux * dp(1f), ay - uy * dp(1f))
+                        lineTo(ax + uy * dp(9f) - ux * dp(6f), ay - ux * dp(9f) - uy * dp(6f))
+                        close()
+                    }
+                    fill.style = Paint.Style.FILL
+                    fill.color = if (s.portalOpen) Color.rgb(196, 150, 255) else Color.rgb(150, 236, 255)
+                    c.drawPath(path, fill)
+                    fill.style = Paint.Style.STROKE; fill.strokeWidth = dp(2.5f); fill.color = INK
+                    c.drawPath(path, fill)
+                    fill.style = Paint.Style.FILL
+                }
+            }
+        }
+
+        // The Void's taunt: whispered in under the top panel, fading after a few seconds.
+        val line = s.voidLine
+        if (line != null && s.voidAge in 0f..5f) {
+            val a = (minOf(s.voidAge / 0.4f, 1f, (5f - s.voidAge) / 0.8f)).coerceIn(0f, 1f)
+            val shown = line.take((s.voidAge * 38f).toInt().coerceAtMost(line.length))
+            text.textSize = dp(19f)
+            text.textSkewX = -0.2f
+            textStroke.textSkewX = -0.2f
+            val y = h * 0.27f
+            fill.color = Color.argb((a * 110).toInt(), 10, 2, 24)
+            c.drawRect(0f, y - dp(30f), w, y + dp(14f), fill)
+            text.textSize = dp(11f)
+            outlined(c, "THE VOID", w / 2, y - dp(14f), withAlpha(Color.rgb(185, 140, 255), a), dp(2.5f))
+            text.textSize = dp(19f)
+            outlined(c, glitchText(shown, depth), w / 2, y + dp(7f), withAlpha(Color.rgb(232, 220, 255), a), dp(3.5f))
+            text.textSkewX = 0f
+            textStroke.textSkewX = 0f
+        }
+
+        // The picture breaking up: nothing in the first dimension, more of it with every one after.
+        val k = ((depth - 1) / (io.github.projectwip.data.Balance.PORTAL_DEPTH.toFloat())).coerceIn(0f, 1f)
+        if (k <= 0f) return
+        val beat = (time * 12f).toInt()
+        fun hash(a: Int, b: Int): Float { var x = a * 374761393 + b * 668265263; x = (x xor (x ushr 13)) * 1274126177; return ((x xor (x ushr 16)) and 0xFFFF) / 65535f }
+        // A burst comes every so often, longer and more often deeper down.
+        val burst = hash(beat / 3, depth) < 0.12f + 0.4f * k
+        // Scanlines, faint at first.
+        fill.color = Color.argb((14 + 40 * k).toInt(), 0, 0, 0)
+        var yy = 0f
+        val gap = dp(3f)
+        while (yy < h) { c.drawRect(0f, yy, w, yy + dp(1f), fill); yy += gap }
+        if (burst) {
+            // Torn bands: a strip of the picture pushed sideways in red and cyan.
+            val bands = 1 + (k * 6).toInt()
+            for (i in 0 until bands) {
+                val by = hash(beat, i * 3 + 1) * h
+                val bh = dp(3f) + hash(beat, i * 3 + 2) * dp(28f) * (0.4f + k)
+                val off = (hash(beat, i * 3 + 3) - 0.5f) * dp(60f) * (0.3f + k)
+                fill.color = Color.argb((60 + 70 * k).toInt(), 255, 40, 90)
+                c.drawRect(off, by, w + off, by + bh * 0.5f, fill)
+                fill.color = Color.argb((60 + 70 * k).toInt(), 40, 230, 255)
+                c.drawRect(-off, by + bh * 0.5f, w - off, by + bh, fill)
+            }
+            // Blocks of dead pixels.
+            val blocks = (k * 14).toInt()
+            for (i in 0 until blocks) {
+                val bx = hash(beat, 100 + i) * w; val by = hash(beat, 200 + i) * h
+                val bw = dp(8f) + hash(beat, 300 + i) * dp(70f); val bh = dp(4f) + hash(beat, 400 + i) * dp(20f)
+                val v = hash(beat, 500 + i)
+                fill.color = if (v < 0.33f) Color.argb(150, 10, 0, 20) else if (v < 0.66f) Color.argb(110, 200, 160, 255) else Color.argb(120, 255, 255, 255)
+                c.drawRect(bx, by, bx + bw, by + bh, fill)
+            }
+        }
+        // Deep down, the whole picture flickers dark for a frame now and then.
+        if (depth >= 5 && hash(beat, 999) < 0.03f * depth) {
+            fill.color = Color.argb(70, 0, 0, 0)
+            c.drawRect(0f, 0f, w, h, fill)
+        }
+        // A vignette that closes in with depth.
+        val vg = android.graphics.RadialGradient(w / 2, h / 2, maxOf(w, h) * 0.75f, intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb((150 * k).toInt(), 18, 4, 36)), floatArrayOf(0f, 0.55f, 1f), android.graphics.Shader.TileMode.CLAMP)
+        fill.shader = vg
+        c.drawRect(0f, 0f, w, h, fill)
+        fill.shader = null
+    }
+
     private fun project(x: Float, y: Float, z: Float): Boolean {
         v4[0] = x; v4[1] = y; v4[2] = z; v4[3] = 1f
         Matrix.multiplyMV(o4, 0, snap.viewProj, 0, v4, 0)
@@ -234,22 +354,24 @@ class HudView(
             text.textSize = dp(12f)
             outlined(c, "%,d DAMAGE".format(s.damage), cx + dp(40f), top + dp(46f), Color.rgb(255, 214, 64), dp(3f))
         } else if (s.portalRun) {
-            // Which dimension, and how the wave stands; when the portal opens, say so.
+            // Which dimension (by name), and how many of its echoes are found; when the portal opens, say so.
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(120, 60, 220), null)
             text.textSize = dp(30f)
-            outlined(c, s.portalDimension.toString(), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
-            text.textSize = dp(17f)
-            outlined(c, "DIMENSION", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
+            outlined(c, glitchText(s.portalDimension.toString(), s.portalDimension), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
+            text.textSize = dp(15f)
+            outlined(c, glitchText(io.github.projectwip.data.Lore.dimensionName(s.portalDimension).uppercase(), s.portalDimension), cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
             text.textSize = dp(12f)
+            val shards = io.github.projectwip.data.Balance.PORTAL_SHARDS
             outlined(c, when {
-                s.portalOpen -> "PORTAL OPEN"
-                s.portalWave == 0 -> "ARRIVING…"
-                else -> "WAVE ${s.portalWave}/${io.github.projectwip.data.Balance.PORTAL_WAVES} · ${s.portalLeft} LEFT"
+                s.portalTravel -> "FALLING…"
+                s.portalOpen -> "THE PORTAL IS OPEN"
+                else -> "ECHOES " + "◆".repeat(s.portalFound) + "◇".repeat(shards - s.portalFound)
             }, cx + dp(40f), top + dp(46f), Color.rgb(200, 170, 255), dp(3f))
-            if (s.portalOpen && s.phase == Phase.PLAYING) {
+            if (s.phase == Phase.PLAYING && !s.portalTravel) {
                 val pulse = 0.75f + 0.25f * sin(time * 4f)
-                text.textSize = dp(20f)
-                outlined(c, "A PORTAL HAS OPENED · STEP INSIDE", cx, top + panelH + dp(34f), withAlpha(Color.rgb(205, 180, 255), pulse), dp(4f))
+                text.textSize = dp(17f)
+                outlined(c, if (s.portalOpen) "THE VOID WAITS AT THE PORTAL · STEP INSIDE" else "FIND THE ECHOES",
+                    cx, top + panelH + dp(30f), withAlpha(Color.rgb(205, 180, 255), if (s.portalOpen) pulse else 0.55f), dp(3.5f))
             }
         } else if (s.bossMode) {
             // Lives left, and the boss's health across a wide bar under the panel.

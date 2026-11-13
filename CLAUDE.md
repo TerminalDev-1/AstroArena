@@ -223,20 +223,27 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   While it runs, zeros and ones stream up over the poisoned fighter's head (`HudSnapshot.poisoned`, drawn in `HudView`).
   With nobody on the line he leaps anyway and the super is spent: a miss. His face is a hologram: a flat lit screen over a projector ring, no head.
 - Team code must not assume two teams when `rules.freeForAll`.
-- Dimension (`GameMode.PORTAL` in the code, "Dimension" to players: the user rejected "Portal Run"; 1.0) is the user's idea: waves of normal enemies, then a portal into another
-  dimension, and so on. The design is ours: one life, a pool of `PORTAL_POOL` enemy fighters waiting off the board
-  (eliminated) that each wave brings in (`Balance.portalWaveSize`), `PORTAL_WAVES` waves a dimension, then a portal
-  at the middle (`World.portal`, `PortalRun`, `stepPortal`, `GameEvent.PortalOpened/PortalEntered`). Stepping in
-  heals the player and takes them a dimension deeper, where enemies have more health and hit harder
-  (`PORTAL_HEALTH_GROWTH`, `Fighter.dimensionDamage`) and the arena is lit differently (`DIMENSION_LIGHT` in
-  `MatchRenderer`). The run's placement is how many portals were entered; it pays `per_portal` Cups each (up to
-  `max_portals`, in `trophies.cfg`, mirrored in `Economy.kt`) and never costs any; two deep earns an Arena Box.
-  Each time the player goes through, the Void speaks (`VOID_LINES`, `VoiceStyle.VOID`, with `Sound.VOID`, a breath
-  of shaped noise): eerie, never gory, as the user asked. It is a story mode, "just the character and the Void": on
-  arriving and at every portal the match pauses for `DimensionCutscene` (the user's design): a cut to black with a
-  blinding white light in the middle, an old-TV switch-off (to a line, then a dot), then a scene where the Void (a
-  drawn figure, `VoidPortrait`) and the player's fighter talk in turns (`data/Lore.kt`: each fighter answers in their
-  own voice), typed out, tap to go on. Debug: `--es screen portal`.
+- Dimension (`GameMode.PORTAL` in the code, "Dimension" to players: the user rejected "Portal Run"; 1.0) is the user's
+  idea, and since build 104 it is **primarily a lore mode, not a fighting mode** (the user's words). There are no
+  enemies (the roster is the player alone). Each dimension hides `PORTAL_SHARDS` echo shards (`PortalRun.shards`,
+  `scatterShards`, far from the start and each other); finding them all opens the portal at the middle
+  (`stepPortal`, `GameEvent.ShardFound/PortalOpened/PortalEntered`). From the second dimension the world tears open
+  near the player now and then (`HazardKind.RIFT`, `stepRifts`, `portalRiftEvery`): a marked patch that then takes
+  `PORTAL_RIFT_SHARE` of their health; one life, so a rift can end the run. `PORTAL_DEPTH` (7) portals reach the
+  bottom, where the story ends and the run with it (a victory). Placement is portals entered; it pays `per_portal`
+  Cups each (`trophies.cfg`, mirrored in `Economy.kt`); two deep earns an Arena Box. The server's `PORTAL_DEPTH` in
+  `rules.py` caps the placement.
+  The user asked for: every dimension weirder than the last, glitching artifacts that grow with depth, the Void
+  taunting the fighter all the way and standing at every portal after the first, and richer cutscenes. So:
+  `DIMENSION_LIGHT`/`DIMENSION_SKY` and the debris in `MatchRenderer.drawDimensionSolids`; the lit shader's `uWarp`
+  (the arena bending) and `uGlitch`/`uGlitchF` (bands of world jumping, colour-split rows), both 0 outside
+  Dimension; HUD glitches, the echo pointer and the Void's taunts (`Lore.taunt`) in `HudView.drawDimension`; the Void
+  as a 3D figure beside the open portal (`voidBody`); sounds `SHARD` (a chime), `RIFT` and `DIM_AIR` (the air,
+  replayed lower the deeper). `DimensionCutscene` (the user's design: cut to black, a blinding light, an old-TV
+  switch-off, then the Void and the fighter talking, tap to go on) is a staged scene: letterbox, a title card with
+  the dimension's name (`Lore.DIMENSIONS`), a sky of its own `Mood`, nebulae, shafts, a vortex, debris, a floor,
+  the Void with tendrils and orbiting shards, a glass dialogue panel, and glitches with depth. Each fighter answers
+  in their own voice (`Lore.REPLIES`, one line a dimension); the last scene is at the bottom. Eerie, never gory.
 - Bots hold fire for `BOT_WARMUP_SECONDS` at the start of a match and while their spawn shield is up (`Match.step`),
   because the user found them beating him up too early.
 - The results screen's team lists have fixed-height rows from the top, one line each when many have to fit
@@ -423,6 +430,11 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   what players see (it was "Beta" until then). Underneath, the build number (`BuildConfig.BUILD`) is what the updater
   and the server's version gate compare, so tags stay `vN.0` with N the build number (v103.0 for 1.0): a `v1.0` tag
   would look older than every build before it and nobody would update.
+- **Updates to 1.0 replace the 1.0 release, by the user's decision (build 104).** Don't publish a new release: edit
+  the existing "AstroArena 1.0" release, replace its APK with the new build's, and move its tag to the new build
+  (`gh release edit <old tag> --tag vN.0`, after pushing tag `vN.0` on the new commit). `versionName` stays "1.0";
+  the build number still goes up, and the tag must carry it, because the updater only offers a tag newer than the
+  installed build.
 - **No long-term support, by the user's decision.** Every build is replaced by the next: the update screen has no
   way past it, and nothing on the server is kept for the sake of an older build. Build 46 shipped with a LATER
   button, so the server refuses it (`versions_not_supported.cfg`); keep that rule. Don't add an update-later option.

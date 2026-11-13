@@ -75,6 +75,8 @@ class MatchRenderer(
     private var realmFade = 0f
     /** The light of the dimension being shown (Portal Run), eased toward the one the player is in. */
     private val dimLight = floatArrayOf(1f, 1f, 1f)
+    private var dimWarp = 0f
+    private var dimGlitch = 0f
     private lateinit var disc: Mesh
     private lateinit var ring: Mesh
     private lateinit var dashRing: Mesh
@@ -85,6 +87,11 @@ class MatchRenderer(
     private lateinit var cell: Mesh
     private lateinit var cellCaps: Mesh
     private lateinit var stormFloor: Mesh
+    /** Dimension: the Void as it stands at a portal, an echo shard, and the beam over one. */
+    private lateinit var voidBody: Mesh
+    private lateinit var voidEyes: Mesh
+    private lateinit var shardGem: Mesh
+    private lateinit var beam: Mesh
     /** One clump of the poison smoke: a few low, overlapping puffs, about two tiles across. */
     private lateinit var smokeClump: Mesh
     private val crateHitAt = HashMap<Int, Float>()
@@ -202,6 +209,24 @@ class MatchRenderer(
             color(0.66f, 0.98f, 0.46f); with { translate(0.35f, 0.18f, -0.25f); ellipsoid(0.5f, 0.4f, 0.5f, 6, 9) }
         }.build()
         stormFloor = MeshBuilder().apply { color(1f, 1f, 1f); ring(1f, 6f, 72) }.build()
+        voidBody = MeshBuilder().apply {
+            // A tall robe flaring to the ground, a deep hood, a hollow where a face should be, and sleeves hanging off it.
+            color(0xFF140A26L); with { translate(0f, 1.1f, 0f); cylinder(0.72f, 2.2f, 22, topRadius = 0.24f, caps = false) }
+            color(0xFF1C0E36L); with { translate(0f, 2.35f, 0f); ellipsoid(0.42f, 0.5f, 0.44f, 10, 16) }
+            color(0xFF000000L); with { translate(0f, 2.3f, 0.2f); ellipsoid(0.27f, 0.32f, 0.26f, 8, 14) }
+            color(0xFF160B2CL)
+            for (s in floatArrayOf(-1f, 1f)) with { translate(s * 0.45f, 1.55f, 0.05f); rotate(s * 22f, 0f, 0f, 1f); cylinder(0.12f, 1.1f, 10, topRadius = 0.2f) }
+        }.build()
+        voidEyes = MeshBuilder().apply {
+            color(1f, 1f, 1f)
+            for (s in floatArrayOf(-1f, 1f)) with { translate(s * 0.11f, 2.33f, 0.43f); ellipsoid(0.07f, 0.035f, 0.03f, 6, 10) }
+        }.build()
+        shardGem = MeshBuilder().apply {
+            color(1f, 1f, 1f); ellipsoid(0.26f, 0.62f, 0.26f, 2, 4)
+            with { translate(0.26f, -0.2f, 0.05f); rotate(25f, 0f, 0f, 1f); ellipsoid(0.11f, 0.28f, 0.11f, 2, 4) }
+            with { translate(-0.22f, -0.28f, -0.08f); rotate(-30f, 0f, 0f, 1f); ellipsoid(0.09f, 0.22f, 0.09f, 2, 4) }
+        }.build()
+        beam = MeshBuilder().apply { color(1f, 1f, 1f); with { translate(0f, 0.5f, 0f); cylinder(1f, 1f, 18, topRadius = 0.55f, caps = false) } }.build()
         shadow = if (gfx.shadowSize > 0) ShadowMap(gfx.shadowSize) else null
         particles.density = gfx.effects
         for (f in world.fighters) { shownFacing[f.id] = f.facing; shownVis[f.id] = 1f }
@@ -236,7 +261,8 @@ class MatchRenderer(
 
         renderShadows(alpha)
         GLES30.glViewport(0, 0, width, height)
-        GLES30.glClearColor(0.15f, 0.11f, 0.3f, 1f)
+        val sky = world.portal?.let { DIMENSION_SKY[(it.dimension - 1).coerceIn(0, DIMENSION_SKY.lastIndex)] }
+        if (sky != null) GLES30.glClearColor(sky[0], sky[1], sky[2], 1f) else GLES30.glClearColor(0.15f, 0.11f, 0.3f, 1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         renderScene(alpha)
         publishHud(alpha)
@@ -313,9 +339,16 @@ class MatchRenderer(
 
         // Environment. In a realm the whole arena goes dark and violet: only the fighters keep their colours.
         world.portal?.let { run ->
-            val want = DIMENSION_LIGHT[(run.dimension - 1) % DIMENSION_LIGHT.size]
+            val want = DIMENSION_LIGHT[(run.dimension - 1).coerceIn(0, DIMENSION_LIGHT.lastIndex)]
             for (i in 0..2) dimLight[i] += (want[i] - dimLight[i]) * 0.03f
+            // Every dimension down bends and tears the world a little more (none in the first).
+            val depth = (run.dimension - 1).toFloat()
+            dimWarp += (depth * 0.07f - dimWarp) * 0.03f
+            dimGlitch += (minOf(1f, depth / 6f) - dimGlitch) * 0.03f
         }
+        lit.f("uWarp", dimWarp)
+        lit.f("uGlitch", dimGlitch)
+        lit.f("uGlitchF", dimGlitch)
         val er = lerp(1f, 0.2f, realmFade) * dimLight[0]
         val eg = lerp(1f, 0.15f, realmFade) * dimLight[1]
         val eb = lerp(1f, 0.46f, realmFade) * dimLight[2]
@@ -327,6 +360,7 @@ class MatchRenderer(
         lit.v4("uTint", 1f, 1f, 1f, 1f)
         drawCrates(lit, shadowPass = false)
         drawCells()
+        drawDimensionSolids()
 
         // X-ray silhouettes: allies hidden behind walls still show as a tinted shape.
         GLES30.glEnable(GLES30.GL_BLEND)
@@ -414,6 +448,7 @@ class MatchRenderer(
         lit.i("uMode", 1)
         drawDecals(alpha)
         drawPortal()
+        drawShardMarks()
         lit.i("uMode", 0)
 
         // Shields
@@ -685,6 +720,107 @@ class MatchRenderer(
         if (rng.nextFloat() < 0.6f) particles.spawn(run.x + (rng.nextFloat() - 0.5f) * 0.4f, 0.2f, run.y + (rng.nextFloat() - 0.5f) * 0.4f, 0f, 3.5f, 0f, 0.8f, 0.16f, 0xFF8E5BFF.toInt(), 0.8f)
     }
 
+    /**
+     * Dimension's solid things: the echo shards turning in the air, the Void standing beside the portal (at every one
+     * after the first, as the user asked), and, deeper down, the debris of the world hanging over the arena.
+     */
+    private fun drawDimensionSolids() {
+        val run = world.portal ?: return
+        val depth = run.dimension
+        // Echoes: pale crystals hanging over the ground, turning, bobbing, glowing from inside.
+        if (run.state == io.github.projectwip.sim.PortalState.EXPLORE || run.state == io.github.projectwip.sim.PortalState.ARRIVE) {
+            lit.f("uEmissive", 0.65f)
+            for (i in 0 until io.github.projectwip.data.Balance.PORTAL_SHARDS) {
+                if (run.taken[i]) continue
+                val x = run.shards[i * 2]; val z = run.shards[i * 2 + 1]
+                val bob = 0.15f * sin(time * 2f + i * 2.1f)
+                lit.v4("uTint", 0.62f, 0.95f, 1f, 1f)
+                setModel(x, 1.05f + bob, z, 1f, 1f, 1f, time * 70f + i * 40f); shardGem.draw()
+            }
+            lit.f("uEmissive", 0f)
+        }
+        // The Void, waiting at the portal: hovering a little, swaying, its eyes lit.
+        if (run.state == io.github.projectwip.sim.PortalState.OPEN && depth >= 2) {
+            val vx = run.x + 1.9f; val vz = run.y - 0.9f
+            val hover = 0.25f + 0.12f * sin(time * 1.3f)
+            val p = match.player
+            val face = Math.toDegrees(atan2((p.x - vx).toDouble(), (p.y - vz).toDouble())).toFloat()
+            lit.f("uRim", 0.9f)
+            lit.v4("uTint", 1f, 1f, 1f, 1f)
+            setModel(vx, hover, vz, 1f, 1f, 1f, face); voidBody.draw()
+            lit.f("uEmissive", 1f)
+            val blink = if ((time % 4.3f) > 4.15f) 0.2f else 1f
+            lit.v4("uTint", 0.85f, 0.92f, 1f, 1f)
+            setModel(vx, hover + 2.33f * (1f - blink), vz, 1f, blink, 1f, face); voidEyes.draw()
+            lit.f("uEmissive", 0f)
+            lit.f("uRim", 0.25f)
+            // Wisps of dark coming off its hem.
+            if (rng.nextFloat() < 0.5f) particles.spawn(vx + (rng.nextFloat() - 0.5f) * 1.2f, hover + 0.1f, vz + (rng.nextFloat() - 0.5f) * 1.2f,
+                0f, 0.8f + rng.nextFloat(), 0f, 1.1f, 0.22f, if (rng.nextFloat() < 0.3f) 0xFF8E5BFF.toInt() else 0xFF241040.toInt(), 0.7f)
+        }
+        // Debris hanging in the air: more of it the deeper the dimension, turning slowly, some of it flickering.
+        if (depth >= 2) {
+            val count = (depth - 1) * 6
+            val tint = DIMENSION_LIGHT[(depth - 1).coerceIn(0, DIMENSION_LIGHT.lastIndex)]
+            for (i in 0 until count) {
+                val x = siteHash(i, depth, 1) * world.arena.width
+                val z = siteHash(i, depth, 2) * world.arena.height
+                if (!inView(x, z)) continue
+                if (depth >= 4 && siteHash(i, (time * 8f).toInt(), 3) < 0.04f * depth) continue
+                val y = 2.4f + siteHash(i, depth, 4) * 3.5f + 0.3f * sin(time * 0.8f + i)
+                val s = 0.25f + siteHash(i, depth, 5) * 0.7f
+                val shade = 0.35f + 0.4f * siteHash(i, depth, 6)
+                lit.v4("uTint", tint[0] * shade, tint[1] * shade, tint[2] * shade, 1f)
+                setModel(x, y, z, s, s * (0.4f + siteHash(i, depth, 7)), s, time * (10f + 30f * siteHash(i, depth, 8)) + i * 47f)
+                bit.draw()
+            }
+            lit.v4("uTint", 1f, 1f, 1f, 1f)
+        }
+        lit.mat4("uModel", identity)
+    }
+
+    /** Dimension: a beam of light over each echo still to find, and a ring on the ground under it (decal pass). */
+    private fun drawShardMarks() {
+        val run = world.portal ?: return
+        if (run.state != io.github.projectwip.sim.PortalState.EXPLORE && run.state != io.github.projectwip.sim.PortalState.ARRIVE) return
+        for (i in 0 until io.github.projectwip.data.Balance.PORTAL_SHARDS) {
+            if (run.taken[i]) continue
+            val x = run.shards[i * 2]; val z = run.shards[i * 2 + 1]
+            val beat = 0.5f + 0.5f * sin(time * 3f + i)
+            lit.v4("uTint", 0.55f, 0.92f, 1f, 0.16f + 0.08f * beat)
+            setModel(x, 0.05f, z, 0.9f, 1f, 0.9f); sector(360f).draw()
+            lit.v4("uTint", 0.8f, 0.97f, 1f, 0.8f)
+            setModel(x, 0.055f, z, 0.9f, 1f, 0.9f, time * 40f); dashRing.draw()
+            lit.v4("uTint", 0.6f, 0.95f, 1f, 0.12f + 0.05f * beat)
+            setModel(x, 0f, z, 0.5f, 7f, 0.5f); beam.draw()
+            if (rng.nextFloat() < 0.25f) particles.spawn(x + (rng.nextFloat() - 0.5f) * 0.6f, 0.3f, z + (rng.nextFloat() - 0.5f) * 0.6f, 0f, 2f, 0f, 1f, 0.08f, 0xFFBFF6FF.toInt(), 0.9f)
+        }
+    }
+
+    /**
+     * Dimension: the ground tearing open. A black hole in the floor exactly as wide as what it hits, its edge a broken
+     * ring of cyan and violet, filling in toward the moment it goes off, with fragments of floor flickering over it.
+     */
+    private fun drawRift(x: Float, z: Float, r: Float, t: Float) {
+        val flick = if ((time * 20f).toInt() % 3 == 0) 0.75f else 1f
+        lit.v4("uTint", 0.02f, 0f, 0.06f, (0.45f + 0.45f * t) * flick)
+        setModel(x, 0.046f, z, r, 1f, r); sector(360f).draw()
+        lit.v4("uTint", 0.45f, 0.2f, 0.9f, 0.5f * t)
+        setModel(x, 0.05f, z, r * t, 1f, r * t); sector(360f).draw()
+        lit.v4("uTint", 0.4f, 0.95f, 1f, 0.95f)
+        setModel(x, 0.054f, z, r, 1f, r, time * 90f); dashRing.draw()
+        lit.v4("uTint", 0.8f, 0.45f, 1f, 0.9f)
+        setModel(x, 0.056f, z, r * 0.97f, 1f, r * 0.97f, -time * 130f); dashRing.draw()
+        // Square fragments jumping about over it.
+        val tick = (time * 14f).toInt()
+        for (k in 0 until 6) {
+            val a = siteHash(tick, k, 1) * 6.283f; val d = siteHash(tick, k, 2) * r
+            val s = 0.08f + 0.18f * siteHash(tick, k, 3)
+            lit.v4("uTint", if (k % 2 == 0) 0.4f else 0.85f, if (k % 2 == 0) 0.95f else 0.5f, 1f, 0.8f)
+            setModel(x + cos(a) * d, 0.06f, z + sin(a) * d, s, 1f, s * 0.5f); rect.draw()
+        }
+    }
+
     /** A fixed pseudo-random number in 0..1 for grid site ([i], [j]) and channel [k]. */
     private fun siteHash(i: Int, j: Int, k: Int): Float {
         var h = (i * 73856093) xor (j * 19349663) xor (k * 83492791)
@@ -886,6 +1022,7 @@ class MatchRenderer(
         // Marked ground (Boss Mode): where something is about to land. The patch fills in as its time runs out.
         for (h in world.hazards) {
             val t = (h.age / h.delay).coerceIn(0f, 1f)
+            if (h.kind == HazardKind.RIFT) { drawRift(h.x, h.y, h.radius, t); continue }
             // Red for what is coming down on the player's side; gold for what their own side called in.
             val mine = h.team == p.team
             if (mine) lit.v4("uTint", 1f, 0.8f, 0.2f, 0.2f + 0.08f * sin(time * 14f)) else lit.v4("uTint", 1f, 0.16f, 0.12f, 0.26f + 0.1f * sin(time * 14f))
@@ -1550,7 +1687,7 @@ class MatchRenderer(
                     tint(if ((time * (4f + 10f * t)).toInt() % 2 == 0) 0xFFFF4FA3L else 0xFFFFFFFFL)
                     setModel(h.x, 0.22f, h.y, 0.3f, 0.2f, 0.3f); sphere.draw()
                 }
-                HazardKind.SLAM -> Unit
+                HazardKind.SLAM, HazardKind.RIFT -> Unit
                 // A flask on its way: up from whoever threw it and down onto the mark, turning as it goes.
                 HazardKind.BREW -> {
                     val from = world.fighter(h.ownerId)
@@ -1888,7 +2025,7 @@ class MatchRenderer(
                     val a = rng.nextFloat() * 6.28f
                     val sp = (2f + rng.nextFloat() * 5f) * e.radius
                     particles.spawn(e.x, 0.4f, e.y, cos(a) * sp, 2f + rng.nextFloat() * 5f, sin(a) * sp, 0.5f + rng.nextFloat() * 0.3f, 0.14f,
-                        if (e.kind == HazardKind.MINE) 0xFFFF4FA3.toInt() else if (e.kind == HazardKind.BREW) 0xFF7CFF4F.toInt() else 0xFFFF8A1F.toInt(), 1f, grav = 12f)
+                        if (e.kind == HazardKind.MINE) 0xFFFF4FA3.toInt() else if (e.kind == HazardKind.BREW) 0xFF7CFF4F.toInt() else if (e.kind == HazardKind.RIFT) (if (it % 2 == 0) 0xFF62F0FF.toInt() else 0xFFB46CFF.toInt()) else 0xFFFF8A1F.toInt(), 1f, grav = 12f)
                 }
                 repeat(5) {
                     particles.spawn(e.x + (rng.nextFloat() - 0.5f) * e.radius, 0.4f, e.y + (rng.nextFloat() - 0.5f) * e.radius, 0f, 1.2f + rng.nextFloat(), 0f,
@@ -1935,6 +2072,14 @@ class MatchRenderer(
                 }
                 if (e.targetId == pid) shake = max(shake, 0.12f)
             }
+            is GameEvent.ShardFound -> {
+                particles.spawn(e.x, 1f, e.y, 0f, 0f, 0f, 0.4f, 3f, 0xFFBFF6FF.toInt(), 0.9f)
+                repeat(26) {
+                    val a = rng.nextFloat() * 6.283f; val sp = 1.5f + rng.nextFloat() * 3.5f
+                    particles.spawn(e.x, 1f, e.y, cos(a) * sp, 1.5f + rng.nextFloat() * 4f, sin(a) * sp, 0.8f, 0.12f, if (it % 3 == 0) 0xFFFFFFFF.toInt() else 0xFF8FE9FF.toInt(), 1f)
+                }
+                shake = max(shake, 0.1f)
+            }
             is GameEvent.PortalOpened -> {
                 particles.spawn(e.x, 0.6f, e.y, 0f, 0f, 0f, 0.5f, 4f, 0xFFB98CFF.toInt(), 0.8f)
                 repeat(30) {
@@ -1978,11 +2123,23 @@ class MatchRenderer(
         s.portalRun = run != null
         if (run != null) {
             s.portalDimension = run.dimension
-            s.portalWave = if (run.state == io.github.projectwip.sim.PortalState.TRAVEL) 0 else run.wave
-            s.portalLeft = w.fighters.count { it.team != p.team && !it.eliminated }
+            s.portalFound = run.found
             s.portalOpen = run.state == io.github.projectwip.sim.PortalState.OPEN
-            s.voidLine = if (run.entered > 0) io.github.projectwip.data.Balance.VOID_LINES[(run.entered - 1) % io.github.projectwip.data.Balance.VOID_LINES.size] else null
-            s.voidAge = run.time - run.enteredAt
+            s.portalTravel = run.state == io.github.projectwip.sim.PortalState.TRAVEL
+            s.voidLine = if (run.taunt >= 0) io.github.projectwip.data.Lore.taunt(run.taunt) else null
+            s.voidAge = run.time - run.tauntAt
+            val px = lerp(p.prevX, p.x, alpha); val pz = lerp(p.prevY, p.y, alpha)
+            s.portalPlayerX = px; s.portalPlayerZ = pz
+            s.portalTargetOn = false
+            if (s.portalOpen) { s.portalTargetOn = true; s.portalTargetX = run.x; s.portalTargetZ = run.y }
+            else if (run.state == io.github.projectwip.sim.PortalState.EXPLORE) {
+                var best = Float.MAX_VALUE
+                for (i in 0 until io.github.projectwip.data.Balance.PORTAL_SHARDS) {
+                    if (run.taken[i]) continue
+                    val d = hypot(run.shards[i * 2] - px, run.shards[i * 2 + 1] - pz)
+                    if (d < best) { best = d; s.portalTargetOn = true; s.portalTargetX = run.shards[i * 2]; s.portalTargetZ = run.shards[i * 2 + 1] }
+                }
+            }
         }
         s.timesDown = p.deaths
         s.practice = w.rules.practice
@@ -2061,14 +2218,28 @@ class MatchRenderer(
         const val SHADOW_LUNGE = 0.3f
     }
 
-/** Portal Run: the light each dimension is drawn in, in turn (the first is the arena as it is). */
+/** Dimension: the light each dimension is drawn in, from the first (the arena as it is) down to the bottom. */
 private val DIMENSION_LIGHT = arrayOf(
     floatArrayOf(1f, 1f, 1f),
-    floatArrayOf(0.78f, 0.62f, 1.08f),
-    floatArrayOf(0.58f, 0.95f, 0.98f),
-    floatArrayOf(1.05f, 0.82f, 0.58f),
-    floatArrayOf(0.62f, 0.66f, 0.82f),
-    floatArrayOf(0.66f, 1f, 0.7f),
+    floatArrayOf(0.8f, 0.64f, 1.1f),
+    floatArrayOf(0.5f, 0.88f, 1.05f),
+    floatArrayOf(1.1f, 0.72f, 0.45f),
+    floatArrayOf(1.15f, 1.08f, 0.95f),
+    floatArrayOf(0.55f, 1.1f, 0.6f),
+    floatArrayOf(1.2f, 0.45f, 0.75f),
+    floatArrayOf(0.42f, 0.38f, 0.6f),
+)
+
+/** Dimension: what is beyond the edge of the arena in each one. */
+private val DIMENSION_SKY = arrayOf(
+    floatArrayOf(0.15f, 0.11f, 0.3f),
+    floatArrayOf(0.1f, 0.05f, 0.2f),
+    floatArrayOf(0.02f, 0.08f, 0.14f),
+    floatArrayOf(0.16f, 0.07f, 0.03f),
+    floatArrayOf(0.78f, 0.74f, 0.68f),
+    floatArrayOf(0.03f, 0.1f, 0.05f),
+    floatArrayOf(0.85f, 0.9f, 0.7f),
+    floatArrayOf(0f, 0f, 0f),
 )
 
 }

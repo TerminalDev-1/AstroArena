@@ -1005,8 +1005,11 @@ class Api(unittest.TestCase):
         self.assertEqual([rules.cup_delta("PORTAL", "DEFEAT", 0, 100, False), rules.cup_delta("PORTAL", "VICTORY", 3, 100, False)], [0, 12])
         self.assertEqual(rules.cup_delta("PORTAL", "VICTORY", 40, 100, False), 40, "ten portals' worth at most")
         self.assertEqual([rules.earns_drop("PORTAL", "VICTORY", 1), rules.earns_drop("PORTAL", "VICTORY", 2)], [False, True])
-        self.assertIsNone(rules.check_result("PORTAL", 300, outcome="VICTORY", placement=2, kos=20, deaths=1, damage=50000))
-        self.assertIsNotNone(rules.check_result("PORTAL", 300, outcome="VICTORY", placement=5, kos=2, deaths=1, damage=500))
+        # A lore mode since build 104: no enemies to knock out, seven portals to the bottom.
+        self.assertIsNone(rules.check_result("PORTAL", 300, outcome="VICTORY", placement=2, kos=0, deaths=0, damage=0))
+        self.assertIsNone(rules.check_result("PORTAL", 600, outcome="VICTORY", placement=7, kos=0, deaths=0, damage=0))
+        self.assertIsNotNone(rules.check_result("PORTAL", 600, outcome="VICTORY", placement=8, kos=0, deaths=0, damage=0))
+        self.assertIsNotNone(rules.check_result("PORTAL", 300, outcome="VICTORY", placement=5, kos=2, deaths=0, damage=500))
         self.assertIn("PORTAL", rules.MODES)
 
     def test_cpu_chips_become_arena_crystals_at_zero_once(self):
