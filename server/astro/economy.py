@@ -117,7 +117,7 @@ def first_win_prisms(mode: str, outcome: str, profile: dict, day: int) -> int:
     return FIRST_WIN_PRISMS
 
 
-# ---------------------------------------------------------------------------- the Cup Track
+# ---------------------------------------------------------------------------- rewards
 
 def _b(n): return {"type": "bolts", "amount": n}
 def _p(n): return {"type": "prisms", "amount": n}
@@ -126,11 +126,6 @@ def _f(name): return {"type": "fighter", "fighter": name}
 def _s(name, i): return {"type": "skin", "fighter": name, "skin": i}
 
 
-CUP_TRACK = {
-    10: _b(40), 25: _p(10), 40: _b(75), 60: _s("BYTE", 1), 80: _p(20), 100: _c(80), 130: _b(150), 160: _p(25),
-    200: _s("BRAKK", 1), 250: _b(250), 300: _p(40), 350: _c(200), 420: _b(400), 500: _c(300), 600: _p(60),
-    700: _b(600), 850: _s("BYTE", 2), 1000: _p(100), 1200: _c(400), 1500: _s("KITO", 1),
-}
 
 
 # ---------------------------------------------------------------------------- Credits and the Spark Road
@@ -262,7 +257,7 @@ def profile_from_save(save: dict) -> dict:
     profile["lastFirstWinDay"] = _int(save.get("lastFirstWinDay"), -1, low=-1)
     claimed = save.get("claimedMilestones")
     if isinstance(claimed, list):
-        profile["claimedMilestones"] = sorted({c for c in claimed if isinstance(c, int) and c in CUP_TRACK})
+        profile["claimedMilestones"] = []  # (the Cup Track was removed in build 111)
     fighters = save.get("fighters")
     if isinstance(fighters, dict):
         for name, count in rules.FIGHTER_SKINS.items():
@@ -366,18 +361,6 @@ def claim_gift(profile: dict, day: int) -> dict:
         raise Refused(409, "today's gift is already claimed")
     profile["lastDailyGiftDay"] = day
     return grant(profile, daily_gift(day))
-
-
-def claim_milestone(profile: dict, cups: int) -> dict:
-    reward = CUP_TRACK.get(cups)
-    if reward is None:
-        raise Refused(404, "no such Cup Track reward")
-    if cups > profile["bestCups"]:
-        raise Refused(409, "not reached yet")
-    if cups in profile["claimedMilestones"]:
-        raise Refused(409, "already claimed")
-    profile["claimedMilestones"] = sorted(profile["claimedMilestones"] + [cups])
-    return grant(profile, reward)
 
 
 # ---------------------------------------------------------------------------- deals (offers made by developers)

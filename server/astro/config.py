@@ -8,7 +8,6 @@ bots.cfg                     how bots behave at each difficulty (the client has 
 game.cfg                     the difficulties players may pick, who the developers are, how new accounts start
 shop.cfg                     the pool the day's shop offers are picked from
 news.cfg                     the items on the News tab
-trophies.cfg                 the Cups each mode pays
 """
 
 from __future__ import annotations
@@ -159,35 +158,9 @@ class Config:
                 for section in parser.sections()
             ][:30]
 
-        if self._changed("trophies.cfg"):
-            # Each section is a mode. Whatever the file leaves out, or gets wrong, keeps the built-in number.
-            parser = configparser.ConfigParser()
-            try:
-                parser.read(self._path("trophies.cfg"), encoding="utf-8")
-            except configparser.Error:
-                parser = configparser.ConfigParser()
-            cups = {mode: dict(pays) for mode, pays in rules.DEFAULT_CUPS.items()}
-            for section in parser.sections():
-                pays = cups.get(section.upper())
-                if pays is None:
-                    continue
-                for key, raw in parser.items(section):
-                    try:
-                        if key == "places":
-                            pays[key] = [int(n) for n in re.split(r"[,\s]+", raw.strip()) if n]
-                        elif key in ("win", "draw", "mvp_bonus", "per_portal", "max_portals"):
-                            pays[key] = int(raw)
-                        elif key in ("max_loss", "loss_step"):
-                            pays[key] = max(0, int(raw))
-                    except ValueError:
-                        continue
-            self._cups = cups
-
     def cups(self) -> dict[str, dict]:
-        """The Cups each mode pays (as written in trophies.cfg, over the built-in numbers)."""
-        with self._lock:
-            self._refresh()
-            return {mode: dict(pays) for mode, pays in self._cups.items()}
+        """(Cups were removed: nothing pays any.)"""
+        return {}
 
     def news(self) -> list[dict]:
         """The News tab's items (as written in news.cfg), newest first."""

@@ -10,36 +10,12 @@ from __future__ import annotations
 
 import math
 
-# ---------------------------------------------------------------------------- Cups
+# ---------------------------------------------------------------------------- Cups (removed)
 
-# Cups don't depend on how hard the bots are. What each mode pays is the operator's to set, in trophies.cfg
-# (`Config.cups`); these are the numbers for whatever that file leaves out.
-#   places      Cups by finishing place, first to last. A mode that has them is paid by place and nothing else.
-#   win, draw   Cups for a victory and for a draw; mvp_bonus is added to a victory as the match's MVP.
-#   max_loss    the most a defeat costs. With loss_step, a defeat costs 1 Cup for every loss_step Cups the
-#               player has, up to max_loss, so new players lose nothing.
-DEFAULT_CUPS = {
-    # The Entity's fight ("BOSS"): the game is a boss-fight game about the Entity now (Knockout Rush, Last Spark and
-    # Dimension were removed in build 111), so it pays what Knockout Rush did.
-    "BOSS": {"win": 8, "mvp_bonus": 2, "draw": 1, "max_loss": 6, "loss_step": 80},
-    # 1v1, against another real player (the lobby replays it and says who won: duel.py).
-    "DUEL": {"win": 8, "draw": 0, "max_loss": 6, "loss_step": 80},
-}
-# The Training Area is never played for Cups (nothing referees it), whatever trophies.cfg says.
-CUP_MODES = tuple(DEFAULT_CUPS)
+# Cups were removed in build 111, by the user's decision: the game is about fighting the Entity, and nothing pays a
+# Cup. (The leaderboard ranks players by their wins: `Store.leaderboard`.) cup_delta stays so that what reports a
+# match's worth can still say "0 Cups" to anything that asks.
 DIFFICULTIES = ("EASY", "NORMAL", "HARD", "ELITE")
-
-# A fighter has Cups of its own (won and lost while playing it) and a rank that follows them: rank 1 starts at
-# the first number here, rank 2 at the second, and so on. There is no top rank: past the end of the list every
-# further rank is another FIGHTER_RANK_STEP Cups, for as long as the Cups keep coming.
-FIGHTER_RANK_CUPS = [0, 10, 20, 35, 50, 75, 100, 140, 180, 230, 280, 340, 400, 470, 540, 620, 700, 790, 880, 1000]
-FIGHTER_RANK_STEP = 150
-
-
-def fighter_rank(cups: int) -> int:
-    if cups >= FIGHTER_RANK_CUPS[-1]:
-        return len(FIGHTER_RANK_CUPS) + (cups - FIGHTER_RANK_CUPS[-1]) // FIGHTER_RANK_STEP
-    return max(1, sum(1 for start in FIGHTER_RANK_CUPS if start <= cups))
 
 
 OUTCOMES = ("VICTORY", "DEFEAT", "DRAW")
@@ -49,23 +25,8 @@ MODES = {"BOSS": 2, "TRAINING": 0}
 
 
 def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, table: dict | None = None) -> int:
-    """How a match changes a player's Cups, by `table` (trophies.cfg). Never takes them below zero."""
-    pays = (DEFAULT_CUPS if table is None else table).get(mode) if mode in CUP_MODES else None
-    if not pays:
-        return 0
-    places = pays.get("places")
-    if "per_portal" in pays:
-        delta = pays["per_portal"] * min(max(placement, 0), pays.get("max_portals", 10))
-    elif places:
-        delta = places[min(max(placement - 1, 0), len(places) - 1)]
-    elif outcome == "VICTORY":
-        delta = pays.get("win", 0) + (pays.get("mvp_bonus", 0) if mvp else 0)
-    elif outcome == "DRAW":
-        delta = pays.get("draw", 0)
-    else:
-        loss, step = pays.get("max_loss", 0), pays.get("loss_step", 0)
-        delta = -(min(loss, cups // step) if step > 0 else loss)
-    return max(delta, -cups)
+    """Cups were removed: no match changes them."""
+    return 0
 
 
 # ---------------------------------------------------------------------------- Arena Boxes ("drops" in the code and the API): earning

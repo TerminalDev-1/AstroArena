@@ -23,6 +23,9 @@ import time
 from . import economy, rules
 from .economy import Refused
 
+# A player's wins: the matches the server judged a victory (the leaderboard ranks by them since Cups were removed).
+WINS = "(SELECT COUNT(*) FROM matches m WHERE m.player_id = players.id AND m.outcome = 'VICTORY')"
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS players (
     id          TEXT PRIMARY KEY,
@@ -69,6 +72,7 @@ CREATE TABLE IF NOT EXISTS deal_purchases (
     PRIMARY KEY (player_id, deal_id)
 );
 CREATE INDEX IF NOT EXISTS players_by_cups ON players(cups DESC);
+CREATE INDEX IF NOT EXISTS matches_by_player ON matches(player_id, outcome);
 CREATE INDEX IF NOT EXISTS matches_by_player ON matches(player_id);
 """
 
@@ -128,8 +132,6 @@ class Store:
         self._lock = threading.Lock()
         # Whether a new account's first save sets its starting progress (the operator's choice; see game.cfg).
         self.import_progress = lambda: True
-        # The Cups each mode pays (the operator's choice; see trophies.cfg).
-        self.cups = lambda: None
         with self._lock, self._db:
             self._db.executescript(SCHEMA)
             have = {row["name"] for row in self._db.execute("PRAGMA table_info(players)")}
@@ -142,6 +144,8 @@ class Store:
                     self._db.execute("ALTER TABLE matches ADD COLUMN %s %s" % (name, definition))
             # Arena Boxes were removed in 1.3: whatever anyone still held is wiped (the owner's decision).
             self._db.execute("UPDATE players SET drops = 0 WHERE drops != 0")
+            # Cups were removed in build 111 (the user's decision): everyone's are wiped.
+            self._db.execute("UPDATE players SET cups = 0 WHERE cups != 0")
 
     def close(self) -> None:
         with self._lock:
@@ -292,12 +296,12 @@ class Store:
             self._db.execute("DELETE FROM deal_purchases WHERE player_id = ?", (player_id,))
 
     def rank(self, player_id: str) -> tuple[int, int]:
-        """Where a player stands by Cups (1 = top; ties go to the older account), and how many players there are."""
+        """Where a player stands by wins (1 = top; ties go to the older account), and how many players there are."""
         with self._lock:
-            me = self._db.execute("SELECT cups, created_at FROM players WHERE id = ?", (player_id,)).fetchone()
+            me = self._db.execute("SELECT %s AS wins, created_at FROM players WHERE id = ?" % WINS, (player_id,)).fetchone()
             total = self._db.execute("SELECT COUNT(*) FROM players WHERE disabled = 0").fetchone()[0]
             ahead = self._db.execute(
-                "SELECT COUNT(*) FROM players WHERE disabled = 0 AND (cups > ? OR (cups = ? AND created_at < ?))", (me["cups"], me["cups"], me["created_at"])
+                "SELECT COUNT(*) FROM players WHERE disabled = 0 AND (%s > ? OR (%s = ? AND created_at < ?))" % (WINS, WINS), (me["wins"], me["wins"], me["created_at"])
             ).fetchone()[0]
         return ahead + 1, total
 
@@ -340,8 +344,6 @@ class Store:
     def claim_gift(self, player_id: str) -> dict:
         return self._change(player_id, lambda p: economy.claim_gift(p, today()))
 
-    def claim_milestone(self, player_id: str, cups: int) -> dict:
-        return self._change(player_id, lambda p: economy.claim_milestone(p, cups))
 
     # ------------------------------------------------------------------ deals
 
@@ -400,7 +402,7 @@ class Store:
         """
         text = json.dumps(save, separators=(",", ":"))
         name = clean_name((save.get("settings") or {}).get("playerName"))
-        cups = max(0, int(save.get("cups") or 0))
+        cups = 0  # (Cups were removed in build 111: an imported save brings none)
         drops = min(max(0, int(save.get("capsules") or 0)), rules.MAX_IMPORTED_DROPS)
         fighter = str(save.get("selectedFighter") or "BYTE")[:16]
         with self._lock, self._db:
@@ -504,16 +506,13 @@ class Store:
                 (now, outcome, placement, kos, deaths, damage, result.get("ticks"), 1 if verified else 0, match_id),
             )
             player = self._db.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
-            table = self.cups()
-            cups = max(0, player["cups"] + rules.cup_delta(mode, outcome, placement, player["cups"], mvp, table))
-            # How many of those Cups were the MVP's bonus, for the result screen to say so.
-            mvp_cups = rules.cup_delta(mode, outcome, placement, 10 ** 9, mvp, table) - rules.cup_delta(mode, outcome, placement, 10 ** 9, False, table)
+            # (Cups were removed in build 111: a match changes none.)
             day = today()
             earned = player["drops_today"] if player["drops_day"] == day else 0
             drop = rules.earns_drop(mode, outcome, placement) and earned < rules.DROPS_PER_DAY
             self._db.execute(
-                "UPDATE players SET cups = ?, drops = drops + ?, drops_day = ?, drops_today = ? WHERE id = ?",
-                (cups, 1 if drop else 0, day, earned + (1 if drop else 0), player_id),
+                "UPDATE players SET drops = drops + ?, drops_day = ?, drops_today = ? WHERE id = ?",
+                (1 if drop else 0, day, earned + (1 if drop else 0), player_id),
             )
             profile = self._profile(player_id)
             bolts = economy.match_bolts(mode, outcome, placement, kos, difficulty)
@@ -522,23 +521,15 @@ class Store:
             profile["prisms"] += prisms
             if prisms:
                 profile["lastFirstWinDay"] = day
-            profile["bestCups"] = max(profile["bestCups"], cups)
-            # The fighter that was played wins (or loses) the same Cups, and its rank follows them.
-            entry = profile["fighters"].get(match["fighter"])
-            fighter_before = entry.get("cups", 0) if entry else 0
-            fighter_cups = max(0, fighter_before + cups - player["cups"])
-            if entry:
-                entry["cups"] = fighter_cups
             # Credits for the Spark Road: they may unlock the fighter they were filling. (Bolts instead, once it is finished.)
             paid = economy.grant(profile, {"type": "credits", "amount": economy.match_credits(mode, outcome, placement)})
             if paid["type"] == "bolts":
                 bolts += paid["amount"]
             self._keep(player_id, profile)
             return {
-                "cupDelta": cups - player["cups"], "cups": cups, "drop": drop, "bolts": bolts, "firstWinPrisms": prisms,
-                "credits": economy.credits_in(paid), "unlocked": economy.fighters_in(paid), "mvpCups": mvp_cups,
-                "fighter": match["fighter"], "fighterCupsBefore": fighter_before, "fighterCups": fighter_cups,
-                "fighterRank": rules.fighter_rank(fighter_cups),
+                "cupDelta": 0, "cups": 0, "drop": drop, "bolts": bolts, "firstWinPrisms": prisms,
+                "credits": economy.credits_in(paid), "unlocked": economy.fighters_in(paid), "mvpCups": 0,
+                "fighter": match["fighter"],
             }
 
     # ------------------------------------------------------------------ Arena Boxes ("drops")
@@ -582,7 +573,7 @@ class Store:
     def leaderboard(self, limit: int) -> list[dict]:
         with self._lock:
             rows = self._db.execute(
-                "SELECT id, name, cups, fighter, profile FROM players WHERE disabled = 0 ORDER BY cups DESC, created_at ASC LIMIT ?", (max(1, min(limit, 200)),)
+                "SELECT id, name, fighter, %s AS wins, profile FROM players WHERE disabled = 0 ORDER BY wins DESC, created_at ASC LIMIT ?" % WINS, (max(1, min(limit, 200)),)
             ).fetchall()
         board = []
         for r in rows:

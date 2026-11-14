@@ -18,14 +18,14 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/shop/buy       {item}      buy a standing shop item with Prisms -> {reward}      (token)
     POST /v1/shop/gift                  claim the daily gift -> {reward}                      (token)
     POST /v1/shop/deals/<id>/buy        buy a deal -> {reward}                                (token)
-    POST /v1/track/claim    {cups}      claim a Cup Track reward -> {reward}                  (token)
+    POST /v1/track/claim                (removed with Cups: 410)
     POST /v1/shop/daily/<n>/buy {day}   buy one of today's offers -> {reward}                 (token)
     POST /v1/settings/difficulty {difficulty}  choose the bot difficulty; the server says yes or no  (token)
     POST /v1/reset                      start this account's progress over                    (token, developer)
     POST /v1/dev/grant      {...}       developer hand-outs                                   (token, developer)
     POST /v1/dev/deals      {...}       put a deal in everyone's shop -> {id}                 (token, developer)
     POST /v1/dev/deals/<id>/delete      take a deal out of the shop                           (token, developer)
-    GET  /v1/leaderboard?limit=50       players by Cups
+    GET  /v1/leaderboard?limit=50       players by wins
     GET  /v1/news                       the News tab's items (news.cfg)
     POST /v1/crashes        {report, version, device}  a crash the game saved; appended to logs/crashes.log
 
@@ -79,7 +79,6 @@ class Game:
         self.referee = referee if referee is not None and referee.available else None
         self.store = Store(db_path or os.path.join(directory, "astroarena.db"))
         self.store.import_progress = self.config.import_saves
-        self.store.cups = self.config.cups
         # accounts.cfg, the operator's view of every account. Whoever starts the server starts it running (run.py).
         self.accounts = Accounts(self.store, directory)
         self.started = time.time()
@@ -322,7 +321,7 @@ def make_handler(game: Game, quiet: bool = False):
             if url.path == "/v1/shop/gift":
                 return self._act(lambda p, d: {"reward": game.store.claim_gift(p["id"])})
             if url.path == "/v1/track/claim":
-                return self._act(lambda p, d: {"reward": game.store.claim_milestone(p["id"], int(d.get("cups") or 0))})
+                return self._error(410, "the Cup Track was removed")
             if url.path == "/v1/reset":
                 return self._act(lambda p, d: game.store.reset(p["id"]), developer=True)
             if url.path == "/v1/settings/difficulty":
