@@ -2,6 +2,10 @@ package io.github.projectwip.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -11,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,8 +28,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.projectwip.BuildConfig
-import io.github.projectwip.ui.ButtonStyle
-import io.github.projectwip.ui.ChunkyButton
 import io.github.projectwip.ui.GameText
 import io.github.projectwip.ui.LocalUi
 import io.github.projectwip.ui.PlainText
@@ -57,14 +58,25 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null,
         val style = Type.Display.copy(fontSize = if (roomy) 76.sp else 54.sp)
         Row(Modifier.align(Alignment.Center).graphicsLayer { scaleX = breathe; scaleY = breathe }) {
             for ((i, c) in LETTERS.withIndex()) {
-                val k = ((time - 0.25f - i * LETTER_GAP) / 0.35f).coerceIn(0f, 1f)
+                val t = time - 0.3f - i * LETTER_GAP
+                val k = (t / LETTER_IN).coerceIn(0f, 1f)
                 val eased = 1f - (1f - k) * (1f - k)
-                GameText(c.toString(), style, modifier = Modifier.graphicsLayer {
-                    alpha = eased
+                // Each letter lands neon purple, with a purple glow behind it, and cools to white.
+                // Solid fast (so the purple is at full strength), then the purple holds a moment and cools to white.
+                val shown = (t / 0.18f).coerceIn(0f, 1f)
+                val flash = if (t <= 0f) 0f else (1f - (t - 0.3f) / FLASH).coerceIn(0f, 1f)
+                Box(Modifier.graphicsLayer {
+                    alpha = shown
                     val s = 1.35f - 0.35f * eased
                     scaleX = s; scaleY = s
                     translationY = -18f * (1f - eased)
-                })
+                }, contentAlignment = Alignment.Center) {
+                    GameText(c.toString(), style, color = NEON, outline = 0.dp, modifier = Modifier.graphicsLayer {
+                        alpha = flash * 0.7f
+                        scaleX = 1f + 0.35f * (1f - flash); scaleY = scaleX
+                    })
+                    GameText(c.toString(), style, color = lerp(Color.White, NEON, flash))
+                }
             }
         }
 
@@ -80,16 +92,25 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null,
                 Type.Small.copy(letterSpacing = Type.Small.fontSize * 0.25f), color = Color.White.copy(alpha = 0.45f), maxLines = 1)
         }
 
-        if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
-            GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
-        }
+        if (onSkip != null) GhostButton("PLAY OFFLINE (DEV)", onSkip, Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 18.dp))
         // The opening, any time (the user's ask): in every build, release too.
-        if (onIntro != null) ChunkyButton(onIntro, Modifier.align(Alignment.TopEnd).padding(end = 18.dp, top = 18.dp).size(190.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
-            GameText("PLAY INTRO", Type.Label, outline = 2.dp)
-        }
+        if (onIntro != null) GhostButton("PLAY INTRO", onIntro, Modifier.align(Alignment.TopEnd).padding(end = 18.dp, top = 18.dp))
         PlainText(BuildConfig.VERSION_NAME + " · build " + BuildConfig.BUILD, Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp), color = Color.White.copy(alpha = 0.3f))
     }
 }
 
 private const val LETTERS = "ASTROARENA"
-private const val LETTER_GAP = 0.12f
+private const val LETTER_GAP = 0.2f
+private const val LETTER_IN = 0.5f
+private const val FLASH = 0.6f
+private val NEON = Color(0xFFC57BFF)
+
+/** A slim see-through button for the black loading screen: a thin light outline and small spaced letters. */
+@Composable
+private fun GhostButton(label: String, onClick: () -> Unit, modifier: Modifier) {
+    val shape = RoundedCornerShape(10.dp)
+    Box(modifier.clip(shape).background(Color.White.copy(alpha = 0.05f)).border(1.dp, Color.White.copy(alpha = 0.3f), shape)
+        .clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 10.dp)) {
+        PlainText(label, Type.Small.copy(letterSpacing = Type.Small.fontSize * 0.2f), color = Color.White.copy(alpha = 0.8f), maxLines = 1)
+    }
+}
