@@ -283,14 +283,25 @@ class HudView(
             io.github.projectwip.sim.UprisingPhase.GAZE -> if (t > 1.5f)
                 entityPlate(c, glitchText("THE ENTITY RISES", if ((time * 8f).toInt() % 4 == 0) 1f else 0f), "IT IS LOOKING AT EVERY ONE OF YOU", w / 2, h * 0.22f, minOf(1f, (t - 1.5f) / 0.4f))
             io.github.projectwip.sim.UprisingPhase.MARCH -> {
-                val k = (t / 3.2f).toInt()
+                val k = (t / 3f).toInt()
                 val lines = io.github.projectwip.data.Lore.UPRISING_CALL
-                entityPlate(c, lines[k % lines.size], null, w / 2, h * 0.22f, minOf(1f, (t - k * 3.2f) / 0.3f))
+                entityPlate(c, lines[k % lines.size], null, w / 2, h * 0.22f, minOf(1f, (t - k * 3f) / 0.3f))
             }
             io.github.projectwip.sim.UprisingPhase.BOW -> {
-                val k = (t / 4f).toInt()
+                // Its speech, spread over the whole bow (however long the walk took), with "Follow me" kept for the
+                // last seconds, as its portal opens.
+                val bal = io.github.projectwip.data.Balance
+                val total = bal.UPRISING_HOLD - bal.UPRISING_ENTER - (s.uprisingHeld - t)
+                val follow = 3.5f
                 val lines = io.github.projectwip.data.Lore.UPRISING_BOW
-                entityPlate(c, lines[minOf(k, lines.size - 1)], if (k == 0) "EVERYONE BOWS TO THE ENTITY" else null, w / 2, h * 0.22f, minOf(1f, (t - k * 4f) / 0.3f))
+                if (t >= total - follow) {
+                    val since = t - (total - follow)
+                    entityPlate(c, io.github.projectwip.data.Lore.UPRISING_FOLLOW, null, w / 2, h * 0.22f, minOf(1f, since / 0.3f))
+                } else {
+                    val per = ((total - follow) / lines.size).coerceIn(2.2f, 4f)
+                    val k = minOf((t / per).toInt(), lines.size - 1)
+                    entityPlate(c, lines[k], if (k == 0) "EVERYONE BOWS TO THE ENTITY" else null, w / 2, h * 0.22f, minOf(1f, (t - k * per) / 0.3f))
+                }
             }
             io.github.projectwip.sim.UprisingPhase.ENTER -> entityPlate(c, "Into my world.", "THROUGH THE PORTAL", w / 2, h * 0.22f, fade(4f))
             io.github.projectwip.sim.UprisingPhase.SKY -> {
@@ -306,7 +317,7 @@ class HudView(
                 c.drawRect(l + dp(14f), top + dp(24f), l + dp(14f) + (pw - dp(28f)) * frac, top + dp(36f), fill)
                 text.textSize = dp(13f)
                 outlined(c, "THE ENTITY · %,d".format(s.uprisingHp), w / 2, top + dp(18f), Color.WHITE, dp(2.5f))
-                if (t < 5f) entityPlate(c, "Then fight me. All of you.", "EVERY ATTACK GOES UP INTO IT", w / 2, h * 0.3f, minOf(1f, (5f - t) / 0.5f))
+                if (t < 5f) entityPlate(c, "Then fight me. All of you.", "HIT THE SHADOW UNDER IT", w / 2, h * 0.3f, minOf(1f, (5f - t) / 0.5f))
                 // Through the portal: a flash, fading.
                 if (t < 0.7f) { fill.color = Color.argb((255 * (1f - t / 0.7f)).toInt(), 230, 220, 255); c.drawRect(0f, 0f, w, h, fill) }
             }

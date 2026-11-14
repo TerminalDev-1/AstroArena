@@ -9,6 +9,7 @@ import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.GameMode
 import io.github.projectwip.data.MatchOutcome
 import io.github.projectwip.data.MatchReport
+import io.github.projectwip.data.SuperKind
 import kotlin.random.Random
 
 data class MatchConfig(
@@ -184,7 +185,8 @@ class Match(val config: MatchConfig) {
         pathfinder.budget = 1
         // Rotate who goes first so the same bot doesn't always get the tick's one path search.
         turn++
-        for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
+        // (In the Entity's dimension the bots are driven below: their brains know only the arena.)
+        if (!world.inSky) for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
         // A boss's brain only walks it about: what it does to the player is its script's business (see World).
         for (f in world.fighters) if (f.def.boss != null) { f.control.attack = false; f.control.superAttack = false; f.control.hyper = false }
         // Bots hold their fire for the first seconds of a match and while their spawn shield is up, so nobody is
@@ -193,14 +195,34 @@ class Match(val config: MatchConfig) {
         for (f in world.fighters) if (f.isBot && f.def.boss == null && (warmingUp || f.shield > 0f)) {
             f.control.attack = false; f.control.superAttack = false; f.control.hyper = false
         }
-        // In the Entity's sky (its uprising) bots fight it and nobody else: they keep striking at it, spend their
-        // powers on it and step out of its strikes. (While it holds everyone, World moves them itself.)
+        // In the Entity's dimension (its uprising) bots fight it and nobody else: they keep to their attack's reach of the
+        // shadow under it, circling, strike at it, spend their powers on it and step out of its strikes. (While it holds
+        // everyone, World moves them itself.)
         val up = world.uprising
         if (up != null && up.phase == UprisingPhase.SKY) for (f in world.fighters) {
             if (!f.isBot || !f.alive || f.def.boss != null) continue
             val c = f.control
-            c.moveX = 0f; c.moveY = 0f; c.aiming = false
-            c.attack = true; c.superAttack = f.superReady; c.hyper = f.hyperReady
+            val dx = up.ex - f.x; val dy = up.ey - f.y
+            val d = kotlin.math.hypot(dx, dy).coerceAtLeast(1e-3f)
+            val big = Balance.UPRISING_ENTITY_RADIUS
+            val reach = f.def.attack.range + big
+            // (Far enough in that the attack lands, never closer than it needs; a storm drives straight through it.)
+            val want = if (f.inTempest) 0f else maxOf(big * 0.5f, reach * 0.7f)
+            val ux = dx / d; val uy = dy / d
+            val circle = if (((f.id * 7 + up.strikes / 3) % 2) == 0) 0.55f else -0.55f
+            val inward = ((d - want) / 1.5f).coerceIn(-1f, 1f)
+            c.moveX = ux * inward - uy * circle * (1f - kotlin.math.abs(inward))
+            c.moveY = uy * inward + ux * circle * (1f - kotlin.math.abs(inward))
+            c.aimX = dx; c.aimY = dy; c.aiming = true
+            c.attack = d < reach - 0.3f
+            val sRange = when (f.def.superSpec.kind) {
+                SuperKind.TEMPEST -> 6f
+                SuperKind.RAM -> f.def.superSpec.range + big
+                else -> f.def.superSpec.range + big * 0.8f
+            }
+            c.superAttack = f.superReady && d < sRange
+            if (c.superAttack && f.def.superSpec.kind == SuperKind.BREW) { val r = minOf(d, f.def.superSpec.range); c.aimX = ux * r; c.aimY = uy * r }
+            c.hyper = f.hyperReady
             dodgeHazards(f)
         }
         // A glitching fighter fights on its own: the Entity is in control (the user's lore).

@@ -11,7 +11,7 @@ import kotlin.random.Random
 /**
  * Static 3D scene for an [Arena]. Sim (x, y) maps to world (x, 0, y). Built once per match on the GL thread.
  */
-class ArenaModel(val arena: Arena) {
+class ArenaModel(val arena: Arena, realm: Boolean = false) {
     /** Floor, pools, rim, surroundings — opaque, no outline. */
     val ground: Mesh
     /** Crate walls and props — opaque, outlined. */
@@ -29,13 +29,16 @@ class ArenaModel(val arena: Arena) {
         val s = MeshBuilder()
         val gr = MeshBuilder()
         val w = MeshBuilder()
-        buildFloor(g)
-        buildPools(g, w)
-        buildWalls(s)
-        buildRim(g, s)
-        buildSurroundings(g, s)
-        buildSpawnPads(g)
-        buildGrass(gr)
+        if (realm) buildRealm(g, s)
+        else {
+            buildFloor(g)
+            buildPools(g, w)
+            buildWalls(s)
+            buildRim(g, s)
+            buildSurroundings(g, s)
+            buildSpawnPads(g)
+            buildGrass(gr)
+        }
         ground = g.build(); solids = s.build(); grass = gr.build(); water = w.build()
     }
 
@@ -43,6 +46,81 @@ class ArenaModel(val arena: Arena) {
         var h = x * 374761393 + y * 668265263
         h = (h xor (h ushr 13)) * 1274126177
         return (h xor (h ushr 16)) and 0x7fffffff
+    }
+
+    // ------------------------------------------------------------------ the Entity's dimension
+
+    /**
+     * The Entity's dimension (`Arenas.entityRealm`): a round slab of dark violet stone floating in its void, laid in
+     * rings of flagstones round a sigil, with a lit edge, a jagged rock underside tapering away below, and broken
+     * pieces of it drifting round about. Its walkable edge is the arena's: tiles further out than
+     * `Arenas.ENTITY_REALM_RADIUS` from the middle stop a fighter.
+     */
+    private fun buildRealm(g: MeshBuilder, s: MeshBuilder) {
+        val c = arena.width / 2f
+        val rad = io.github.projectwip.sim.Arenas.ENTITY_REALM_RADIUS + 0.45f
+        // The slab: a thick disc whose top is the floor.
+        g.color(0.2f, 0.13f, 0.32f)
+        g.with { translate(c, -0.3f, c); cylinder(rad, 0.6f, 72) }
+        // Flagstones in rings: each ring of stones a shade apart, each stone a little different.
+        var ringIn = 0.9f
+        var band = 0
+        while (ringIn < rad - 0.4f) {
+            val ringOut = minOf(rad - 0.35f, ringIn + 1.5f)
+            val stones = maxOf(6, (ringOut * 4.2f).toInt())
+            for (k in 0 until stones) {
+                val h = hash(band, k)
+                val v = (h % 9) / 100f
+                if (band % 2 == 0) g.color(0.3f - v, 0.21f - v, 0.46f - v) else g.color(0.26f - v, 0.18f - v, 0.41f - v)
+                val from = 360f * k / stones + 0.6f
+                val to = 360f * (k + 1) / stones - 0.6f
+                g.with { translate(c, 0.004f, c); ring(ringIn + 0.05f, ringOut - 0.05f, 6, from, to) }
+            }
+            ringIn = ringOut
+            band++
+        }
+        // The sigil in the middle: an eye of rings, faintly lit.
+        g.color(0.55f, 0.3f, 0.95f)
+        g.with { translate(c, 0.008f, c); ring(0.55f, 0.78f, 40) }
+        g.color(0.35f, 0.85f, 1f)
+        g.with { translate(c, 0.009f, c); ring(0.18f, 0.3f, 24) }
+        for (k in 0 until 6) {
+            g.color(0.5f, 0.28f, 0.9f)
+            g.with { translate(c, 0.008f, c); rotate(k * 60f + 30f, 0f, 1f, 0f); groundQuad(-0.04f, 0.9f, 0.04f, rad - 0.5f, 0f) }
+        }
+        // Its lit edge: a band of violet light round the rim, cyan just inside it.
+        g.color(0.78f, 0.5f, 1f)
+        g.with { translate(c, 0.01f, c); ring(rad - 0.32f, rad - 0.08f, 96) }
+        g.color(0.42f, 0.95f, 1f)
+        g.with { translate(c, 0.012f, c); ring(rad - 0.46f, rad - 0.38f, 96) }
+        // The underside: rock tapering away into the void, in jagged steps.
+        s.color(0.17f, 0.1f, 0.27f)
+        s.with { translate(c, -1.6f, c); cylinder(rad * 0.82f, 2.0f, 14, topRadius = rad) }
+        s.color(0.13f, 0.08f, 0.22f)
+        s.with { translate(c, -4.0f, c); cylinder(rad * 0.45f, 2.8f, 11, topRadius = rad * 0.82f) }
+        s.color(0.1f, 0.06f, 0.17f)
+        s.with { translate(c, -6.6f, c); cylinder(0.6f, 2.4f, 9, topRadius = rad * 0.45f) }
+        // Broken pieces of it drifting round about, a dark slab with a lit top each.
+        val rr = Random(9)
+        for (i in 0 until 18) {
+            val a = rr.nextFloat() * 6.2832f
+            val d = rad + 2.5f + rr.nextFloat() * 12f
+            val x = c + cos(a) * d; val z = c + sin(a) * d
+            val y = -1.2f - rr.nextFloat() * 4.5f
+            val sz = 0.6f + rr.nextFloat() * 1.6f
+            s.color(0.18f, 0.11f, 0.3f)
+            s.with { translate(x, y - sz * 0.35f, z); rotate(rr.nextFloat() * 360f, 0f, 1f, 0f); cylinder(sz * 0.25f, sz * 0.8f, 6, topRadius = sz) }
+            g.color(0.32f, 0.22f, 0.5f)
+            g.with { translate(x, y + 0.06f, z); cylinder(sz * 0.95f, 0.04f, 6) }
+        }
+        // Crystals of its violet standing out of the rock just past the edge (out of reach: only to be seen).
+        for (i in 0 until 14) {
+            val a = i * (6.2832f / 14) + rr.nextFloat() * 0.25f
+            val d = rad + 0.3f + rr.nextFloat() * 0.4f
+            val ht = 0.8f + rr.nextFloat() * 1.8f
+            if (i % 3 == 0) s.color(0.42f, 0.9f, 1f) else s.color(0.62f, 0.36f, 1f)
+            s.with { translate(c + cos(a) * d, ht / 2 - 0.35f, c + sin(a) * d); rotate(rr.nextFloat() * 30f - 15f, cos(a), 0f, sin(a)); cylinder(0.02f, ht, 5, topRadius = 0.3f + rr.nextFloat() * 0.2f) }
+        }
     }
 
     // ------------------------------------------------------------------ floor

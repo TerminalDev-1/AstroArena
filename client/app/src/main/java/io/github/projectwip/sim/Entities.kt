@@ -35,7 +35,8 @@ class Fighter(
     val def: FighterDef,
     val level: Int,
     val skin: Int,
-    val team: Int,
+    /** (Changes only in the Entity's dimension, where everyone fights on one side, and back again.) */
+    var team: Int,
     val name: String,
     val isBot: Boolean,
     /** Fixed to the spot (Training Area targets): it can turn and shoot, but never walks, dashes or gets shoved. */
@@ -254,7 +255,7 @@ sealed interface GameEvent {
     /** The Entity's uprising moved on to [phase] (an `UprisingPhase` ordinal). */
     data class Uprising(val phase: Int) : GameEvent
     /** In the Entity's sky, [fighterId] struck it for [damage] (a super: [isSuper]). */
-    data class SkyShot(val fighterId: Int, val isSuper: Boolean, val damage: Int) : GameEvent
+    data class EntityHit(val fighterId: Int, val isSuper: Boolean, val damage: Int, val x: Float, val y: Float) : GameEvent
     data class Shot(val fighterId: Int, val isSuper: Boolean, val x: Float, val y: Float, val dirX: Float, val dirY: Float) : GameEvent
     data class Hit(val targetId: Int, val sourceId: Int, val damage: Int, val x: Float, val y: Float, val isSuper: Boolean) : GameEvent
     data class Blocked(val x: Float, val y: Float) : GameEvent

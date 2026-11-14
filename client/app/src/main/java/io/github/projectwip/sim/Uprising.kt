@@ -4,9 +4,11 @@ package io.github.projectwip.sim
  * The Entity's uprising (the user's idea, 1.3): once in every match, at a moment the match's seed picks, the sky goes
  * glitchy and the Entity rises over the arena, staring down at everyone. It takes every fighter in the match (players
  * and bots alike), walks them all to it, has them bow, and talks to them; then it opens a portal and takes them all
- * to a secret dimension, where every fighter, whatever their team, fights the Entity itself, high in the sky, every
- * attack flying up at it. When it is beaten, or when it lets them go, everyone is back where they stood, as they
- * were, and the match goes on. Nothing in it is a roll: it happens in every match, only the moment is the seed's.
+ * to its own dimension (a platform floating in its void, `Arenas.entityRealm`), where every fighter, whatever their
+ * team, fights side by side against the Entity itself, hovering huge over the platform. Attacks stay what they are,
+ * on the ground: whatever reaches the shadow under it ([Balance.UPRISING_ENTITY_RADIUS] round [Uprising.ex],
+ * [Uprising.ey]) hits it (the user's design: no camera tilted up, nothing flying into the sky). When it is beaten, or
+ * when it lets them go, everyone is back in the arena where they stood, as they were, and the match goes on. Nothing in it is a roll: it happens in every match, only the moment is the seed's.
  *
  * It is part of the simulation (`World.stepUprising`), so every device and the referee play it out the same way.
  */
@@ -21,7 +23,7 @@ enum class UprisingPhase {
     BOW,
     /** Its portal opens in the middle and everyone walks into it. */
     ENTER,
-    /** The secret dimension: everyone against the Entity, in the sky. */
+    /** Its dimension: everyone together against the Entity, hovering over them. */
     SKY,
     /** Back where they were. */
     RETURN,
@@ -44,13 +46,22 @@ class Uprising(
     val members = ArrayList<Int>()
     val slotX = HashMap<Int, Float>()
     val slotY = HashMap<Int, Float>()
-    /** Where each one stood and the health they had, to put them back afterwards: x, y, hp. */
+    /** How each one was, to put them back afterwards: x, y, hp, super charge, hyper charge, ammo, blade bar, the Entity's pull. */
     val saved = HashMap<Int, FloatArray>()
     /** The Entity's health in the sky. */
     var hp = 0
     var maxHp = 0
     var strikeIn = 0f
     var strikes = 0
+    /** Where the Entity hovers in its dimension: the middle of the shadow under it, which is what attacks hit. */
+    var ex = 0f
+    var ey = 0f
+    /** The arena the match was in, while everyone is in the Entity's dimension. */
+    var home: Arena? = null
+    /** Everyone's own team, while they fight on one side in its dimension. */
+    val teams = HashMap<Int, Int>()
+    /** Hexes biting the Entity. */
+    val hexes = ArrayList<Hex>()
     /** True once it has been beaten (rather than having let them go). */
     var beaten = false
 

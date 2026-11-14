@@ -278,6 +278,24 @@ object Arenas {
      * Dimension's arena: Foundry Yard with the bush in the very middle cleared away, because the portal stands there
      * (the user's decision, build 106).
      */
+    /**
+     * The Entity's dimension (its uprising): a round platform floating in its void, open from edge to edge, and nothing
+     * round it but the drop (the tiles off the edge stop a fighter but not a shot). [ENTITY_REALM_RADIUS] tiles across
+     * from the middle.
+     */
+    fun entityRealm(): Arena {
+        val r = ENTITY_REALM_RADIUS
+        val size = 2 * r + 2
+        val c = size / 2f
+        val tiles = Array(size * size) { i ->
+            val x = i % size + 0.5f; val y = i / size + 0.5f
+            if (kotlin.math.hypot(x - c, y - c) <= r) Tile.FLOOR else Tile.WATER
+        }
+        val spawn = listOf(Spawn(c, c + 2f))
+        return Arena("The Entity's Dimension", size, size, tiles, listOf(spawn, spawn), spawn)
+    }
+    const val ENTITY_REALM_RADIUS = 9
+
     fun dimension(): Arena = foundryYard().let { it.withoutGrassNear(it.width / 2f, it.height / 2f, 2.4f) }
 
     fun foundryYard(): Arena = Arena.fromQuadrant(

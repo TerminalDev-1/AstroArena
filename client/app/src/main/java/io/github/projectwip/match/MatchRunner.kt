@@ -271,7 +271,13 @@ class MatchRunner(
             return
         }
         val t = match.world.nearestVisibleEnemy(p, range)
+        val u = match.world.uprising
         if (t != null) { c.aimX = t.x - p.x; c.aimY = t.y - p.y }
+        else if (match.world.inSky && u != null) {
+            // (In the Entity's dimension: on the shadow under it, as far as it reaches.)
+            val dx = u.ex - p.x; val dy = u.ey - p.y; val d = hypot(dx, dy).coerceAtLeast(1e-3f)
+            c.aimX = dx / d * minOf(d, range); c.aimY = dy / d * minOf(d, range)
+        }
         else { c.aimX = cos(p.facing) * range * 0.5f; c.aimY = sin(p.facing) * range * 0.5f }
     }
 
@@ -313,9 +319,13 @@ class MatchRunner(
                 return
             }
             val t = autoTarget ?: w.nearestVisibleEnemy(p, range + 3f)
+            val u = w.uprising
             if (t != null) {
                 w.leadAim(p, t, speed, lead)
                 c.aimX = lead[0]; c.aimY = lead[1]
+            } else if (w.inSky && u != null) {
+                // (In the Entity's dimension a tap goes at the Entity: the middle of the shadow under it.)
+                c.aimX = u.ex - p.x; c.aimY = u.ey - p.y
             } else {
                 c.aimX = cos(p.facing); c.aimY = sin(p.facing)
             }
@@ -350,7 +360,7 @@ class MatchRunner(
                 io.github.projectwip.sim.UprisingPhase.RETURN -> sfx.play(Sound.WHOOSH, 1f, 0.7f)
                 else -> Unit
             }
-            is GameEvent.SkyShot -> if (e.fighterId == pid) sfx.play(if (e.isSuper) Sound.SHOCK else Sound.WHOOSH, if (e.isSuper) 0.9f else 0.45f, 1.3f)
+            is GameEvent.EntityHit -> if (e.fighterId == pid) sfx.play(Sound.HIT, if (e.isSuper) 0.9f else 0.55f, 0.75f)
             is GameEvent.Shot -> {
                 if (e.isSuper && e.fighterId == pid) say(VoiceCue.SUPER)
                 val f = world.fighter(e.fighterId) ?: return

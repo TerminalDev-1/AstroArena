@@ -108,12 +108,14 @@ class HudSnapshot {
     /** The Entity's uprising: its phase (an `UprisingPhase` ordinal, -1 for none), seconds in it, its health in the sky. */
     var uprisingPhase = -1
     var uprisingT = 0f
+    /** Seconds the Entity has held everyone so far (`Uprising.heldFor`). */
+    var uprisingHeld = 0f
     var uprisingHp = 0
     var uprisingMaxHp = 0
     var uprisingBeaten = false
 
     fun copyFrom(o: HudSnapshot) {
-        uprisingPhase = o.uprisingPhase; uprisingT = o.uprisingT; uprisingHp = o.uprisingHp; uprisingMaxHp = o.uprisingMaxHp; uprisingBeaten = o.uprisingBeaten
+        uprisingPhase = o.uprisingPhase; uprisingT = o.uprisingT; uprisingHeld = o.uprisingHeld; uprisingHp = o.uprisingHp; uprisingMaxHp = o.uprisingMaxHp; uprisingBeaten = o.uprisingBeaten
         width = o.width; height = o.height
         System.arraycopy(o.viewProj, 0, viewProj, 0, 16)
         phase = o.phase; phaseTime = o.phaseTime; countdownSeconds = o.countdownSeconds; timeLeft = o.timeLeft

@@ -366,14 +366,19 @@ object Balance {
     /** It holds everyone for this long in all (the user: "at least a minute") before they go through its portal. */
     const val UPRISING_HOLD = 60f
     const val UPRISING_ENTER = 4f
-    /** The longest the fight in its sky lasts: then it lets them go, beaten or not. */
+    /** The longest the fight in its dimension lasts: then it lets them go, beaten or not. */
     const val UPRISING_SKY = 60f
     const val UPRISING_RETURN = 1.5f
-    /** Its health in the sky: everyone's attack damage (all of a volley) added up, this many times over. */
-    const val UPRISING_HP_SHOTS = 22
-    /** Shortest time between two strikes at it from one fighter. */
-    const val UPRISING_ATTACK_GAP = 0.35f
-    /** A super into the sky does this many attacks' worth. */
+    /** Its health in its dimension: everyone's attack damage (all of a volley) added up, this many times over. */
+    const val UPRISING_HP_SHOTS = 100
+    /**
+     * It hovers over its platform, and the shadow under it, this many tiles round it, is what attacks hit: they stay
+     * on the ground (the user's design) and land on it where they reach that shadow.
+     */
+    const val UPRISING_ENTITY_RADIUS = 2.2f
+    /** It drifts after the fight, toward the middle of everyone, this many tiles a second. */
+    const val UPRISING_ENTITY_SPEED = 1.1f
+    /** A super with nothing of its own to do to it (Buddy's leap) lands on it for this many attacks' worth. */
     const val UPRISING_SUPER_SHOTS = 4
     /** Its own strikes down at them: marked circles that hurt everyone (never a knock-out). */
     const val UPRISING_STRIKE_GAP = 2.4f

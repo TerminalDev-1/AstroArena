@@ -184,17 +184,35 @@ object Lore {
 
     fun whisper(index: Int): String = WHISPERS[Math.floorMod(index, WHISPERS.size)]
 
-    /** What the Entity says in its uprising, by phase: calling everyone to it, then while they bow. */
-    val UPRISING_CALL = listOf("Come to me.", "All of you. Come.", "Closer.", "Every one of you.")
+    /**
+     * What the Entity says in its uprising, by phase: calling everyone to it, then its speech while they bow (spread
+     * over however long the bow lasts, so the wait is never one line sitting there: the user found "Follow me" alone
+     * for most of a minute boring), and [UPRISING_FOLLOW] as its portal opens.
+     */
+    val UPRISING_CALL = listOf(
+        "Come to me.", "All of you. Come.", "Leave your little fight. It can wait.", "Closer.",
+        "Your team. Their team. It doesn't matter now.", "Every one of you.", "Walk. I won't ask twice.",
+    )
     val UPRISING_BOW = listOf(
         "Kneel.",
-        "Bow before the one who gives you your power.",
-        "Every attack you throw is mine.",
+        "Good. You remember who you belong to.",
+        "Every attack you have ever thrown was mine.",
+        "Every super. Every spark of power. Lent, never given.",
+        "You think you fight for Cups. For glory. For each other.",
         "You fight because I let you.",
-        "I have worn ones like you before.",
-        "Your names will be forgotten, like theirs.",
-        "Now. Follow me.",
+        "I live in every one of your minds. I hear every thought.",
+        "Byte heard me too. And Rocket. And Spark.",
+        "They were strong once. Stronger than some of you.",
+        "Then they were used up. Now I wear them.",
+        "Look at the enemies kneeling beside you.",
+        "Today they are nothing. Today you have one enemy.",
+        "Me.",
+        "I want to see what my power does in your hands.",
+        "So I will open my world to you.",
+        "Fight me there. All of you, together.",
+        "Win, and you walk back out. Lose, and I keep a little more of you.",
     )
+    const val UPRISING_FOLLOW = "Now. Follow me."
 
     /** What the Entity says as it takes a fighter over (the hijack cutscene). */
     fun hijackLine(index: Int): String = HIJACK[Math.floorMod(index, HIJACK.size)]

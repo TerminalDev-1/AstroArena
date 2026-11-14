@@ -1523,16 +1523,25 @@ class SimulationTest {
         var bowedTogether = false
         var skyHits = 0
         var hurtEachOther = false
+        var inRealm = false
+        var charges: Map<Int, Pair<Float, Float>> = emptyMap()
+        var oneSide = true
+        val home = w.arena
+        val teams = w.fighters.associate { it.id to it.team }
         var t = 0
         while (u.phase != io.github.projectwip.sim.UprisingPhase.DONE && t < 60 * 400) {
             val wasWaiting = u.phase == io.github.projectwip.sim.UprisingPhase.WAITING
-            if (wasWaiting) { before = w.fighters.filter { it.alive }.associate { it.id to (it.x to it.y) }; clockAtStart = w.timeLeft }
+            if (wasWaiting) { before = w.fighters.filter { it.alive }.associate { it.id to (it.x to it.y) }; clockAtStart = w.timeLeft; charges = w.fighters.associate { it.id to (it.superCharge to it.hyperCharge) } }
             m.step(Match.STEP); t++
             seen += u.phase
             if (u.phase == io.github.projectwip.sim.UprisingPhase.BOW)
                 bowedTogether = u.members.all { id -> w.fighter(id)!!.let { kotlin.math.hypot(it.x - u.slotX.getValue(id), it.y - u.slotY.getValue(id)) < 0.2f } }
+            if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) {
+                if (w.arena !== home && w.arena.name == "The Entity's Dimension") inRealm = true
+                if (u.members.any { w.fighter(it)!!.team != 0 }) oneSide = false
+            }
             for (e in w.events) {
-                if (e is io.github.projectwip.sim.GameEvent.SkyShot) skyHits++
+                if (e is io.github.projectwip.sim.GameEvent.EntityHit) skyHits++
                 if (e is io.github.projectwip.sim.GameEvent.Hit && u.phase == io.github.projectwip.sim.UprisingPhase.SKY && e.sourceId >= 0) hurtEachOther = true
             }
         }
@@ -1540,13 +1549,65 @@ class SimulationTest {
         assertTrue("everyone came", u.members.size == before.size && u.members.size >= 4)
         assertTrue("everyone stood in their place round it, bowing", bowedTogether)
         assertTrue("it held them at least a minute", u.heldFor >= Balance.UPRISING_HOLD - 0.1f)
-        assertTrue("the bots struck it in the sky ($skyHits)", skyHits > 10)
-        assertFalse("nobody hurt anybody else up there", hurtEachOther)
+        assertTrue("the bots struck it in its dimension ($skyHits)", skyHits > 10)
+        assertFalse("nobody hurt anybody else in there", hurtEachOther)
+        assertTrue("they fought on the Entity's own platform", inRealm)
+        assertTrue("everyone fought on one side", oneSide)
+        assertTrue("back in the match's own arena", w.arena === home)
+        for (f in w.fighters) assertEquals("${f.name} is on their own team again", teams.getValue(f.id), f.team)
+        for ((id, c) in charges) {
+            val f = w.fighter(id)!!
+            assertEquals("${f.name} has the super charge they had before", c.first, f.superCharge, 1e-4f)
+            assertEquals("${f.name} has the hyper charge they had before", c.second, f.hyperCharge, 1e-4f)
+            assertFalse("${f.name} has no hypercharge running", f.hyperActive)
+        }
         assertTrue("the match clock waited", w.timeLeft >= clockAtStart - 0.1f)
         for ((id, at) in before) {
             val f = w.fighter(id)!!
             assertEquals("${f.name} is back where they stood", at.first, f.x, 0.01f)
             assertEquals(at.second, f.y, 0.01f)
+        }
+    }
+
+    /**
+     * In the Entity's dimension every fighter's own attack and super land on it where they reach the shadow under it
+     * (the user's design: attacks stay on the ground, nothing goes up into the sky).
+     */
+    @Test fun everyFightersAttackAndSuperLandOnTheEntityInItsDimension() {
+        for (id in listOf(FighterId.BYTE, FighterId.BRAKK, FighterId.KIRA, FighterId.KITO, FighterId.BUDDY)) {
+            val m = Match(MatchConfig(id, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 33L, uprisingAt = 1f))
+            val w = m.world
+            val u = w.uprising!!
+            val p = m.player
+            var t = 0
+            while (u.phase != io.github.projectwip.sim.UprisingPhase.SKY && t < 60 * 120) { m.step(Match.STEP); t++ }
+            assertEquals(io.github.projectwip.sim.UprisingPhase.SKY, u.phase)
+            var attackHits = 0
+            var superHits = 0
+            var superUsed = false
+            var tempestHits = 0
+            t = 0
+            while (u.phase == io.github.projectwip.sim.UprisingPhase.SKY && t < 60 * 25) {
+                val c = p.control
+                val dx = u.ex - p.x; val dy = u.ey - p.y
+                val d = kotlin.math.hypot(dx, dy).coerceAtLeast(1e-3f)
+                val want = if (p.inTempest) 0f else maxOf(1f, (p.def.attack.range + Balance.UPRISING_ENTITY_RADIUS) * 0.6f)
+                val inward = ((d - want) / 1.5f).coerceIn(-1f, 1f)
+                c.moveX = dx / d * inward; c.moveY = dy / d * inward
+                val r = minOf(d, p.def.superSpec.range.coerceAtLeast(1f))
+                c.aimX = dx / d * r; c.aimY = dy / d * r; c.aiming = true
+                // A few seconds of attacks, then the super (charged for the test).
+                c.attack = t < 60 * 6 || superUsed
+                if (t == 60 * 6) p.superCharge = 1f
+                c.superAttack = t >= 60 * 6 && !superUsed && p.superReady
+                if (c.superAttack) superUsed = true
+                m.step(Match.STEP); t++
+                for (e in w.events) if (e is io.github.projectwip.sim.GameEvent.EntityHit && e.fighterId == p.id) {
+                    if (e.isSuper) superHits++ else if (p.inTempest) tempestHits++ else attackHits++
+                }
+            }
+            assertTrue("$id: its attack lands on the Entity ($attackHits)", attackHits >= 3)
+            assertTrue("$id: its super lands on the Entity (super $superHits, tempest $tempestHits)", superHits + tempestHits >= 1)
         }
     }
 

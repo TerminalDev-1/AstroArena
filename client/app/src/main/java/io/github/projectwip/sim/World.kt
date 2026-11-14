@@ -109,11 +109,14 @@ class Storm(val cx: Float, val cy: Float, val startRadius: Float) {
  * it can run in unit tests, headless bot-vs-bot balance runs, or a future server.
  */
 class World(
-    val arena: Arena,
+    /** (The Entity's dimension swaps it for its own platform while everyone is there: see `beginSky`.) */
+    arena: Arena,
     val fighters: List<Fighter>,
     val rules: MatchRules = MatchRules(),
     private val random: Random = Random.Default,
 ) {
+    var arena: Arena = arena
+        private set
     val projectiles = ArrayList<Projectile>(64)
     val pickups = ArrayList<Pickup>()
     /** Marked patches of ground waiting to go off (Boss Mode). */
@@ -243,7 +246,9 @@ class World(
         u.members.clear()
         for (f in fighters) if (f.alive) {
             u.members += f.id
-            u.saved[f.id] = floatArrayOf(f.x, f.y, f.hp.toFloat())
+            // (A hypercharge running when it comes is put away, ready to use again afterwards.)
+            if (f.hyperActive) { endHyper(f); f.hyperCharge = 1f }
+            u.saved[f.id] = floatArrayOf(f.x, f.y, f.hp.toFloat(), f.superCharge, f.hyperCharge, f.ammo, f.edge, f.entityPull)
             // Whatever they were in the middle of ends.
             f.tempestLeft = 0f; f.dashTime = 0f; f.leapTime = 0f
             f.hexes.clear(); f.poisonBy = -1
@@ -316,16 +321,56 @@ class World(
         return false
     }
 
+    /** In the Entity's dimension, fighting it. */
+    val inSky get() = uprising?.phase == UprisingPhase.SKY
+
+    /** In the Entity's dimension: whether a circle at (x, y) of radius [r] reaches the shadow under it (what hits it). */
+    private fun onEntity(x: Float, y: Float, r: Float): Boolean {
+        val u = uprising ?: return false
+        return u.phase == UprisingPhase.SKY && u.hp > 0 && hypot(x - u.ex, y - u.ey) < Balance.UPRISING_ENTITY_RADIUS + r
+    }
+
+    /**
+     * Whether the line from [f] along (dx, dy) passes over the Entity's shadow within [range]; if so, how far along the
+     * line its near edge is (below 0: it doesn't).
+     */
+    private fun entityOnLine(f: Fighter, dx: Float, dy: Float, range: Float): Float {
+        val u = uprising ?: return -1f
+        if (u.phase != UprisingPhase.SKY || u.hp <= 0) return -1f
+        val ox = u.ex - f.x; val oy = u.ey - f.y
+        val on = ox * dx + oy * dy
+        val big = Balance.UPRISING_ENTITY_RADIUS
+        if (on <= 0f || on - big > range || kotlin.math.abs(ox * dy - oy * dx) > big + f.radius) return -1f
+        return maxOf(0f, on - big * 0.6f)
+    }
+
     private fun beginSky(u: Uprising) {
-        // Through the portal: set down round the middle of its dimension, spread out.
-        val n = u.members.size
+        // Through the portal and into its dimension: its own platform, floating in its void. Everyone there fights on
+        // one side (their teams are kept to give back), set down in an arc in front of it.
+        u.home = arena
+        arena = Arenas.entityRealm()
+        val c = arena.width / 2f
+        u.ex = c; u.ey = c - 2.5f
+        u.hexes.clear()
+        val n = u.members.count { fighter(it)?.def?.boss == null }
         var hp = 0
-        for ((k, id) in u.members.withIndex()) {
+        var k = 0
+        for (id in u.members) {
             val f = fighter(id) ?: continue
-            val a = k * (6.2831855f / n) - 1.5707964f
-            val spot = arena.nearestOpen(u.cx + cos(a) * 3.5f, u.cy + sin(a) * 3.5f, f.radius)
+            u.teams[id] = f.team
+            f.team = 0
+            f.control.clear()
+            if (f.def.boss != null) {
+                // (A boss stays out of it: it waits, unseen, off the edge, until everyone is back.)
+                f.x = 0.5f; f.y = 0.5f; f.prevX = f.x; f.prevY = f.y; f.vx = 0f; f.vy = 0f
+                continue
+            }
+            val a = 3.1415927f * (k++ + 0.5f) / maxOf(1, n)
+            val spot = arena.nearestOpen(c + cos(a) * 5f, u.ey + 1f + sin(a) * 5f, f.radius)
             f.x = spot.x; f.y = spot.y; f.prevX = f.x; f.prevY = f.y; f.vx = 0f; f.vy = 0f
-            if (f.def.boss == null) hp += f.attackDamage * maxOf(1, f.def.attack.projectiles)
+            f.facing = atan2(u.ey - f.y, u.ex - f.x)
+            f.pending.clear()
+            hp += f.attackDamage * maxOf(1, f.def.attack.projectiles)
         }
         u.maxHp = maxOf(1, hp * Balance.UPRISING_HP_SHOTS)
         u.hp = u.maxHp
@@ -334,27 +379,39 @@ class World(
     }
 
     private fun stepSky(u: Uprising, dt: Float) {
+        // Everyone fights as they always do: their attacks stay on the ground, and whatever reaches the shadow under
+        // the Entity hits it (see [onEntity]); nobody can hurt anybody else in here, as they are all on one side.
         for (id in u.members) {
             val f = fighter(id) ?: continue
-            if (!f.alive) continue
             if (f.def.boss != null) { f.prevX = f.x; f.prevY = f.y; f.control.clear(); continue }
-            // Every attack goes up, into the Entity: nobody can hurt anybody else in here.
-            val c = f.control
-            val volley = f.attackDamage * maxOf(1, f.def.attack.projectiles)
-            if (c.attack && f.ammo >= 1f && f.sinceAttack >= Balance.UPRISING_ATTACK_GAP) {
-                f.ammo -= 1f
-                f.sinceAttack = 0f
-                strikeEntity(u, f, volley, false)
-                f.superCharge = minOf(1f, f.superCharge + 0.08f)
-            }
-            if (c.superAttack && f.superReady) {
-                f.superCharge = 0f
-                strikeEntity(u, f, volley * Balance.UPRISING_SUPER_SHOTS, true)
-            }
-            c.attack = false; c.superAttack = false; c.detonate = false
             stepFighter(f, dt)
+            f.control.detonate = false
         }
+        stepProjectiles(dt)
         stepHazards(dt)
+        // Hexes bite it as they would anyone.
+        var i = 0
+        while (i < u.hexes.size) {
+            val h = u.hexes[i]
+            h.left -= dt; h.tick -= dt
+            if (h.tick <= 0f) {
+                h.tick += Balance.HEX_TICK_SECONDS
+                fighter(h.by)?.let { strikeEntity(it, h.damage, false, u.ex, u.ey, charge = false) }
+            }
+            if (h.left <= 0f) u.hexes.removeAt(i) else i++
+        }
+        // It drifts after the fight, over the middle of everyone (a little ahead of them), never off its platform.
+        var sx = 0f; var sy = 0f; var cnt = 0
+        for (id in u.members) fighter(id)?.let { if (it.alive && it.def.boss == null) { sx += it.x; sy += it.y; cnt++ } }
+        if (cnt > 0) {
+            val dx = sx / cnt - u.ex; val dy = sy / cnt - 2f - u.ey
+            val d = hypot(dx, dy)
+            if (d > 0.3f) { val step = minOf(d, Balance.UPRISING_ENTITY_SPEED * dt); u.ex += dx / d * step; u.ey += dy / d * step }
+            val c = arena.width / 2f
+            val lim = Arenas.ENTITY_REALM_RADIUS - Balance.UPRISING_ENTITY_RADIUS
+            val od = hypot(u.ex - c, u.ey - c)
+            if (od > lim) { u.ex = c + (u.ex - c) / od * lim; u.ey = c + (u.ey - c) / od * lim }
+        }
         // It strikes back: marked circles under a few of them at a time, in turn, that never knock anyone out.
         u.strikeIn -= dt
         if (u.strikeIn <= 0f) {
@@ -369,23 +426,37 @@ class World(
         }
         if (u.hp <= 0 || u.t >= Balance.UPRISING_SKY) {
             u.beaten = u.hp <= 0
-            // Back where they were, as they were.
-            projectiles.clear(); hazards.clear()
+            // Back in the arena, where they were, as they were, each on their own team again.
+            projectiles.clear(); hazards.clear(); u.hexes.clear()
+            u.home?.let { arena = it }
+            u.home = null
             for (id in u.members) {
                 val f = fighter(id) ?: continue
+                u.teams[id]?.let { f.team = it }
                 val s = u.saved[id] ?: continue
                 f.x = s[0]; f.y = s[1]; f.prevX = f.x; f.prevY = f.y; f.vx = 0f; f.vy = 0f
+                // Exactly as they were: what they charged fighting the Entity stays in its dimension (coming back with
+                // every super and hypercharge full had everyone unloading at once, as if the bots had got smarter).
+                if (f.hyperActive) endHyper(f)
                 if (f.alive) f.hp = s[2].toInt().coerceIn(1, f.maxHp)
+                f.superCharge = s[3]; f.hyperCharge = s[4]; f.ammo = s[5]; f.edge = s[6]; f.entityPull = s[7]
+                f.tempestLeft = 0f; f.dashTime = 0f; f.leapTime = 0f; f.leapTarget = -1
+                f.pending.clear(); f.hexes.clear(); f.slowLeft = 0f
+                f.control.clear()
             }
             uprisingPhase(u, UprisingPhase.RETURN)
         }
     }
 
-    private fun strikeEntity(u: Uprising, f: Fighter, damage: Int, isSuper: Boolean) {
+    /** [f] lands a hit on the Entity, at (x, y): it charges their super and hyper as a hit on anyone would. */
+    private fun strikeEntity(f: Fighter, damage: Int, isSuper: Boolean, x: Float, y: Float, charge: Boolean = true, chargeShare: Float = 1f) {
+        val u = uprising ?: return
+        if (u.hp <= 0) return
         val dealt = minOf(damage, u.hp)
         u.hp -= dealt
         f.damageDealt += dealt
-        events += GameEvent.SkyShot(f.id, isSuper, dealt)
+        if (!isSuper && charge) chargeFrom(f, chargeShare)
+        events += GameEvent.EntityHit(f.id, isSuper, dealt, x, y)
     }
 
     /** [team] gives up (in a 1v1: its player left): the other team wins on the spot. */
@@ -722,6 +793,19 @@ class World(
             if (!arena.shotClear(f.x, f.y, o.x, o.y)) continue
             damage(o, f, hit, false, o.x, o.y)
         }
+        // (The blade reaches the Entity where its arc reaches the shadow under it.)
+        uprising?.let { u ->
+            if (u.phase != UprisingPhase.SKY || u.hp <= 0) return@let
+            val ox = u.ex - f.x; val oy = u.ey - f.y
+            val d = hypot(ox, oy)
+            val big = Balance.UPRISING_ENTITY_RADIUS
+            if (d > reach + big) return@let
+            val widen = kotlin.math.asin((big / maxOf(d, big)).coerceAtMost(1f))
+            val off = kotlin.math.acos(((ox * dx + oy * dy) / maxOf(d, 1e-3f)).coerceIn(-1f, 1f))
+            if (d > big + f.radius && off - widen > Math.toRadians(a.spreadDegrees / 2.0).toFloat()) return@let
+            val at = minOf(reach, maxOf(0f, d - big * 0.5f))
+            strikeEntity(f, hit, false, f.x + dx * at, f.y + dy * at)
+        }
         val r = reach + 1f
         for (ty in kotlin.math.floor(f.y - r).toInt()..kotlin.math.floor(f.y + r).toInt()) {
             for (tx in kotlin.math.floor(f.x - r).toInt()..kotlin.math.floor(f.x + r).toInt()) {
@@ -871,6 +955,17 @@ class World(
                 val d = hypot(o.x - f.x, o.y - f.y)
                 if (d < best) { t = o; best = d }
             }
+            val u = uprising
+            if (t == null && u != null && u.phase == UprisingPhase.SKY && u.hp > 0 &&
+                hypot(u.ex - f.x, u.ey - f.y) < Balance.TEMPEST_BOLT_RANGE + Balance.UPRISING_ENTITY_RADIUS) {
+                // (In the Entity's dimension the lightning goes into it, somewhere in its shadow.)
+                val a = random.nextFloat() * 6.2832f
+                val off = random.nextFloat() * Balance.UPRISING_ENTITY_RADIUS * 0.7f
+                val bx = u.ex + cos(a) * off
+                val by = u.ey + sin(a) * off
+                events += GameEvent.TempestBolt(f.id, bx, by)
+                strikeEntity(f, (f.superDamage * Balance.TEMPEST_BOLT_DAMAGE).toInt(), false, bx, by, chargeShare = Balance.TEMPEST_CHARGE)
+            }
             if (t != null) {
                 val a = random.nextFloat() * 6.2832f
                 val off = random.nextFloat() * Balance.TEMPEST_BOLT_SCATTER
@@ -889,6 +984,14 @@ class World(
         if (f.tempestTick > 0f) return
         f.tempestTick += Balance.TEMPEST_TICK_SECONDS
         val s = f.def.superSpec
+        // (The funnel tears into the Entity wherever its foot is over the shadow.)
+        if (onEntity(f.x, f.y, s.radius + f.radius)) {
+            val u = uprising!!
+            val d = hypot(u.ex - f.x, u.ey - f.y)
+            val k = if (d > 1e-3f) minOf(1f, (s.radius + f.radius) / d) else 0f
+            strikeEntity(f, f.superDamage, false, f.x + (u.ex - f.x) * k, f.y + (u.ey - f.y) * k, chargeShare = Balance.TEMPEST_CHARGE)
+            events += GameEvent.TempestHit(f.id, -1, f.x + (u.ex - f.x) * k, f.y + (u.ey - f.y) * k)
+        }
         for (o in fighters) {
             if (o.team == f.team || !o.alive || o.realm != f.realm || o.isLeaping) continue
             val ox = o.x - f.x
@@ -1100,6 +1203,20 @@ class World(
             // nobody on the line it is the end of the super's reach, and nothing is ready that wasn't.
             SuperKind.BLINK -> if (!f.rooted) {
                 val t = corruptTarget(f, dx, dy)
+                // (In the Entity's dimension: under its edge on the line, cutting into it as he arrives.)
+                val onIt = if (t == null) entityOnLine(f, dx, dy, s.range) else -1f
+                if (onIt >= 0f) {
+                    val fromX = f.x; val fromY = f.y
+                    val spot = arena.nearestOpen(f.x + dx * onIt, f.y + dy * onIt, f.radius)
+                    f.x = spot.x; f.y = spot.y; f.prevX = f.x; f.prevY = f.y
+                    f.pending.clear()
+                    uprising?.let { u -> f.facing = atan2(u.ey - f.y, u.ex - f.x) }
+                    f.ammo = f.def.ammoMax.toFloat()
+                    if (f.def.attack.edgeSeconds > 0f) f.edge = 1f
+                    events += GameEvent.Blink(f.id, fromX, fromY, f.x, f.y)
+                    strikeEntity(f, f.superDamage, true, f.x, f.y)
+                    return
+                }
                 val fromX = f.x
                 val fromY = f.y
                 val spot = if (t != null) {
@@ -1137,9 +1254,15 @@ class World(
                 f.leapFromX = f.x; f.leapFromY = f.y
                 f.leapTarget = t?.id ?: -1
                 f.pending.clear()
+                // (In the Entity's dimension he leaps up into it instead, and comes down under it.)
+                val onIt = if (t == null) entityOnLine(f, dx, dy, s.range) else -1f
                 if (t != null) {
                     f.facing = atan2(t.y - f.y, t.x - f.x)
                     aimLeap(f, t)
+                } else if (onIt >= 0f) {
+                    f.leapTarget = ENTITY_TARGET
+                    val spot = arena.nearestOpen(f.x + dx * (onIt + 0.8f), f.y + dy * (onIt + 0.8f), f.radius)
+                    f.leapToX = spot.x; f.leapToY = spot.y
                 } else {
                     val spot = arena.nearestOpen(f.x + dx * s.range, f.y + dy * s.range, f.radius)
                     f.leapToX = spot.x; f.leapToY = spot.y
@@ -1196,6 +1319,11 @@ class World(
         f.y = f.leapFromY + (f.leapToY - f.leapFromY) * u
         if (f.leapTime > 0f) return
         f.leapTime = 0f
+        if (f.leapTarget == ENTITY_TARGET) {
+            f.leapTarget = -1
+            strikeEntity(f, f.attackDamage * maxOf(1, f.def.attack.projectiles) * Balance.UPRISING_SUPER_SHOTS, true, f.x, f.y)
+            return
+        }
         f.leapTarget = -1
         if (t == null || !t.alive || t.realm != f.realm) return
         f.facing = atan2(t.y - f.y, t.x - f.x)
@@ -1219,7 +1347,11 @@ class World(
         val movedY = tmp[1] - f.y
         f.x = tmp[0]; f.y = tmp[1]
         f.walkCycle += hypot(movedX, movedY) * 3.2f
-        // Hit everyone we ram into, once each.
+        // Hit everyone we ram into, once each (the Entity too, charging in under it).
+        if (ENTITY_TARGET !in f.dashHits && onEntity(f.x, f.y, f.radius + 0.25f)) {
+            f.dashHits += ENTITY_TARGET
+            strikeEntity(f, f.superDamage, true, f.x, f.y)
+        }
         for (o in fighters) {
             if (o.team == f.team || !o.alive || o.id in f.dashHits || o.realm != f.realm) continue
             if (hypot(o.x - f.x, o.y - f.y) < f.radius + o.radius + 0.25f) {
@@ -1262,6 +1394,8 @@ class World(
             hazards.removeAt(i)
             events += GameEvent.Blast(h.x, h.y, h.radius, h.kind)
             val owner = fighter(h.ownerId)
+            // (A fighter's own blast that covers part of the Entity's shadow hits it.)
+            if (owner != null && h.ownerId >= 0 && onEntity(h.x, h.y, h.radius)) strikeEntity(owner, h.damage, true, h.x, h.y)
             for (f in fighters) {
                 if (f.team == h.team || !f.alive) continue
                 // Caught if the middle of the fighter is inside the mark (a little is forgiven at the very edge).
@@ -1304,6 +1438,15 @@ class World(
                     if (p.blast > 0f) detonate(p, p.x - sdx, p.y - sdy)
                     if (arena.tileAt(p.x, p.y) == Tile.CRATE) damageCrate(kotlin.math.floor(p.x).toInt(), kotlin.math.floor(p.y).toInt(), p.damage)
                     break@loop
+                }
+                // (In the Entity's dimension, a shot that reaches the shadow under it hits it.)
+                if (ENTITY_TARGET !in p.hit && onEntity(p.x, p.y, p.radius)) {
+                    p.hit += ENTITY_TARGET
+                    fighter(p.ownerId)?.let { o ->
+                        strikeEntity(o, if (p.share > 0f) p.damage * Balance.SHARE_GIANT_HITS else p.damage, p.isSuper, p.x, p.y)
+                        if (p.hex > 0f) uprising?.hexes?.add(Hex(p.ownerId, p.damage, Balance.HEX_TICK_SECONDS, p.hex - Balance.HEX_TICK_SECONDS / 2f))
+                    }
+                    if (!p.pierce || p.blast > 0f) { p.alive = false; break@loop }
                 }
                 if (phase == Phase.PLAYING) for (f in fighters) {
                     if (f.team == p.team || !f.alive || f.id in p.hit || f.realm != realm) continue
@@ -1354,8 +1497,17 @@ class World(
             if (d >= bestD || ox * hx + oy * hy <= 0f) continue
             best = f; bestD = d
         }
-        val t = best ?: return
-        val want = atan2(t.y - p.y, t.x - p.x)
+        val tx: Float; val ty: Float
+        if (best != null) { tx = best.x; ty = best.y }
+        else {
+            // (In the Entity's dimension it turns toward the Entity, over the middle of its shadow.)
+            val u = uprising
+            if (u == null || u.phase != UprisingPhase.SKY || ENTITY_TARGET in p.hit) return
+            val ox = u.ex - p.x; val oy = u.ey - p.y
+            if (hypot(ox, oy) > Balance.ARROW_SEEK_RADIUS + Balance.UPRISING_ENTITY_RADIUS || ox * hx + oy * hy <= 0f) return
+            tx = u.ex; ty = u.ey
+        }
+        val want = atan2(ty - p.y, tx - p.x)
         val now = atan2(p.vy, p.vx)
         var turn = want - now
         while (turn > Math.PI) turn -= (2 * Math.PI).toFloat()
@@ -1376,8 +1528,10 @@ class World(
 
     /** [lethal] false: the hit can take the target down to its last point of health, but never knocks it out. */
     private fun damage(target: Fighter, source: Fighter?, wanted: Int, isSuper: Boolean, x: Float, y: Float, lethal: Boolean = true, charge: Boolean = true, chargeShare: Float = 1f) {
-        // (Nothing crosses from the arena into a realm, or out of one.)
+        // (Nothing crosses from the arena into a realm, or out of one; and in the Entity's dimension nobody hurts anybody
+        // but the Entity.)
         if (source != null && source.realm != target.realm) return
+        if (source != null && inSky) return
         // (A captive that may fight back in there hits softer.)
         val wantedHere = if (source != null && source.captive) (wanted * Balance.REALM_CAPTIVE_DAMAGE).toInt() else wanted
         val amount = if (lethal) wantedHere else minOf(wantedHere, target.hp - 1)
@@ -1394,20 +1548,23 @@ class World(
         target.lastAttackerId = source?.id ?: -1
         if (source != null) {
             source.damageDealt += dealt
-            if (!isSuper && charge) {
-                val before = source.superReady
-                val faster = (if (source.hyperActive) source.def.hyper?.superCharge ?: 1f else 1f) * (if (source.realm == source.id) Balance.REALM_CHARGE else 1f)
-                source.superCharge = (source.superCharge + source.def.superChargePerHit * faster * chargeShare).coerceAtMost(1f)
-                if (!before && source.superReady) events += GameEvent.SuperReady(source.id)
-                // Hits charge the hyper even while one is running, so the next can follow straight on.
-                if (source.hyperCharge < 1f) {
-                    source.hyperCharge = (source.hyperCharge + source.def.superChargePerHit * chargeShare * Balance.HYPER_CHARGE_RATE * (source.def.hyper?.charge ?: 1f)).coerceAtMost(1f)
-                    if (source.hyperCharge >= 1f) events += GameEvent.HyperReady(source.id)
-                }
-            }
+            if (!isSuper && charge) chargeFrom(source, chargeShare)
         }
         events += GameEvent.Hit(target.id, source?.id ?: -1, amount, x, y, isSuper)
         if (target.hp <= 0) knockOut(target, source)
+    }
+
+    /** A hit by [source] charges its super (and its hyper) by a hit's worth, times [chargeShare]. */
+    private fun chargeFrom(source: Fighter, chargeShare: Float) {
+        val before = source.superReady
+        val faster = (if (source.hyperActive) source.def.hyper?.superCharge ?: 1f else 1f) * (if (source.realm == source.id) Balance.REALM_CHARGE else 1f)
+        source.superCharge = (source.superCharge + source.def.superChargePerHit * faster * chargeShare).coerceAtMost(1f)
+        if (!before && source.superReady) events += GameEvent.SuperReady(source.id)
+        // Hits charge the hyper even while one is running, so the next can follow straight on.
+        if (source.hyperCharge < 1f) {
+            source.hyperCharge = (source.hyperCharge + source.def.superChargePerHit * chargeShare * Balance.HYPER_CHARGE_RATE * (source.def.hyper?.charge ?: 1f)).coerceAtMost(1f)
+            if (source.hyperCharge >= 1f) events += GameEvent.HyperReady(source.id)
+        }
     }
 
     private fun knockOut(victim: Fighter, killer: Fighter?) {
@@ -1718,3 +1875,6 @@ class World(
     /** Most valuable player = highest contribution score across both teams. */
     fun mvp(): Fighter? = fighters.maxByOrNull { it.kos * 3f + it.damageDealt / 1600f - it.deaths * 0.5f }
 }
+
+/** Stands for the Entity in a shot's or a charge's list of who it has hit, and as a leap's target (its dimension). */
+const val ENTITY_TARGET = -100
