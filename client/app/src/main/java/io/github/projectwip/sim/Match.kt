@@ -276,11 +276,15 @@ class Match(val config: MatchConfig) {
      * count; as a tornado it flies over them. Runs after its brain or its tornado driving, and only changes the move.
      */
     private fun dodgeHazards(f: Fighter) {
-        if (world.hazards.isEmpty()) return
+        val flares = world.uprising?.flares
+        if (world.hazards.isEmpty() && flares.isNullOrEmpty()) return
         val c = f.control
         val margin = f.radius + HAZARD_MARGIN
         fun danger(x: Float, y: Float): Boolean {
             for (h in world.hazards) if (h.team != f.team && h.age < h.delay && kotlin.math.hypot(h.x - x, h.y - y) < h.radius + margin) return true
+            // The Entity's flares too, once one has stopped following and a moment has passed to see it (a bot is not
+            // instant: some still get caught).
+            if (flares != null) for (fl in flares) if (fl.age > Balance.FLARE_LOCK + FLARE_REACT && kotlin.math.hypot(fl.x - x, fl.y - y) < Balance.FLARE_RADIUS + margin) return true
             return false
         }
         val wantX = c.moveX; val wantY = c.moveY
@@ -415,3 +419,6 @@ class Match(val config: MatchConfig) {
         )
     }
 }
+
+/** How long a bot takes to see that an Entity flare has stopped following and step out from under it. */
+private const val FLARE_REACT = 0.6f

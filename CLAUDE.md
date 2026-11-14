@@ -167,10 +167,19 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   team of three, bots filling any place, fights it until it is beaten or `UPRISING_BOSS_SECONDS` run out: that decides
   the match), 1v1 and the Training Area. **Knockout Rush, Last Spark and Dimension were removed, and the old bosses
   (Hailstorm, Lighthouse, Ramrod) deleted**, code and all: don't bring them back. Many notes below describe them; they
-  are history. The Entity's moves in its world are `World.entityMoves` (strikes, rings, sweeps, and corruption flares:
-  whoever one lands on fights for it, against their own side, for `CORRUPT_SECONDS`; `World.corrupt`,
-  `Match.driveCorrupted`). The Entity's fight pays what Knockout Rush did (`trophies.cfg` [BOSS]). The Training Area's
-  giant is `Balance.giant`.
+  are history. The Entity's moves in its world are `World.entityMoves`, in a fixed order (`ENTITY_MOVES`): strikes,
+  rings, sweeps, flares, and since build 111 (the user asked for "way more abilities") spokes, soul rain, its hand
+  (`GRASP`), shockwaves (`PULSE`) and a chase (`World.stepChase`). Nothing it fires lands past the edge of its platform
+  (`World.markEntity`; the user's ask). **Its flares trap, they don't corrupt** (build 111, the user's design): whoever
+  one lands on is pulled into it among the souls it carries (`Fighter.trapped`, `World.trap`; drawn in its chest with
+  soul wisps round it, `MatchRenderer.drawTrapped`), out of the fight with no respawn; beating it frees everyone
+  (`World.free`), time running out leaves them in it, and everyone trapped is the match lost. The player's cutscene is
+  `EntityCut.CORRUPT` ("PULLED INTO THE ENTITY"); after it the camera follows a free teammate. Bots step out from
+  under a flare after `FLARE_REACT` (they still get caught about half the matches; at 0.55 s of fall a whole team was
+  in it within a minute). Corruption (`World.corrupt`, `Match.driveCorrupted`) is kept with nothing using it. In the
+  ritual, "Kneel." is followed by a beat with no words (`RitualShot.KNEEL`, `UprisingScript.KNEEL_BEAT`) where the
+  camera pulls back and everyone goes down one after another: the user wanted to see them actually bow. The mode
+  picker has no bot difficulty (the user removed it in build 111). The Training Area's giant is `Balance.giant`.
 
 - `sim/`, `ai/`, `data/` and `audio/SfxSynth.kt` are pure Kotlin (no Android imports); they run in JVM tests.
 - Humans and bots drive fighters through the same `Control`. Visibility goes through `World.isVisibleTo`.

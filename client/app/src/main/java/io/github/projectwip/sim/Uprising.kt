@@ -69,6 +69,10 @@ class Uprising(
     /** Its corruption flares on their way down, and how many times it has sent them. */
     val flares = ArrayList<EntityFlare>()
     var flaresFired = 0
+    /** Its chase: strikes coming down one after another where [chaseTarget] is, [chaseLeft] more, the next in [chaseIn]. */
+    var chaseTarget = -1
+    var chaseLeft = 0
+    var chaseIn = 0f
     /** A player skipped its ritual. */
     var skipped = false
     /** True once it has been beaten (rather than having let them go). */

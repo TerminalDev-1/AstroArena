@@ -1408,29 +1408,65 @@ class SimulationTest {
      * Boss Mode is the Entity's fight (the user's direction): its ritual, then its world, and the match is decided there,
      * beaten or out of time. Its flares come down on someone and corrupt them, and they fight their own side.
      */
-    @Test fun bossModeIsTheEntitysFightAndItsFlaresCorrupt() {
-        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.HARD, mode = GameMode.BOSS, humanPlayer = false, seed = 9L))
+    @Test fun bossModeIsTheEntitysFightAndItsFlaresTrapFighters() {
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 3L))
         val w = m.world
         val u = w.uprising!!
         assertTrue("the Entity's fight", u.boss)
         assertEquals("a team of three", 3, w.fighters.size)
-        var flares = 0; var corrupted = 0; var t = 0
-        var turned = false
+        var flares = 0; var trapped = 0; var t = 0
+        val moves = HashSet<Int>()
+        var outside = 0
+        var heldWhileTrapped = true
         while (!m.isOver && t < 60 * 420) {
             m.step(Match.STEP); t++
             for (e in w.events) {
                 if (e is io.github.projectwip.sim.GameEvent.EntityFlare && !e.landed) flares++
-                if (e is io.github.projectwip.sim.GameEvent.Corrupted && e.on) corrupted++
+                if (e is io.github.projectwip.sim.GameEvent.Trapped && e.on) trapped++
             }
             w.events.clear()
-            if (w.fighters.any { it.corruptLeft > 0f && it.team == 1 }) turned = true
+            if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) {
+                // (Its platform's middle: read in there, the arena is swapped for its world.)
+                val c = w.arena.width / 2f
+                moves += u.strikes
+                // Nothing it fires lands past the edge of its platform.
+                for (h in w.hazards) if (h.ownerId == -1 && kotlin.math.hypot(h.x - c, h.y - c) > io.github.projectwip.sim.Arenas.ENTITY_REALM_RADIUS - h.radius * 0.5f + 1e-3f) outside++
+                // Whoever is trapped stays out of the fight: never respawned while it has them.
+                for (f in w.fighters) if (f.trapped && f.alive) heldWhileTrapped = false
+            }
         }
-        println("the Entity's fight: ${t / 60} s, beaten=${u.beaten}, hp ${u.hp}/${u.maxHp}, flares $flares, corrupted $corrupted")
+        println("the Entity's fight: ${t / 60} s, beaten=${u.beaten}, hp ${u.hp}/${u.maxHp}, flares $flares, trapped $trapped, moves ${moves.size}")
         assertTrue("it decides the match", m.isOver)
         assertEquals(if (u.beaten) MatchOutcome.VICTORY else MatchOutcome.DEFEAT, m.report().outcome)
-        assertTrue("its flares come ()", flares >= 3)
-        assertTrue("and corrupt someone ()", corrupted >= 1 && turned)
-        assertTrue("everyone is on their own side again", w.fighters.all { it.team == 0 && it.corruptLeft <= 0f })
+        assertTrue("its flares come", flares >= 3)
+        assertTrue("and pull someone into it", trapped >= 1)
+        assertTrue("trapped fighters stay out of the fight", heldWhileTrapped)
+        assertEquals("every strike lands on its platform", 0, outside)
+        assertTrue("nobody fights for it any more", w.fighters.all { it.team == 0 && it.corruptLeft <= 0f })
+        if (u.beaten) assertTrue("beaten, it lets everyone go", w.fighters.none { it.trapped })
+    }
+
+    @Test fun theEntityHasMovesBeyondTheBasicOnes() {
+        val names = io.github.projectwip.sim.EntityMove.entries.map { it.name }.toSet()
+        assertTrue(names.containsAll(listOf("STRIKES", "RING", "SWEEP", "FLARE", "SPOKES", "RAIN", "GRASP", "PULSE", "CHASE")))
+    }
+
+    @Test fun everyoneTrappedLosesTheEntitysFight() {
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
+        val w = m.world
+        val u = w.uprising!!
+        var t = 0
+        while (u.phase != io.github.projectwip.sim.UprisingPhase.SKY && t < 60 * 200) { m.step(Match.STEP); t++ }
+        assertEquals(io.github.projectwip.sim.UprisingPhase.SKY, u.phase)
+        // Its flares keep coming at whoever is still free (the bots dodge them) until all of them are pulled in.
+        var k = 0
+        while (!m.isOver && k < 60 * 120) {
+            if (k % 30 == 0) for (f in w.fighters) if (f.alive && !f.trapped) u.flares += io.github.projectwip.sim.EntityFlare(f.id, f.x, f.y)
+            m.step(Match.STEP); k++
+        }
+        assertTrue("everyone pulled in ends it", m.isOver)
+        assertTrue(w.fighters.all { it.trapped })
+        assertEquals(MatchOutcome.DEFEAT, m.report().outcome)
     }
 
     @Test fun skipJumpsTheRitualStraightToItsPortal() {

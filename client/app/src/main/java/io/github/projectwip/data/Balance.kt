@@ -395,10 +395,15 @@ object Balance {
     const val UPRISING_BOSS_DAMAGE = 2f
     /** Its corruption flares: they follow their target this long, then come down this much later, over this circle. */
     const val FLARE_LOCK = 1.6f
-    const val FLARE_FALL = 0.55f
+    // (0.9 s from when it stops following to when it lands: being pulled in lasts until the Entity is beaten, so it
+    // has to be fair to step out of. At 0.55 s a whole team was in it within a minute.)
+    const val FLARE_FALL = 0.9f
     const val FLARE_RADIUS = 1.15f
     /** A fighter caught under one fights for the Entity, against its own side, for this long. */
     const val CORRUPT_SECONDS = 6f
+    /** Its hand's circle (its slam), and how far apart its chase's strikes come down. */
+    const val ENTITY_GRASP_RADIUS = 2.6f
+    const val ENTITY_CHASE_GAP = 0.45f
     /** A tornado sets her down at least this far clear of anyone (past both their edges), so nobody hides her. */
     const val TEMPEST_LANDING_GAP = 0.6f
     /** ...and each of its hits charges the super by only this share of a normal hit, so a tempest doesn't pay for the next one. */

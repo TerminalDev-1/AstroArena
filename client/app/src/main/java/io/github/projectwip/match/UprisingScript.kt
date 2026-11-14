@@ -38,8 +38,21 @@ object UprisingScript {
         return 1.2f + 0.33f * words + 0.32f * breaks
     }
 
-    private val bowLengths = Lore.UPRISING_BOW.map { speakingTime(it.text) }
+    /** How long everyone takes going down after "Kneel." (a beat with no words, its own shot). */
+    const val KNEEL_BEAT = 4.2f
+
+    private val bowLengths = Lore.UPRISING_BOW.map { if (it.shot == Lore.RitualShot.KNEEL) KNEEL_BEAT else speakingTime(it.text) }
     private val bowTotal = bowLengths.sum()
+    private val kneelIndex = Lore.UPRISING_BOW.indexOfFirst { it.shot == Lore.RitualShot.KNEEL }
+
+    /**
+     * Seconds into the bow when everyone starts going down (the kneel beat, after "Kneel."): they stand while it says
+     * it, so the bow is seen happening.
+     */
+    fun kneelAt(bowLength: Float): Float {
+        val k = (bowLength - FOLLOW).coerceAtLeast(1f) / bowTotal
+        return bowLengths.take(kneelIndex.coerceAtLeast(0)).sum() * k
+    }
 
     fun cue(phase: UprisingPhase, t: Float, bowLength: Float, beaten: Boolean, playerName: String): Cue? = when (phase) {
         UprisingPhase.GAZE -> if (t >= 2.5f) Cue(1000, Lore.UPRISING_GAZE, null, Lore.RitualShot.ENTITY, -1, t - 2.5f, Balance.UPRISING_GAZE - 2.5f, plate = false) else null
@@ -58,8 +71,8 @@ object UprisingScript {
                 var i = 0
                 while (i < bowLengths.size - 1 && t >= start + bowLengths[i] * k) { start += bowLengths[i] * k; i++ }
                 val line = Lore.UPRISING_BOW[i]
-                Cue(3000 + i, line.text.replace("%s", playerName), if (i == 0) "EVERYONE BOWS TO THE ENTITY" else null, line.shot, i,
-                    t - start, bowLengths[i] * k, plate = true)
+                Cue(3000 + i, line.text.replace("%s", playerName), if (line.shot == Lore.RitualShot.KNEEL) "EVERYONE BOWS TO THE ENTITY" else null, line.shot, i,
+                    t - start, bowLengths[i] * k, plate = line.text.isNotEmpty())
             }
         }
         UprisingPhase.ENTER -> Cue(4000, Lore.UPRISING_ENTER, null, Lore.RitualShot.WIDE, -1, t, Balance.UPRISING_ENTER, plate = false)

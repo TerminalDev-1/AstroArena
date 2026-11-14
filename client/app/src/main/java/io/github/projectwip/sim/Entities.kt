@@ -84,6 +84,11 @@ class Fighter(
     var entityPull = 0f
     /** Seconds the Entity still has this fighter, corrupted by one of its flares (it fights for the Entity). */
     var corruptLeft = 0f
+    /**
+     * Pulled into the Entity by one of its flares, among the hundreds of souls it carries (the user's design): out of
+     * the fight (not alive, no respawn) until the Entity is beaten, which frees everyone it has.
+     */
+    var trapped = false
     var alive = true
     var respawnTimer = 0f
     var shield = 0f
@@ -261,6 +266,8 @@ sealed interface GameEvent {
     /** In the Entity's sky, [fighterId] struck it for [damage] (a super: [isSuper]). */
     /** One of the Entity's flares locked onto [targetId] (or, [landed], came down at x, y). */
     data class EntityFlare(val targetId: Int, val x: Float, val y: Float, val landed: Boolean) : GameEvent
+    /** The Entity pulled [fighterId] into itself ([on]), or it was freed. */
+    data class Trapped(val fighterId: Int, val on: Boolean) : GameEvent
     /** The Entity corrupted a fighter ([on]) or let it go. */
     data class Corrupted(val fighterId: Int, val on: Boolean) : GameEvent
     data class EntityHit(val fighterId: Int, val isSuper: Boolean, val damage: Int, val x: Float, val y: Float) : GameEvent

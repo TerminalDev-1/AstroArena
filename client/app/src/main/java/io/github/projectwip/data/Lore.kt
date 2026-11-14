@@ -194,7 +194,7 @@ object Lore {
         "Your team. Their team. It doesn't matter now.", "Every one of you.", "Walk. I won't ask twice.",
     )
     /** Where the camera is while a line of the ritual is said (the user wanted close-ups of faces and of the Entity). */
-    enum class RitualShot { WIDE, ENTITY, PLAYER, OTHER }
+    enum class RitualShot { WIDE, ENTITY, PLAYER, OTHER, KNEEL }
     /** A line of the ritual, and who the camera is on while it is said; "%s" is the player's name. */
     class RitualLine(val text: String, val shot: RitualShot)
     /**
@@ -203,6 +203,9 @@ object Lore {
      */
     val UPRISING_BOW = listOf(
         RitualLine("Kneel.", RitualShot.ENTITY),
+        // (No words: the camera pulls back low across the circle and everyone goes down, one after another. The user
+        // wanted to see them actually bow when it says kneel.)
+        RitualLine("", RitualShot.KNEEL),
         RitualLine("Good. You remember who you belong to.", RitualShot.WIDE),
         RitualLine("Every attack you have ever thrown was mine.", RitualShot.ENTITY),
         RitualLine("Every super. Lent, never given.", RitualShot.OTHER),

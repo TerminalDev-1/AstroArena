@@ -361,10 +361,6 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty?, modifier: Modifier, onCl
                 PlainText("GAME MODE", Type.Eyebrow, maxLines = 1)
                 GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.dp)
                 if (mode == GameMode.DUEL) PlainText("Against a real player", Type.Small, color = Palette.Positive, maxLines = 1)
-                else if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
-                    PlainText("${mode.tagline.substringBefore(" ·")} · Bots ", Type.Small, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                    PlainText(d.label, Type.Label, color = difficultyColor(d), maxLines = 1)
-                }
                 else PlainText(mode.tagline, Type.Small, maxLines = 1)
             }
             GameIcon(IconKind.BACK, Modifier.size(20.dp).graphicsLayer { rotationZ = 180f; alpha = 0.8f })
@@ -391,20 +387,8 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
                     }
                 }
                 Spacer(Modifier.height(14.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GameText("BOTS", Type.Heading, outline = 2.5.dp)
-                    Spacer(Modifier.width(6.dp))
-                    for (d in BotDifficulty.entries) {
-                        val sel = d == save.settings.botDifficulty
-                        // The server has to agree; its answer (the approved difficulty) is what gets shown.
-                        ChunkyButton({ ask({ setDifficulty(d) }) }, Modifier.size(118.dp, 50.dp),
-                            if (sel) ButtonStyle.ORANGE else ButtonStyle.PURPLE, lip = 4.dp, sound = Sound.UI_SELECT) {
-                            GameText(d.label.uppercase(), Type.Label, color = if (sel) Color.White else difficultyColor(d), outline = 2.dp)
-                        }
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    ChunkyButton(onClose, Modifier.size(130.dp, 54.dp), ButtonStyle.GREEN) { GameText("DONE", Type.Heading) }
-                }
+                // (No bot difficulty here any more: the user took it out of the mode picker in build 111.)
+                ChunkyButton(onClose, Modifier.size(130.dp, 54.dp), ButtonStyle.GREEN) { GameText("DONE", Type.Heading) }
             }
         }
     }

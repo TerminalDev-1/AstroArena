@@ -92,7 +92,7 @@ class MatchRunner(
         val cue = UprisingScript.cue(u.phase, u.t, u.bowLength, u.beaten, match.player.name) ?: return
         if (cue.id == lastEntityCue) return
         lastEntityCue = cue.id
-        sfx.say(cue.text, io.github.projectwip.data.VoiceStyle.VOID, force = true)
+        if (cue.text.isNotEmpty()) sfx.say(cue.text, io.github.projectwip.data.VoiceStyle.VOID, force = true)
     }
 
     /** The Entity says [line] in its own voice (its whispers; [soft] for those). */
@@ -515,6 +515,12 @@ class MatchRunner(
             is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
             // The Entity's flares: a deep note as one locks on, and a hit when it comes down; being corrupted shakes the phone.
             is GameEvent.EntityFlare -> if (e.landed) sfx.play(Sound.WHOOSH, 0.8f, 0.55f) else if (e.targetId == pid) sfx.play(Sound.VOID, 0.9f, 1.15f) else sfx.play(Sound.VOID, 0.4f, 1.15f)
+            // Pulled into the Entity: its cutscene for the player (the match waits, unless other real players are in it);
+            // a deep rush for anyone else; freed, a burst.
+            is GameEvent.Trapped -> if (!e.on) sfx.play(Sound.WHOOSH, 0.9f, 1.3f) else if (e.fighterId == pid) {
+                sfx.buzz(220, 255)
+                if (!shared) { paused = true; corruptions++ } else sfx.play(Sound.VOID, 1f, 0.7f)
+            } else sfx.play(Sound.VOID, 0.7f, 0.7f)
             is GameEvent.Corrupted -> if (e.fighterId == pid && e.on) {
                 sfx.buzz(160, 255)
                 // Its cutscene plays over the match, which waits (unless other real players are in it, who can't).

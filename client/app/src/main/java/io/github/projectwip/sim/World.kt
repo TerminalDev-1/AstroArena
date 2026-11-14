@@ -333,7 +333,15 @@ class World(
             if (od > lim) { u.ex = c + (u.ex - c) / od * lim; u.ey = c + (u.ey - c) / od * lim }
         }
         entityMoves(u, dt)
+        stepChase(u, dt)
         stepFlares(u, dt)
+        // Everyone in its world pulled into it: in its fight, that is the match lost on the spot.
+        if (u.boss && u.hp > 0 && u.members.isNotEmpty() && u.members.all { fighter(it)?.trapped != false }) {
+            projectiles.clear(); hazards.clear(); u.hexes.clear(); u.flares.clear()
+            for (id in u.members) fighter(id)?.let { f -> u.teams[id]?.let { f.team = it }; f.control.clear() }
+            end(1)
+            return
+        }
         // Whoever it corrupted is theirs again when it wears off.
         for (id in u.members) fighter(id)?.let { f ->
             if (f.corruptLeft > 0f) { f.corruptLeft -= dt; f.glitchLeft = maxOf(f.glitchLeft, f.corruptLeft); if (f.corruptLeft <= 0f) uncorrupt(f) }
@@ -341,6 +349,9 @@ class World(
         if (u.hp <= 0 || u.t >= (if (u.boss) Balance.UPRISING_BOSS_SECONDS else Balance.UPRISING_SKY)) {
             u.beaten = u.hp <= 0
             for (id in u.members) fighter(id)?.let { if (it.corruptLeft > 0f) uncorrupt(it) }
+            // Beaten, it lets go of everyone it pulled in. (Not beaten in its fight, it keeps them: "Lose, and I keep
+            // a piece of you". Out of a match's uprising, everyone goes back as they were.)
+            if (u.beaten || !u.boss) for (id in u.members) fighter(id)?.let { if (it.trapped) free(it, u) }
             if (u.boss) {
                 // The Entity's fight is the match: won if it is beaten, lost if time runs out. Everyone stays in its
                 // world for the end of it.
@@ -374,7 +385,11 @@ class World(
     /**
      * The Entity's moves in its world, one after another (the next always the same, never a roll; sooner and harder as
      * it weakens, in its fight): marked strikes under some of them, a ring all round it, a line swept out at one of
-     * them, and its corruption flares. In Boss Mode they knock out; in a match's uprising they never do.
+     * them, its flares (which pull whoever they land on into it), and since build 111 (the user asked for "way more
+     * abilities"): spokes turning round it, a rain of falling souls over the platform, its hand slamming down,
+     * shockwaves rolling out from it and a chase of strikes on someone's heels. Everything lands on its platform:
+     * nothing is marked past the edge (the user's ask, "only within the borders of the map").
+     * In Boss Mode they knock out; in a match's uprising they never do.
      */
     private fun entityMoves(u: Uprising, dt: Float) {
         u.strikeIn -= dt
@@ -386,10 +401,7 @@ class World(
         val move = ENTITY_MOVES[u.strikes % ENTITY_MOVES.size]
         u.strikes++
         if (alive.isEmpty()) return
-        val hard = if (u.boss) Balance.UPRISING_BOSS_DAMAGE else 1f
-        fun mark(x: Float, y: Float, r: Float, delay: Float, damage: Int) {
-            hazards += Hazard(-1, -1, x, y, r, delay, (damage * hard).toInt(), HazardKind.RIFT, lethal = u.boss)
-        }
+        fun mark(x: Float, y: Float, r: Float, delay: Float, damage: Int) = markEntity(u, x, y, r, delay, damage)
         when (move) {
             EntityMove.STRIKES -> for (j in 0 until 1 + alive.size / 3 + stage) {
                 val f = alive[(u.strikes + j) % alive.size]
@@ -426,7 +438,72 @@ class World(
                 }
                 u.flaresFired++
             }
+            EntityMove.SPOKES -> {
+                // Spokes of strikes from under it out to the edge, going off one spoke after the next round it.
+                val n = 5 + stage
+                val turn = u.strikes * 0.7f
+                for (s in 0 until n) for (k in 0 until 8) {
+                    val a = turn + s * (6.2831855f / n)
+                    val at = Balance.UPRISING_ENTITY_RADIUS + 0.5f + k * 1.1f
+                    mark(u.ex + cos(a) * at, u.ey + sin(a) * at, 0.8f, Balance.UPRISING_STRIKE_DELAY + s * 0.32f, Balance.UPRISING_STRIKE_DAMAGE)
+                }
+            }
+            EntityMove.RAIN -> {
+                // Souls falling all over its platform, in three waves: spots spread by a fixed pattern (never a roll).
+                val c = arena.width / 2f
+                val n = 14 + stage * 4
+                for (wave in 0 until 3) for (k in 0 until n) {
+                    val h = ((u.strikes * 7919 + wave * 104729 + k * 15485863) and 0x7fffffff)
+                    val a = (h % 3600) / 3600f * 6.2831855f
+                    val r = kotlin.math.sqrt(((h / 3600) % 1000) / 1000f) * (Arenas.ENTITY_REALM_RADIUS - 1f)
+                    mark(c + cos(a) * r, c + sin(a) * r, 0.75f, Balance.UPRISING_STRIKE_DELAY + wave * 0.7f, Balance.UPRISING_STRIKE_DAMAGE * 3 / 4)
+                }
+            }
+            EntityMove.GRASP -> {
+                // Its hand comes down on one of them: a great circle, slower to land, that hits much harder.
+                for (k in 0 until (if (stage == 2) 2 else 1)) {
+                    val f = alive[(u.strikes + k) % alive.size]
+                    mark(f.x + f.vx * 0.6f, f.y + f.vy * 0.6f, Balance.ENTITY_GRASP_RADIUS, Balance.UPRISING_STRIKE_DELAY + 0.6f, Balance.UPRISING_STRIKE_DAMAGE * 2)
+                }
+            }
+            EntityMove.PULSE -> {
+                // Shockwaves rolling out from under it: rings one after another, further out each time.
+                for (w in 0 until 5 + stage) {
+                    val r = Balance.UPRISING_ENTITY_RADIUS + 0.8f + w * 1.5f
+                    val n = (r * 3.4f).toInt()
+                    for (k in 0 until n) {
+                        val a = k * (6.2831855f / n) + w * 0.3f
+                        mark(u.ex + cos(a) * r, u.ey + sin(a) * r, 0.85f, Balance.UPRISING_STRIKE_DELAY + w * 0.5f, Balance.UPRISING_STRIKE_DAMAGE)
+                    }
+                }
+            }
+            EntityMove.CHASE -> {
+                // Strikes come down on one of them, one after another, wherever they are: they have to keep moving.
+                u.chaseTarget = alive[u.strikes % alive.size].id
+                u.chaseLeft = 6 + stage * 2
+                u.chaseIn = 0f
+            }
         }
+    }
+
+    /** One of the Entity's marked strikes, at (x, y): never past the edge of its platform. */
+    private fun markEntity(u: Uprising, x: Float, y: Float, r: Float, delay: Float, damage: Int) {
+        val c = arena.width / 2f
+        if (hypot(x - c, y - c) > Arenas.ENTITY_REALM_RADIUS - r * 0.5f) return
+        val hard = if (u.boss) Balance.UPRISING_BOSS_DAMAGE else 1f
+        hazards += Hazard(-1, -1, x, y, r, delay, (damage * hard).toInt(), HazardKind.RIFT, lethal = u.boss)
+    }
+
+    /** Its chase: the next strike comes down where its target is now, a little ahead of where they are going. */
+    private fun stepChase(u: Uprising, dt: Float) {
+        if (u.chaseLeft <= 0) return
+        u.chaseIn -= dt
+        if (u.chaseIn > 0f) return
+        val f = fighter(u.chaseTarget)
+        if (f == null || !f.alive) { u.chaseLeft = 0; return }
+        markEntity(u, f.x + f.vx * 0.3f, f.y + f.vy * 0.3f, 1.1f, 0.9f, Balance.UPRISING_STRIKE_DAMAGE)
+        u.chaseLeft--
+        u.chaseIn = Balance.ENTITY_CHASE_GAP
     }
 
     /** The Entity's flares: each follows its target while it locks on, then holds where it is and comes down there. */
@@ -441,9 +518,55 @@ class World(
             it.remove()
             events += GameEvent.EntityFlare(fl.target, fl.x, fl.y, landed = true)
             for (id in u.members) fighter(id)?.let { f ->
-                if (f.alive && f.corruptLeft <= 0f && hypot(f.x - fl.x, f.y - fl.y) < Balance.FLARE_RADIUS + f.radius * 0.3f) corrupt(f)
+                if (f.alive && f.corruptLeft <= 0f && hypot(f.x - fl.x, f.y - fl.y) < Balance.FLARE_RADIUS + f.radius * 0.3f) trap(f)
             }
         }
+    }
+
+    /**
+     * One of its flares came down on [f]: the Entity pulls them into itself, among the souls it carries (the user's
+     * design, in place of corrupting them). They are out of the fight until it is beaten.
+     */
+    private fun trap(f: Fighter) {
+        f.trapped = true
+        f.alive = false
+        f.respawnTimer = 0f
+        f.pending.clear(); f.dashTime = 0f; f.leapTime = 0f; f.leapTarget = -1
+        f.hexes.clear(); f.slowLeft = 0f
+        f.latchedTo = -1
+        release(f)
+        cure(f)
+        if (f.hyperActive) endHyper(f)
+        if (f.inTempest) endTempest(f)
+        f.control.clear()
+        events += GameEvent.Trapped(f.id, true)
+    }
+
+    /** The Entity lets [f] go: back on its platform, whole, clear of everyone (`landingClear`). */
+    private fun free(f: Fighter, u: Uprising) {
+        f.trapped = false
+        f.alive = true
+        f.hp = f.maxHp
+        f.vx = 0f; f.vy = 0f
+        val c = arena.width / 2f
+        // Set down just in front of where it was, searching outward for open ground.
+        var placed = false
+        var ring = 0
+        while (!placed && ring < 8) {
+            val r = Balance.UPRISING_ENTITY_RADIUS + 1.2f + ring * 0.8f
+            var k = 0
+            while (!placed && k < 12) {
+                val a = 1.5707964f + (if (k % 2 == 0) 1 else -1) * (k / 2) * 0.5236f
+                val x = u.ex + cos(a) * r; val y = u.ey + sin(a) * r
+                if (hypot(x - c, y - c) < Arenas.ENTITY_REALM_RADIUS - 1f && landingClear(f, x, y)) { f.x = x; f.y = y; placed = true }
+                k++
+            }
+            ring++
+        }
+        if (!placed) { f.x = c; f.y = c }
+        f.prevX = f.x; f.prevY = f.y
+        f.control.clear()
+        events += GameEvent.Trapped(f.id, false)
     }
 
     /** The Entity has [f]: for a while it fights for the Entity, against its own side (the user's idea). */
@@ -494,7 +617,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits()); mix(f.slowLeft.toRawBits()); mix(f.tempestLeft.toRawBits())
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits()); mix(f.slowLeft.toRawBits()); mix(f.tempestLeft.toRawBits()); mix(if (f.trapped) 1 else 0)
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(lobs.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -515,7 +638,7 @@ class World(
         f.prevX = f.x
         f.prevY = f.y
         val c = f.control
-        if (f.eliminated) { c.attack = false; c.superAttack = false; c.hyper = false; c.detonate = false; return }
+        if (f.eliminated || f.trapped) { c.attack = false; c.superAttack = false; c.hyper = false; c.detonate = false; return }
         if (!f.alive) {
             f.respawnTimer -= dt
             if (f.respawnTimer <= 0f) respawn(f)
@@ -1756,8 +1879,10 @@ class World(
 const val ENTITY_TARGET = -100
 
 /** The Entity's moves in its world, in the order it makes them, round and round. */
-enum class EntityMove { STRIKES, RING, SWEEP, FLARE }
+enum class EntityMove { STRIKES, RING, SWEEP, FLARE, SPOKES, RAIN, GRASP, PULSE, CHASE }
 private val ENTITY_MOVES = listOf(
-    EntityMove.STRIKES, EntityMove.STRIKES, EntityMove.RING, EntityMove.STRIKES, EntityMove.FLARE,
-    EntityMove.SWEEP, EntityMove.STRIKES, EntityMove.RING, EntityMove.FLARE, EntityMove.SWEEP,
+    EntityMove.STRIKES, EntityMove.GRASP, EntityMove.RING, EntityMove.CHASE, EntityMove.FLARE,
+    EntityMove.SPOKES, EntityMove.STRIKES, EntityMove.RAIN, EntityMove.SWEEP, EntityMove.PULSE,
+    EntityMove.GRASP, EntityMove.STRIKES, EntityMove.CHASE, EntityMove.SPOKES, EntityMove.RING,
+    EntityMove.RAIN, EntityMove.SWEEP, EntityMove.PULSE,
 )

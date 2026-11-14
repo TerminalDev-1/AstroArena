@@ -280,7 +280,8 @@ class MatchRenderer(
     private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
 
     private fun updateCamera(dt: Float, alpha: Float) {
-        val p = match.player
+        // Pulled into the Entity, the player watches their team fight to free them: the camera is on one of them.
+        val p = if (match.player.trapped) world.uprising?.members?.firstNotNullOfOrNull { id -> world.fighter(id)?.takeIf { it.alive } } ?: match.player else match.player
         val inp = runner.input
         val aiming = inp.aimingAttack || inp.aimingSuper
         // The look-ahead while aiming eases in and out...
@@ -427,6 +428,46 @@ class MatchRenderer(
     private val upAtWant = FloatArray(3)
     private val entityAt = FloatArray(3)
     private val entityAnim = FighterAnim()
+    /** Fighters it has pulled in: when each was taken (they fly up into its chest), drawn pressed inside it. */
+    private val trapAt = HashMap<Int, Float>()
+    private val trapAnim = FighterAnim()
+
+    /**
+     * Where trapped fighter [f] is drawn at this moment ([out]: x, height, z, scale): flying from where the flare took
+     * them up into the Entity's chest, then held there, side by side with anyone else it has, drifting.
+     */
+    private fun trappedPlace(f: io.github.projectwip.sim.Fighter, k: Int, n: Int, big: Float, out: FloatArray) {
+        val since = time - (trapAt[f.id] ?: -10f)
+        val pull = smooth(since / 1.4f)
+        val cx = entityAt[0] + (k - (n - 1) / 2f) * big * 0.42f + 0.06f * sin(time * 1.3f + k)
+        val cy = entityAt[1] + big * 0.95f + 0.08f * sin(time * 1.7f + k * 2f)
+        val cz = entityAt[2] + big * 0.42f
+        out[0] = lerp(f.x, cx, pull)
+        // (An arc: up first, then in.)
+        out[1] = lerp(0f, cy, smooth(since / 0.9f))
+        out[2] = lerp(f.y, cz, pull)
+        out[3] = lerp(1f, 0.72f, pull)
+    }
+    private val trapPlace = FloatArray(4)
+
+    /** Everyone it has pulled in, inside it: held at its chest, struggling, lit with its blue. */
+    private fun drawTrapped(u: io.github.projectwip.sim.Uprising, pass: Pass) {
+        if (u.phase != io.github.projectwip.sim.UprisingPhase.SKY) return
+        val held = u.members.mapNotNull { id -> world.fighter(id)?.takeIf { it.trapped } }
+        if (held.isEmpty()) return
+        val big = entityScale(u)
+        for ((k, f) in held.withIndex()) {
+            trappedPlace(f, k, held.size, big, trapPlace)
+            val since = time - (trapAt[f.id] ?: -10f)
+            trapAnim.time = time; trapAnim.walk = time * (if (since < 1.4f) 14f else 3f); trapAnim.moving = if (since < 1.4f) 1f else 0.35f
+            trapAnim.recoil = 0f; trapAnim.spin = 0f; trapAnim.bow = -12f; trapAnim.talk = 0f
+            trapAnim.jump = trapPlace[1]; trapAnim.scale = trapPlace[3]
+            trapAnim.flash = 0.35f + 0.15f * sin(time * 5f + k)
+            if (pass == Pass.COLOR) { lit.f("uRim", 1f); lit.f("uEmissive", 0.25f); lit.v4("uTint", 0.55f, 0.75f, 1.15f, 1f) }
+            models.draw(lit, f.def, f.skin, trapPlace[0], trapPlace[2], 1.5707964f, trapAnim, pass)
+        }
+        if (pass == Pass.COLOR) { lit.f("uRim", 0.45f); lit.f("uEmissive", 0f); lit.f("uFlash", 0f); lit.v4("uTint", 1f, 1f, 1f, 1f); lit.mat4("uModel", identity) }
+    }
     private var upGlitchIn = 1f
     private var upGlitchLeft = 0f
 
@@ -476,6 +517,14 @@ class MatchRenderer(
                 upWantEye(ex, ey + head * 0.85f, ez + d); upWantAt(ex, ey + head * 0.88f, ez)
             }
             io.github.projectwip.data.Lore.RitualShot.PLAYER -> face(match.player)
+            io.github.projectwip.data.Lore.RitualShot.KNEEL -> {
+                // Low, from the open side of the circle, drifting round it: everyone going down before the Entity
+                // looming behind them.
+                val a = lerp(-0.35f, 0.35f, push)
+                val d = lerp(12.5f, 11f, push)
+                upWantEye(u.cx + sin(a) * d, lerp(3.6f, 3.1f, push), u.cy + cos(a) * d)
+                upWantAt(u.cx, 1.1f, u.cy - 0.8f)
+            }
             io.github.projectwip.data.Lore.RitualShot.OTHER -> {
                 val others = u.members.mapNotNull { world.fighter(it) }.filter { it !== match.player && it.alive }
                 if (others.isEmpty()) face(match.player) else face(others[cue.index.coerceAtLeast(0) % others.size])
@@ -618,6 +667,7 @@ class MatchRenderer(
         // (It looks down at everyone: straight toward the camera's side of the arena.)
         models.drawSoul(lit, soul, entityAt[0], entityAt[2], 1.5707964f, entityAnim, pass)
         if (pass == Pass.COLOR) { lit.f("uRim", 0.45f); lit.f("uGloss", 0f); lit.f("uEmissive", 0f); lit.f("uFlash", 0f); lit.v4("uTint", 1f, 1f, 1f, 1f); lit.mat4("uModel", identity) }
+        drawTrapped(u, pass)
     }
 
     /** How far [f] is bent in its bow to the Entity (degrees). */
@@ -625,8 +675,13 @@ class MatchRenderer(
         val u = world.uprising ?: return 0f
         if (f.id !in u.members) return 0f
         return when (u.phase) {
-            io.github.projectwip.sim.UprisingPhase.BOW -> 40f * smooth(u.t / 0.9f)
-            io.github.projectwip.sim.UprisingPhase.ENTER -> 40f * (1f - smooth(u.t / 0.6f))
+            // Standing while it says "Kneel.", then going down one after another round the circle (the kneel beat),
+            // slowly, deeper than a nod.
+            io.github.projectwip.sim.UprisingPhase.BOW -> {
+                val at = io.github.projectwip.match.UprisingScript.kneelAt(u.bowLength) + 0.5f + u.members.indexOf(f.id) * 0.28f
+                48f * smooth((u.t - at) / 1.3f)
+            }
+            io.github.projectwip.sim.UprisingPhase.ENTER -> 48f * (1f - smooth(u.t / 0.6f))
             else -> 0f
         }
     }
@@ -661,6 +716,33 @@ class MatchRenderer(
                     sprites.add(u.cx + cos(a) * rx * r, cy + sin(a) * ry * r, u.cy + 0.02f, 0.5f * (1.2f - r), 0.55f, 0.25f, 1f, 0.35f * open)
                 }
                 sprites.add(u.cx, cy, u.cy, 2.6f * open, 0.6f, 0.3f, 1f, 0.35f * open)
+            }
+            // In its world: the hundreds of souls it carries, faint lights drifting up and round inside its body, and
+            // a glow round each fighter it has pulled in (and a trail as they fly up into it).
+            if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY && upDark > 0.05f) {
+                entityPoint(u)
+                val big = entityScale(u)
+                for (k in 0 until 260) {
+                    val a1 = (k * 0.6180339f) % 1f; val a2 = (k * 0.3819660f + 0.17f) % 1f
+                    val rise = (a1 + time * (0.03f + 0.03f * a2)) % 1f
+                    val ang = k * 2.39996f + time * (0.25f + 0.35f * a2)
+                    val rr = big * (0.18f + 0.42f * a2) * (0.6f + 0.4f * sin(rise * 3.1416f))
+                    val fade = sin(rise * 3.1416f)
+                    val warm = k % 5 == 0
+                    sprites.add(entityAt[0] + cos(ang) * rr, entityAt[1] + big * (0.15f + 1.75f * rise), entityAt[2] + sin(ang) * rr * 0.55f,
+                        0.12f + 0.16f * a1, if (warm) 0.8f else 0.55f, if (warm) 0.6f else 0.85f, 1f, 0.32f * fade * upDark)
+                }
+                val held = u.members.mapNotNull { id -> world.fighter(id)?.takeIf { it.trapped } }
+                for ((k, f) in held.withIndex()) {
+                    trappedPlace(f, k, held.size, big, trapPlace)
+                    sprites.add(trapPlace[0], trapPlace[1] + 0.9f * trapPlace[3], trapPlace[2] - 0.3f, 1.5f * trapPlace[3], 0.35f, 0.75f, 1f, 0.22f * upDark)
+                    val since = time - (trapAt[f.id] ?: -10f)
+                    if (since < 1.6f) for (j in 0 until 14) {
+                        val back = j / 14f * 0.5f
+                        val s = smooth(((since - back) / 1.4f).coerceIn(0f, 1f))
+                        sprites.add(lerp(f.x, trapPlace[0], s), lerp(0.5f, trapPlace[1] + 0.8f, s), lerp(f.y, trapPlace[2], s), 0.5f * (1f - j / 14f), 0.4f, 0.8f, 1f, 0.6f * (1f - j / 14f))
+                    }
+                }
             }
             // A cold light round the Entity, so its shape reads against the dark.
             if (u.phase != io.github.projectwip.sim.UprisingPhase.RETURN && upDark > 0.05f) {
@@ -2680,6 +2762,14 @@ class MatchRenderer(
                 if (hypot(e.x - match.player.x, e.y - match.player.y) < 3f) shake = max(shake, 0.2f)
             }
             is GameEvent.Corrupted -> if (e.on) energyFlare(e.fighterId, 1f, sky = true)
+            is GameEvent.Trapped -> if (e.on) trapAt[e.fighterId] = time else {
+                trapAt.remove(e.fighterId)
+                // Let go: a burst of its blue where they land.
+                world.fighter(e.fighterId)?.let { f -> repeat(40) {
+                    val a = rng.nextFloat() * 6.28f; val sp = 2f + rng.nextFloat() * 3.5f
+                    particles.spawn(f.x, 0.6f + rng.nextFloat(), f.y, cos(a) * sp, 1f + rng.nextFloat() * 3f, sin(a) * sp, 0.6f, 0.12f, 0xFF5CC8FF.toInt(), 1f)
+                } }
+            }
             is GameEvent.EntityHit -> {
                 // Where it landed on the Entity's shadow: a burst of its violet; the Entity flashes when the player hits it.
                 if (e.fighterId == match.player.id) entityHitAt = time
@@ -2719,6 +2809,8 @@ class MatchRenderer(
         s.uprisingPhase = if (upr != null && upr.active) upr.phase.ordinal else -1
         s.uprisingT = upr?.t ?: 0f; s.uprisingHeld = upr?.heldFor ?: 0f; s.uprisingBowLen = upr?.bowLength ?: 0f; s.uprisingHp = upr?.hp ?: 0; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
         s.bossMode = w.rules.boss
+        s.playerTrapped = p.trapped
+        s.trappedNames = if (upr == null) "" else upr.members.mapNotNull { id -> w.fighter(id)?.takeIf { it.trapped && it !== p }?.name }.joinToString(", ")
         s.playerGlitch = p.glitchLeft
         s.timesDown = p.deaths
         s.practice = w.rules.practice

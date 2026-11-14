@@ -292,7 +292,9 @@ class HudView(
                 // face it is on stays clear.
                 val cue = UprisingScript.cue(phase, t, s.uprisingBowLen, s.uprisingBeaten, runner.match.player.name) ?: return
                 val close = cue.shot != io.github.projectwip.data.Lore.RitualShot.WIDE
-                entityPlate(c, cue.text, cue.sub, w / 2, if (close) h * 0.8f else h * 0.22f, minOf(1f, cue.since / 0.3f))
+                // (The kneel beat has no words: just what is happening, high up, out of the way of the bowing.)
+                if (cue.text.isEmpty()) entityPlate(c, "ALL KNEEL", cue.sub, w / 2, h * 0.16f, minOf(1f, cue.since / 0.5f, (cue.length - cue.since) / 0.5f).coerceIn(0f, 1f))
+                else entityPlate(c, cue.text, cue.sub, w / 2, if (close) h * 0.8f else h * 0.22f, minOf(1f, cue.since / 0.3f))
             }
             io.github.projectwip.sim.UprisingPhase.ENTER -> entityPlate(c, "Into my world.", "THROUGH THE PORTAL", w / 2, h * 0.22f, fade(4f))
             io.github.projectwip.sim.UprisingPhase.SKY -> {
@@ -309,6 +311,8 @@ class HudView(
                 text.textSize = dp(13f)
                 outlined(c, "THE ENTITY · %,d".format(s.uprisingHp), w / 2, top + dp(18f), Color.WHITE, dp(2.5f))
                 if (t < 5f) entityPlate(c, "Then fight me. All of you.", "HIT THE SHADOW UNDER IT", w / 2, h * 0.3f, minOf(1f, (5f - t) / 0.5f))
+                else if (s.trappedNames.isNotEmpty() && !s.playerTrapped)
+                    entityPlate(c, "TRAPPED: " + s.trappedNames.uppercase(), "BEAT THE ENTITY TO FREE THEM", w / 2, top + ph + dp(40f), 1f)
                 // Through the portal: a flash, fading.
                 if (t < 0.7f) { fill.color = Color.argb((255 * (1f - t / 0.7f)).toInt(), 230, 220, 255); c.drawRect(0f, 0f, w, h, fill) }
             }
@@ -459,7 +463,11 @@ class HudView(
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))
         }
 
-        if (!s.playerAlive && s.phase == Phase.PLAYING) {
+        if (s.playerTrapped && s.phase == Phase.PLAYING) {
+            // Inside the Entity, among its souls, until the team beats it.
+            // (Up under its health bar, out of the way of the teammate the camera is on.)
+            entityPlate(c, "TRAPPED INSIDE THE ENTITY", "YOUR TEAM MUST BEAT IT TO FREE YOU", cx, dp(92f) + dp(46f) + dp(40f), 1f)
+        } else if (!s.playerAlive && s.phase == Phase.PLAYING) {
             text.textSize = dp(28f)
             outlined(c, "KNOCKED OUT", cx, h * 0.4f, Color.rgb(255, 92, 92), dp(5f))
             text.textSize = dp(19f)

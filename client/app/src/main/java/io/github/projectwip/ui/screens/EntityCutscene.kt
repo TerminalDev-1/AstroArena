@@ -97,13 +97,13 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
             }
         }
         // The title, at the end.
-        val titleAt = when (cut) { EntityCut.VICTORY -> 9.8f; EntityCut.DEFEAT -> 11.2f; EntityCut.CORRUPT -> 4.2f }
+        val titleAt = when (cut) { EntityCut.VICTORY -> 9.8f; EntityCut.DEFEAT -> 11.2f; EntityCut.CORRUPT -> 5.4f }
         if (time >= titleAt) {
             val k = ((time - titleAt) / 0.35f).coerceIn(0f, 1f)
             val (word, color) = when (cut) {
                 EntityCut.VICTORY -> "VICTORY" to Palette.Gold
                 EntityCut.DEFEAT -> "DEFEAT" to Palette.Red
-                EntityCut.CORRUPT -> "THE ENTITY HAS YOU" to Color(0xFFC9A6FF)
+                EntityCut.CORRUPT -> "PULLED INTO THE ENTITY" to Color(0xFFC9A6FF)
             }
             Box(Modifier.align(if (cut == EntityCut.VICTORY) Alignment.TopCenter else Alignment.Center).padding(top = if (cut == EntityCut.VICTORY) 44.dp else 0.dp)) {
                 GameText(word, Type.Display.copy(fontSize = if (cut == EntityCut.CORRUPT) 40.sp else 64.sp), color = color, outline = 6.dp,

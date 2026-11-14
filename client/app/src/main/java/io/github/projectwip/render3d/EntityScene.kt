@@ -23,19 +23,21 @@ import kotlin.random.Random
  *    nothing; the fighter turns to the camera and celebrates.
  *  - [DEFEAT]: it looms over the fighter on their knees, its streaks wrap them, lift them and pull them into its chest,
  *    where they are gone; then it speaks to the player.
- *  - [CORRUPT]: one of its flares lands on the player mid-fight: streaks pour down into them, they fight it, glitch,
- *    and turn round, its now. (The match waits while it plays.)
+ *  - [CORRUPT]: one of its flares lands on the player mid-fight and pulls them into it (since build 111, the user's
+ *    design: no longer corrupted, trapped among the souls it carries until their team beats it): its streaks pour
+ *    down on them, they fight it, they are lifted and pulled into its chest, and the souls inside it flicker across
+ *    it. (The match waits while it plays.)
  */
 enum class EntityCut { VICTORY, DEFEAT, CORRUPT }
 
 object EntityScript {
     class Beat(val at: Float, val text: String)
 
-    fun length(cut: EntityCut) = when (cut) { EntityCut.VICTORY -> 13f; EntityCut.DEFEAT -> 12.8f; EntityCut.CORRUPT -> 5.6f }
+    fun length(cut: EntityCut) = when (cut) { EntityCut.VICTORY -> 13f; EntityCut.DEFEAT -> 12.8f; EntityCut.CORRUPT -> 7.6f }
 
     private val CORRUPT_LINES = listOf(
-        "Turn around. Hurt them for me.", "Your friends look so breakable.", "Let me drive for a while.",
-        "Fight them. Not me.", "Shh. I've got you now.",
+        "Come. Join the others.", "In you go. They're waiting for you.", "Another voice for me.",
+        "Hush. You're mine now.", "So many souls. Room for one more.",
     )
 
     fun beats(cut: EntityCut, line: Int): List<Beat> = when (cut) {
@@ -50,7 +52,10 @@ object EntityScript {
             Beat(7.3f, "Mine. Like all the others."),
             Beat(9.8f, "Come back when you're ready to lose again."),
         )
-        EntityCut.CORRUPT -> listOf(Beat(1.4f, CORRUPT_LINES[Math.floorMod(line, CORRUPT_LINES.size)]))
+        EntityCut.CORRUPT -> listOf(
+            Beat(0.9f, CORRUPT_LINES[Math.floorMod(line, CORRUPT_LINES.size)]),
+            Beat(5.6f, "Your team can still free you. If they beat me."),
+        )
     }
 
     /** The line being shown at [t], or -1. */
@@ -181,13 +186,19 @@ class EntityScene {
                 shake = 0.05f * streaks
             }
             EntityCut.CORRUPT -> {
-                streaks = smooth(t / 0.5f) * (1f - smooth((t - 3.6f) / 0.5f))
-                streakFromAbove = true
-                struggle = streaks
-                glitch = smooth(t / 0.6f)
-                fy = 0.35f * streaks
-                showEntity = false
-                if (t > 3.9f) facing = lerp(-1.5707964f, 1.5707964f, smooth((t - 3.9f) / 0.7f))
+                // The flare's streaks pour down on them, then its own take them: lifted and pulled into its chest.
+                streaks = smooth(t / 0.4f) * (1f - smooth((t - 5f) / 0.4f))
+                streakFromAbove = t < 1.6f
+                val pull = smooth((t - 1.6f) / 3.4f)
+                fx = lerp(fx0, ex, pull); fz = lerp(fz0, ez + 0.9f, pull); fy = lerp(0.3f * streaks, ey + es * 0.75f, pull)
+                struggle = streaks * (1f - pull * 0.5f)
+                glitch = streaks
+                eBow = 14f * smooth((t - 1.4f) / 1f) * (1f - smooth((t - 5.4f) / 1f))
+                if (t > 4.6f) fScale = FIGHTER_SCALE * (1f - smooth((t - 4.6f) / 0.6f))
+                if (t in 5.1f..5.25f && lastFlashAt < 5f) { lastFlashAt = t; repeat(50) { spark(ex, ey + es * 0.8f, ez + 0.8f, 5f, 0xFF5CC8FF.toInt()) } }
+                eFlash = 0.18f * smooth((t - 5.1f) / 0.2f) * (1f - smooth((t - 5.6f) / 1f))
+                // Inside it now: the souls it carries flicker across it.
+                if (t > 5.3f && (t * 10f).toInt() % 3 != 0) soul = souls[(t * 6f).toInt() % souls.size]
                 shake = 0.04f * streaks
             }
         }
@@ -208,9 +219,9 @@ class EntityScene {
                 else -> { val k = smooth((t - 9.5f) / 3.2f); setEye(ex, head - 0.2f, ez + lerp(10f, 6f, k)); setAt(ex, head, ez) }
             }
             EntityCut.CORRUPT -> when {
-                t < 1.8f -> { setEye(fx0 + 3f, 2.2f, fz0 + 4f); setAt(fx0, 1.2f, fz0) }
-                t < 3.9f -> { setEye(fx0 + 0.35f, 1.15f, fz0 - lerp(2.6f, 2f, smooth((t - 1.8f) / 2f))); setAt(fx0, 1.05f, fz0) }
-                else -> { setEye(fx0 + 0.3f, 1.15f, fz0 + 2.6f); setAt(fx0, 1.05f, fz0) }
+                t < 1.6f -> { setEye(fx0 + 3f, 2.2f, fz0 + 4f); setAt(fx0, 1.2f, fz0) }
+                t < 5.2f -> { setEye(c + 6.5f, 2.6f, c + 3f); setAt(fx, fy + 1f, fz) }
+                else -> { val k = smooth((t - 5.2f) / 2.4f); setEye(ex + 0.3f, ey + es * 0.95f, ez + lerp(8.5f, 6.5f, k)); setAt(ex, ey + es * 0.9f, ez) }
             }
         }
         if (shake > 0f) { eye[0] += (rng.nextFloat() - 0.5f) * shake; eye[1] += (rng.nextFloat() - 0.5f) * shake }
