@@ -5,7 +5,6 @@ import io.github.projectwip.data.BotDifficulty
 import io.github.projectwip.data.CapsuleTier
 import io.github.projectwip.data.GameMode
 import io.github.projectwip.data.SparkCapsules
-import io.github.projectwip.data.CupTrack
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.MatchOutcome
 import io.github.projectwip.data.MatchReport
@@ -50,10 +49,7 @@ class ProgressionTest {
     @Test fun theServerDecidesWhatAMatchIsWorth() {
         val verdict = ServerVerdict(8, 8, false, 1, 3, bolts = 28, firstWinPrisms = 10)
         val (a, r1) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = verdict)
-        assertEquals(8, a.cups)
-        assertEquals(8, a.bestCups)
-        assertEquals(0, r1.cupsBefore)
-        assertEquals(8, r1.cupDelta)
+        assertEquals("no Cups any more (removed in build 111)", 0, a.cups)
         assertTrue(r1.online)
         assertEquals(28, r1.bolts)
         assertEquals(10, r1.firstWinPrisms)
@@ -69,7 +65,6 @@ class ProgressionTest {
         assertEquals(494, after.cups)
         assertEquals(500, after.bestCups)
         assertEquals(4, after.capsules)
-        assertEquals(500, rewards.cupsBefore)
         assertTrue(rewards.capsuleEarned)
         assertEquals(1, rewards.capsulesLeftToday)
         assertEquals(1, Progression.capsulesLeftToday(after, 7))
@@ -86,7 +81,6 @@ class ProgressionTest {
         val save = SaveData(cups = 120, bestCups = 120, capsules = 2)
         val (after, rewards) = Progression.applyMatch(save, report(MatchOutcome.VICTORY), today = 3, verdict = null)
         assertFalse(rewards.online)
-        assertEquals(0, rewards.cupDelta)
         assertEquals(120, after.cups)
         assertFalse(rewards.capsuleEarned)
         assertEquals(2, after.capsules)
@@ -96,22 +90,10 @@ class ProgressionTest {
         assertEquals(1, after.matchesPlayed)
     }
 
-    @Test fun cupTrackRewardsStayClaimableAfterLosingCups() {
-        val s = SaveData(cups = 30, bestCups = 30)
-        assertEquals(listOf(10, 25), Progression.claimable(s).map { it.cups })
-        // The server records a claim; losing Cups doesn't revoke what was reached.
-        assertEquals(listOf(25), Progression.claimable(s.copy(cups = 5, claimedMilestones = setOf(10))).map { it.cups })
-    }
-
     @Test fun dailyGiftOncePerDay() {
         assertTrue(Progression.dailyGiftAvailable(SaveData(), 10))
         assertFalse(Progression.dailyGiftAvailable(SaveData(lastDailyGiftDay = 10), 10))
         assertTrue(Progression.dailyGiftAvailable(SaveData(lastDailyGiftDay = 10), 11))
-    }
-
-    @Test fun trackIsSortedAndUnique() {
-        val cups = CupTrack.milestones.map { it.cups }
-        assertEquals(cups.sorted().distinct(), cups)
     }
 
     @Test fun theServersDropCountIsShownAndResetsWithTheDay() {
@@ -264,7 +246,6 @@ class ProgressionTest {
         val (after, rewards) = Progression.applyMatch(SaveData(cups = 100, bestCups = 100), shown, today = 4, verdict = verdict)
         assertEquals(0, after.victories)
         assertEquals(1, after.totalKos)
-        assertEquals(-1, rewards.cupDelta)
     }
 
     @Test fun versionsCompareByNumber() {
@@ -294,7 +275,6 @@ class ProgressionTest {
         // Fighters are unlocked on the Spark Road; the Cup Track pays Credits towards it instead of handing one out.
         assertTrue(io.github.projectwip.data.SparkRoad.steps.any { it.fighter == FighterId.KITO })
         assertEquals("the last one on the road is Buddy (Spark was retired)", FighterId.BUDDY, io.github.projectwip.data.SparkRoad.steps.last().fighter)
-        assertTrue(CupTrack.milestones.none { it.reward is Reward.UnlockFighter })
         assertEquals(io.github.projectwip.data.SparkRoad.steps.first(), io.github.projectwip.data.SparkRoad.next(SaveData()))
         // The floor every fighter stands on: enough health, and enough damage from one ammo when it all lands.
         for (f in Balance.fighters.filter { it.upgradable }) {

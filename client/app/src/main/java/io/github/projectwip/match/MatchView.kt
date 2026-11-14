@@ -111,6 +111,9 @@ class MatchView(
         thread = null
     }
 
+    /** How many times the Entity has corrupted the player (each plays its cutscene). */
+    val corruptions: Int get() = runner.corruptions
+
     /** The Entity's hijack (see `MatchRunner.hijack`): 2 when its cutscene should play. */
     val hijack: Int get() = runner.hijack
 

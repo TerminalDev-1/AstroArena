@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
 import io.github.projectwip.data.BotDifficulty
-import io.github.projectwip.data.CupTrack
 import io.github.projectwip.data.GameMode
 import io.github.projectwip.data.GameRepository
 import io.github.projectwip.data.Progression
@@ -90,7 +89,6 @@ fun HomeScreen(
     val online = serverStatus?.online == true
     val prog = save.progress(save.selectedFighter)
     val canUpgradeAny = Balance.fighters.any { Progression.canUpgrade(save, it.id) }
-    val claimable = Progression.claimable(save).size
     val giftReady = Progression.dailyGiftAvailable(save, repo.today)
     // The player's place among the real accounts on the server; unknown while offline.
     val rank = serverStatus?.account?.takeIf { serverStatus.online }?.rank
@@ -113,13 +111,13 @@ fun HomeScreen(
             }
 
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                // ---------------- top bar: Cups and the Cup Track on the left, the wallet on the right
+                // ---------------- top bar: who you are on the left (it opens the leaderboard), the wallet on the right
                 Row(
                     Modifier.fillMaxWidth().padding(start = 14.dp, end = 18.dp, top = 10.dp).enterFrom(60, dy = (-12).dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // The Cups panel takes whatever room the wallet leaves, so nothing is ever squeezed.
-                    Box(Modifier.weight(1f)) { ProfileAndCups(save, claimable) { go(Screen.CupTrack) } }
+                    // The profile takes whatever room the wallet leaves, so nothing is ever squeezed.
+                    Box(Modifier.weight(1f)) { Profile(save) { go(Screen.Leaderboard) } }
                     Spacer(Modifier.width(12.dp))
                     CurrencyPill(IconKind.BOLT, save.bolts)
                     Spacer(Modifier.width(10.dp))
@@ -251,34 +249,19 @@ private fun RailItem(label: String, icon: IconKind, badge: String?, badgeColor: 
 
 // ---------------------------------------------------------------------------------------------- top bar
 
+/** Who the player is: their name and how many times they've won (Cups were removed: the game is about the Entity). */
 @Composable
-private fun ProfileAndCups(save: SaveData, claimable: Int, onCups: () -> Unit) {
-    val next = CupTrack.nextMilestone(save.bestCups)
-    val prev = CupTrack.previousMilestoneCups(save.bestCups)
-    val frac = if (next == null) 1f else (save.bestCups - prev).toFloat() / (next.cups - prev)
+private fun Profile(save: SaveData, onClick: () -> Unit) {
     Box {
-        ChunkyButton(onCups, Modifier.height(56.dp).widthIn(max = 360.dp).fillMaxWidth(), ButtonStyle.GLASS, lip = 4.dp, cut = 12.dp) {
+        ChunkyButton(onClick, Modifier.height(56.dp).widthIn(max = 300.dp).fillMaxWidth(), ButtonStyle.GLASS, lip = 4.dp, cut = 12.dp) {
             Row(Modifier.padding(start = 62.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.width(104.dp)) {
+                Column(Modifier.weight(1f)) {
                     GameText(save.settings.playerName, Type.Label, outline = 2.dp)
                     PlainText("${save.victories} WINS", Type.Eyebrow, color = Palette.TextDim, maxLines = 1)
                 }
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        GameText("%,d".format(save.cups), Type.Heading, color = Palette.Gold, outline = 2.dp)
-                        Spacer(Modifier.width(6.dp))
-                        PlainText(next?.let { "NEXT ${it.cups}" } ?: "TRACK DONE", Type.Eyebrow, color = Palette.TextDim, maxLines = 1, modifier = Modifier.padding(bottom = 3.dp))
-                    }
-                    ProgressBar(frac, Modifier.fillMaxWidth().height(8.dp))
-                }
             }
         }
-        GameIcon(IconKind.CUP, Modifier.size(60.dp).offset(x = (-4).dp, y = (-3).dp))
-        if (claimable > 0) {
-            val pulse by rememberInfiniteTransition(label = "cupBadge").animateFloat(1f, 1.15f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "p")
-            Badge(claimable.toString(), Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-6).dp).graphicsLayer { scaleX = pulse; scaleY = pulse }, color = Palette.Red)
-        }
+        GameIcon(IconKind.RANK, Modifier.size(56.dp).offset(x = (-2).dp, y = (-1).dp))
     }
 }
 
@@ -449,7 +432,7 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
             PlainText(
                 when (m) {
                     GameMode.BOSS -> "The Entity calls your team to its ritual, then takes you into its world. Hit the shadow under it. Dodge its marked ground, its rings and sweeps, and its flares: whoever one lands on is corrupted and turns on their own side. Beat it before time runs out to earn Cups."
-                    GameMode.DUEL -> "Against one real player on this server, each on their own device. First to 3 knockouts, played for Cups. Leaving a match counts as a defeat."
+                    GameMode.DUEL -> "Against one real player on this server, each on their own device. First to 3 knockouts. Leaving a match counts as a defeat."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a giant that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },
                 Type.Small.copy(fontSize = Type.Small.fontSize * 0.92f, lineHeight = Type.Small.fontSize * 1.1f), color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 11,

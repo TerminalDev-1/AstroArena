@@ -154,7 +154,7 @@ enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val ri
     PURPLE(Palette.PanelLight, Palette.Panel, Palette.PanelDark, Palette.Rim),
     GOLD(Color(0xFFFFE066), Palette.Gold, Color(0xFFA8650A), Color(0xFFFFF6C8)),
     /** Translucent purple plate that lets the 3D lobby show through. */
-    GLASS(Color(0xD8392A8C), Color(0xE01A1150), Color(0xFF0E0828), Palette.Rim),
+    GLASS(Color(0xD8200C4A), Color(0xE00C0420), Color(0xFF05020D), Palette.Rim),
 }
 
 /** Soft drop shadow under a plate, so it reads as sitting above the scene. */
@@ -268,7 +268,10 @@ fun Panel(
             val ink = 3.dp.toPx()
             val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
             plateShadow(path, 6.dp.toPx())
-            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.14f), color, colorBottom)), Palette.Ink, ink, gloss = false)
+            // A neon glow round it, out of the void.
+            drawPath(path, Palette.Rim.copy(alpha = 0.10f), style = Stroke(9.dp.toPx()))
+            drawPath(path, Palette.Rim.copy(alpha = 0.18f), style = Stroke(5.dp.toPx()))
+            plate(shape, size, Brush.verticalGradient(listOf(lerp(color, Color.White, 0.08f), color, colorBottom)), Palette.Ink, ink, gloss = false)
             clipPath(path) {
                 // Faint diagonal brushing, and a sheen across the top, so large panels aren't a flat fill.
                 val step = 22.dp.toPx()
@@ -284,7 +287,8 @@ fun Panel(
             if (size.width > inset * 3 && size.height > inset * 3) translate(inset, inset) {
                 val inner = Size(size.width - inset * 2, size.height - inset * 2)
                 val o = plateShape(cut - 2.dp, (cut * 0.35f - 1.dp).coerceAtLeast(1.dp)).createOutline(inner, layoutDirection, this)
-                drawPath(Path().apply { addOutline(o) }, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.03f))), style = Stroke(1.5.dp.toPx()))
+                // (In neon violet: the edge of a panel lit by the void's light.)
+                drawPath(Path().apply { addOutline(o) }, Brush.verticalGradient(listOf(Palette.Rim.copy(alpha = 0.75f), Palette.Rim.copy(alpha = 0.15f))), style = Stroke(1.8.dp.toPx()))
             }
         },
         content = content,
@@ -521,7 +525,6 @@ private val SECTIONS = listOf(
     Section(IconKind.SHOP, "SHOP", { Screen.Shop }, { it is Screen.Shop }),
     Section(IconKind.FIGHTERS, "FIGHTERS", { Screen.Fighters() }, { it is Screen.Fighters }),
     Section(IconKind.TRACK, "ROAD", { Screen.Road }, { it is Screen.Road }),
-    Section(IconKind.CUP, "CUPS", { Screen.CupTrack }, { it is Screen.CupTrack }),
     Section(IconKind.RANK, "RANKS", { Screen.Leaderboard }, { it is Screen.Leaderboard }),
     Section(IconKind.NEWS, "NEWS", { Screen.News }, { it is Screen.News }),
 )

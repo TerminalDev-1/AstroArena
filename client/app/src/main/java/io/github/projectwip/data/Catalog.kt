@@ -99,8 +99,6 @@ object SparkCapsules {
     fun moreItemsChance(luck: Float = 0f) = (0.4f + 0.05f * luck).coerceAtMost(1f)
 }
 
-data class Milestone(val cups: Int, val reward: Reward)
-
 /** One stop on the Spark Road: a fighter, and the Credits it takes to unlock. */
 data class RoadStep(val fighter: FighterId, val cost: Int)
 
@@ -115,58 +113,6 @@ object SparkRoad {
 
     /** The fighter the Credits are filling: the first one along the road that is still locked. Null when the road is finished. */
     fun next(save: SaveData): RoadStep? = steps.firstOrNull { !save.progress(it.fighter).unlocked }
-}
-
-/**
- * A fighter's own rank, climbed with the Cups won while playing that fighter. Rank 1 starts at the first number,
- * rank 2 at the second, and so on. There is no top rank: past the end of the list every further rank is another
- * [STEP] Cups. The server's table (`rules.py`) is the one that counts.
- */
-object FighterRanks {
-    val starts = intArrayOf(0, 10, 20, 35, 50, 75, 100, 140, 180, 230, 280, 340, 400, 470, 540, 620, 700, 790, 880, 1000)
-    const val STEP = 150
-
-    fun rank(cups: Int): Int = if (cups >= starts.last()) starts.size + (cups - starts.last()) / STEP else starts.count { it <= cups }.coerceAtLeast(1)
-    /** Cups at which [rank] starts. */
-    fun startOf(rank: Int): Int = if (rank <= starts.size) starts[(rank - 1).coerceAtLeast(0)] else starts.last() + (rank - starts.size) * STEP
-    fun label(cups: Int): String = rank(cups).toString()
-    /** Cups at which the next rank starts. */
-    fun nextAt(cups: Int): Int = startOf(rank(cups) + 1)
-    /** How far through the current rank [cups] is, 0..1. */
-    fun progress(cups: Int): Float {
-        val from = startOf(rank(cups))
-        return ((cups - from).toFloat() / (nextAt(cups) - from)).coerceIn(0f, 1f)
-    }
-}
-
-/** The Cup Track. Milestones must be sorted by [Milestone.cups] and unique. */
-object CupTrack {
-    val milestones: List<Milestone> = listOf(
-        Milestone(10, Reward.Bolts(40)),
-        Milestone(25, Reward.Prisms(10)),
-        Milestone(40, Reward.Bolts(75)),
-        Milestone(60, Reward.SkinReward(FighterId.BYTE, 1)),
-        Milestone(80, Reward.Prisms(20)),
-        Milestone(100, Reward.Credits(80)),
-        Milestone(130, Reward.Bolts(150)),
-        Milestone(160, Reward.Prisms(25)),
-        Milestone(200, Reward.SkinReward(FighterId.BRAKK, 1)),
-        Milestone(250, Reward.Bolts(250)),
-        Milestone(300, Reward.Prisms(40)),
-        Milestone(350, Reward.Credits(200)),
-        Milestone(420, Reward.Bolts(400)),
-        Milestone(500, Reward.Credits(300)),
-        Milestone(600, Reward.Prisms(60)),
-        Milestone(700, Reward.Bolts(600)),
-        Milestone(850, Reward.SkinReward(FighterId.BYTE, 2)),
-        Milestone(1000, Reward.Prisms(100)),
-        Milestone(1200, Reward.Credits(400)),
-        Milestone(1500, Reward.SkinReward(FighterId.KITO, 1)),
-    )
-
-    fun nextMilestone(cups: Int): Milestone? = milestones.firstOrNull { it.cups > cups }
-    fun previousMilestoneCups(cups: Int): Int = milestones.lastOrNull { it.cups <= cups }?.cups ?: 0
-
 }
 
 sealed interface ShopItem {

@@ -19,11 +19,8 @@ data class MatchReport(
 
 /** What the result screen shows. Before/after values let it animate the change. */
 data class MatchRewards(
-    val cupsBefore: Int,
-    val cupDelta: Int,
     val bolts: Int,
     val firstWinPrisms: Int,
-    val newlyReachedMilestones: List<Milestone>,
     val capsuleEarned: Boolean = false,
     /** Spark Capsules that can still be earned today, after this match. */
     val capsulesLeftToday: Int = 0,
@@ -32,11 +29,6 @@ data class MatchRewards(
     /** Credits for the Spark Road, and the fighters they unlocked. */
     val credits: Int = 0,
     val unlocked: List<FighterId> = emptyList(),
-    /** The Cups of the fighter that was played, before the match and what it changed them by: its rank follows them. */
-    val fighterCupsBefore: Int = 0,
-    val fighterCupDelta: Int = 0,
-    /** How many of the Cups were the MVP's bonus (0 if there was none). */
-    val mvpCups: Int = 0,
 )
 
 /**
@@ -107,22 +99,16 @@ object Progression {
      * (an offline match) nothing is earned.
      */
     fun applyMatch(save: SaveData, report: MatchReport, today: Long, verdict: ServerVerdict?): Pair<SaveData, MatchRewards> {
-        val newCups = (verdict?.cups ?: save.cups).coerceAtLeast(0)
-        val cupDelta = verdict?.cupDelta ?: 0
-        val reached = CupTrack.milestones.filter { it.cups in (save.bestCups + 1)..newCups }
         val leftToday = verdict?.dropsLeftToday ?: capsulesLeftToday(save, today)
         val next = save.copy(
             capsules = verdict?.drops ?: save.capsules,
             capsuleDay = today,
             capsulesEarnedToday = SparkCapsules.PER_DAY - leftToday,
-            cups = newCups,
-            bestCups = maxOf(save.bestCups, newCups),
             matchesPlayed = save.matchesPlayed + 1,
             victories = save.victories + if (report.outcome == MatchOutcome.VICTORY) 1 else 0,
             totalKos = save.totalKos + report.kos,
         )
-        val rewards = MatchRewards(newCups - cupDelta, cupDelta, verdict?.bolts ?: 0, verdict?.firstWinPrisms ?: 0, reached, verdict?.drop == true, leftToday, online = verdict != null, credits = verdict?.credits ?: 0, unlocked = verdict?.unlocked ?: emptyList(),
-            fighterCupsBefore = verdict?.fighterCupsBefore ?: save.progress(save.selectedFighter).cups, fighterCupDelta = verdict?.let { it.fighterCups - it.fighterCupsBefore } ?: 0, mvpCups = verdict?.mvpCups ?: 0)
+        val rewards = MatchRewards(verdict?.bolts ?: 0, verdict?.firstWinPrisms ?: 0, verdict?.drop == true, leftToday, online = verdict != null, credits = verdict?.credits ?: 0, unlocked = verdict?.unlocked ?: emptyList())
         return next to rewards
     }
 
@@ -203,11 +189,6 @@ object Progression {
             line(def.superSpec.name, def.superDamage, if (def.superSpec.projectiles > 1) " ×${def.superSpec.projectiles}" else ""),
         )
     }
-
-    // ---------------- Cup Track ----------------
-
-    fun claimable(save: SaveData): List<Milestone> =
-        CupTrack.milestones.filter { it.cups <= save.bestCups && it.cups !in save.claimedMilestones }
 
     fun owns(save: SaveData, reward: Reward): Boolean = when (reward) {
         is Reward.Bundle -> false

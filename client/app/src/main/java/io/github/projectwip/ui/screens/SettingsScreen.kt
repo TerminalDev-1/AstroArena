@@ -259,7 +259,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     val ask = io.github.projectwip.ui.LocalServerCall.current
     // Starting an account over is for developers; the server refuses anyone else.
     if (dev) {
-    SectionTitle("RESET PROGRESS", "Erase Cups, levels, currencies and claimed rewards on the server. Your name and settings are kept. This cannot be undone.")
+    SectionTitle("RESET PROGRESS", "Erase levels, currencies and claimed rewards on the server. Your name and settings are kept. This cannot be undone.")
     ChunkyButton({ confirm = true }, Modifier.width(260.dp).height(56.dp), ButtonStyle.RED) { GameText("RESET PROGRESS", Type.Heading) }
     Spacer(Modifier.height(10.dp))
     }
@@ -272,7 +272,7 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
         status == null -> "No server connection in this build."
         !status.supported -> "The server at ${status.url} doesn't support this version."
         status.disabled -> "Your account on ${status.url} has been disabled by the server's owner."
-        status.online -> "Online: connected to ${status.url}. The server keeps your Cups, Coins, Arena Crystals and fighters, sets matches up and decides their results."
+        status.online -> "Online: connected to ${status.url}. The server keeps your Coins, Arena Crystals and fighters, sets matches up and decides their results."
         else -> "Offline mode: couldn't reach ${status.url.ifBlank { BuildConfig.SERVER_URL }}. You are on your offline profile, which is kept on this device: what you earn and spend here stays here, and your server account is untouched. The game keeps trying, and goes back online by itself."
     })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

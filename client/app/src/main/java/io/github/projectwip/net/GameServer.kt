@@ -88,7 +88,7 @@ data class MatchPlan(
 typealias NewsItem = io.github.projectwip.data.NewsItem
 
 /** A real player on the server's leaderboard. */
-data class RemotePlayer(val id: String, val name: String, val cups: Int, val fighter: FighterId)
+data class RemotePlayer(val id: String, val name: String, val wins: Int, val fighter: FighterId)
 
 /**
  * The game's connection to the AstroArena server (see the `server/` directory of the repository).
@@ -266,8 +266,6 @@ class GameServer(context: Context) : GameActions {
 
     override fun claimGift(): Reward? = act("/v1/shop/gift")?.optJSONObject("reward")?.let { reward(it) }
 
-    /** Claims the Cup Track reward at [cups]. What comes back is what was actually given (owned things are paid out instead). */
-    override fun claimMilestone(cups: Int): Reward? = act("/v1/track/claim", JSONObject().put("cups", cups))?.optJSONObject("reward")?.let { reward(it) }
 
     override fun buyDeal(id: Long): Reward? = act("/v1/shop/deals/$id/buy")?.optJSONObject("reward")?.let { reward(it) }
 
@@ -284,8 +282,8 @@ class GameServer(context: Context) : GameActions {
     override fun reset(): Boolean? = act("/v1/reset")?.let { true }
 
     /** Developer hand-outs (the server refuses anyone else). */
-    override fun devGrant(cups: Int, drops: Int, bolts: Int, prisms: Int, credits: Int): Boolean? =
-        act("/v1/dev/grant", JSONObject().put("cups", cups).put("drops", drops).put("bolts", bolts).put("prisms", prisms).put("credits", credits))?.let { true }
+    override fun devGrant(drops: Int, bolts: Int, prisms: Int, credits: Int): Boolean? =
+        act("/v1/dev/grant", JSONObject().put("drops", drops).put("bolts", bolts).put("prisms", prisms).put("credits", credits))?.let { true }
 
     private fun register(name: String): Boolean {
         val r = call("POST", "/v1/players", JSONObject().put("name", name).put("version", version)) ?: return false
@@ -546,14 +544,14 @@ class GameServer(context: Context) : GameActions {
         NewsItem(n.optString("title"), n.optString("date"), n.optString("tag", "NEWS"), n.optString("text"))
     }
 
-    /** Real players by Cups, or null when the server can't be asked. */
+    /** Real players by wins, or null when the server can't be asked. */
     fun leaderboard(limit: Int = 200): List<RemotePlayer>? {
         if (!_status.value.online) return null
         val players = call("GET", "/v1/leaderboard?limit=$limit")?.body?.optJSONArray("players") ?: return null
         return (0 until players.length()).mapNotNull { i ->
             val p = players.optJSONObject(i) ?: return@mapNotNull null
             RemotePlayer(
-                p.optString("id"), p.optString("name", "Player"), p.optInt("cups"),
+                p.optString("id"), p.optString("name", "Player"), p.optInt("wins"),
                 FighterId.entries.firstOrNull { it.name == p.optString("fighter") } ?: FighterId.BYTE,
             )
         }

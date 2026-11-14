@@ -47,16 +47,16 @@ import io.github.projectwip.ui.ScreenHeader
 import io.github.projectwip.ui.Type
 import io.github.projectwip.ui.plateShape
 
-/** The Cup ladder: the real players on the game server, ranked by Cups. Offline there is nothing to rank against. */
+/** The leaderboard: the real players on the game server, ranked by wins against the Entity and in 1v1s. Offline there is nothing to rank against. */
 @Composable
 fun LeaderboardScreen(save: SaveData, go: (Screen) -> Unit) {
     val server = io.github.projectwip.ui.LocalServer.current
     /** Null while loading; empty when the server couldn't be asked. */
     var standings by remember { androidx.compose.runtime.mutableStateOf<List<LeaderboardEntry>?>(null) }
-    LaunchedEffect(save.cups, save.settings.playerName) {
+    LaunchedEffect(save.victories, save.settings.playerName) {
         val players = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { server?.leaderboard() }
         // The server sends them best first.
-        standings = players.orEmpty().mapIndexed { i, p -> LeaderboardEntry(i + 1, p.name, p.cups, p.fighter, p.id == server?.playerId) }
+        standings = players.orEmpty().mapIndexed { i, p -> LeaderboardEntry(i + 1, p.name, p.wins, p.fighter, p.id == server?.playerId) }
     }
     val rows = standings
     val me = rows?.firstOrNull { it.isPlayer }
@@ -88,7 +88,7 @@ fun LeaderboardScreen(save: SaveData, go: (Screen) -> Unit) {
                             }
                         }
                         Spacer(Modifier.height(6.dp))
-                        PlainText("Every player on the server, ranked by Cups.", Type.Small, Modifier.padding(start = 30.dp, bottom = 16.dp), maxLines = 2)
+                        PlainText("Every player on the server, ranked by wins.", Type.Small, Modifier.padding(start = 30.dp, bottom = 16.dp), maxLines = 2)
                     }
                 }
             }
@@ -115,6 +115,6 @@ private fun LeaderRow(e: LeaderboardEntry) {
         Spacer(Modifier.weight(1f))
         GameIcon(IconKind.CUP, Modifier.size(32.dp))
         Spacer(Modifier.width(6.dp))
-        GameText("%,d".format(e.cups), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
+        GameText("%,d WINS".format(e.wins), Type.Heading, color = Palette.Gold, outline = 2.5.dp)
     }
 }

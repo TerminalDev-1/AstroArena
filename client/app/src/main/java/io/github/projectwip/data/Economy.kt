@@ -129,13 +129,6 @@ object Economy {
         return grant(save.copy(lastDailyGiftDay = day), Shop.dailyGift(day))
     }
 
-    fun claimMilestone(save: SaveData, cups: Int): Done<Reward> {
-        val milestone = CupTrack.milestones.firstOrNull { it.cups == cups } ?: throw Refused(404, "no such Cup Track reward")
-        if (cups > save.bestCups) throw Refused(409, "not reached yet")
-        if (cups in save.claimedMilestones) throw Refused(409, "already claimed")
-        return grant(save.copy(claimedMilestones = save.claimedMilestones + cups), milestone.reward)
-    }
-
     // ---------------------------------------------------------------------------- deals
 
     /** Pays for a deal and returns the reward. [purchased] is how many times it has been bought. */
@@ -239,31 +232,26 @@ object Economy {
 
     /**
      * Settles a finished match: what it pays in Bolts, Arena Crystals, Credits and Spark Pass points goes into the save,
-     * and the verdict says the rest (Cups and Arena Boxes are applied by [Progression.applyMatch] from it).
+     * and the verdict says the rest.
      */
     fun settleMatch(save: SaveData, report: MatchReport, day: Long): Done<ServerVerdict> {
         val mode = report.mode
         // The Training Area is practice: nothing is earned in it.
         if (mode == GameMode.TRAINING) return Done(save, ServerVerdict(0, save.cups, false, save.capsules, Progression.capsulesLeftToday(save, day)))
-        val cups = (save.cups + Trophies.cupDelta(mode, report.outcome, report.placement, save.cups, report.mvp)).coerceAtLeast(0)
-        val mvpCups = Trophies.cupDelta(mode, report.outcome, report.placement, 1_000_000_000, true) - Trophies.cupDelta(mode, report.outcome, report.placement, 1_000_000_000, false)
+        // (Cups were removed in build 111: no match changes them.)
         val earnedToday = if (save.capsuleDay == day) save.capsulesEarnedToday else 0
         val drop = earnsDrop(mode, report.outcome, report.placement) && earnedToday < SparkCapsules.PER_DAY
         val bolts = matchBolts(mode, report.outcome, report.placement, report.kos, report.difficulty)
         val prisms = firstWinPrisms(mode, report.outcome, save, day)
-        val fighterBefore = save.progress(report.fighter).cups
-        val fighterAfter = (fighterBefore + cups - save.cups).coerceAtLeast(0)
         var s = save.copy(
             bolts = save.bolts + bolts, prisms = save.prisms + prisms,
             lastFirstWinDay = if (prisms > 0) day else save.lastFirstWinDay,
-            fighters = save.fighters + (report.fighter to save.progress(report.fighter).copy(cups = fighterAfter)),
         )
         val paid = grant(s, Reward.Credits(matchCredits(mode, report.outcome, report.placement))).also { s = it.save }.value
         // (Arena Boxes were removed in 1.3: none are paid, and nobody holds any.)
         return Done(s, ServerVerdict(
-            cupDelta = cups - save.cups, cups = cups, drop = drop, drops = 0, dropsLeftToday = 0,
+            cupDelta = 0, cups = save.cups, drop = drop, drops = 0, dropsLeftToday = 0,
             bolts = bolts + ((paid as? Reward.Bolts)?.amount ?: 0), firstWinPrisms = prisms, credits = creditsIn(paid), unlocked = fightersIn(paid),
-            fighterCupsBefore = fighterBefore, fighterCups = fighterAfter, mvpCups = mvpCups,
         ))
     }
 
@@ -345,34 +333,12 @@ object Economy {
     // ---------------------------------------------------------------------------- developers
 
     /** The debug menu's hand-outs. */
-    fun devGrant(save: SaveData, cups: Int = 0, drops: Int = 0, bolts: Int = 0, prisms: Int = 0, credits: Int = 0): SaveData {
-        val newCups = (save.cups + cups).coerceAtLeast(0)
+    fun devGrant(save: SaveData, drops: Int = 0, bolts: Int = 0, prisms: Int = 0, credits: Int = 0): SaveData {
         val base = save.copy(
-            cups = newCups, bestCups = maxOf(save.bestCups, newCups), capsules = 0, // (no boxes: removed in 1.3)
+            capsules = 0, // (no boxes: removed in 1.3)
             bolts = (save.bolts + bolts).coerceAtLeast(0), prisms = (save.prisms + prisms).coerceAtLeast(0),
         )
         return if (credits > 0) grant(base, Reward.Credits(credits)).save else base
     }
 }
 
-/** What each mode pays in Cups. Cups don't depend on how hard the bots are, and the Training Area never pays. */
-object Trophies {
-    /** A victory, a draw, and a defeat that costs 1 Cup per [lossStep] held, up to [maxLoss]. */
-    private class Pays(val win: Int = 0, val mvpBonus: Int = 0, val draw: Int = 0, val maxLoss: Int = 0, val lossStep: Int = 0)
-
-    private val table = mapOf(
-        // The Entity is the game now: it pays what Knockout Rush did (the server's trophies.cfg can change it).
-        GameMode.BOSS to Pays(win = 8, mvpBonus = 2, draw = 1, maxLoss = 6, lossStep = 80),
-    )
-
-    /** How a match changes a player's Cups. Never takes them below zero. */
-    fun cupDelta(mode: GameMode, outcome: MatchOutcome, placement: Int, cups: Int, mvp: Boolean): Int {
-        val pays = table[mode] ?: return 0
-        val delta = when {
-            outcome == MatchOutcome.VICTORY -> pays.win + if (mvp) pays.mvpBonus else 0
-            outcome == MatchOutcome.DRAW -> pays.draw
-            else -> -(if (pays.lossStep > 0) minOf(pays.maxLoss, cups / pays.lossStep) else pays.maxLoss)
-        }
-        return maxOf(delta, -cups)
-    }
-}

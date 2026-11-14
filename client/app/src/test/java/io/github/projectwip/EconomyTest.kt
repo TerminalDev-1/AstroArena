@@ -3,7 +3,6 @@ package io.github.projectwip
 import io.github.projectwip.data.Balance
 import io.github.projectwip.data.BotDifficulty
 import io.github.projectwip.data.CapsuleTier
-import io.github.projectwip.data.CupTrack
 import io.github.projectwip.data.Currency
 import io.github.projectwip.data.CustomOffer
 import io.github.projectwip.data.Economy
@@ -19,7 +18,6 @@ import io.github.projectwip.data.SaveData
 import io.github.projectwip.data.Shop
 import io.github.projectwip.data.SparkCapsules
 import io.github.projectwip.data.SparkRoad
-import io.github.projectwip.data.Trophies
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -143,18 +141,6 @@ class EconomyTest {
         assertEquals(Reward.Prisms(8), Economy.claimGift(even.save, 11).value)
     }
 
-    @Test fun cupTrackRewardsAreClaimedOnceAndOnlyWhenReached() {
-        val s = SaveData(cups = 30, bestCups = 30)
-        refused(404) { Economy.claimMilestone(s, 11) }
-        refused(409) { Economy.claimMilestone(s, 40) }
-        val first = Economy.claimMilestone(s, 10)
-        assertEquals(Reward.Bolts(40), first.value)
-        refused(409) { Economy.claimMilestone(first.save, 10) }
-        // Losing Cups doesn't revoke what was reached.
-        assertEquals(Reward.Prisms(10), Economy.claimMilestone(s.copy(cups = 0), 25).value)
-        assertEquals(CupTrack.milestones.size, CupTrack.milestones.map { it.cups }.distinct().size)
-    }
-
     // ---------------------------------------------------------------- the Spark Pass
 
     // ---------------------------------------------------------------- deals and daily offers
@@ -204,19 +190,6 @@ class EconomyTest {
 
     // ---------------------------------------------------------------- what a match pays
 
-    @Test fun cupsFollowTheModesTable() {
-        val c = Trophies::cupDelta
-        // The Entity's fight (what Knockout Rush paid): a win, an MVP bonus, a draw, and a defeat that costs 1 Cup per 80 held, up to 6.
-        assertEquals(8, c(GameMode.BOSS, MatchOutcome.VICTORY, 0, 0, false))
-        assertEquals(10, c(GameMode.BOSS, MatchOutcome.VICTORY, 0, 0, true))
-        assertEquals(1, c(GameMode.BOSS, MatchOutcome.DRAW, 0, 0, false))
-        assertEquals("beginners lose nothing", 0, c(GameMode.BOSS, MatchOutcome.DEFEAT, 0, 79, false))
-        assertEquals(-1, c(GameMode.BOSS, MatchOutcome.DEFEAT, 0, 80, false))
-        assertEquals(-6, c(GameMode.BOSS, MatchOutcome.DEFEAT, 0, 5000, false))
-        assertEquals("the Training Area never pays", 0, c(GameMode.TRAINING, MatchOutcome.VICTORY, 0, 0, true))
-        assertEquals("a 1v1 is paid by the server's lobby alone", 0, c(GameMode.DUEL, MatchOutcome.VICTORY, 0, 0, true))
-    }
-
     @Test fun matchPayDependsOnTheFinishAndTheBotDifficulty() {
         assertEquals(0, Economy.matchBolts(GameMode.TRAINING, MatchOutcome.VICTORY, 0, 5, BotDifficulty.ELITE))
         assertEquals(27, Economy.matchBolts(GameMode.DUEL, MatchOutcome.VICTORY, 0, 6, BotDifficulty.EASY))   // (24 + 12) * 0.75
@@ -241,47 +214,42 @@ class EconomyTest {
         val before = SaveData(cups = 100, bestCups = 100, capsules = 1)
         val done = Economy.settleMatch(before, report(GameMode.BOSS, MatchOutcome.VICTORY, mvp = true), day)
         val v = done.value
-        assertEquals(10, v.cupDelta)
-        assertEquals(110, v.cups)
-        assertEquals(2, v.mvpCups)
+        // (Cups were removed in build 111: a match changes none.)
+        assertEquals(0, v.cupDelta)
+        assertEquals(100, v.cups)
+        assertEquals(0, v.mvpCups)
         assertFalse(v.drop)  // no Arena Boxes since 1.3
         assertEquals(0, v.drops)
         assertEquals(0, v.dropsLeftToday)
         assertEquals(28, v.bolts)
         assertEquals(10, v.firstWinPrisms)
         assertEquals(6, v.credits)
-        assertEquals(0 to 10, v.fighterCupsBefore to v.fighterCups)
         assertEquals(before.bolts + 28, done.save.bolts)
         assertEquals(before.prisms + 10, done.save.prisms)
         assertEquals(day, done.save.lastFirstWinDay)
         assertEquals(6, done.save.credits)
-        assertEquals(10, done.save.progress(FighterId.BYTE).cups)
         // The same day's second win pays no first-win CPU Chips.
         assertEquals(0, Economy.settleMatch(done.save, report(GameMode.BOSS, MatchOutcome.VICTORY), day).value.firstWinPrisms)
-        // Applying it: Cups and drops are taken on, and the Cup Track reward that was just reached shows up.
-        val (after, rewards) = Progression.applyMatch(done.save, report(GameMode.BOSS, MatchOutcome.VICTORY, mvp = true), day, v)
-        assertEquals(110, after.cups)
-        assertEquals(110, after.bestCups)
+        // Applying it: the win is counted, nothing else moves.
+        val (after, _) = Progression.applyMatch(done.save, report(GameMode.BOSS, MatchOutcome.VICTORY, mvp = true), day, v)
+        assertEquals(done.save.victories + 1, after.victories)
         assertEquals(0, after.capsules)
-        assertEquals(listOf<Int>(), rewards.newlyReachedMilestones.map { it.cups })
         // Training changes nothing but the count.
         val training = Economy.settleMatch(before, report(GameMode.TRAINING, MatchOutcome.VICTORY), day)
         assertEquals(before, training.save)
         assertEquals(0, training.value.cupDelta)
     }
 
-    @Test fun winsPayNoBoxesAndLosingNeverGoesBelowZero() {
+    @Test fun matchesPayNoBoxesAndNoCups() {
         val day = 9L
         val held = SaveData(capsules = 2)
         val won = Economy.settleMatch(held, report(GameMode.BOSS, MatchOutcome.VICTORY), day)
         assertFalse(won.value.drop)
         assertEquals("boxes held before 1.3 are wiped", 0, won.value.drops)
         assertFalse(Economy.settleMatch(held, report(GameMode.BOSS, MatchOutcome.VICTORY), day + 1).value.drop)
-        val beginner = Economy.settleMatch(SaveData(cups = 3, bestCups = 3), report(GameMode.BOSS, MatchOutcome.DEFEAT), day)
-        assertEquals("beginners lose nothing", 3 to 0, beginner.value.cups to beginner.value.cupDelta)
-        val veteran = Economy.settleMatch(SaveData(cups = 500, bestCups = 500), report(GameMode.BOSS, MatchOutcome.DEFEAT), day)
-        assertEquals(494 to -6, veteran.value.cups to veteran.value.cupDelta)
-        assertEquals("a lost fighter's Cups follow the player's", 0, veteran.save.progress(FighterId.BYTE).cups)
+        // (Cups were removed in build 111: a defeat costs none, and nothing pays any.)
+        val lost = Economy.settleMatch(SaveData(), report(GameMode.BOSS, MatchOutcome.DEFEAT), day)
+        assertEquals(0 to 0, lost.value.cups to lost.value.cupDelta)
     }
 
     // ---------------------------------------------------------------- Arena Boxes
@@ -340,14 +308,11 @@ class EconomyTest {
     }
 
     @Test fun theDebugMenusHandOutsChangeTheSave() {
-        val s = Economy.devGrant(SaveData(cups = 10, bestCups = 10), cups = 500, drops = 5, bolts = 1000, prisms = 100, credits = 100)
-        assertEquals(510, s.cups)
-        assertEquals(510, s.bestCups)
+        val s = Economy.devGrant(SaveData(), drops = 5, bolts = 1000, prisms = 100, credits = 100)
         assertEquals("no boxes, even as a hand-out", 0, s.capsules)
         assertEquals(Balance.STARTING_BOLTS + 1000, s.bolts)
         assertEquals(100, s.prisms)
         assertEquals(100, s.credits)
-        assertEquals("nothing goes below zero", 0, Economy.devGrant(SaveData(cups = 10), cups = -50).cups)
         assertEquals(Balance.upgradeCostFrom(1), Progression.upgradeCost(SaveData(), FighterId.BYTE))
     }
 

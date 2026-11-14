@@ -45,8 +45,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
-import io.github.projectwip.data.CupTrack
-import io.github.projectwip.data.FighterRanks
 import androidx.compose.runtime.mutableStateOf
 import io.github.projectwip.data.MatchOutcome
 import io.github.projectwip.data.MatchRewards
@@ -74,9 +72,6 @@ import io.github.projectwip.ui.startMatchConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** How long the Cups a match paid take to fly to the counter, and the share of that one Cup is in the air for. */
-private const val FLIGHT_MS = 1500
-private const val FLIGHT_SPAN = 0.55f
 
 @Composable
 fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, go: (Screen) -> Unit) {
@@ -89,30 +84,10 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
         else -> Pair("DEFEAT", Palette.Red)
     }
     val bannerPop = remember { Animatable(0.3f) }
-    val cupsShown = remember { Animatable(rewards.cupsBefore.toFloat()) }
     val me = summary.players.firstOrNull { it.isPlayer }
-    val fighterCupsAfter = rewards.fighterCupsBefore + rewards.fighterCupDelta
-    val fighterCupsShown = remember { Animatable(rewards.fighterCupsBefore.toFloat()) }
-    val rankedUp = FighterRanks.rank(fighterCupsAfter) > FighterRanks.rank(rewards.fighterCupsBefore)
-    /** Springs up when the fighter's rank changes. */
-    val rankPop = remember { Animatable(1f) }
-    /** The medallion's turn and the burst of sparks round it when the rank changes, 0..1. */
-    val rankSpin = remember { Animatable(0f) }
-    val rankBurst = remember { Animatable(0f) }
-    var celebrate by remember { mutableStateOf(false) }
     /** How many reward rows have popped in so far. */
     var rowsShown by remember { mutableIntStateOf(0) }
     val won = r.outcome == MatchOutcome.VICTORY
-    // Cups that were won fly from the banner to the counter, which counts up as they land. Each is thrown out to
-    // a spot of its own first (these, as a share of the throw's reach).
-    val flyingCups = remember {
-        val rng = kotlin.random.Random(rewards.cupsBefore * 31 + rewards.cupDelta)
-        List(if (rewards.cupDelta > 0) rewards.cupDelta.coerceIn(6, 14) else 0) { Offset(rng.nextFloat() * 2f - 1f, rng.nextFloat() * 2f - 1f) }
-    }
-    val flight = remember { Animatable(0f) }
-    var flyFrom by remember { mutableStateOf(Offset.Unspecified) }
-    var flyTo by remember { mutableStateOf(Offset.Unspecified) }
-    var flyOrigin by remember { mutableStateOf(Offset.Zero) }
     /** The reveal ([ResultReveal]) plays first; the stats and their own animations follow it. */
     var revealed by remember { mutableStateOf(false) }
     LaunchedEffect(revealed) {
@@ -135,46 +110,17 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                 delay(260)
             }
         }
-        // ...and the Cups tick up to their new total.
-        if (rewards.cupDelta != 0) {
-            val flying = flyingCups.isNotEmpty()
-            if (flying) {
-                sfx?.play(Sound.POP, 0.8f, 0.7f); sfx?.buzz(30, 160)
-                launch { flight.animateTo(1f, tween(FLIGHT_MS, easing = LinearEasing)) }
-                // The count starts as the first of them lands.
-                delay((FLIGHT_MS * FLIGHT_SPAN).toLong())
-            }
-            val counting = tween<Float>(if (flying) (FLIGHT_MS * (1f - FLIGHT_SPAN)).toInt() else 1000, easing = if (flying) LinearEasing else FastOutSlowInEasing)
-            val ticking = launch {
-                var n = 0
-                while (true) { sfx?.play(Sound.COUNT, 0.6f, 0.85f + minOf(n, 12) * 0.05f); n++; delay(75) }
-            }
-            launch { fighterCupsShown.animateTo(fighterCupsAfter.toFloat(), counting) }
-            cupsShown.animateTo((rewards.cupsBefore + rewards.cupDelta).toFloat(), counting)
-            ticking.cancel()
-            if (rewards.cupDelta > 0) { sfx?.play(Sound.REWARD, 0.8f); sfx?.play(Sound.CHING, 0.9f, 1.15f) } else sfx?.play(Sound.DENIED, 0.8f)
-        }
-        // A new rank: the badge leaps, the rays come out, and it gets a fanfare of its own.
-        if (rankedUp) {
-            delay(150)
-            celebrate = true
-            sfx?.play(Sound.UPGRADE, 1f); sfx?.play(Sound.CHING, 0.9f, 1.3f); sfx?.buzz(90, 230)
-            launch { rankSpin.animateTo(1f, tween(800, easing = FastOutSlowInEasing)) }
-            launch { rankBurst.animateTo(1f, tween(1100, easing = LinearEasing)) }
-            rankPop.snapTo(1.9f)
-            rankPop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessLow))
-        }
     }
 
-    Box(Modifier.fillMaxSize().onGloballyPositioned { flyOrigin = it.positionInRoot() }) {
+    Box(Modifier.fillMaxSize()) {
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         androidx.compose.foundation.layout.Box(Modifier.bleed().fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         // Light and motion behind everything: rays turning round the title, and confetti for a win.
-        ResultBackdrop(color, won, if (flyFrom.isSpecified) flyFrom - flyOrigin else Offset.Unspecified)
+        ResultBackdrop(color, won, Offset.Unspecified)
         Row(Modifier.fillMaxSize().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // ---------------- left: banner + scoreboard
             Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.height(if (ui.roomy) 136.dp else 100.dp).fillMaxWidth().onGloballyPositioned { flyFrom = it.boundsInRoot().center }) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.height(if (ui.roomy) 136.dp else 100.dp).fillMaxWidth()) {
                     OutcomeRibbon(color, Modifier.fillMaxWidth(0.94f).height(if (ui.roomy) 92.dp else 66.dp))
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { scaleX = bannerPop.value; scaleY = bannerPop.value }) {
                         GameText(label, Type.Display.copy(fontSize = Type.Display.fontSize * if (ui.roomy) 1.6f else 1.3f), color = color, outline = 5.dp)
@@ -200,59 +146,21 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                 }
             }
 
-            // ---------------- right: the fighter's rank, the Cups, and what the match paid
+            // ---------------- right: the fighter, and what the match paid
             Column(Modifier.width(if (ui.wide) 360.dp else 300.dp).fillMaxHeight().arrive(0, 60f, 0f)) {
                 Panel(Modifier.weight(1f).fillMaxWidth(), cut = 18.dp) {
                     Column(Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        val shownCups = fighterCupsShown.value.toInt()
-                        HeaderChip(if (celebrate) "RANK UP!" else "FIGHTER RANK", if (celebrate) Palette.Positive else Palette.Gold,
-                            Modifier.graphicsLayer { scaleX = rankPop.value.coerceAtMost(1.3f); scaleY = rankPop.value.coerceAtMost(1.3f) })
-                        // The fighter, on a lit pedestal, with its rank medallion at its shoulder.
+                        HeaderChip(if (won) "YOU BEAT IT" else "YOUR FIGHTER", Palette.Gold)
+                        // The fighter, on a lit pedestal (in light, after a win).
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            if (celebrate || won) FighterRays(Modifier.size(300.dp), if (celebrate) Palette.Positive else Palette.Gold)
-                            Pedestal(if (celebrate) Palette.Positive else Palette.Cyan, Modifier.fillMaxSize())
+                            if (won) FighterRays(Modifier.size(300.dp), Palette.Gold)
+                            Pedestal(Palette.Cyan, Modifier.fillMaxSize())
                             if (me != null) FighterView(Balance.fighter(me.fighter), me.skin, Modifier.fillMaxSize(), pedestal = false)
-                            RankMedallion(FighterRanks.label(shownCups), FighterRanks.progress(shownCups), rankSpin.value, rankBurst.value,
-                                Modifier.align(Alignment.BottomEnd).size(if (ui.roomy) 84.dp else 66.dp).graphicsLayer { scaleX = rankPop.value; scaleY = rankPop.value })
                         }
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            GameText(me?.let { Balance.fighter(it.fighter).name.uppercase() } ?: "", Type.Heading, outline = 2.5.dp, modifier = Modifier.weight(1f))
-                            GameIcon(IconKind.CUP, Modifier.size(22.dp))
-                            Spacer(Modifier.width(4.dp))
-                            GameText("%,d".format(shownCups), Type.Heading, outline = 2.5.dp)
-                            if (rewards.fighterCupDelta != 0) {
-                                Spacer(Modifier.width(6.dp))
-                                Badge((if (rewards.fighterCupDelta > 0) "+" else "") + rewards.fighterCupDelta, color = if (rewards.fighterCupDelta > 0) Palette.GreenDeep else Palette.RedDeep)
-                            }
-                        }
-                        PlainText(FighterRanks.nextAt(shownCups).let { "Rank ${FighterRanks.label(it)} at ${"%,d".format(it)} Cups" }, Type.Small, color = Palette.TextDim)
-
-                        // The tray: the player's own Cups, the Cup Track they climb, and what the match paid.
+                        GameText(me?.let { Balance.fighter(it.fighter).name.uppercase() } ?: "", Type.Heading, outline = 2.5.dp)
+                        // What the match paid: a tile each, popping in one by one.
                         Column(Modifier.fillMaxWidth().tray().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             var row = 0
-                            val cupIcon = with(LocalDensity.current) { 27.dp.toPx() }
-                            if (row++ < rowsShown) Box(Modifier.fillMaxWidth().onGloballyPositioned { val b = it.boundsInRoot(); flyTo = Offset(b.left + cupIcon, b.center.y) }.graphicsLayer {
-                                // The counter jumps a little as each Cup lands in it.
-                                val landing = (flight.value - FLIGHT_SPAN) / (1f - FLIGHT_SPAN)
-                                val bump = if (landing > 0f && landing < 1f) 0.05f * kotlin.math.abs(kotlin.math.sin(landing * flyingCups.size * Math.PI.toFloat())) else 0f
-                                scaleX = 1f + bump; scaleY = 1f + bump
-                            }) {
-                                RewardRow(IconKind.CUP, "%,d".format(cupsShown.value.toInt()),
-                                    (if (rewards.cupDelta >= 0) "+" else "") + rewards.cupDelta,
-                                    if (rewards.cupDelta >= 0) Palette.GreenDeep else Palette.RedDeep)
-                            }
-                            val best = save.bestCups
-                            val next = CupTrack.nextMilestone(best)
-                            val prev = CupTrack.previousMilestoneCups(best)
-                            if (rewards.newlyReachedMilestones.isNotEmpty()) {
-                                Badge("NEW CUP TRACK REWARD!", color = Palette.GreenDeep)
-                                PlainText(rewards.newlyReachedMilestones.joinToString { rewardLabel(it.reward) }, Type.Small, color = Palette.Positive)
-                            }
-                            if (next != null) {
-                                ProgressBar((best - prev).toFloat() / (next.cups - prev), Modifier.fillMaxWidth().height(10.dp))
-                                PlainText("Cup Track: ${rewardLabel(next.reward)} at ${next.cups} Cups", Type.Small, color = Palette.Text)
-                            }
-                            // What the match paid: a tile each, popping in one by one.
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
                                 if (row++ < rowsShown) RewardTile(IconKind.BOLT, "+${rewards.bolts}", Palette.Orange)
                                 if (rewards.credits > 0 && row++ < rowsShown) RewardTile(IconKind.CREDIT, "+${rewards.credits}", Palette.Gold)
@@ -261,7 +169,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                             if (rewards.unlocked.isNotEmpty() && row++ < rowsShown) for (f in rewards.unlocked) {
                                 Badge("${Balance.fighter(f).name.substringBefore(' ').uppercase()} UNLOCKED ON THE SPARK ROAD!", Modifier.arrive(0, 0f, 20f), color = Palette.GoldDeep)
                             }
-                            if (rewards.mvpCups > 0 && row++ < rowsShown) Badge("MVP · +${rewards.mvpCups} CUPS", Modifier.arrive(0, 0f, 20f), color = Palette.GoldDeep)
+                            if (r.mvp && row++ < rowsShown) Badge("MVP OF THE MATCH", Modifier.arrive(0, 0f, 20f), color = Palette.GoldDeep)
                         }
                         // Everything a match is worth is awarded by the server; without it a match is practice.
                         if (r.mode == io.github.projectwip.data.GameMode.DUEL && !rewards.online) PlainText("This 1v1 wasn't settled by the server · nothing is earned", Type.Small, color = Palette.Gold)
@@ -277,57 +185,21 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                 }
             }
         }
-        // The Cups the match paid, on their way from the banner to the counter.
-        val f = flight.value
-        if (f > 0f && f < 1f && flyFrom.isSpecified && flyTo.isSpecified) {
-            for ((i, thrown) in flyingCups.withIndex()) {
-                val u = (f - i.toFloat() / (flyingCups.size - 1) * (1f - FLIGHT_SPAN)) / FLIGHT_SPAN
-                if (u <= 0f || u >= 1f) continue
-                GameIcon(IconKind.CUP, Modifier.size(36.dp).graphicsLayer {
-                    // Thrown out from the banner, slowing; then off to the counter along an arc, gathering speed.
-                    val reach = 110.dp.toPx()
-                    val out = Offset(flyFrom.x + thrown.x * reach, flyFrom.y + thrown.y * reach * 0.5f)
-                    val at = if (u < 0.3f) {
-                        val k = 1f - (1f - u / 0.3f) * (1f - u / 0.3f)
-                        Offset(flyFrom.x + (out.x - flyFrom.x) * k, flyFrom.y + (out.y - flyFrom.y) * k)
-                    } else {
-                        val k = (u - 0.3f) / 0.7f * ((u - 0.3f) / 0.7f)
-                        val top = Offset((out.x + flyTo.x) / 2f, minOf(out.y, flyTo.y) - 70.dp.toPx())
-                        Offset(
-                            (1f - k) * (1f - k) * out.x + 2f * (1f - k) * k * top.x + k * k * flyTo.x,
-                            (1f - k) * (1f - k) * out.y + 2f * (1f - k) * k * top.y + k * k * flyTo.y,
-                        )
-                    }
-                    translationX = at.x - flyOrigin.x - size.width / 2f
-                    translationY = at.y - flyOrigin.y - size.height / 2f
-                    val grow = if (u < 0.12f) u / 0.12f * 1.3f else 1.3f - 0.5f * (u - 0.12f) / 0.88f
-                    scaleX = grow; scaleY = grow
-                    rotationZ = thrown.x * 50f * (1f - u)
-                })
-            }
-        }
         // The reveal plays over it all first, then sweeps away to show it.
-        if (!revealed) ResultReveal(summary) { revealed = true }
+        if (!revealed) {
+            // Against the Entity the end is a cutscene of its own (the user's ask): it breaks, or it takes you.
+            val me = summary.players.firstOrNull { it.isPlayer }
+            if (summary.report.mode == io.github.projectwip.data.GameMode.BOSS && me != null && summary.report.outcome != MatchOutcome.DRAW)
+                EntityCutscene(if (summary.report.outcome == MatchOutcome.VICTORY) io.github.projectwip.render3d.EntityCut.VICTORY else io.github.projectwip.render3d.EntityCut.DEFEAT,
+                    me.fighter, me.skin, 0, LocalSfx.current) { revealed = true }
+            else ResultReveal(summary) { revealed = true }
+        }
     }
 }
 
 /** How many rows the rewards panel will show, so each one gets its own pop. */
 private fun rewardRowCount(rewards: MatchRewards, mvpBonus: Boolean) =
     2 + (if (rewards.credits > 0) 1 else 0) + (if (rewards.unlocked.isNotEmpty()) 1 else 0) + (if (rewards.firstWinPrisms > 0) 1 else 0) + (if (rewards.capsuleEarned) 1 else 0) + (if (mvpBonus) 1 else 0)
-
-/** A fighter's rank: a gold medallion with the rank on it. */
-@Composable
-fun RankBadge(label: String, modifier: Modifier = Modifier) {
-    Box(modifier.drawBehind {
-        val r = size.minDimension / 2
-        drawCircle(Palette.Ink, r)
-        drawCircle(Palette.GoldDeep, r * 0.9f)
-        drawCircle(Palette.Gold, r * 0.74f)
-        drawCircle(Color.White.copy(alpha = 0.35f), r * 0.5f, center.copy(y = center.y - r * 0.22f))
-    }, contentAlignment = Alignment.Center) {
-        GameText(label, if (label.length > 3) Type.Small else if (label.length > 2) Type.Label else Type.Title, outline = 2.5.dp)
-    }
-}
 
 /**
  * Slides and fades something in [index] steps after the screen opens, from ([dx], [dy]) dp away. Used to bring the
@@ -448,41 +320,6 @@ private fun Pedestal(color: Color, modifier: Modifier) {
             Offset(center.x - w * 0.6f, top.y - h * 0.1f), androidx.compose.ui.geometry.Size(w * 1.2f, h * 1.2f))
         drawOval(Palette.PanelInset.copy(alpha = 0.85f), top, androidx.compose.ui.geometry.Size(w, h))
         drawOval(color.copy(alpha = 0.55f + 0.25f * kotlin.math.sin(time * 2.5f)), top, androidx.compose.ui.geometry.Size(w, h), style = Stroke(2.5.dp.toPx()))
-    }
-}
-
-/**
- * A fighter's rank medallion, with a ring round it that fills toward the next rank. On a rank-up it turns over
- * ([spin], 0..1) and throws a ring of sparks ([burst], 0..1).
- */
-@Composable
-private fun RankMedallion(label: String, progress: Float, spin: Float, burst: Float, modifier: Modifier = Modifier) {
-    Box(modifier.drawBehind {
-        val r = size.minDimension / 2
-        if (burst > 0f && burst < 1f) {
-            for (i in 0 until 18) {
-                val a = i * 2.0 * Math.PI / 18
-                val d = r * (1.05f + burst * 1.4f)
-                drawCircle(if (i % 2 == 0) Palette.Positive else Palette.Gold, (5.dp.toPx()) * (1f - burst),
-                    Offset(center.x + (kotlin.math.cos(a) * d).toFloat(), center.y + (kotlin.math.sin(a) * d).toFloat()), alpha = 1f - burst)
-            }
-        }
-        drawCircle(Palette.Ink, r)
-        val ring = r * 0.17f
-        val inset = ring / 2f + r * 0.08f
-        val arcSize = androidx.compose.ui.geometry.Size(size.minDimension - inset * 2, size.minDimension - inset * 2)
-        drawArc(Palette.PanelInset, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(ring))
-        drawArc(androidx.compose.ui.graphics.Brush.sweepGradient(listOf(Palette.GoldDeep, Palette.Gold, Palette.Positive, Palette.GoldDeep), center), -90f, 360f * progress.coerceIn(0f, 1f),
-            false, Offset(inset, inset), arcSize, style = Stroke(ring, cap = androidx.compose.ui.graphics.StrokeCap.Round))
-    }, contentAlignment = Alignment.Center) {
-        Box(Modifier.fillMaxSize(0.66f).graphicsLayer { rotationY = spin * 360f; cameraDistance = 12f * density }.drawBehind {
-            val r = size.minDimension / 2
-            drawCircle(Palette.GoldDeep, r)
-            drawCircle(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFFFFE28A), Palette.Gold, Palette.GoldDeep)), r * 0.84f)
-            drawCircle(Color.White.copy(alpha = 0.35f), r * 0.45f, center.copy(y = center.y - r * 0.3f))
-        }, contentAlignment = Alignment.Center) {
-            GameText(label, if (label.length > 3) Type.Small else if (label.length > 2) Type.Label else Type.Title, outline = 2.5.dp)
-        }
     }
 }
 

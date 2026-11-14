@@ -58,7 +58,6 @@ import io.github.projectwip.data.GameRepository
 import io.github.projectwip.data.MatchRewards
 import io.github.projectwip.data.Reward
 import io.github.projectwip.sim.MatchConfig
-import io.github.projectwip.ui.screens.CupTrackScreen
 import io.github.projectwip.ui.screens.FightersScreen
 import io.github.projectwip.ui.screens.HomeScreen
 import io.github.projectwip.ui.screens.MatchScreen
@@ -71,7 +70,6 @@ sealed interface Screen {
     val depth: Int
     data object Home : Screen { override val depth = 0 }
     data class Fighters(val focus: FighterId? = null) : Screen { override val depth = 1 }
-    data object CupTrack : Screen { override val depth = 1 }
     data object Leaderboard : Screen { override val depth = 1 }
     data object News : Screen { override val depth = 1 }
     data object Shop : Screen { override val depth = 1 }
@@ -109,7 +107,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     playerFighter = FighterId.valueOf(startScreen.removePrefix("try").uppercase().replace("SWISH", "BYTE")), playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING))
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road
-                "track" -> Screen.CupTrack
                 "settings" -> Screen.Settings
                 "leaders" -> Screen.Leaderboard
                 "news" -> Screen.News
@@ -193,7 +190,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             // Stay up long enough to be read; once the server question is settled, never hang on anything else.
             // Debug: `--es screen loading` keeps the loading screen up, to look at it.
             if (startScreen == "loading") { delay(40); continue }
-            if ((done && waited > 1200 && bootProgress > 0.985f) || (settled && waited > 15000)) break
+            // (4.6 s: long enough for the loading title to land letter by letter once the app has settled.)
+            if ((done && waited > 4600 && bootProgress > 0.985f) || (settled && waited > 15000)) break
             delay(40)
         }
         bootProgress = 1f
@@ -240,6 +238,13 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     var showIntro by remember { mutableStateOf(startScreen == "intro") }
     /** The player asked for the opening from the loading screen: it plays over the loading, which goes on behind it. */
     var introAsked by remember { mutableStateOf(false) }
+    /** Debug: `cutvictory`, `cutdefeat`, `cutcorrupt` play one of the Entity's cutscenes over the menus. */
+    var debugCut by remember { mutableStateOf(when (startScreen) {
+        "cutvictory" -> io.github.projectwip.render3d.EntityCut.VICTORY
+        "cutdefeat" -> io.github.projectwip.render3d.EntityCut.DEFEAT
+        "cutcorrupt" -> io.github.projectwip.render3d.EntityCut.CORRUPT
+        else -> null
+    }) }
     LaunchedEffect(booting, needsName, save.settings.introSeen) {
         if (!booting && !needsName && !save.settings.introSeen) showIntro = true
     }
@@ -297,14 +302,17 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
 
         val lobby = remember { io.github.projectwip.render3d.LobbyParams() }
         CompositionLocalProvider(LocalDensity provides density, LocalUi provides metrics, LocalCutout provides cutoutSides, LocalSfx provides sfx, LocalLobby provides lobby, LocalServer provides server, LocalOfflineGame provides local, LocalOfflineMode provides offline, LocalDev provides dev, LocalServerCall provides ask, LocalNav provides go) {
-            if (screen !is Screen.Match) {
+            // Nothing is built under the loading screen (the 3D lobby and the menus' animations made its title
+            // stutter): they start as it fades out. A match started straight away (debug) still runs.
+            val underway = !booting || screen is Screen.Match
+            if (screen !is Screen.Match && underway) {
                 androidx.compose.ui.viewinterop.AndroidView(
                     factory = { ctx -> io.github.projectwip.render3d.LobbyView(ctx, lobby) },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
             val menuAlpha = 1f
-            AnimatedContent(
+            if (underway) AnimatedContent(
                 modifier = Modifier.graphicsLayer { alpha = menuAlpha }.then(if (screen is Screen.Match) Modifier else Modifier.windowInsetsPadding(cutout)),
                 targetState = screen,
                 contentKey = { it::class },
@@ -327,7 +335,6 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 CompositionLocalProvider(LocalScreen provides s) { when (s) {
                     Screen.Home -> HomeScreen(save, repo, go, showReward)
                     is Screen.Fighters -> FightersScreen(save, repo, s.focus, go)
-                    Screen.CupTrack -> CupTrackScreen(save, repo, go, showReward)
                     Screen.Leaderboard -> io.github.projectwip.ui.screens.LeaderboardScreen(save, go)
                     Screen.News -> io.github.projectwip.ui.screens.NewsScreen(go)
                     Screen.Shop -> ShopScreen(save, repo, go, showReward)
@@ -414,6 +421,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 repo.updateSettings { it.copy(playerName = name, nameChosen = true) }
                 needsName = false
             }
+            debugCut?.let { cut -> if (!booting) io.github.projectwip.ui.screens.EntityCutscene(cut, save.selectedFighter, save.fighters[save.selectedFighter]?.skin ?: 0, 0, sfx) { debugCut = null } }
             if (showIntro && (introAsked || !booting) && !needsName) io.github.projectwip.ui.screens.IntroCutscene(sfx) {
                 introAsked = false
                 showIntro = false
@@ -435,7 +443,7 @@ private fun previewResult(save: io.github.projectwip.data.SaveData, kind: String
     val players = (1..10).map { i ->
         io.github.projectwip.ui.screens.PlayerLine(if (i == 1) save.settings.playerName else "Bot $i", FighterId.entries[i % 3], 0, i, 10 - i, 1, 6000 - i * 500, i == 1, i == 1, i != 1, placement = i)
     }
-    return Screen.Result(MatchSummary(report, players, 1), MatchRewards(save.cups, 8, 32, 10, emptyList(), capsuleEarned = true, capsulesLeftToday = 2))
+    return Screen.Result(MatchSummary(report, players, 1), MatchRewards(32, 10, capsuleEarned = true, capsulesLeftToday = 2))
 }
 
 private const val REPO_RELEASES = "https://github.com/TerminalDev-1/AstroArena/releases"

@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.projectwip.audio.Sound
 import io.github.projectwip.data.Balance
-import io.github.projectwip.data.CupTrack
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.GameRepository
 import io.github.projectwip.data.Progression
@@ -215,11 +214,6 @@ private fun FighterPage(save: SaveData, repo: GameRepository, id: FighterId, go:
                     Box(Modifier.weight(1f).fillMaxWidth().lobbyAnchor(), contentAlignment = Alignment.Center) {
                         UpgradeBurst(upgradeCount, accent)
                         if (!prog.unlocked) GameIcon(IconKind.LOCK, Modifier.size(80.dp))
-                    }
-                    if (prog.unlocked) Row(verticalAlignment = Alignment.CenterVertically) {
-                        RankBadge(io.github.projectwip.data.FighterRanks.label(prog.cups), Modifier.size(40.dp))
-                        Spacer(Modifier.width(8.dp))
-                        GameText("RANK ${io.github.projectwip.data.FighterRanks.label(prog.cups)}  ·  ${"%,d".format(prog.cups)} CUPS", Type.Label, outline = 2.dp)
                     }
                     // A fighter with something to say about its future says it here, on every screen size.
                     def.notice?.let { notice ->

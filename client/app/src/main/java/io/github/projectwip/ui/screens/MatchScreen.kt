@@ -143,7 +143,7 @@ fun MatchScreen(
 
 /**
  * A 1v1 against a real player: joins the server's lobby, waits there for someone else to join, then plays the
- * match in step with their device. Leaving the match hangs up, which hands the other player the win and its Cups.
+ * match in step with their device. Leaving the match hangs up, which hands the other player the win.
  */
 @Composable
 private fun DuelMatch(
@@ -179,7 +179,7 @@ private fun DuelMatch(
                 PlainText("The match starts as soon as another player on this server picks 1v1. It waits for a real player, however long that takes.", Type.Body, color = Color.White, align = TextAlign.Center, modifier = Modifier.width(560.dp))
                 // (Read every frame, as the dots animate: the lobby may say why nobody is being found.)
                 link?.note?.let { PlainText(it, Type.Body, color = io.github.projectwip.ui.Palette.Red, align = TextAlign.Center, modifier = Modifier.width(560.dp)) }
-                PlainText("Played for Cups: the winner takes them, and leaving a match counts as a defeat.", Type.Small, color = io.github.projectwip.ui.Palette.Gold)
+                PlainText("Leaving a match counts as a defeat.", Type.Small, color = io.github.projectwip.ui.Palette.Gold)
             } else {
                 GameText("NO 1V1 RIGHT NOW", Type.Title, color = io.github.projectwip.ui.Palette.Gold, outline = 3.5.dp)
                 PlainText(p, Type.Body, color = Color.White, align = TextAlign.Center, modifier = Modifier.width(520.dp))
@@ -293,10 +293,15 @@ private fun MatchBody(
     /** The Entity's hijack cutscene is showing (its comet has come down into the player); and how many there have been. */
     var hijacking by remember { mutableStateOf(false) }
     var hijacks by remember { mutableStateOf(0) }
+    /** The Entity's corruption cutscene showing (which one), or -1; and how many have been shown. */
+    var corrupting by remember { mutableStateOf(-1) }
+    var corruptSeen by remember { mutableStateOf(0) }
     if (!shared) androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
             androidx.compose.runtime.withFrameNanos { }
             if (!hijacking && view?.hijack == 2) hijacking = true
+            val c = view?.corruptions ?: 0
+            if (corrupting < 0 && c > corruptSeen) { corruptSeen = c; corrupting = c }
         }
     }
     val context = LocalContext.current
@@ -339,6 +344,10 @@ private fun MatchBody(
             modifier = Modifier.fillMaxSize(),
         )
         if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
+        if (corrupting >= 0) EntityCutscene(io.github.projectwip.render3d.EntityCut.CORRUPT, match.config.playerFighter, match.config.playerSkin, corrupting, sfx) {
+            corrupting = -1
+            if (!paused) view?.resumeGame()
+        }
         if (hijacking) EntityHijack(match.config.playerFighter, match.config.playerSkin, hijacks, sfx) {
             hijacking = false; hijacks++
             if (paused) view?.let { v -> v.endHijack(); v.paused = true } else view?.endHijack()

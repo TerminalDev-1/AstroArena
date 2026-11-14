@@ -67,6 +67,8 @@ class MatchRunner(
      * cutscene is wanted (`MatchScreen` plays it, then sets this back to 0 and resumes).
      */
     @Volatile var hijack = 0
+    /** How many times the Entity has corrupted the player: each one plays its cutscene (`MatchScreen`), the match waiting. */
+    @Volatile var corruptions = 0
     /** Other real players are in this match: it can't be held still for one of them. */
     val shared: Boolean get() = duel != null || team != null
     fun sound(s: Sound, gain: Float) = sfx.play(s, gain)
@@ -513,7 +515,11 @@ class MatchRunner(
             is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
             // The Entity's flares: a deep note as one locks on, and a hit when it comes down; being corrupted shakes the phone.
             is GameEvent.EntityFlare -> if (e.landed) sfx.play(Sound.WHOOSH, 0.8f, 0.55f) else if (e.targetId == pid) sfx.play(Sound.VOID, 0.9f, 1.15f) else sfx.play(Sound.VOID, 0.4f, 1.15f)
-            is GameEvent.Corrupted -> if (e.fighterId == pid && e.on) { sfx.play(Sound.VOID, 1f, 0.8f); sfx.buzz(160, 255) }
+            is GameEvent.Corrupted -> if (e.fighterId == pid && e.on) {
+                sfx.buzz(160, 255)
+                // Its cutscene plays over the match, which waits (unless other real players are in it, who can't).
+                if (!shared) { paused = true; corruptions++ } else sfx.play(Sound.VOID, 1f, 0.8f)
+            }
             else -> Unit
         }
     }

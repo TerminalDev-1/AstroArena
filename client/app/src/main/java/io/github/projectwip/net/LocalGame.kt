@@ -27,12 +27,11 @@ interface GameActions {
     fun upgrade(fighter: FighterId, costFactor: Float = 1f, noCap: Boolean = false): Int?
     fun buy(itemKey: String): Reward?
     fun claimGift(): Reward?
-    fun claimMilestone(cups: Int): Reward?
     fun buyDeal(id: Long): Reward?
     fun createDeal(o: CustomOffer): Long?
     fun deleteDeal(id: Long): Boolean?
     fun reset(): Boolean?
-    fun devGrant(cups: Int = 0, drops: Int = 0, bolts: Int = 0, prisms: Int = 0, credits: Int = 0): Boolean?
+    fun devGrant(drops: Int = 0, bolts: Int = 0, prisms: Int = 0, credits: Int = 0): Boolean?
     fun refreshAccount(): Boolean
 }
 
@@ -76,7 +75,6 @@ class LocalGame(private val repo: GameRepository) : GameActions {
     override fun upgrade(fighter: FighterId, costFactor: Float, noCap: Boolean): Int? = act { Economy.upgrade(it, fighter, costFactor, noCap) }
     override fun buy(itemKey: String): Reward? = act { Economy.buy(it, itemKey) }
     override fun claimGift(): Reward? = act { Economy.claimGift(it, repo.today) }
-    override fun claimMilestone(cups: Int): Reward? = act { Economy.claimMilestone(it, cups) }
     override fun buyDeal(id: Long): Reward? = act { Economy.buyDeal(it, id, System.currentTimeMillis()) }
     override fun createDeal(o: CustomOffer): Long? = act { Economy.createDeal(it, o) }
     override fun deleteDeal(id: Long): Boolean? = act { Economy.deleteDeal(it, id) }
@@ -84,8 +82,8 @@ class LocalGame(private val repo: GameRepository) : GameActions {
     /** Starts the offline profile over. (The caller wipes it: see the Data tab.) */
     override fun reset(): Boolean? = if (repo.offlineMode) true else null
 
-    override fun devGrant(cups: Int, drops: Int, bolts: Int, prisms: Int, credits: Int): Boolean? =
-        act { Done(Economy.devGrant(it, cups, drops, bolts, prisms, credits), true) }
+    override fun devGrant(drops: Int, bolts: Int, prisms: Int, credits: Int): Boolean? =
+        act { Done(Economy.devGrant(it, drops, bolts, prisms, credits), true) }
     override fun refreshAccount(): Boolean = true
 
     /** Opens one Arena Box from the offline profile. [luck] and [free] are Chaos Mode's. Null if there is none to open. */

@@ -12,22 +12,23 @@ import androidx.compose.ui.unit.sp
 import io.github.projectwip.audio.Sfx
 
 /**
- * Visual identity, back to the old glory days (build 58, restored in build 102 by the user's decision): deep purple,
- * chunky chamfered plates with thick ink outlines, glossy faces and solid lips, heavy italic display type, hot orange
- * for the main action, electric cyan for secondary, gold for Cups.
+ * Visual identity: chunky chamfered plates with thick ink outlines, glossy faces and solid lips, heavy italic display
+ * type (build 58's, restored in build 102), now in the Entity's colours (build 111, the user's ask: "less of a light
+ * purple and more of a voidy neon purple", menus only): near-black violet panels out of the void, edges lit in neon
+ * violet. Hot orange for the main action, electric cyan for secondary, gold for coins.
  */
 object Palette {
-    val Ink = Color(0xFF1B1035)
-    val BgTop = Color(0xFF34188A)
-    val BgBottom = Color(0xFF120A2E)
-    val Panel = Color(0xFF2D1D74)
-    val PanelLight = Color(0xFF41309F)
-    val PanelDark = Color(0xFF1D1252)
-    val PanelInset = Color(0xFF170D44)
-    /** The soft lavender light that catches the edges of plates and panels. */
-    val Rim = Color(0xFFC9B8FF)
+    val Ink = Color(0xFF0A0417)
+    val BgTop = Color(0xFF1A0838)
+    val BgBottom = Color(0xFF06020F)
+    val Panel = Color(0xFF1A0A3A)
+    val PanelLight = Color(0xFF2E1366)
+    val PanelDark = Color(0xFF0E0524)
+    val PanelInset = Color(0xFF0A0319)
+    /** The neon violet light that catches the edges of plates and panels. */
+    val Rim = Color(0xFFB46CFF)
     /** A hairline edge. */
-    val Hairline = Color(0x66C9B8FF)
+    val Hairline = Color(0x99B46CFF)
 
     val Orange = Color(0xFFFF9F1C)
     val OrangeDeep = Color(0xFFFF6A00)
@@ -53,7 +54,7 @@ object Palette {
     val PrismDeep = Color(0xFF8E2BE0)
 
     val Text = Color.White
-    val TextDim = Color(0xFFB9ADEB)
+    val TextDim = Color(0xFFA996D9)
     val Positive = Color(0xFF7CFF9B)
     val Ally = Color(0xFF3FB6FF)
     val Enemy = Color(0xFFFF4D5E)

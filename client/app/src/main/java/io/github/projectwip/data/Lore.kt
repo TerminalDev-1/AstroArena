@@ -206,7 +206,7 @@ object Lore {
         RitualLine("Good. You remember who you belong to.", RitualShot.WIDE),
         RitualLine("Every attack you have ever thrown was mine.", RitualShot.ENTITY),
         RitualLine("Every super. Lent, never given.", RitualShot.OTHER),
-        RitualLine("You think you fight for Cups. For glory.", RitualShot.OTHER),
+        RitualLine("You think you fight for glory. For each other.", RitualShot.OTHER),
         RitualLine("You fight because I let you.", RitualShot.ENTITY),
         RitualLine("And you. Yes, you.", RitualShot.PLAYER),
         RitualLine("Not the fighter. The one holding the screen.", RitualShot.PLAYER),
