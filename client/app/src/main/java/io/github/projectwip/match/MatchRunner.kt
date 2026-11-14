@@ -514,6 +514,12 @@ class MatchRunner(
             }
             is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
             // The Entity's flares: a deep note as one locks on, and a hit when it comes down; being corrupted shakes the phone.
+            // Its moves: its sword spin roars, its dash rushes, the rest a low rumble.
+            is GameEvent.EntityAttack -> when (io.github.projectwip.sim.EntityMove.entries[e.move]) {
+                io.github.projectwip.sim.EntityMove.SPIN -> sfx.play(Sound.TEMPEST, 0.9f, 0.7f)
+                io.github.projectwip.sim.EntityMove.DASH -> sfx.play(Sound.WHOOSH, 1f, 0.45f)
+                else -> sfx.play(Sound.VOID, 0.45f, 0.6f)
+            }
             is GameEvent.EntityFlare -> if (e.landed) sfx.play(Sound.WHOOSH, 0.8f, 0.55f) else if (e.targetId == pid) sfx.play(Sound.VOID, 0.9f, 1.15f) else sfx.play(Sound.VOID, 0.4f, 1.15f)
             // Pulled into the Entity: its cutscene for the player (the match waits, unless other real players are in it);
             // a deep rush for anyone else; freed, a burst.

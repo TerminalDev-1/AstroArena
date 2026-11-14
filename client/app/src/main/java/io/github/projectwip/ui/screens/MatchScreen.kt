@@ -296,6 +296,8 @@ private fun MatchBody(
     /** The Entity's corruption cutscene showing (which one), or -1; and how many have been shown. */
     var corrupting by remember { mutableStateOf(-1) }
     var corruptSeen by remember { mutableStateOf(0) }
+    /** Inside the Entity: the player is trapped in it (its ruin shows until they are freed or the match ends). */
+    var inside by remember { mutableStateOf(false) }
     if (!shared) androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
             androidx.compose.runtime.withFrameNanos { }
@@ -303,6 +305,10 @@ private fun MatchBody(
             val c = view?.corruptions ?: 0
             if (corrupting < 0 && c > corruptSeen) { corruptSeen = c; corrupting = c }
         }
+    }
+    // (In every match, team matches too: whoever is trapped sees inside it.)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) { androidx.compose.runtime.withFrameNanos { }; inside = view?.playerTrapped == true }
     }
     val context = LocalContext.current
 
@@ -344,6 +350,8 @@ private fun MatchBody(
             modifier = Modifier.fillMaxSize(),
         )
         if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
+        // (Under its pulled-in cutscene, which plays first.)
+        if (inside && !done) EntityInsideScreen { view?.insideInfo() }
         if (corrupting >= 0) EntityCutscene(io.github.projectwip.render3d.EntityCut.CORRUPT, match.config.playerFighter, match.config.playerSkin, corrupting, sfx) {
             corrupting = -1
             if (!paused) view?.resumeGame()

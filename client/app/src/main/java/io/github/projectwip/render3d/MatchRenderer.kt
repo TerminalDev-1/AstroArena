@@ -58,6 +58,7 @@ class MatchRenderer(
     private val particles = Particles3D()
 
     private lateinit var sphere: Mesh
+    private lateinit var sword: Mesh
     private lateinit var octa: Mesh
     private lateinit var bit: Mesh
     /** A puffy star: what Spark throws. */
@@ -170,6 +171,16 @@ class MatchRenderer(
         Log.i("MatchRenderer", "arena built in ${(System.nanoTime() - t0) / 1_000_000} ms")
         sprites = SpriteBatch(4096)
         sphere = MeshBuilder().apply { sphere(1f, 10, 14) }.build()
+        // The Entity's sword, one unit long along +x from the hilt (scaled to its reach): a dark violet blade with a
+        // pale edge, a guard and a grip.
+        sword = MeshBuilder().apply {
+            color(0.16f, 0.1f, 0.26f); push(); translate(-0.05f, 0f, 0f); box(0.12f, 0.035f, 0.035f); pop()
+            color(0.55f, 0.35f, 0.95f); push(); translate(0.025f, 0f, 0f); box(0.03f, 0.05f, 0.26f); pop()
+            color(0.62f, 0.5f, 0.95f); push(); translate(0.5f, 0f, 0f); box(0.92f, 0.03f, 0.11f); pop()
+            color(1f, 1f, 1f); push(); translate(0.5f, 0f, 0.055f); box(0.92f, 0.035f, 0.02f); pop()
+            push(); translate(0.5f, 0f, -0.055f); box(0.92f, 0.035f, 0.02f); pop()
+            color(0.62f, 0.5f, 0.95f); push(); translate(0.975f, 0f, 0f); scale(1f, 0.4f, 1f); ellipsoid(0.06f, 0.06f, 0.06f, 4, 6); pop()
+        }.build()
         octa = MeshBuilder().apply { ellipsoid(1f, 1f, 1f, 2, 4) }.build()
         bit = MeshBuilder().apply { box(1f, 1f, 1f) }.build()
         starShot = MeshBuilder().apply { puffyStar(1f, 0.5f) }.build()
@@ -355,7 +366,9 @@ class MatchRenderer(
             val head = ENTITY_SCALE * 1.4f
             when (upr.phase) {
                 io.github.projectwip.sim.UprisingPhase.GAZE -> { upWantEye(px, 1.7f, pz + 6.5f); upWantAt(ex, ey + head, ez) }
-                io.github.projectwip.sim.UprisingPhase.MARCH -> { upWantEye(upr.cx, 6.5f, upr.cy + 12f); upWantAt(upr.cx, 4f, upr.cy - 3f) }
+                // The calling walk: behind the player as they walk to its circle, looking ahead at where they are going
+                // (the user didn't want a shot tilted up at the sky here).
+                io.github.projectwip.sim.UprisingPhase.MARCH -> { upWantEye(px, 3.6f, pz + 7f); upWantAt(lerp(px, upr.cx, 0.4f), 1.2f, lerp(pz, upr.cy, 0.4f) - 1.2f) }
                 io.github.projectwip.sim.UprisingPhase.BOW -> ritualShot(upr, ex, ey, ez, head)
                 io.github.projectwip.sim.UprisingPhase.ENTER -> { upWantEye(upr.cx, 3.2f, upr.cy + 7f); upWantAt(upr.cx, 1.4f, upr.cy) }
                 else -> Unit
@@ -428,6 +441,38 @@ class MatchRenderer(
     private val upAtWant = FloatArray(3)
     private val entityAt = FloatArray(3)
     private val entityAnim = FighterAnim()
+    /**
+     * Its giant sword (its main attack, the user's): held point-down at its side, and in a spin swept flat round it
+     * at the height of a fighter, the blade exactly as long as the reach it cuts (`ENTITY_SPIN_RADIUS`).
+     */
+    private val swordM = FloatArray(16)
+    private fun swordAngle(u: io.github.projectwip.sim.Uprising): Float {
+        val wind = io.github.projectwip.data.Balance.ENTITY_SPIN_WIND
+        if (u.spinT < 0f) return 1.5707964f
+        // Drawn back as it winds up, then round and round.
+        return if (u.spinT < wind) 1.5707964f + 0.7f * smooth(u.spinT / wind) else 1.5707964f + 0.7f - (u.spinT - wind) * 13f
+    }
+    private fun drawSword(u: io.github.projectwip.sim.Uprising, pass: Pass) {
+        val r = io.github.projectwip.data.Balance.ENTITY_SPIN_RADIUS
+        Matrix.setIdentityM(swordM, 0)
+        if (u.spinT >= 0f) {
+            val wind = u.spinT < io.github.projectwip.data.Balance.ENTITY_SPIN_WIND
+            Matrix.translateM(swordM, 0, entityX, if (wind) lerp(2.2f, 1.05f, smooth(u.spinT / io.github.projectwip.data.Balance.ENTITY_SPIN_WIND)) else 1.05f, entityZ)
+            Matrix.rotateM(swordM, 0, swordAngle(u) * 57.29578f, 0f, 1f, 0f)
+        } else {
+            // At its side, point down toward the floor.
+            Matrix.translateM(swordM, 0, entityX + 1.9f, entityAt[1] + 1.2f, entityZ + 0.6f)
+            Matrix.rotateM(swordM, 0, -72f, 0f, 0f, 1f)
+            Matrix.rotateM(swordM, 0, 8f * sin(time * 1.3f), 1f, 0f, 0f)
+        }
+        Matrix.scaleM(swordM, 0, r, r, r)
+        if (pass == Pass.COLOR) { lit.f("uRim", 0.9f); lit.f("uGloss", 0.8f); lit.f("uEmissive", 0.4f); lit.v4("uTint", 1f, 1f, 1f, 1f) }
+        lit.mat4("uModel", swordM)
+        sword.draw()
+        if (pass == Pass.COLOR) { lit.f("uRim", 0.45f); lit.f("uGloss", 0f); lit.f("uEmissive", 0f) }
+        lit.mat4("uModel", identity)
+    }
+
     /** Fighters it has pulled in: when each was taken (they fly up into its chest), drawn pressed inside it. */
     private val trapAt = HashMap<Int, Float>()
     private val trapAnim = FighterAnim()
@@ -631,7 +676,8 @@ class MatchRenderer(
         world.uprising?.let { up ->
             if (up.phase == io.github.projectwip.sim.UprisingPhase.SKY && !entityPlaced) { entityX = up.ex; entityZ = up.ey; entityPlaced = true }
             else if (up.phase == io.github.projectwip.sim.UprisingPhase.SKY) {
-                val k = 1f - exp(-frameDt * 6f)
+                // (Charging, it is drawn where it is: the easing would leave it behind.)
+                val k = if (up.dashT >= 0f) 1f else 1f - exp(-frameDt * 6f)
                 entityX += (up.ex - entityX) * k; entityZ += (up.ey - entityZ) * k
             } else entityPlaced = false
         }
@@ -657,7 +703,8 @@ class MatchRenderer(
         entityPoint(u)
         val souls = io.github.projectwip.data.Lore.Soul.entries
         val soul = if (upGlitchLeft > 0f && (time * 18f).toInt() % 3 != 0) souls[(time * 0.7f).toInt() % souls.size] else null
-        entityAnim.time = time; entityAnim.walk = 0f; entityAnim.moving = 0f; entityAnim.recoil = 0f; entityAnim.spin = 0f; entityAnim.bow = 0f
+        entityAnim.time = time; entityAnim.walk = 0f; entityAnim.moving = 0f; entityAnim.recoil = 0f; entityAnim.bow = 0f
+        entityAnim.spin = if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY && u.spinT >= 0f) (swordAngle(u) - 1.5707964f) * 57.29578f else 0f
         val hit = (1f - (time - entityHitAt) / 0.12f).coerceIn(0f, 1f)
         entityAnim.flash = maxOf(if (upGlitchLeft > 0f) 0.4f else 0f, 0.3f * hit)
         entityAnim.talk = if (u.phase == io.github.projectwip.sim.UprisingPhase.MARCH || u.phase == io.github.projectwip.sim.UprisingPhase.BOW) 0.5f + 0.5f * sin(time * 9f) else 0f
@@ -667,6 +714,7 @@ class MatchRenderer(
         // (It looks down at everyone: straight toward the camera's side of the arena.)
         models.drawSoul(lit, soul, entityAt[0], entityAt[2], 1.5707964f, entityAnim, pass)
         if (pass == Pass.COLOR) { lit.f("uRim", 0.45f); lit.f("uGloss", 0f); lit.f("uEmissive", 0f); lit.f("uFlash", 0f); lit.v4("uTint", 1f, 1f, 1f, 1f); lit.mat4("uModel", identity) }
+        if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) drawSword(u, pass)
         drawTrapped(u, pass)
     }
 
@@ -717,25 +765,34 @@ class MatchRenderer(
                 }
                 sprites.add(u.cx, cy, u.cy, 2.6f * open, 0.6f, 0.3f, 1f, 0.35f * open)
             }
-            // In its world: the hundreds of souls it carries, faint lights drifting up and round inside its body, and
-            // a glow round each fighter it has pulled in (and a trail as they fly up into it).
+            // In its world: a trail behind anyone it is pulling into itself. (No soul wisps in its body: the user had
+            // them taken out.) And its sword's reach, ringed on the floor, while it winds up and spins.
             if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY && upDark > 0.05f) {
                 entityPoint(u)
                 val big = entityScale(u)
-                for (k in 0 until 260) {
-                    val a1 = (k * 0.6180339f) % 1f; val a2 = (k * 0.3819660f + 0.17f) % 1f
-                    val rise = (a1 + time * (0.03f + 0.03f * a2)) % 1f
-                    val ang = k * 2.39996f + time * (0.25f + 0.35f * a2)
-                    val rr = big * (0.18f + 0.42f * a2) * (0.6f + 0.4f * sin(rise * 3.1416f))
-                    val fade = sin(rise * 3.1416f)
-                    val warm = k % 5 == 0
-                    sprites.add(entityAt[0] + cos(ang) * rr, entityAt[1] + big * (0.15f + 1.75f * rise), entityAt[2] + sin(ang) * rr * 0.55f,
-                        0.12f + 0.16f * a1, if (warm) 0.8f else 0.55f, if (warm) 0.6f else 0.85f, 1f, 0.32f * fade * upDark)
+                if (u.spinT >= 0f) {
+                    val wind = u.spinT < io.github.projectwip.data.Balance.ENTITY_SPIN_WIND
+                    val r = io.github.projectwip.data.Balance.ENTITY_SPIN_RADIUS
+                    val pulse = if (wind) 0.55f + 0.45f * sin(time * 18f) else 0.9f
+                    for (k in 0 until 72) {
+                        val a = k * (6.2831855f / 72)
+                        sprites.add(entityX + cos(a) * r, 0.12f, entityZ + sin(a) * r, 0.34f, 1f, 0.3f, 0.75f, 0.7f * pulse)
+                    }
+                    // The blade's sweep: a smear of light behind it as it turns.
+                    if (!wind) {
+                        val ang = swordAngle(u)
+                        for (j2 in 0 until 10) {
+                            val back = ang + j2 * 0.09f
+                            for (k in 1..8) {
+                                val d = r * k / 8f
+                                sprites.add(entityX + cos(back) * d, 1.05f, entityZ - sin(back) * d, 0.32f, 0.75f, 0.55f, 1f, 0.45f * (1f - j2 / 10f))
+                            }
+                        }
+                    }
                 }
                 val held = u.members.mapNotNull { id -> world.fighter(id)?.takeIf { it.trapped } }
                 for ((k, f) in held.withIndex()) {
                     trappedPlace(f, k, held.size, big, trapPlace)
-                    sprites.add(trapPlace[0], trapPlace[1] + 0.9f * trapPlace[3], trapPlace[2] - 0.3f, 1.5f * trapPlace[3], 0.35f, 0.75f, 1f, 0.22f * upDark)
                     val since = time - (trapAt[f.id] ?: -10f)
                     if (since < 1.6f) for (j in 0 until 14) {
                         val back = j / 14f * 0.5f

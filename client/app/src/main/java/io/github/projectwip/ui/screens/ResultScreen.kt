@@ -327,7 +327,8 @@ private fun Pedestal(color: Color, modifier: Modifier) {
 private fun Modifier.tray() = drawBehind {
     val o = plateShape(10.dp, 4.dp).createOutline(size, layoutDirection, this)
     val p = androidx.compose.ui.graphics.Path().apply { addOutline(o) }
-    drawPath(p, Palette.PanelInset.copy(alpha = 0.85f))
+    // (Dark purple, not near-black: the user found the black round the rewards bleak.)
+    drawPath(p, androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3B1A72), Color(0xFF241047))))
     clipPath(p) {
         // Its upper lip throws a shadow into it.
         drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.4f), Color.Transparent), 0f, 12.dp.toPx()))

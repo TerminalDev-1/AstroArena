@@ -174,7 +174,15 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   one lands on is pulled into it among the souls it carries (`Fighter.trapped`, `World.trap`; drawn in its chest with
   soul wisps round it, `MatchRenderer.drawTrapped`), out of the fight with no respawn; beating it frees everyone
   (`World.free`), time running out leaves them in it, and everyone trapped is the match lost. The player's cutscene is
-  `EntityCut.CORRUPT` ("PULLED INTO THE ENTITY"); after it the camera follows a free teammate. Bots step out from
+  `EntityCut.CORRUPT` ("PULLED INTO THE ENTITY"); after it the player sees inside the Entity (`EntityInsideScreen`,
+  `render3d/EntityInside.kt`): a dark ruin like a hell, chained prisoners (the trapped team and the forgotten souls),
+  their energy drawn up into its heart, until they are freed or the match ends (`--es screen inside` previews it).
+  It starves them (the user's idea): each fighter it holds heals it (`ENTITY_FEED_HEAL`) and makes it hit harder
+  (`ENTITY_FEED_DAMAGE`). Its main attack is a giant sword it spins like a tornado (`EntityMove.SPIN`,
+  `World.stepSpin`; the blade is drawn exactly `ENTITY_SPIN_RADIUS` long, ringed on the floor), and it dashes
+  (`EntityMove.DASH`, its lane marked first). No soul wisps in its body in the fight (the user had them removed).
+  "Come to me" is a walk the camera follows from behind, paced to last `UPRISING_MARCH_PACE` (everyone starts close
+  in its fight, and a full-speed walk was over at once). Bots step out from
   under a flare after `FLARE_REACT` (they still get caught about half the matches; at 0.55 s of fall a whole team was
   in it within a minute). Corruption (`World.corrupt`, `Match.driveCorrupted`) is kept with nothing using it. In the
   ritual, "Kneel." is followed by a beat with no words (`RitualShot.KNEEL`, `UprisingScript.KNEEL_BEAT`) where the

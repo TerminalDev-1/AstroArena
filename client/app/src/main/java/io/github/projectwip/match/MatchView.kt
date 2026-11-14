@@ -111,6 +111,23 @@ class MatchView(
         thread = null
     }
 
+    /** What the screen inside the Entity shows (the player is trapped in it): read from the match as it runs. */
+    class InsideInfo(val hp: Int, val maxHp: Int, val held: List<Pair<io.github.projectwip.data.FighterId, Int>>, val team: List<Mate>)
+    class Mate(val name: String, val hp: Int, val maxHp: Int, val alive: Boolean, val trapped: Boolean)
+
+    /** The player is held inside the Entity, with the match still going. */
+    val playerTrapped: Boolean get() = runner.match.player.trapped && runner.match.world.phase == io.github.projectwip.sim.Phase.PLAYING
+
+    fun insideInfo(): InsideInfo? {
+        val w = runner.match.world
+        val u = w.uprising ?: return null
+        val p = runner.match.player
+        val members = u.members.mapNotNull { w.fighter(it) }
+        val held = (listOf(p) + members.filter { it !== p }).filter { it.trapped }.map { it.def.id to it.skin }
+        val team = members.filter { it !== p }.map { Mate(it.name, it.hp, it.maxHp, it.alive, it.trapped) }
+        return InsideInfo(u.hp, u.maxHp, held, team)
+    }
+
     /** How many times the Entity has corrupted the player (each plays its cutscene). */
     val corruptions: Int get() = runner.corruptions
 

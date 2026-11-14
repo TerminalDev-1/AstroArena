@@ -421,4 +421,4 @@ class Match(val config: MatchConfig) {
 }
 
 /** How long a bot takes to see that an Entity flare has stopped following and step out from under it. */
-private const val FLARE_REACT = 0.6f
+private const val FLARE_REACT = 0.7f

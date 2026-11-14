@@ -73,6 +73,18 @@ class Uprising(
     var chaseTarget = -1
     var chaseLeft = 0
     var chaseIn = 0f
+    /** Its dash: seconds since it began (-1: none), from where to where. It winds up, then charges down its lane. */
+    var dashT = -1f
+    var dashFromX = 0f
+    var dashFromY = 0f
+    var dashToX = 0f
+    var dashToY = 0f
+    /** Its sword: seconds since its spin began (-1: none), the next cut in [spinTick], and whom it spins toward. */
+    var spinT = -1f
+    var spinTick = 0f
+    var spinTarget = -1
+    /** Health it has drunk from the fighters it holds, not yet whole points. */
+    var fed = 0f
     /** A player skipped its ritual. */
     var skipped = false
     /** True once it has been beaten (rather than having let them go). */

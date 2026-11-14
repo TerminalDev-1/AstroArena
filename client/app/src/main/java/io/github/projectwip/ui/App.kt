@@ -421,6 +421,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 repo.updateSettings { it.copy(playerName = name, nameChosen = true) }
                 needsName = false
             }
+            // Debug: `--es screen inside` shows the ruin inside the Entity, as if the player and a teammate were held.
+            if (startScreen == "inside" && !booting) io.github.projectwip.ui.screens.EntityInsideScreen {
+                io.github.projectwip.match.MatchView.InsideInfo(612_000, 1_400_000,
+                    listOf(save.selectedFighter to (save.fighters[save.selectedFighter]?.skin ?: 0), io.github.projectwip.data.FighterId.KIRA to 0),
+                    listOf(io.github.projectwip.match.MatchView.Mate("Kira", 0, 9000, false, true), io.github.projectwip.match.MatchView.Mate("Onyx", 6200, 11550, true, false)))
+            }
             debugCut?.let { cut -> if (!booting) io.github.projectwip.ui.screens.EntityCutscene(cut, save.selectedFighter, save.fighters[save.selectedFighter]?.skin ?: 0, 0, sfx) { debugCut = null } }
             if (showIntro && (introAsked || !booting) && !needsName) io.github.projectwip.ui.screens.IntroCutscene(sfx) {
                 introAsked = false

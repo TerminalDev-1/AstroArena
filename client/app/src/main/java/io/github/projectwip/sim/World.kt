@@ -200,10 +200,16 @@ class World(
                 var all = true
                 for (id in u.members) {
                     val f = fighter(id) ?: continue
-                    if (!walkTo(f, u.slotX.getValue(id), u.slotY.getValue(id), dt, drag = u.t >= Balance.UPRISING_PULL)) all = false
+                    // An entranced walk, paced to reach its circle as its calling ends (in its fight everyone starts
+                    // close, and a full-speed walk was over before "Come to me" was said).
+                    val left = (Balance.UPRISING_MARCH_PACE - u.t).coerceAtLeast(0.25f)
+                    val dist = hypot(u.slotX.getValue(id) - f.x, u.slotY.getValue(id) - f.y)
+                    val pace = (dist / left).coerceIn(0.15f, f.def.moveSpeed)
+                    if (!walkTo(f, u.slotX.getValue(id), u.slotY.getValue(id), dt, drag = u.t >= Balance.UPRISING_PULL, speed = pace)) all = false
                     else f.facing = atan2(u.cy - f.y, u.cx - f.x)
                 }
-                if (all || u.t >= Balance.UPRISING_MARCH) {
+                // (Its calling runs its full length even when everyone is already there.)
+                if ((all && u.t >= Balance.UPRISING_MARCH_PACE) || u.t >= Balance.UPRISING_MARCH) {
                     for (id in u.members) fighter(id)?.let { f -> f.x = u.slotX.getValue(id); f.y = u.slotY.getValue(id) }
                     u.bowLength = maxOf(Balance.UPRISING_BOW, Balance.UPRISING_HOLD - Balance.UPRISING_ENTER - u.heldFor)
                     uprisingPhase(u, UprisingPhase.BOW)
@@ -230,11 +236,11 @@ class World(
      * Walks [f] toward (x, y) at its own pace, sliding along walls; with [drag] the Entity pulls it straight there,
      * through anything. True once it is there.
      */
-    private fun walkTo(f: Fighter, x: Float, y: Float, dt: Float, drag: Boolean): Boolean {
+    private fun walkTo(f: Fighter, x: Float, y: Float, dt: Float, drag: Boolean, speed: Float = f.def.moveSpeed): Boolean {
         val dx = x - f.x; val dy = y - f.y
         val d = hypot(dx, dy)
         if (d < 0.08f) { f.vx = 0f; f.vy = 0f; return true }
-        val step = minOf(d, f.def.moveSpeed * (if (drag) 1.6f else 1f) * dt)
+        val step = minOf(d, speed * (if (drag) 1.6f else 1f) * dt)
         if (drag) { f.x += dx / d * step; f.y += dy / d * step }
         else { arena.moveCircle(f.x, f.y, f.radius, dx / d * step, dy / d * step, tmp); f.x = tmp[0]; f.y = tmp[1] }
         f.walkCycle += hypot(f.x - f.prevX, f.y - f.prevY) * 3.2f
@@ -320,10 +326,21 @@ class World(
             }
             if (h.left <= 0f) u.hexes.removeAt(i) else i++
         }
-        // It drifts after the fight, over the middle of everyone (a little ahead of them), never off its platform.
+        // It feeds on everyone it holds (the user's design: it starves them to make itself stronger): it heals, and
+        // (see [markEntity]) it hits harder.
+        val held = u.members.count { fighter(it)?.trapped == true }
+        if (held > 0 && u.hp > 0) {
+            u.fed += Balance.ENTITY_FEED_HEAL * u.maxHp * held * dt
+            val whole = u.fed.toInt()
+            if (whole > 0) { u.fed -= whole; u.hp = minOf(u.maxHp, u.hp + whole) }
+        }
+        stepDash(u, dt)
+        stepSpin(u, dt)
+        // It drifts after the fight, over the middle of everyone (a little ahead of them), never off its platform
+        // (not while it dashes or spins: those move it themselves).
         var sx = 0f; var sy = 0f; var cnt = 0
         for (id in u.members) fighter(id)?.let { if (it.alive) { sx += it.x; sy += it.y; cnt++ } }
-        if (cnt > 0) {
+        if (cnt > 0 && u.dashT < 0f && u.spinT < 0f) {
             val dx = sx / cnt - u.ex; val dy = sy / cnt - 2f - u.ey
             val d = hypot(dx, dy)
             if (d > 0.3f) { val step = minOf(d, Balance.UPRISING_ENTITY_SPEED * dt); u.ex += dx / d * step; u.ey += dy / d * step }
@@ -398,9 +415,12 @@ class World(
         val stage = if (!u.boss || frac > 0.66f) 0 else if (frac > 0.33f) 1 else 2
         u.strikeIn = Balance.UPRISING_STRIKE_GAP * (if (stage == 0) 1f else if (stage == 1) 0.8f else 0.65f)
         val alive = u.members.mapNotNull { fighter(it) }.filter { it.alive && it.corruptLeft <= 0f }
-        val move = ENTITY_MOVES[u.strikes % ENTITY_MOVES.size]
+        // (Never two of its own movements at once: a dash or a spin still going waits for the next move.)
+        var move = ENTITY_MOVES[u.strikes % ENTITY_MOVES.size]
+        if ((move == EntityMove.DASH || move == EntityMove.SPIN) && (u.dashT >= 0f || u.spinT >= 0f)) move = EntityMove.STRIKES
         u.strikes++
         if (alive.isEmpty()) return
+        events += GameEvent.EntityAttack(move.ordinal)
         fun mark(x: Float, y: Float, r: Float, delay: Float, damage: Int) = markEntity(u, x, y, r, delay, damage)
         when (move) {
             EntityMove.STRIKES -> for (j in 0 until 1 + alive.size / 3 + stage) {
@@ -477,6 +497,33 @@ class World(
                     }
                 }
             }
+            EntityMove.DASH -> {
+                // It charges at one of them: its lane is marked at once, and it comes down it after a wind-up, hitting
+                // whoever is still in it as it passes (the marks go off as it reaches each one).
+                val f = alive[u.strikes % alive.size]
+                val c = arena.width / 2f
+                val lim = Arenas.ENTITY_REALM_RADIUS - Balance.UPRISING_ENTITY_RADIUS
+                val dx = f.x - u.ex; val dy = f.y - u.ey
+                val d = hypot(dx, dy).coerceAtLeast(0.1f)
+                var tx = f.x + dx / d * 2.5f; var ty = f.y + dy / d * 2.5f
+                val od = hypot(tx - c, ty - c)
+                if (od > lim) { tx = c + (tx - c) / od * lim; ty = c + (ty - c) / od * lim }
+                u.dashFromX = u.ex; u.dashFromY = u.ey; u.dashToX = tx; u.dashToY = ty; u.dashT = 0f
+                val len = hypot(tx - u.ex, ty - u.ey)
+                val n = (len / 0.9f).toInt().coerceAtLeast(1)
+                for (k in 0..n) {
+                    val s = k / n.toFloat()
+                    mark(lerp(u.ex, tx, s), lerp(u.ey, ty, s), Balance.UPRISING_ENTITY_RADIUS * 0.75f,
+                        Balance.ENTITY_DASH_WIND + s * len / Balance.ENTITY_DASH_SPEED, Balance.UPRISING_STRIKE_DAMAGE * 3 / 2)
+                }
+            }
+            EntityMove.SPIN -> {
+                // Its sword (its main attack): it winds up, then spins like a tornado, the blade cutting everyone in its
+                // reach again and again, and drifts toward one of them as it goes.
+                u.spinT = 0f
+                u.spinTick = Balance.ENTITY_SPIN_WIND
+                u.spinTarget = alive[u.strikes % alive.size].id
+            }
             EntityMove.CHASE -> {
                 // Strikes come down on one of them, one after another, wherever they are: they have to keep moving.
                 u.chaseTarget = alive[u.strikes % alive.size].id
@@ -486,11 +533,51 @@ class World(
         }
     }
 
+    /** How hard the Entity hits now: harder in its fight, and harder for every fighter it is feeding on. */
+    private fun entityHard(u: Uprising): Float =
+        (if (u.boss) Balance.UPRISING_BOSS_DAMAGE else 1f) * (1f + Balance.ENTITY_FEED_DAMAGE * u.members.count { fighter(it)?.trapped == true })
+
+    /** Its dash: once wound up, it moves down its lane at [Balance.ENTITY_DASH_SPEED] (its marks do the hurting). */
+    private fun stepDash(u: Uprising, dt: Float) {
+        if (u.dashT < 0f) return
+        u.dashT += dt
+        val len = hypot(u.dashToX - u.dashFromX, u.dashToY - u.dashFromY).coerceAtLeast(0.01f)
+        val s = ((u.dashT - Balance.ENTITY_DASH_WIND) * Balance.ENTITY_DASH_SPEED / len).coerceIn(0f, 1f)
+        u.ex = lerp(u.dashFromX, u.dashToX, s); u.ey = lerp(u.dashFromY, u.dashToY, s)
+        if (s >= 1f) u.dashT = -1f
+    }
+
+    /** Its sword spin: after the wind-up, a cut every [Balance.ENTITY_SPIN_TICK] across its whole reach. */
+    private fun stepSpin(u: Uprising, dt: Float) {
+        if (u.spinT < 0f) return
+        u.spinT += dt
+        if (u.spinT > Balance.ENTITY_SPIN_WIND) {
+            // Drifting after its target as it spins, never off its platform.
+            fighter(u.spinTarget)?.takeIf { it.alive }?.let { f ->
+                val dx = f.x - u.ex; val dy = f.y - u.ey
+                val d = hypot(dx, dy)
+                if (d > 0.3f) { val step = minOf(d, Balance.ENTITY_SPIN_MOVE * dt); u.ex += dx / d * step; u.ey += dy / d * step }
+                val c = arena.width / 2f
+                val lim = Arenas.ENTITY_REALM_RADIUS - Balance.UPRISING_ENTITY_RADIUS
+                val od = hypot(u.ex - c, u.ey - c)
+                if (od > lim) { u.ex = c + (u.ex - c) / od * lim; u.ey = c + (u.ey - c) / od * lim }
+            }
+        }
+        if (u.spinT >= u.spinTick && u.spinT <= Balance.ENTITY_SPIN_WIND + Balance.ENTITY_SPIN_SECONDS) {
+            u.spinTick += Balance.ENTITY_SPIN_TICK
+            val dmg = (Balance.ENTITY_SPIN_DAMAGE * entityHard(u)).toInt()
+            for (id in u.members) fighter(id)?.let { f ->
+                if (f.alive && hypot(f.x - u.ex, f.y - u.ey) < Balance.ENTITY_SPIN_RADIUS + f.radius * 0.3f) damage(f, null, dmg, true, f.x, f.y, lethal = u.boss)
+            }
+        }
+        if (u.spinT > Balance.ENTITY_SPIN_WIND + Balance.ENTITY_SPIN_SECONDS) u.spinT = -1f
+    }
+
     /** One of the Entity's marked strikes, at (x, y): never past the edge of its platform. */
     private fun markEntity(u: Uprising, x: Float, y: Float, r: Float, delay: Float, damage: Int) {
         val c = arena.width / 2f
         if (hypot(x - c, y - c) > Arenas.ENTITY_REALM_RADIUS - r * 0.5f) return
-        val hard = if (u.boss) Balance.UPRISING_BOSS_DAMAGE else 1f
+        val hard = entityHard(u)
         hazards += Hazard(-1, -1, x, y, r, delay, (damage * hard).toInt(), HazardKind.RIFT, lethal = u.boss)
     }
 
@@ -1879,10 +1966,13 @@ class World(
 const val ENTITY_TARGET = -100
 
 /** The Entity's moves in its world, in the order it makes them, round and round. */
-enum class EntityMove { STRIKES, RING, SWEEP, FLARE, SPOKES, RAIN, GRASP, PULSE, CHASE }
+enum class EntityMove { STRIKES, RING, SWEEP, FLARE, SPOKES, RAIN, GRASP, PULSE, CHASE, DASH, SPIN }
+// (Its sword spin is its main attack, the user's: it comes round most often.)
 private val ENTITY_MOVES = listOf(
-    EntityMove.STRIKES, EntityMove.GRASP, EntityMove.RING, EntityMove.CHASE, EntityMove.FLARE,
-    EntityMove.SPOKES, EntityMove.STRIKES, EntityMove.RAIN, EntityMove.SWEEP, EntityMove.PULSE,
-    EntityMove.GRASP, EntityMove.STRIKES, EntityMove.CHASE, EntityMove.SPOKES, EntityMove.RING,
-    EntityMove.RAIN, EntityMove.SWEEP, EntityMove.PULSE,
+    EntityMove.SPIN, EntityMove.STRIKES, EntityMove.GRASP, EntityMove.DASH, EntityMove.FLARE,
+    EntityMove.SPIN, EntityMove.RING, EntityMove.CHASE, EntityMove.SPOKES, EntityMove.DASH,
+    EntityMove.SPIN, EntityMove.RAIN, EntityMove.FLARE, EntityMove.SWEEP, EntityMove.GRASP,
+    EntityMove.SPIN, EntityMove.PULSE, EntityMove.DASH, EntityMove.STRIKES, EntityMove.CHASE,
 )
+
+private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t

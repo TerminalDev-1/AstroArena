@@ -271,6 +271,8 @@ sealed interface GameEvent {
     /** The Entity corrupted a fighter ([on]) or let it go. */
     data class Corrupted(val fighterId: Int, val on: Boolean) : GameEvent
     data class EntityHit(val fighterId: Int, val isSuper: Boolean, val damage: Int, val x: Float, val y: Float) : GameEvent
+    /** The Entity began a move ([move]: an `EntityMove` ordinal), for its sound. */
+    data class EntityAttack(val move: Int) : GameEvent
     data class Shot(val fighterId: Int, val isSuper: Boolean, val x: Float, val y: Float, val dirX: Float, val dirY: Float) : GameEvent
     data class Hit(val targetId: Int, val sourceId: Int, val damage: Int, val x: Float, val y: Float, val isSuper: Boolean) : GameEvent
     data class Blocked(val x: Float, val y: Float) : GameEvent

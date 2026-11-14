@@ -392,7 +392,8 @@ object Balance {
     const val UPRISING_BOSS_START = 1.5f
     const val UPRISING_BOSS_SECONDS = 210f
     const val UPRISING_BOSS_HP = 1.6f
-    const val UPRISING_BOSS_DAMAGE = 2f
+    // (3 since build 111: the user wanted it to "actually do some damage".)
+    const val UPRISING_BOSS_DAMAGE = 3f
     /** Its corruption flares: they follow their target this long, then come down this much later, over this circle. */
     const val FLARE_LOCK = 1.6f
     // (0.9 s from when it stops following to when it lands: being pulled in lasts until the Entity is beaten, so it
@@ -404,6 +405,24 @@ object Balance {
     /** Its hand's circle (its slam), and how far apart its chase's strikes come down. */
     const val ENTITY_GRASP_RADIUS = 2.6f
     const val ENTITY_CHASE_GAP = 0.45f
+    /** Its dash: the wind-up (its lane marked) and how fast it charges down it. */
+    const val ENTITY_DASH_WIND = 1.1f
+    const val ENTITY_DASH_SPEED = 11f
+    /**
+     * Its sword spin (its main attack): the wind-up, how long it spins, a cut every tick over its whole reach (the
+     * blade is exactly this long), what a cut does before its fight's multiplier, and how fast it drifts as it spins.
+     */
+    const val ENTITY_SPIN_WIND = 1.2f
+    const val ENTITY_SPIN_SECONDS = 2.8f
+    const val ENTITY_SPIN_TICK = 0.4f
+    const val ENTITY_SPIN_RADIUS = 4.6f
+    const val ENTITY_SPIN_DAMAGE = 700
+    const val ENTITY_SPIN_MOVE = 2.2f
+    /** Feeding on whoever it holds: health a second (a share of its whole) and harder hits, for each of them. */
+    const val ENTITY_FEED_HEAL = 0.0015f
+    const val ENTITY_FEED_DAMAGE = 0.2f
+    /** The calling walk is paced to reach its circle at this many seconds. */
+    const val UPRISING_MARCH_PACE = 10f
     /** A tornado sets her down at least this far clear of anyone (past both their edges), so nobody hides her. */
     const val TEMPEST_LANDING_GAP = 0.6f
     /** ...and each of its hits charges the super by only this share of a normal hit, so a tempest doesn't pay for the next one. */

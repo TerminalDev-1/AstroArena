@@ -1375,6 +1375,8 @@ class SimulationTest {
             var t = 0
             while (u.phase != io.github.projectwip.sim.UprisingPhase.SKY && t < 60 * 120) { m.step(Match.STEP); t++ }
             assertEquals(io.github.projectwip.sim.UprisingPhase.SKY, u.phase)
+            // (Its own moves held off: this is about the fighter's attacks reaching it, and its sword spin is deadly.)
+            u.strikeIn = 1e9f
             var attackHits = 0
             var superHits = 0
             var superUsed = false
