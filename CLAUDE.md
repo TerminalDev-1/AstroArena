@@ -12,9 +12,14 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
   and cutscene while it is happening; check `adb logcat -b crash -d` and the saved crash report; walk through every
   phase of the feature start to finish, not just the first seconds; and judge it critically against exactly what the
   user asked for ("would this look and feel good in a real game?"). If anything is off, unfinished, ugly, cheap-feeling
-  or not what the user described, fix it and QA again: it is not released until it is perfect. When reporting, say what
-  was checked and how, and say plainly anything that could not be checked. Never call a task finished on the strength
-  of a commit or a release alone.
+  or not what the user described, fix it and QA again: a build that doesn't pass is held back, not released, and the
+  work goes on until it is perfect; only then is that build released. When reporting, say what was checked and how,
+  and say plainly anything that could not be checked. Never call a task finished on the strength of a commit or a
+  release alone.
+- **End with questions, and iterate with the user.** After QA, show the user what it looks like (screenshots, contact
+  sheets of animations) and ask them pointed questions: does anything look or feel wrong, is the timing right, is it
+  what they pictured? Fix what they flag, QA again, and ask again, round after round, until they say it's right. The
+  user likes working this way (it is how an animation was got perfect in an earlier session).
 - Read what is necessary for the task you are trying to accomplish, and then stop reading. Don't go on long
   reading sprees, and don't keep reading and re-reading: it takes a lot of time. Be reasonable about it: find the
   spot, read that part, and start changing things. Don't re-read a file you have already read, or what this file
