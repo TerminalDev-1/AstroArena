@@ -38,6 +38,8 @@ class Sfx(private val context: Context) {
 
     fun load() {
         Thread({
+            // Below the UI thread, so building sounds while the loading screen animates doesn't make it stutter.
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
             for (old in listOf("sfx-v1", "sfx-v2", "sfx-v3", "sfx-v4", "sfx-v5", "sfx-v6")) File(context.cacheDir, old).deleteRecursively()
             val dir = File(context.cacheDir, CACHE).apply { mkdirs() }
             for (s in Sound.entries) {

@@ -33,6 +33,8 @@ class Music(private val context: Context) {
 
     fun load() {
         Thread({
+            // Below the UI thread, so building sounds while the loading screen animates doesn't make it stutter.
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
             try {
                 for (old in context.cacheDir.listFiles { f -> f.name.startsWith("music-") && !f.name.startsWith(CACHE) } ?: emptyArray()) old.delete()
                 for (which in Track.entries) {
