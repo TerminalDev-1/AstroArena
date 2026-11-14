@@ -6,6 +6,15 @@ original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters h
 
 ## How to work here
 
+- **Committing and releasing is not "done". Nothing ships until it has passed rigorous QA and is up to the user's
+  standard.** Passing tests and a build that compiles are not enough. Before any release: play the change on the
+  tablet the way a player would, from the game's own camera; screenshot (and burst-capture) every new screen, effect
+  and cutscene while it is happening; check `adb logcat -b crash -d` and the saved crash report; walk through every
+  phase of the feature start to finish, not just the first seconds; and judge it critically against exactly what the
+  user asked for ("would this look and feel good in a real game?"). If anything is off, unfinished, ugly, cheap-feeling
+  or not what the user described, fix it and QA again: it is not released until it is perfect. When reporting, say what
+  was checked and how, and say plainly anything that could not be checked. Never call a task finished on the strength
+  of a commit or a release alone.
 - Read what is necessary for the task you are trying to accomplish, and then stop reading. Don't go on long
   reading sprees, and don't keep reading and re-reading: it takes a lot of time. Be reasonable about it: find the
   spot, read that part, and start changing things. Don't re-read a file you have already read, or what this file
@@ -516,7 +525,8 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   way past it, and nothing on the server is kept for the sake of an older build. Build 46 shipped with a LATER
   button, so the server refuses it (`versions_not_supported.cfg`); keep that rule. Don't add an update-later option.
 - **Non-negotiable: release without being asked.** The user must never have to say "release". When a task that
-  changed the client is finished, verified and pushed, release it: add one to `versionCode` (unless that build
+  changed the client is finished, has passed the full QA in "How to work here" (on the tablet, every phase, up to
+  the user's standard) and is pushed, release it; a build that hasn't passed that QA is never released: add one to `versionCode` (unless that build
   number has not been released yet), commit, tag `vN.0` (N = the build number), push the tag, and publish a GitHub
   release titled "AstroArena 1.3" (see the rule above: updates within 1.3 replace that release) with the release APK
   attached (`AstroArena-1.3-N.apk`). The build number is
