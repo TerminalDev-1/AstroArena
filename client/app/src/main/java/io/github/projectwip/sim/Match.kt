@@ -209,10 +209,15 @@ class Match(val config: MatchConfig) {
             // (Far enough in that the attack lands, never closer than it needs; a storm drives straight through it.)
             val want = if (f.inTempest) 0f else maxOf(big * 0.5f, reach * 0.7f)
             val ux = dx / d; val uy = dy / d
-            val circle = if (((f.id * 7 + up.strikes / 3) % 2) == 0) 0.55f else -0.55f
-            val inward = ((d - want) / 1.5f).coerceIn(-1f, 1f)
-            c.moveX = ux * inward - uy * circle * (1f - kotlin.math.abs(inward))
-            c.moveY = uy * inward + ux * circle * (1f - kotlin.math.abs(inward))
+            // (Each keeps circling one way, and holds its distance within a band rather than on a line, easing from one
+            // way of moving to the next: steering hard at an exact distance had them jerking back and forth.)
+            val circle = if (f.id % 2 == 0) 0.5f else -0.5f
+            val off = d - want
+            val inward = if (kotlin.math.abs(off) < 0.9f) 0f else ((off - kotlin.math.sign(off) * 0.9f) / 2f).coerceIn(-1f, 1f)
+            val wantX = ux * inward - uy * circle * (1f - kotlin.math.abs(inward))
+            val wantY = uy * inward + ux * circle * (1f - kotlin.math.abs(inward))
+            c.moveX += (wantX - c.moveX) * 0.12f
+            c.moveY += (wantY - c.moveY) * 0.12f
             c.aimX = dx; c.aimY = dy; c.aiming = true
             c.attack = d < reach - 0.3f
             val sRange = when (f.def.superSpec.kind) {

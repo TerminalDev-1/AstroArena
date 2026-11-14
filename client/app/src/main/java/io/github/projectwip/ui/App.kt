@@ -242,6 +242,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     // Music: silence while loading and in matches, its own theme on the result screen, the lobby loop elsewhere.
     // The opening a new player sees once (`--es screen intro` shows it any time).
     var showIntro by remember { mutableStateOf(startScreen == "intro") }
+    /** The player asked for the opening from the loading screen: it plays over the loading, which goes on behind it. */
+    var introAsked by remember { mutableStateOf(false) }
     LaunchedEffect(booting, needsName, save.settings.introSeen) {
         if (!booting && !needsName && !save.settings.introSeen) showIntro = true
     }
@@ -393,7 +395,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             AnimatedVisibility(booting, enter = fadeIn(tween(0)), exit = fadeOut(tween(250))) {
                 // Dev builds don't have to sit through the minute of trying.
                 io.github.projectwip.ui.screens.LoadingScreen(bootProgress, bootStatus,
-                    onSkip = if (io.github.projectwip.BuildConfig.DEBUG && connection == Connection.CONNECTING) ({ connection = Connection.SETTLED }) else null)
+                    onSkip = if (io.github.projectwip.BuildConfig.DEBUG && connection == Connection.CONNECTING) ({ connection = Connection.SETTLED }) else null,
+                    onIntro = if (needsName) null else ({ introAsked = true; showIntro = true }))
             }
             shareReport?.let { text ->
                 val context = androidx.compose.ui.platform.LocalContext.current
@@ -415,7 +418,8 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 repo.updateSettings { it.copy(playerName = name, nameChosen = true) }
                 needsName = false
             }
-            if (showIntro && !booting && !needsName) io.github.projectwip.ui.screens.IntroCutscene(sfx) {
+            if (showIntro && (introAsked || !booting) && !needsName) io.github.projectwip.ui.screens.IntroCutscene(sfx) {
+                introAsked = false
                 showIntro = false
                 repo.updateSettings { it.copy(introSeen = true) }
             }

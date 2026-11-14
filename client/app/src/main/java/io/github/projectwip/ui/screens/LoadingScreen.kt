@@ -68,7 +68,7 @@ import kotlin.math.sin
  * steps ticking off, and a tip.
  */
 @Composable
-fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null) {
+fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null, onIntro: (() -> Unit)? = null) {
     val time by rememberAnimTime()
     val roomy = LocalUi.current.roomy
     val fighters = Balance.fighters
@@ -134,6 +134,10 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null)
 
         if (onSkip != null) ChunkyButton(onSkip, Modifier.align(Alignment.TopStart).padding(start = 18.dp, top = 18.dp).size(240.dp, 50.dp), ButtonStyle.GREY, lip = 4.dp) {
             GameText("PLAY OFFLINE (DEV)", Type.Label, outline = 2.dp)
+        }
+        // The opening, any time (the user's ask): in every build, release too.
+        if (onIntro != null) ChunkyButton(onIntro, Modifier.align(Alignment.TopEnd).padding(end = 18.dp, top = 18.dp).size(190.dp, 50.dp), ButtonStyle.CYAN, lip = 4.dp) {
+            GameText("PLAY INTRO", Type.Label, outline = 2.dp)
         }
         PlainText(BuildConfig.VERSION_NAME + " · build " + BuildConfig.BUILD, Type.Small, Modifier.align(Alignment.BottomEnd).padding(12.dp), color = Palette.TextDim)
     }

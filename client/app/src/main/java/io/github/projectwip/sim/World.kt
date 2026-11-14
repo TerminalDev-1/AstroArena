@@ -361,6 +361,9 @@ class World(
             u.teams[id] = f.team
             f.team = 0
             f.control.clear()
+            // (Bots come in with nothing charged: they earn their supers and hypers by hitting the Entity. The user's
+            // balance call. What anyone had is given back afterwards.)
+            if (f.isBot) { f.superCharge = 0f; f.hyperCharge = 0f }
             if (f.def.boss != null) {
                 // (A boss stays out of it: it waits, unseen, off the edge, until everyone is back.)
                 f.x = 0.5f; f.y = 0.5f; f.prevX = f.x; f.prevY = f.y; f.vx = 0f; f.vy = 0f
