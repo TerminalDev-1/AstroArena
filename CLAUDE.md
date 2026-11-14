@@ -110,6 +110,16 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   every attack goes up into it (`GameEvent.SkyShot`), its strikes are non-lethal circles, bots attack it and dodge.
   Beaten or after `UPRISING_SKY`, everyone is put back where they stood with their health, and the match clock (which
   waited) goes on. `--es screen uprising` starts one 4 s into a Knockout Rush match.
+- **The uprising's dimension and ritual** (build 111, the user's design): the fight is on the Entity's own platform
+  (`Arenas.entityRealm`, `World.beginSky` swaps `World.arena`), with the game's own camera (no tilt; it slides toward
+  the Entity), and attacks stay on the ground: whatever reaches the shadow under it (`UPRISING_ENTITY_RADIUS` round
+  `Uprising.ex/ey`) hits it. Everyone is team 0 in there and gets back the super, hyper, ammo and bar they had before.
+  The bow is `UPRISING_BOW` long; its speech (`Lore.UPRISING_BOW`, some of it to the player by name) is laid out by
+  `match/UprisingScript`, which the HUD, the voice and the camera's close-ups (`MatchRenderer.ritualShot`) all read.
+- **The Entity speaks** (TTS, `VoiceStyle.VOID`): its ritual, takeovers and whispers. Lines are timed by
+  `speakingTime` (measured on the tablet; `adb logcat -s Voice` logs each line's real length and any cut-off).
+- **The opening** (the user's idea): a new player sees Swish taken by the Entity once (`IntroScene`/`IntroScript`,
+  `IntroCutscene`, `Settings.introSeen`; older saves count as seen). `--es screen intro` previews it.
 - **No `Sound.GLITCH` blip in the Entity's cutscenes** (the user hated it, "annihilate that"), including when the
   Entity flickers into another soul.
 - **Shell traps on this machine** (Git Bash on Windows): adb under `MSYS_NO_PATHCONV=1` needs Windows paths

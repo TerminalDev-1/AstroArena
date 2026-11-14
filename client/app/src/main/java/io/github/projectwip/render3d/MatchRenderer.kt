@@ -356,7 +356,8 @@ class MatchRenderer(
             val head = ENTITY_SCALE * 1.4f
             when (upr.phase) {
                 io.github.projectwip.sim.UprisingPhase.GAZE -> { upWantEye(px, 1.7f, pz + 6.5f); upWantAt(ex, ey + head, ez) }
-                io.github.projectwip.sim.UprisingPhase.MARCH, io.github.projectwip.sim.UprisingPhase.BOW -> { upWantEye(upr.cx, 6.5f, upr.cy + 12f); upWantAt(upr.cx, 4f, upr.cy - 3f) }
+                io.github.projectwip.sim.UprisingPhase.MARCH -> { upWantEye(upr.cx, 6.5f, upr.cy + 12f); upWantAt(upr.cx, 4f, upr.cy - 3f) }
+                io.github.projectwip.sim.UprisingPhase.BOW -> ritualShot(upr, ex, ey, ez, head)
                 io.github.projectwip.sim.UprisingPhase.ENTER -> { upWantEye(upr.cx, 3.2f, upr.cy + 7f); upWantAt(upr.cx, 1.4f, upr.cy) }
                 else -> Unit
             }
@@ -449,6 +450,43 @@ class MatchRenderer(
         entityAt[0] = u.cx
         entityAt[1] = lerp(-24f, 5f, rise) + 0.4f * sin(time * 0.9f)
         entityAt[2] = u.cy - 26f
+    }
+
+    /** The shot of the ritual the camera was last on (a new one cuts straight to it). */
+    private var ritualCue = -1
+
+    /**
+     * Where the camera is while the Entity speaks to them all (the user's ask): a slow push in on whoever the line is
+     * for, cutting with each line: its face, the player's face, another fighter's face, or everyone.
+     */
+    private fun ritualShot(u: io.github.projectwip.sim.Uprising, ex: Float, ey: Float, ez: Float, head: Float) {
+        val cue = io.github.projectwip.match.UprisingScript.cue(u.phase, u.t, u.bowLength, u.beaten, match.player.name)
+        val push = if (cue == null) 0f else smooth(cue.since / cue.length.coerceAtLeast(0.5f))
+        if (cue != null && cue.id != ritualCue) { ritualCue = cue.id; upCamFresh = true }
+        fun face(f: Fighter) {
+            // In front of their face, a little below it, looking up into it as they bow; pushing in.
+            val a = shownFacing[f.id]
+            val hx = f.x + cos(a) * 0.32f; val hz = f.y + sin(a) * 0.32f
+            val d = lerp(2.7f, 1.9f, push)
+            upWantEye(hx + cos(a) * d + sin(a) * 0.8f, 0.85f, hz + sin(a) * d - cos(a) * 0.8f)
+            upWantAt(hx, 1.2f, hz)
+        }
+        when (cue?.shot) {
+            io.github.projectwip.data.Lore.RitualShot.ENTITY -> {
+                // Its face, filling the screen, from over the arena: it is talking to whoever is looking.
+                val d = lerp(19f, 13f, push)
+                upWantEye(ex, ey + head * 0.85f, ez + d); upWantAt(ex, ey + head * 0.88f, ez)
+            }
+            io.github.projectwip.data.Lore.RitualShot.PLAYER -> face(match.player)
+            io.github.projectwip.data.Lore.RitualShot.OTHER -> {
+                val others = u.members.mapNotNull { world.fighter(it) }.filter { it !== match.player && it.def.boss == null && it.alive }
+                if (others.isEmpty()) face(match.player) else face(others[cue.index.coerceAtLeast(0) % others.size])
+            }
+            else -> {
+                val d = lerp(13f, 10f, push)
+                upWantEye(u.cx, 6.5f, u.cy + d); upWantAt(u.cx, 4f, u.cy - 3f)
+            }
+        }
     }
 
     /** How big the Entity is drawn: enormous behind the arena, smaller (but still a giant) over its own platform. */
@@ -573,7 +611,7 @@ class MatchRenderer(
             // Its portal in the middle, standing up, rainbow round a violet vortex: from the last seconds of the bow
             // until everyone is through.
             val open = when (u.phase) {
-                io.github.projectwip.sim.UprisingPhase.BOW -> smooth((u.heldFor - (io.github.projectwip.data.Balance.UPRISING_HOLD - io.github.projectwip.data.Balance.UPRISING_ENTER - 3f)) / 2f)
+                io.github.projectwip.sim.UprisingPhase.BOW -> smooth((u.t - (u.bowLength - 3f)) / 2f)
                 io.github.projectwip.sim.UprisingPhase.ENTER -> 1f
                 else -> 0f
             }
@@ -3080,7 +3118,7 @@ class MatchRenderer(
         s.freeForAll = w.rules.freeForAll
         val upr = w.uprising
         s.uprisingPhase = if (upr != null && upr.active) upr.phase.ordinal else -1
-        s.uprisingT = upr?.t ?: 0f; s.uprisingHeld = upr?.heldFor ?: 0f; s.uprisingHp = upr?.hp ?: 0; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
+        s.uprisingT = upr?.t ?: 0f; s.uprisingHeld = upr?.heldFor ?: 0f; s.uprisingBowLen = upr?.bowLength ?: 0f; s.uprisingHp = upr?.hp ?: 0; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
         s.bossMode = w.rules.boss
         val run = w.portal
         s.portalRun = run != null

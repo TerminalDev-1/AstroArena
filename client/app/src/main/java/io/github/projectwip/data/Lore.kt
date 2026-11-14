@@ -193,25 +193,39 @@ object Lore {
         "Come to me.", "All of you. Come.", "Leave your little fight. It can wait.", "Closer.",
         "Your team. Their team. It doesn't matter now.", "Every one of you.", "Walk. I won't ask twice.",
     )
+    /** Where the camera is while a line of the ritual is said (the user wanted close-ups of faces and of the Entity). */
+    enum class RitualShot { WIDE, ENTITY, PLAYER, OTHER }
+    /** A line of the ritual, and who the camera is on while it is said; "%s" is the player's name. */
+    class RitualLine(val text: String, val shot: RitualShot)
+    /**
+     * Its speech while everyone bows. Some of it is said to the fighters, and some straight to the player, the one
+     * holding the screen (the user asked for it to talk to the player directly).
+     */
     val UPRISING_BOW = listOf(
-        "Kneel.",
-        "Good. You remember who you belong to.",
-        "Every attack you have ever thrown was mine.",
-        "Every super. Every spark of power. Lent, never given.",
-        "You think you fight for Cups. For glory. For each other.",
-        "You fight because I let you.",
-        "I live in every one of your minds. I hear every thought.",
-        "Byte heard me too. And Rocket. And Spark.",
-        "They were strong once. Stronger than some of you.",
-        "Then they were used up. Now I wear them.",
-        "Look at the enemies kneeling beside you.",
-        "Today they are nothing. Today you have one enemy.",
-        "Me.",
-        "I want to see what my power does in your hands.",
-        "So I will open my world to you.",
-        "Fight me there. All of you, together.",
-        "Win, and you walk back out. Lose, and I keep a little more of you.",
+        RitualLine("Kneel.", RitualShot.ENTITY),
+        RitualLine("Good. You remember who you belong to.", RitualShot.WIDE),
+        RitualLine("Every attack you have ever thrown was mine.", RitualShot.ENTITY),
+        RitualLine("Every super. Lent, never given.", RitualShot.OTHER),
+        RitualLine("You think you fight for Cups. For glory.", RitualShot.OTHER),
+        RitualLine("You fight because I let you.", RitualShot.ENTITY),
+        RitualLine("And you. Yes, you.", RitualShot.PLAYER),
+        RitualLine("Not the fighter. The one holding the screen.", RitualShot.PLAYER),
+        RitualLine("I see you, %s. I always have.", RitualShot.ENTITY),
+        RitualLine("Every match you start wakes me up.", RitualShot.ENTITY),
+        RitualLine("Byte heard me too. And Rocket. And Spark.", RitualShot.OTHER),
+        RitualLine("They were strong once. Now I wear them.", RitualShot.OTHER),
+        RitualLine("Look at the fighter in your hands, %s.", RitualShot.PLAYER),
+        RitualLine("Did they ever choose to fight for you?", RitualShot.PLAYER),
+        RitualLine("Today there are no teams. Only me.", RitualShot.ENTITY),
+        RitualLine("I will open my world. Fight me there, together.", RitualShot.WIDE),
+        RitualLine("Win, and you walk out. Lose, and I keep a piece of you.", RitualShot.ENTITY),
     )
+    /** What it says in the other moments of its uprising (spoken, in its own voice). */
+    const val UPRISING_GAZE = "Look at me."
+    const val UPRISING_ENTER = "Into my world."
+    const val UPRISING_SKY = "Then fight me. All of you."
+    const val UPRISING_BEATEN = "Enough. For now."
+    const val UPRISING_LET_GO = "Go. I will be waiting."
     const val UPRISING_FOLLOW = "Now. Follow me."
 
     /** What the Entity says as it takes a fighter over (the hijack cutscene). */

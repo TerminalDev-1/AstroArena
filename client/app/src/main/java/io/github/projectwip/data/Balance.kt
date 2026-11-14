@@ -220,8 +220,13 @@ enum class VoiceStyle(val locale: String, val pitch: Float, val rate: Float) {
     PLAIN("en-US", 0.8f, 1.1f),
     /** Buddy: a machine reading its own log. Flat, deep and unhurried. */
     MACHINE("en-GB", 0.42f, 0.86f),
-    /** The Void, in Portal Run: as deep and slow as a voice will go, from somewhere a long way down. */
-    VOID("en-GB", 0.3f, 0.62f),
+    /**
+     * The Entity (the Void in the code): as deep as a voice will go, from somewhere a long way down, and slow, but not so
+     * slow that its speech in the uprising can't be said in the time it has.
+     */
+    VOID("en-GB", 0.3f, 0.92f),
+    /** Swish, in the opening (the one time she speaks): light and quick, a little breathless. */
+    STORM("en-US", 1.3f, 1.02f),
 }
 
 /** The moments a fighter with a voice speaks up. */
@@ -366,6 +371,11 @@ object Balance {
     /** It holds everyone for this long in all (the user: "at least a minute") before they go through its portal. */
     const val UPRISING_HOLD = 60f
     const val UPRISING_ENTER = 4f
+    /**
+     * The bow lasts at least this long, however long the walk took: long enough for the Entity's whole speech in its
+     * own voice, with the camera on each face it speaks to (`match/UprisingScript`).
+     */
+    const val UPRISING_BOW = 72f
     /** The longest the fight in its dimension lasts: then it lets them go, beaten or not. */
     const val UPRISING_SKY = 60f
     const val UPRISING_RETURN = 1.5f

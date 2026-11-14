@@ -99,6 +99,7 @@ class SaveStore(context: Context, name: String = "save.json") {
                 put("showFps", st.showFps)
                 put("playerName", st.playerName)
                 put("nameChosen", st.nameChosen)
+                put("introSeen", st.introSeen)
                 put("serverUrl", st.serverUrl)
                 put("attackStickMode", st.attackStickMode.name)
                 put("debugLuck", st.debugLuck.toDouble())
@@ -146,6 +147,8 @@ class SaveStore(context: Context, name: String = "save.json") {
                 showFps = so.optBoolean("showFps", sd.showFps),
                 playerName = so.optString("playerName", sd.playerName).take(16).ifBlank { sd.playerName },
                 nameChosen = so.optBoolean("nameChosen", false),
+                // (Players from before the opening existed have seen the game already: only new ones get it.)
+                introSeen = so.optBoolean("introSeen", so.optBoolean("nameChosen", false)),
                 serverUrl = so.optString("serverUrl", "").take(120),
                 attackStickMode = enumOr(so.optString("attackStickMode"), sd.attackStickMode),
                 debugLuck = so.optDouble("debugLuck", 0.0).toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, SparkCapsules.MAX_LUCK) },

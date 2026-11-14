@@ -240,7 +240,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
 
     // Lobby music plays in the menus and makes way for the match.
     // Music: silence while loading and in matches, its own theme on the result screen, the lobby loop elsewhere.
-    val wantedTrack = when (val s = screen) {
+    // The opening a new player sees once (`--es screen intro` shows it any time).
+    var showIntro by remember { mutableStateOf(startScreen == "intro") }
+    LaunchedEffect(booting, needsName, save.settings.introSeen) {
+        if (!booting && !needsName && !save.settings.introSeen) showIntro = true
+    }
+    val wantedTrack = if (showIntro) null else when (val s = screen) {
         is Screen.Match -> null
         is Screen.Result -> if (s.summary.report.outcome == io.github.projectwip.data.MatchOutcome.VICTORY) io.github.projectwip.audio.Track.VICTORY else io.github.projectwip.audio.Track.DEFEAT
         else -> io.github.projectwip.audio.Track.LOBBY
@@ -409,6 +414,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             if (needsName) io.github.projectwip.ui.screens.NameScreen { name ->
                 repo.updateSettings { it.copy(playerName = name, nameChosen = true) }
                 needsName = false
+            }
+            if (showIntro && !booting && !needsName) io.github.projectwip.ui.screens.IntroCutscene(sfx) {
+                showIntro = false
+                repo.updateSettings { it.copy(introSeen = true) }
             }
         }
     }

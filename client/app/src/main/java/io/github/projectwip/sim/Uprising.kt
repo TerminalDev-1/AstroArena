@@ -37,6 +37,8 @@ class Uprising(
     var phase = UprisingPhase.WAITING
     /** Seconds in the current phase. */
     var t = 0f
+    /** How long the bow lasts, settled as it begins (see [io.github.projectwip.data.Balance.UPRISING_BOW]). */
+    var bowLength = 0f
     /** Seconds the Entity has held everyone (gaze, march, bow and portal together). */
     var heldFor = 0f
     /** Where everyone gathers (the middle of the arena), and where its portal opens. */

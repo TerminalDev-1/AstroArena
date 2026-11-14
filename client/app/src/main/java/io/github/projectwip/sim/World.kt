@@ -284,12 +284,13 @@ class World(
                 }
                 if (all || u.t >= Balance.UPRISING_MARCH) {
                     for (id in u.members) fighter(id)?.let { f -> f.x = u.slotX.getValue(id); f.y = u.slotY.getValue(id) }
+                    u.bowLength = maxOf(Balance.UPRISING_BOW, Balance.UPRISING_HOLD - Balance.UPRISING_ENTER - u.heldFor)
                     uprisingPhase(u, UprisingPhase.BOW)
                 }
             }
             UprisingPhase.BOW -> {
                 for (id in u.members) fighter(id)?.let { f -> f.vx = 0f; f.vy = 0f; f.facing = atan2(u.cy - f.y, u.cx - f.x) }
-                if (u.heldFor >= Balance.UPRISING_HOLD - Balance.UPRISING_ENTER) uprisingPhase(u, UprisingPhase.ENTER)
+                if (u.t >= u.bowLength) uprisingPhase(u, UprisingPhase.ENTER)
             }
             UprisingPhase.ENTER -> {
                 for (id in u.members) fighter(id)?.let { f -> walkTo(f, u.cx, u.cy, dt, drag = true) }

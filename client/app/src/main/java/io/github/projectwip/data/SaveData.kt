@@ -42,6 +42,8 @@ data class Settings(
     val playerName: String = "Player",
     /** The player has picked their name (new players are asked before their account is made). */
     val nameChosen: Boolean = false,
+    /** The opening (Swish taken by the Entity) has been seen: a new player sees it once, the first time they open the game. */
+    val introSeen: Boolean = false,
     val controlLayout: ControlLayout = ControlLayout(),
     /** Address of the game server, e.g. http://192.168.1.103:8765. Blank = the address this build was made with. */
     val serverUrl: String = "",

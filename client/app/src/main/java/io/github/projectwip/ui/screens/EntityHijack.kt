@@ -69,6 +69,8 @@ fun EntityHijack(fighter: FighterId, skin: Int, index: Int, sfx: Sfx?, onDone: (
     var done by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         sfx?.play(Sound.VOID)
+        // Its line, in its own voice (the user: it had words but no voice).
+        sfx?.say(line, io.github.projectwip.data.VoiceStyle.VOID, force = true)
         // (No glitch blip as it takes hold, or when the Entity flickers into another soul: the user hated it.)
         kotlinx.coroutines.delay((BURST * 1000).toLong())
         if (!done) sfx?.play(Sound.WHOOSH)

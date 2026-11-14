@@ -81,6 +81,7 @@ class Sfx(private val context: Context) {
     private var tts: android.speech.tts.TextToSpeech? = null
     @Volatile private var ttsReady = false
     private var lastSaid = 0L
+    @Volatile private var spokenAt = 0L
 
     /** Wakes the speech engine up, so the first line isn't lost. A device without one simply stays silent. */
     fun loadVoice() {
@@ -88,24 +89,33 @@ class Sfx(private val context: Context) {
         tts = android.speech.tts.TextToSpeech(context.applicationContext) { status ->
             val t = tts
             if (status != android.speech.tts.TextToSpeech.SUCCESS || t == null) return@TextToSpeech
+            // (How long each line really takes to say, in the log: the Entity's script gives each line its time.)
+            t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                override fun onStart(id: String) { spokenAt = android.os.SystemClock.uptimeMillis() }
+                override fun onDone(id: String) { android.util.Log.i("Voice", "said in ${android.os.SystemClock.uptimeMillis() - spokenAt} ms: $id") }
+                override fun onStop(id: String, interrupted: Boolean) { android.util.Log.i("Voice", "cut off after ${android.os.SystemClock.uptimeMillis() - spokenAt} ms: $id") }
+                @Deprecated("Deprecated in Java") override fun onError(id: String) {}
+            })
             ttsReady = true
         }
     }
 
     /** Says a line out loud in [style]'s voice, unless one was said a moment ago. */
-    fun say(line: String, style: io.github.projectwip.data.VoiceStyle = io.github.projectwip.data.VoiceStyle.PLAIN) {
+    fun say(line: String, style: io.github.projectwip.data.VoiceStyle = io.github.projectwip.data.VoiceStyle.PLAIN, force: Boolean = false, loudness: Float = 1f, queue: Boolean = false) {
         val t = tts ?: return
         val now = android.os.SystemClock.uptimeMillis()
-        if (!ttsReady || volume <= 0f || now - lastSaid < 2200) return
+        // (A fighter's lines wait a moment between them; the Entity's script says each line when its time comes.)
+        if (!ttsReady || volume <= 0f || (!force && now - lastSaid < 2200)) return
         lastSaid = now
-        val params = android.os.Bundle().apply { putFloat(android.speech.tts.TextToSpeech.Engine.KEY_PARAM_VOLUME, volume.coerceIn(0f, 1f)) }
+        val params = android.os.Bundle().apply { putFloat(android.speech.tts.TextToSpeech.Engine.KEY_PARAM_VOLUME, (volume * loudness).coerceIn(0f, 1f)) }
         try {
             // Each voice has an accent, a pitch and a pace of its own. An accent the device doesn't have falls back to plain English.
             val locale = java.util.Locale.forLanguageTag(style.locale)
             t.language = if (t.isLanguageAvailable(locale) >= android.speech.tts.TextToSpeech.LANG_AVAILABLE) locale else java.util.Locale.US
             t.setPitch(style.pitch)
             t.setSpeechRate(style.rate)
-            t.speak(line, android.speech.tts.TextToSpeech.QUEUE_FLUSH, params, "line")
+            // (A cutscene queues its lines: switching voices takes the engine a moment, and a line must never cut the last off.)
+            t.speak(line, if (queue) android.speech.tts.TextToSpeech.QUEUE_ADD else android.speech.tts.TextToSpeech.QUEUE_FLUSH, params, line.take(40))
         } catch (_: Exception) {
         }
     }

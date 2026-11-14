@@ -80,7 +80,24 @@ class MatchRunner(
         private set
 
     /** Advances the simulation. Returns the interpolation alpha for rendering. */
+    /** The last line of the Entity's uprising said out loud. */
+    private var lastEntityCue = -1
+
+    /** Says the Entity's line out loud the moment its uprising moves on to a new one (its voice; the HUD shows the words). */
+    private fun speakUprising() {
+        val u = match.world.uprising ?: return
+        if (!u.active) { lastEntityCue = -1; return }
+        val cue = UprisingScript.cue(u.phase, u.t, u.bowLength, u.beaten, match.player.name) ?: return
+        if (cue.id == lastEntityCue) return
+        lastEntityCue = cue.id
+        sfx.say(cue.text, io.github.projectwip.data.VoiceStyle.VOID, force = true)
+    }
+
+    /** The Entity says [line] in its own voice (its whispers; [soft] for those). */
+    fun entitySays(line: String, soft: Boolean = false) = sfx.say(line, io.github.projectwip.data.VoiceStyle.VOID, force = true, loudness = if (soft) 0.55f else 1f)
+
     fun update(dt: Float): Float {
+        speakUprising()
         frameEvents.clear()
         if (paused) { controls.poll(input); return 1f }
         acc = acc.coerceAtMost(0.25f)

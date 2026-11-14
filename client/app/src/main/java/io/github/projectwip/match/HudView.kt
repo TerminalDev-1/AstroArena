@@ -84,14 +84,16 @@ class HudView(
             }
         }
 
-        drawOverheads(c)
+        // (While the Entity holds everyone, its ritual is a cutscene: no names over heads, no buttons in the shot.)
+        val held = snap.uprisingPhase in io.github.projectwip.sim.UprisingPhase.GAZE.ordinal..io.github.projectwip.sim.UprisingPhase.ENTER.ordinal
+        if (!held) drawOverheads(c)
         drawFloaters(c, dt)
         drawWhisper(c, dt)
         drawPossessed(c)
         drawUprising(c)
         if (snap.portalRun) drawDimension(c)
         drawHud(c, dt)
-        if (snap.phase != Phase.ENDED) controls.draw(c, snap.ammo, snap.ammoMax, snap.superCharge, snap.hyperCharge, snap.hyperLeft, snap.playerAlive && snap.phase == Phase.PLAYING, time)
+        if (snap.phase != Phase.ENDED && !held) controls.draw(c, snap.ammo, snap.ammoMax, snap.superCharge, snap.hyperCharge, snap.hyperLeft, snap.playerAlive && snap.phase == Phase.PLAYING, time)
         drawCoach(c)
     }
 
@@ -204,8 +206,10 @@ class HudView(
         nextWhisper -= dt
         if ((usedSuper || usedHyper) && (whisper == null || whisperAge > 2.5f)) {
             whisper = io.github.projectwip.data.Lore.powerWhisper(whispers++); whisperAge = 0f; nextWhisper = maxOf(nextWhisper, 18f)
+            whisper?.let { runner.entitySays(it, soft = true) }
         } else if (nextWhisper <= 0f) {
             whisper = io.github.projectwip.data.Lore.whisper(whispers++); whisperAge = 0f; nextWhisper = 30f + rng.nextFloat() * 30f
+            whisper?.let { runner.entitySays(it, soft = true) }
         }
         val line = whisper ?: return
         whisperAge += dt
@@ -282,26 +286,12 @@ class HudView(
         when (phase) {
             io.github.projectwip.sim.UprisingPhase.GAZE -> if (t > 1.5f)
                 entityPlate(c, glitchText("THE ENTITY RISES", if ((time * 8f).toInt() % 4 == 0) 1f else 0f), "IT IS LOOKING AT EVERY ONE OF YOU", w / 2, h * 0.22f, minOf(1f, (t - 1.5f) / 0.4f))
-            io.github.projectwip.sim.UprisingPhase.MARCH -> {
-                val k = (t / 3f).toInt()
-                val lines = io.github.projectwip.data.Lore.UPRISING_CALL
-                entityPlate(c, lines[k % lines.size], null, w / 2, h * 0.22f, minOf(1f, (t - k * 3f) / 0.3f))
-            }
-            io.github.projectwip.sim.UprisingPhase.BOW -> {
-                // Its speech, spread over the whole bow (however long the walk took), with "Follow me" kept for the
-                // last seconds, as its portal opens.
-                val bal = io.github.projectwip.data.Balance
-                val total = bal.UPRISING_HOLD - bal.UPRISING_ENTER - (s.uprisingHeld - t)
-                val follow = 3.5f
-                val lines = io.github.projectwip.data.Lore.UPRISING_BOW
-                if (t >= total - follow) {
-                    val since = t - (total - follow)
-                    entityPlate(c, io.github.projectwip.data.Lore.UPRISING_FOLLOW, null, w / 2, h * 0.22f, minOf(1f, since / 0.3f))
-                } else {
-                    val per = ((total - follow) / lines.size).coerceIn(2.2f, 4f)
-                    val k = minOf((t / per).toInt(), lines.size - 1)
-                    entityPlate(c, lines[k], if (k == 0) "EVERYONE BOWS TO THE ENTITY" else null, w / 2, h * 0.22f, minOf(1f, (t - k * per) / 0.3f))
-                }
+            io.github.projectwip.sim.UprisingPhase.MARCH, io.github.projectwip.sim.UprisingPhase.BOW -> {
+                // Its words (the same script its voice and the camera follow): low on the screen in a close-up, so the
+                // face it is on stays clear.
+                val cue = UprisingScript.cue(phase, t, s.uprisingBowLen, s.uprisingBeaten, runner.match.player.name) ?: return
+                val close = cue.shot != io.github.projectwip.data.Lore.RitualShot.WIDE
+                entityPlate(c, cue.text, cue.sub, w / 2, if (close) h * 0.8f else h * 0.22f, minOf(1f, cue.since / 0.3f))
             }
             io.github.projectwip.sim.UprisingPhase.ENTER -> entityPlate(c, "Into my world.", "THROUGH THE PORTAL", w / 2, h * 0.22f, fade(4f))
             io.github.projectwip.sim.UprisingPhase.SKY -> {
