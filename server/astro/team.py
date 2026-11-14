@@ -1,4 +1,4 @@
-"""Teams: two or three real players in one match, in Boss Mode or Knockout Rush (3v3).
+"""Teams: two or three real players in one match against the Entity (Boss Mode in the code).
 
 A team is made by one player, who is given a short code; friends type the code in to join, and the one who made
 it presses Play. They then share one match the way a 1v1's two players do (duel.py): every device runs the same
@@ -44,7 +44,7 @@ from .economy import Refused
 FRAME_BYTES = 17
 CHECK_BYTES = 8
 MAX_FRAMES = 60 * 60 * 20
-MODES = ("BOSS", "KNOCKOUT_RUSH")
+MODES = ("BOSS",)
 MAX_PLAYERS = 3
 
 
@@ -85,9 +85,8 @@ class TeamLobby:
             if action == "create":
                 mode = str(hello.get("mode") or "").upper()
                 if mode not in MODES:
-                    return "Teams play Boss Mode or Knockout Rush."
-                boss = str(hello.get("boss") or "").upper()
-                boss = boss if mode == "BOSS" and boss in rules.BOSSES else ""
+                    return "Teams fight the Entity."
+                boss = ""  # (no bosses to choose: the team fights the Entity)
                 code = next(c for c in iter(lambda: "%04d" % self._random.randrange(10000), None) if c not in self._teams)
                 team = self._teams[code] = _Team(code, mode, boss, me.version)
             else:
@@ -125,7 +124,7 @@ class TeamLobby:
             store = self.game.store
             team.difficulty = self.game.difficulty(store.player(me.player_id))
             team.bots = self.game.config.bots().get(team.difficulty, {})
-            bots = 2 * 3 - len(team.members) if team.mode == "KNOCKOUT_RUSH" else 0
+            bots = 3 - len(team.members)  # (bots make up a team of three against the Entity)
             now = time.monotonic()
             for seat in team.members:
                 seat.frames, seat.record, seat.gone, seat.heard = 0, bytearray(), False, now

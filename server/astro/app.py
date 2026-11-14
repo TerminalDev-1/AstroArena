@@ -403,9 +403,8 @@ def make_handler(game: Game, quiet: bool = False):
             # The difficulty is the one the player picked earlier and the server approved, not whatever this request says;
             # the fighter's level is the server's; and the bots behave as bots.cfg says right now.
             difficulty = game.difficulty(player)
-            # Boss Mode: which boss to fight is the player's to choose. Anything else means "let the seed pick".
-            boss = str(data.get("boss") or "").upper()
-            boss = boss if mode == "BOSS" and boss in rules.BOSSES else ""
+            # (There are no bosses to choose any more: Boss Mode is the Entity's fight.)
+            boss = ""
             try:
                 plan = game.store.plan_match(
                     player["id"], mode, str(data.get("fighter") or "BYTE"), difficulty, rules.MODES[mode], game.config.bots().get(difficulty, {}), boss

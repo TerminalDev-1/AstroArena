@@ -206,45 +206,40 @@ class EconomyTest {
 
     @Test fun cupsFollowTheModesTable() {
         val c = Trophies::cupDelta
-        // Last Spark pays by place and nothing else.
-        assertEquals(25, c(GameMode.LAST_SPARK, MatchOutcome.VICTORY, 1, 0, false))
-        assertEquals(3, c(GameMode.LAST_SPARK, MatchOutcome.DEFEAT, 8, 500, false))
-        assertEquals(0, c(GameMode.LAST_SPARK, MatchOutcome.DEFEAT, 10, 500, false))
-        // Knockout Rush: a win, an MVP bonus, a draw, and a defeat that costs 1 Cup per 80 held, up to 6.
-        assertEquals(8, c(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, 0, 0, false))
-        assertEquals(10, c(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, 0, 0, true))
-        assertEquals(1, c(GameMode.KNOCKOUT_RUSH, MatchOutcome.DRAW, 0, 0, false))
-        assertEquals("beginners lose nothing", 0, c(GameMode.KNOCKOUT_RUSH, MatchOutcome.DEFEAT, 0, 79, false))
-        assertEquals(-1, c(GameMode.KNOCKOUT_RUSH, MatchOutcome.DEFEAT, 0, 80, false))
-        assertEquals(-6, c(GameMode.KNOCKOUT_RUSH, MatchOutcome.DEFEAT, 0, 5000, false))
-        assertEquals(5, c(GameMode.BOSS, MatchOutcome.VICTORY, 0, 0, true))
-        assertEquals(0, c(GameMode.BOSS, MatchOutcome.DEFEAT, 0, 900, false))
+        // The Entity's fight (what Knockout Rush paid): a win, an MVP bonus, a draw, and a defeat that costs 1 Cup per 80 held, up to 6.
+        assertEquals(8, c(GameMode.BOSS, MatchOutcome.VICTORY, 0, 0, false))
+        assertEquals(10, c(GameMode.BOSS, MatchOutcome.VICTORY, 0, 0, true))
+        assertEquals(1, c(GameMode.BOSS, MatchOutcome.DRAW, 0, 0, false))
+        assertEquals("beginners lose nothing", 0, c(GameMode.BOSS, MatchOutcome.DEFEAT, 0, 79, false))
+        assertEquals(-1, c(GameMode.BOSS, MatchOutcome.DEFEAT, 0, 80, false))
+        assertEquals(-6, c(GameMode.BOSS, MatchOutcome.DEFEAT, 0, 5000, false))
         assertEquals("the Training Area never pays", 0, c(GameMode.TRAINING, MatchOutcome.VICTORY, 0, 0, true))
+        assertEquals("a 1v1 is paid by the server's lobby alone", 0, c(GameMode.DUEL, MatchOutcome.VICTORY, 0, 0, true))
     }
 
     @Test fun matchPayDependsOnTheFinishAndTheBotDifficulty() {
         assertEquals(0, Economy.matchBolts(GameMode.TRAINING, MatchOutcome.VICTORY, 0, 5, BotDifficulty.ELITE))
-        assertEquals(32, Economy.matchBolts(GameMode.LAST_SPARK, MatchOutcome.VICTORY, 1, 6, BotDifficulty.EASY))   // (30 + 12) * 0.75, rounded up
-        assertEquals(28, Economy.matchBolts(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, 0, 2, BotDifficulty.NORMAL))
-        assertEquals("a defeat still pays, and the knockout bonus stops at six", 22, Economy.matchBolts(GameMode.KNOCKOUT_RUSH, MatchOutcome.DEFEAT, 0, 7, BotDifficulty.NORMAL))
-        assertEquals(10, Economy.firstWinPrisms(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, SaveData(), 5))
-        assertEquals(0, Economy.firstWinPrisms(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, SaveData(lastFirstWinDay = 5), 5))
-        assertEquals(0, Economy.firstWinPrisms(GameMode.BOSS, MatchOutcome.VICTORY, SaveData(), 5))
-        assertEquals(0, Economy.firstWinPrisms(GameMode.KNOCKOUT_RUSH, MatchOutcome.DEFEAT, SaveData(), 5))
-        assertEquals(6, Economy.matchCredits(GameMode.LAST_SPARK, MatchOutcome.DEFEAT, 4))
-        assertEquals(2, Economy.matchCredits(GameMode.LAST_SPARK, MatchOutcome.DEFEAT, 5))
-        assertEquals(1, Economy.matchCredits(GameMode.BOSS, MatchOutcome.DEFEAT, 0))
+        assertEquals(27, Economy.matchBolts(GameMode.DUEL, MatchOutcome.VICTORY, 0, 6, BotDifficulty.EASY))   // (24 + 12) * 0.75
+        assertEquals(28, Economy.matchBolts(GameMode.BOSS, MatchOutcome.VICTORY, 0, 2, BotDifficulty.NORMAL))
+        assertEquals("a defeat still pays, and the knockout bonus stops at six", 22, Economy.matchBolts(GameMode.BOSS, MatchOutcome.DEFEAT, 0, 7, BotDifficulty.NORMAL))
+        assertEquals(10, Economy.firstWinPrisms(GameMode.BOSS, MatchOutcome.VICTORY, SaveData(), 5))
+        assertEquals(0, Economy.firstWinPrisms(GameMode.BOSS, MatchOutcome.VICTORY, SaveData(lastFirstWinDay = 5), 5))
+        assertEquals(0, Economy.firstWinPrisms(GameMode.TRAINING, MatchOutcome.VICTORY, SaveData(), 5))
+        assertEquals(0, Economy.firstWinPrisms(GameMode.BOSS, MatchOutcome.DEFEAT, SaveData(), 5))
+        assertEquals(6, Economy.matchCredits(GameMode.BOSS, MatchOutcome.VICTORY, 0))
+        assertEquals(2, Economy.matchCredits(GameMode.DUEL, MatchOutcome.DEFEAT, 0))
+        assertEquals(0, Economy.matchCredits(GameMode.TRAINING, MatchOutcome.VICTORY, 0))
         // Arena Boxes were removed in 1.3: nothing earns one.
-        assertFalse(Economy.earnsDrop(GameMode.LAST_SPARK, MatchOutcome.DEFEAT, 4))
-        assertFalse(Economy.earnsDrop(GameMode.LAST_SPARK, MatchOutcome.VICTORY, 1))
-        assertFalse(Economy.earnsDrop(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, 0))
+        assertFalse(Economy.earnsDrop(GameMode.DUEL, MatchOutcome.DEFEAT, 4))
+        assertFalse(Economy.earnsDrop(GameMode.DUEL, MatchOutcome.VICTORY, 1))
+        assertFalse(Economy.earnsDrop(GameMode.BOSS, MatchOutcome.VICTORY, 0))
         assertFalse(Economy.earnsDrop(GameMode.BOSS, MatchOutcome.VICTORY, 0))
     }
 
     @Test fun settlingAMatchPaysEverythingAndTheSaveShowsIt() {
         val day = 50L
         val before = SaveData(cups = 100, bestCups = 100, capsules = 1)
-        val done = Economy.settleMatch(before, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, mvp = true), day)
+        val done = Economy.settleMatch(before, report(GameMode.BOSS, MatchOutcome.VICTORY, mvp = true), day)
         val v = done.value
         assertEquals(10, v.cupDelta)
         assertEquals(110, v.cups)
@@ -262,9 +257,9 @@ class EconomyTest {
         assertEquals(6, done.save.credits)
         assertEquals(10, done.save.progress(FighterId.BYTE).cups)
         // The same day's second win pays no first-win CPU Chips.
-        assertEquals(0, Economy.settleMatch(done.save, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY), day).value.firstWinPrisms)
+        assertEquals(0, Economy.settleMatch(done.save, report(GameMode.BOSS, MatchOutcome.VICTORY), day).value.firstWinPrisms)
         // Applying it: Cups and drops are taken on, and the Cup Track reward that was just reached shows up.
-        val (after, rewards) = Progression.applyMatch(done.save, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY, mvp = true), day, v)
+        val (after, rewards) = Progression.applyMatch(done.save, report(GameMode.BOSS, MatchOutcome.VICTORY, mvp = true), day, v)
         assertEquals(110, after.cups)
         assertEquals(110, after.bestCups)
         assertEquals(0, after.capsules)
@@ -278,13 +273,13 @@ class EconomyTest {
     @Test fun winsPayNoBoxesAndLosingNeverGoesBelowZero() {
         val day = 9L
         val held = SaveData(capsules = 2)
-        val won = Economy.settleMatch(held, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY), day)
+        val won = Economy.settleMatch(held, report(GameMode.BOSS, MatchOutcome.VICTORY), day)
         assertFalse(won.value.drop)
         assertEquals("boxes held before 1.3 are wiped", 0, won.value.drops)
-        assertFalse(Economy.settleMatch(held, report(GameMode.KNOCKOUT_RUSH, MatchOutcome.VICTORY), day + 1).value.drop)
-        val beginner = Economy.settleMatch(SaveData(cups = 3, bestCups = 3), report(GameMode.KNOCKOUT_RUSH, MatchOutcome.DEFEAT), day)
+        assertFalse(Economy.settleMatch(held, report(GameMode.BOSS, MatchOutcome.VICTORY), day + 1).value.drop)
+        val beginner = Economy.settleMatch(SaveData(cups = 3, bestCups = 3), report(GameMode.BOSS, MatchOutcome.DEFEAT), day)
         assertEquals("beginners lose nothing", 3 to 0, beginner.value.cups to beginner.value.cupDelta)
-        val veteran = Economy.settleMatch(SaveData(cups = 500, bestCups = 500), report(GameMode.KNOCKOUT_RUSH, MatchOutcome.DEFEAT), day)
+        val veteran = Economy.settleMatch(SaveData(cups = 500, bestCups = 500), report(GameMode.BOSS, MatchOutcome.DEFEAT), day)
         assertEquals(494 to -6, veteran.value.cups to veteran.value.cupDelta)
         assertEquals("a lost fighter's Cups follow the player's", 0, veteran.save.progress(FighterId.BYTE).cups)
     }

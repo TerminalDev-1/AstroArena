@@ -45,10 +45,8 @@ import io.github.projectwip.ui.Type
 data class PlayerLine(
     val name: String, val fighter: FighterId, val skin: Int, val team: Int,
     val kos: Int, val deaths: Int, val damage: Int, val isPlayer: Boolean, val isMvp: Boolean, val isBot: Boolean,
-    /** Free-for-all finishing place; 0 = still fighting when your match ended. */
+    /** (A finishing place: no mode is played for one now. Kept for the server's verdicts.) */
     val placement: Int = 0,
-    /** Set when this line is a Boss Mode boss rather than a fighter. */
-    val boss: io.github.projectwip.data.BossKind? = null,
 )
 
 data class MatchSummary(
@@ -68,13 +66,12 @@ data class MatchSummary(
 }
 
 fun summarize(match: Match, report: MatchReport): MatchSummary {
-    // Free-for-all: the star goes to the last fighter standing; team modes use the contribution score.
-    val mvp = if (match.freeForAll) match.world.fighters.firstOrNull { it.placement == 1 } else match.world.mvp()
+    val mvp = match.world.mvp()
     return MatchSummary(
         report,
         match.world.fighters.map {
             PlayerLine(it.name, it.def.id, it.skin, it.team, it.kos, it.deaths, it.damageDealt, it === match.player, it === mvp, it.isBot,
-                placement = if (it === match.player) report.placement else it.placement, boss = it.def.boss)
+                placement = if (it === match.player) report.placement else it.placement)
         },
         match.player.team,
         match.config.serverMatchId,
@@ -125,7 +122,7 @@ fun MatchScreen(
     var started by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         val plan = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            server?.planMatch(config.mode, config.playerFighter, config.playerLevel, config.difficulty, config.boss)
+            server?.planMatch(config.mode, config.playerFighter, config.playerLevel, config.difficulty)
         }
         val planned = if (plan == null) config
             else config.copy(
@@ -135,8 +132,8 @@ fun MatchScreen(
         match = Match(planned)
     }
     val ready = match
-    // Boss Mode and the Training Area have nobody to find: they go straight in.
-    val matchmade = config.mode == io.github.projectwip.data.GameMode.LAST_SPARK || config.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH
+    // Nothing has anybody to find now (the Entity's fight, the Training Area): they go straight in.
+    val matchmade = false
     if (ready != null && (started || !matchmade)) MatchBody(ready, settings, sfx, matchesPlayed, onFinish)
     else if (matchmade) Matchmaking(config, ready, onCancel) { started = true }
     else Box(Modifier.fillMaxSize().background(Color(0xFF241760)), contentAlignment = Alignment.Center) {
@@ -293,12 +290,6 @@ private fun MatchBody(
     var done by remember { mutableStateOf(false) }
     /** The line-up is showing; the match waits behind it. */
     var intro by remember { mutableStateOf(!match.practice) }
-    /** Dimension: the scene showing (portals entered when it began), or -1. The match is paused behind it. */
-    var scene by remember { mutableStateOf(-1) }
-    /** Dimension: the talk with the chained fighter showing (its dimension), or -1; and the last dimension talked in. */
-    var talk by remember { mutableStateOf(-1) }
-    var talkedIn by remember { mutableStateOf(0) }
-    var seenPortals by remember { mutableStateOf(match.world.portal?.entered ?: 0) }
     /** The Entity's hijack cutscene is showing (its comet has come down into the player); and how many there have been. */
     var hijacking by remember { mutableStateOf(false) }
     var hijacks by remember { mutableStateOf(0) }
@@ -306,21 +297,6 @@ private fun MatchBody(
         while (true) {
             androidx.compose.runtime.withFrameNanos { }
             if (!hijacking && view?.hijack == 2) hijacking = true
-        }
-    }
-    if (match.portalRun) androidx.compose.runtime.LaunchedEffect(Unit) {
-        while (true) {
-            androidx.compose.runtime.withFrameNanos { }
-            val entered = match.world.portal?.entered ?: 0
-            if (entered > seenPortals && scene < 0) { seenPortals = entered; scene = entered; view?.paused = true }
-            // Walking up to the chained fighter: the match pauses and they talk (once a dimension).
-            val run = match.world.portal
-            if (run != null && scene < 0 && talk < 0 && talkedIn != run.dimension && !paused && run.state == io.github.projectwip.sim.PortalState.EXPLORE) {
-                val p = match.player
-                if (p.alive && kotlin.math.hypot(p.x - run.captiveX, p.y - run.captiveY) < p.radius + io.github.projectwip.data.Balance.PORTAL_CAPTIVE_REACH) {
-                    talkedIn = run.dimension; talk = run.dimension; view?.paused = true
-                }
-            }
         }
     }
     val context = LocalContext.current
@@ -362,20 +338,17 @@ private fun MatchBody(
             },
             modifier = Modifier.fillMaxSize(),
         )
-        if (intro && match.portalRun) DimensionCutscene(match.world.portal?.entered ?: 0, match.config.playerFighter, match.config.playerSkin, sfx) { intro = false; view?.resumeGame() }
-        else if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
-        if (talk >= 0) CaptiveTalk(talk, match.config.playerFighter, match.config.playerSkin, io.github.projectwip.data.Balance.PORTAL_SHARDS - (match.world.portal?.found ?: 0), sfx) { talk = -1; view?.resumeGame() }
+        if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
         if (hijacking) EntityHijack(match.config.playerFighter, match.config.playerSkin, hijacks, sfx) {
             hijacking = false; hijacks++
             if (paused) view?.let { v -> v.endHijack(); v.paused = true } else view?.endHijack()
         }
-        if (scene >= 0) DimensionCutscene(scene, match.config.playerFighter, match.config.playerSkin, sfx) { scene = -1; view?.resumeGame() }
         if (paused && !done) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
                 Panel(cut = 20.dp) {
                     Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         GameText("PAUSED", Type.Display, outline = 4.dp)
-                        PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else if (team != null) "The match is still going: your team can't be paused. Leaving counts as a defeat for you, and they play on without you." else if (duel != null) "The match is still going: your opponent can't be paused. Leaving hands them the win, and costs you Cups." else if (match.portalRun) "The Entity will wait. Leaving now ends the run where it is." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
+                        PlainText(if (match.practice) "Nothing is at stake in the Training Area. Leave whenever you like." else if (team != null) "The match is still going: your team can't be paused. Leaving counts as a defeat for you, and they play on without you." else if (duel != null) "The match is still going: your opponent can't be paused. Leaving hands them the win, and costs you Cups." else "Bots wait for you. Leaving now counts as a defeat.", Type.Body, align = TextAlign.Center)
                         Spacer(Modifier.height(4.dp))
                         ChunkyButton({ paused = false; if (!shared) view?.resumeGame() }, Modifier.size(260.dp, 64.dp), ButtonStyle.GREEN) { GameText("RESUME", Type.Title) }
                         ChunkyButton({ finish(match.forfeit()) }, Modifier.size(260.dp, 54.dp), ButtonStyle.RED) {

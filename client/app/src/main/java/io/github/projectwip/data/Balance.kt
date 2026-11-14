@@ -45,8 +45,6 @@ enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
 enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH, STAR, ARROW }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
-enum class BossKind { BARRAGE, SWEEPER, STAMPEDE }
-
 /**
  * How rare a fighter is. Rarer fighters take more Credits on the Spark Road ([roadCost]; the server's own table
  * in `economy.py` is the one that counts). Swish, the fighter everyone starts with, is the Starter: free, never on the road, and with no price.
@@ -182,8 +180,6 @@ data class FighterDef(
     val radius: Float = 0.42f,
     val skins: List<Skin>,
     val rarity: Rarity = Rarity.RARE,
-    /** Set for a Boss Mode boss: which one it is. Null for every fighter. */
-    val boss: BossKind? = null,
     /** What this fighter's own hyper adds to the buffs every hyper gives. Null: the plain hyper. */
     val hyper: HyperSpec? = null,
     /** What the fighter says, and when. Empty for a fighter without a voice. */
@@ -241,21 +237,18 @@ enum class BotDifficulty(val label: String, val blurb: String, val boltMultiplie
 
 enum class MatchOutcome { VICTORY, DEFEAT, DRAW }
 
-/** Game modes. Names and rules are original to this game. */
+/**
+ * Game modes. Names and rules are original to this game. AstroArena is a boss-fight game about the Entity (the
+ * user's direction, build 111): Knockout Rush, Last Spark and Dimension were removed, and Boss Mode is the fight
+ * against the Entity itself, its ritual first.
+ */
 enum class GameMode(val title: String, val tagline: String, val players: Int) {
-    LAST_SPARK("Last Spark", "10-fighter free-for-all · last one standing", 10),
-    KNOCKOUT_RUSH("Knockout Rush", "3v3 · first team to 10 KOs", 6),
-    /** You against one giant, with as many lives as it takes. */
-    BOSS("Boss Mode", "You against a boss · unlimited lives", 2),
-    /** Practice: dummies, a swarm and a boss that just stand there, plus one sentry gun. No timer, nothing won or lost. */
-    TRAINING("Training Area", "Dummies, a swarm, a sentry and a boss · no stakes", 19),
-    /** One real player against another, each on their own device. Nothing is earned in it yet. */
+    /** Your team against the Entity: its ritual, then its world. */
+    BOSS("The Entity", "Your team against the Entity · its ritual, then its world", 3),
+    /** Practice: dummies, a swarm and a giant that just stand there, plus one sentry gun. No timer, nothing won or lost. */
+    TRAINING("Training Area", "Dummies, a swarm, a sentry and a giant · no stakes", 19),
+    /** One real player against another, each on their own device. */
     DUEL("1v1", "You against one real player · first to 3 knockouts", 2),
-    /**
-     * Dimension (1.0, the user's idea; a lore mode since build 104): in each dimension a fighter is chained up; find
-     * the echoes to break the chains, and a portal opens into a stranger one. It goes on forever. Nothing is won.
-     */
-    PORTAL("Dimension", "The Entity's world · free the chained · go deeper, forever", 1),
 }
 
 object Balance {
@@ -395,6 +388,17 @@ object Balance {
     const val UPRISING_STRIKE_RADIUS = 1.4f
     const val UPRISING_STRIKE_DELAY = 1.3f
     const val UPRISING_STRIKE_DAMAGE = 900
+    /** Boss Mode (the Entity's fight): it begins this soon, lasts at most this long, is this much tougher, and hits this much harder. */
+    const val UPRISING_BOSS_START = 1.5f
+    const val UPRISING_BOSS_SECONDS = 210f
+    const val UPRISING_BOSS_HP = 1.6f
+    const val UPRISING_BOSS_DAMAGE = 2f
+    /** Its corruption flares: they follow their target this long, then come down this much later, over this circle. */
+    const val FLARE_LOCK = 1.6f
+    const val FLARE_FALL = 0.55f
+    const val FLARE_RADIUS = 1.15f
+    /** A fighter caught under one fights for the Entity, against its own side, for this long. */
+    const val CORRUPT_SECONDS = 6f
     /** A tornado sets her down at least this far clear of anyone (past both their edges), so nobody hides her. */
     const val TEMPEST_LANDING_GAP = 0.6f
     /** ...and each of its hits charges the super by only this share of a normal hit, so a tempest doesn't pay for the next one. */
@@ -709,40 +713,12 @@ object Balance {
 
     fun fighter(id: FighterId): FighterDef = fighters.first { it.id == id }
 
-    // ---- Boss Mode ----
-    /**
-     * A Boss Mode boss. Two and a half times a fighter's size with a mountain of health; its stats are fixed and
-     * never follow the player's level. What it does in a fight is in `sim/Boss.kt`: the attack and super lines
-     * here only tell the bot brain how far to stand off, and set the speed and damage of a charge.
-     */
-    private fun bossDef(kind: BossKind, name: String, title: String, lore: String, health: Int, speed: Float, standOff: Float, skin: Skin) = FighterDef(
-        id = FighterId.BYTE, rarity = Rarity.STARTER, boss = kind,
-        name = name, title = title, role = "Boss", lore = lore, attackName = "",
-        health = StatLine(health, 0), attackDamage = StatLine(500, 0), superDamage = StatLine(1190, 0),
-        moveSpeed = speed,
-        attack = AttackSpec(AttackShape.SPREAD, projectiles = 5, spreadDegrees = 30f, range = standOff, speed = 14f, radius = 0.24f, burstInterval = 0f),
-        superSpec = SuperSpec(SuperKind.RAM, "Charge", "", range = 7f, speed = 12.5f, radius = 0.9f),
-        ammoMax = 3, reloadSeconds = 1.5f, superChargePerHit = 0f,
-        radius = spark.radius * 2.5f,
-        skins = listOf(skin),
-    )
-
-    val bosses: List<FighterDef> by lazy {
-        listOf(
-            bossDef(BossKind.BARRAGE, "Hailstorm", "Rocket Platform", "A walking launch pad. Whatever it points at is about to have a very bad few seconds.",
-                75000, 2.1f, 8f, Skin("Launch Grey", 0xFF6C7A89, 0xFFFF6A1F, 0xFFFFD23F, 0)),
-            bossDef(BossKind.SWEEPER, "Lighthouse", "Beam Sweeper", "Built to guide ships home. Nobody is sure who taught it to turn the light all the way up.",
-                65000, 2.3f, 7f, Skin("Harbour", 0xFFE8EEF5, 0xFF2EC4F1, 0xFFFF4FA3, 0)),
-            bossDef(BossKind.STAMPEDE, "Ramrod", "Wrecking Bull", "Head down, eyes shut, straight ahead. It has never once gone round anything.",
-                88000, 2.7f, 3f, Skin("Oxblood", 0xFF9B2D30, 0xFFE9D8A6, 0xFFFFC145, 0)),
-        )
-    }
-
-    fun boss(kind: BossKind): FighterDef = bosses.first { it.boss == kind }
-
     // ---- Training Area ----
     // (The dummies, swarm and sentry are made from Swish, the starter, and look like her, as the user asked.)
-    // Everything here is created at level 1 with flat stat lines, like the boss: it is a fixed yardstick.
+    // Everything here is created at level 1 with flat stat lines: it is a fixed yardstick.
+
+    /** The Training Area's giant: a dummy two and a half times the size, with a mountain of health (it stands where a boss stood). */
+    val giant: FighterDef by lazy { fighter(FighterId.BYTE).let { it.copy(name = "Giant", title = "Target", health = StatLine(75000, 0), radius = it.radius * 2.5f) } }
 
     /** A target dummy: never attacks, soaks up damage and regenerates like anyone else. */
     val dummy: FighterDef = fighter(FighterId.BYTE).let { it.copy(name = "Dummy", title = "Target", health = StatLine(8000, 0)) }

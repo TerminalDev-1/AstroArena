@@ -77,36 +77,34 @@ fun MatchIntro(match: Match, onDone: () -> Unit) {
             GameText(match.config.mode.title.uppercase(), Type.Display, color = Palette.Gold, outline = 4.dp)
             PlainText("${match.world.arena.name} · ${match.config.mode.tagline}", Type.Label, color = Palette.TextDim)
             Spacer(Modifier.height(10.dp))
-            if (match.freeForAll) {
-                // Everyone for themselves: two rows of five.
-                val rows = match.world.fighters.chunked(5)
-                Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    rows.forEachIndexed { r, row ->
-                        Row(
-                            Modifier.weight(1f).fillMaxWidth().graphicsLayer { translationX = (1f - slide.value) * size.width * if (r == 0) -1f else 1f },
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) { for (f in row) FighterCard(f, f === me, if (f === me) Palette.GreenDeep else Palette.RedDeep, Modifier.weight(1f), tall = true) }
-                    }
-                }
-            } else {
                 Row(Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TeamColumn(if (match.bossMode) "YOU" else "YOUR TEAM", match.world.fighters.filter { it.team == me.team }, me, Palette.CyanDeep, Palette.Ally,
+                    TeamColumn("YOUR TEAM", match.world.fighters.filter { it.team == me.team }, me, Palette.CyanDeep, Palette.Ally,
                         Modifier.weight(1f).graphicsLayer { translationX = -(1f - slide.value) * size.width * 1.2f })
                     Box(Modifier.width(if (ui.wide) 190.dp else 130.dp), contentAlignment = Alignment.Center) {
                         GameText("VS", Type.Display.copy(fontSize = Type.Display.fontSize * if (ui.roomy) 3f else 2.2f), color = Palette.Gold, outline = 7.dp,
                             modifier = Modifier.graphicsLayer { scaleX = vs.value; scaleY = vs.value; alpha = vsAlpha.value; rotationZ = -8f })
                     }
-                    TeamColumn(if (match.bossMode) "THE BOSS" else "OPPONENTS", match.world.fighters.filter { it.team != me.team }, me, Palette.RedDeep, Palette.Enemy,
+                    if (match.bossMode) EntityColumn(Modifier.weight(1f).graphicsLayer { translationX = (1f - slide.value) * size.width * 1.2f })
+                    else TeamColumn("OPPONENTS", match.world.fighters.filter { it.team != me.team }, me, Palette.RedDeep, Palette.Enemy,
                         Modifier.weight(1f).graphicsLayer { translationX = (1f - slide.value) * size.width * 1.2f })
                 }
-            }
             Spacer(Modifier.height(8.dp))
             PlainText(
-                if (match.freeForAll) "Last one standing wins"
-                else if (match.bossMode) "Knock out the boss. Watch the marked ground. You have unlimited lives"
+                if (match.bossMode) "Hit the shadow under it. Dodge its marks and its flares. Beat it before time runs out"
                 else "First team to ${match.world.rules.koTarget} knockouts wins",
                 Type.Label, color = Color.White,
             )
+        }
+    }
+}
+
+/** The other side in the Entity's fight: the Entity itself, glitching between the souls it carries. */
+@Composable
+private fun EntityColumn(modifier: Modifier) {
+    Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        GameText("THE ENTITY", Type.Title, color = Color(0xFFC9A6FF), outline = 3.dp)
+        Panel(Modifier.weight(1f).fillMaxWidth(), color = Color(0xFF3A2390), colorBottom = Palette.PanelDark, cut = 14.dp) {
+            io.github.projectwip.ui.SoulView(Modifier.fillMaxSize(), voidCycle = true)
         }
     }
 }
@@ -129,7 +127,7 @@ private fun FighterCard(f: Fighter, isMe: Boolean, plate: Color, modifier: Modif
             Column(Modifier.fillMaxSize().padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 FighterView(f.def, f.skin, Modifier.weight(1f).fillMaxWidth(), pedestal = false)
                 GameText(f.name, Type.Label, color = if (isMe) Palette.Gold else Color.White, outline = 2.dp)
-                PlainText(if (f.def.boss != null) "${f.def.title} · ${"%,d".format(f.maxHp)} HP" else "${f.def.name} · LV ${f.level}", Type.Small, color = Color.White, maxLines = 1)
+                PlainText("${f.def.name} · LV ${f.level}", Type.Small, color = Color.White, maxLines = 1)
             }
             return@Panel
         }

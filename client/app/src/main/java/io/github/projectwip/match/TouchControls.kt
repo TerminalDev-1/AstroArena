@@ -54,6 +54,8 @@ class TouchControls(private val density: Float) {
         var hyper = false
         var detonate = false
         var pause = false
+        /** SKIP the Entity's ritual. */
+        var skip = false
     }
 
     private val move = Stick()
@@ -86,6 +88,10 @@ class TouchControls(private val density: Float) {
     var detonateCx = 0f; private set
     var detonateCy = 0f; private set
     val pauseRect = RectF()
+    /** SKIP, while the Entity's ritual holds everyone (shown by the HUD, which sets [skipShown]). */
+    val skipRect = RectF()
+    @Volatile var skipShown = false
+    private var pendingSkip = false
 
     private var settings = Settings()
 
@@ -141,6 +147,7 @@ class TouchControls(private val density: Float) {
         detonateCy = (attackCy + attackRadius * 0.42f).coerceAtMost(height - detonateRadius * 1.25f)
         val ps = dp(46f)
         pauseRect.set(safeLeft + dp(16f), dp(14f), safeLeft + dp(16f) + ps, dp(14f) + ps)
+        skipRect.set(width - dp(24f) - dp(124f), dp(18f), width - dp(24f), dp(18f) + dp(46f))
     }
 
     @Synchronized
@@ -165,6 +172,7 @@ class TouchControls(private val density: Float) {
     private fun down(id: Int, x: Float, y: Float) {
         val pr = RectF(pauseRect).apply { inset(-dp(10f), -dp(10f)) }
         if (pr.contains(x, y)) { pendingPause = true; return }
+        if (skipShown && RectF(skipRect).apply { inset(-dp(10f), -dp(10f)) }.contains(x, y)) { pendingSkip = true; return }
 
         if (hyperReady && hypot(x - hyperCx, y - hyperCy) < hyperRadius * 1.4f) { pendingHyper = true; return }
         if (rocketsDown >= 0 && hypot(x - detonateCx, y - detonateCy) < detonateRadius * 1.3f) { pendingDetonate = true; return }
@@ -278,6 +286,8 @@ class TouchControls(private val density: Float) {
         out.hyper = pendingHyper
         out.detonate = pendingDetonate
         out.pause = pendingPause
+        out.skip = pendingSkip
+        pendingSkip = false
         pendingAttack = FireMode.NONE
         pendingSuper = FireMode.NONE
         pendingHyper = false

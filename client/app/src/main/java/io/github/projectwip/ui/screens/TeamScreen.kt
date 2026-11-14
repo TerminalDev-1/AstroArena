@@ -71,7 +71,7 @@ fun TeamScreen(save: SaveData, team: TeamLink?, setTeam: (TeamLink?) -> Unit, go
         problem = null
         scope.launch {
             val link = withContext(Dispatchers.IO) {
-                server.teamLink()?.takeIf { it.open(server.teamHello(save.selectedFighter, skin, action, mode, save.selectedBoss, code)) }
+                server.teamLink()?.takeIf { it.open(server.teamHello(save.selectedFighter, skin, action, mode, code)) }
             }
             busy = false
             if (link == null) problem = "The team lobby is on the game server, and it can't be reached right now."
@@ -157,8 +157,7 @@ fun TeamScreen(save: SaveData, team: TeamLink?, setTeam: (TeamLink?) -> Unit, go
                                 PlainText("You get a code for up to two friends to join with, and you start the matches.", Type.Small, color = Palette.Text, align = TextAlign.Center)
                                 Box(Modifier.weight(1f).fillMaxWidth()) { FighterView(fighter, skin, Modifier.fillMaxSize(), pedestal = false) }
                                 PlainText("You bring ${fighter.name}. Pick another fighter before you make or join a team.", Type.Small, color = Palette.Text, align = TextAlign.Center)
-                                ChunkyButton({ open("create", GameMode.BOSS) }, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.PURPLE, lip = 5.dp) { GameText("BOSS MODE", Type.Heading) }
-                                ChunkyButton({ open("create", GameMode.KNOCKOUT_RUSH) }, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.ORANGE, lip = 5.dp) { GameText("KNOCKOUT RUSH 3V3", Type.Heading) }
+                                ChunkyButton({ open("create", GameMode.BOSS) }, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.PURPLE, lip = 5.dp) { GameText("FIGHT THE ENTITY", Type.Heading) }
                             }
                         }
                         // ---- join one

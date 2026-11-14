@@ -355,9 +355,9 @@ private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) 
 
 // ---------------------------------------------------------------------------------------------- mode
 
-fun modeIcon(m: GameMode) = when (m) { GameMode.LAST_SPARK -> IconKind.SPARK; GameMode.KNOCKOUT_RUSH -> IconKind.SWORDS; GameMode.BOSS -> IconKind.SKULL; GameMode.TRAINING -> IconKind.FIGHTERS; GameMode.DUEL -> IconKind.SWORDS; GameMode.PORTAL -> IconKind.PORTAL }
+fun modeIcon(m: GameMode) = when (m) { GameMode.BOSS -> IconKind.SKULL; GameMode.TRAINING -> IconKind.FIGHTERS; GameMode.DUEL -> IconKind.SWORDS }
 
-fun arenaFor(m: GameMode): Arena = when (m) { GameMode.LAST_SPARK -> Arenas.staticCanyon(); GameMode.KNOCKOUT_RUSH -> Arenas.foundryYard(); GameMode.BOSS -> Arenas.provingGround(); GameMode.TRAINING -> Arenas.trainingArea(); GameMode.DUEL -> Arenas.provingGround(); GameMode.PORTAL -> Arenas.dimension() }
+fun arenaFor(m: GameMode): Arena = when (m) { GameMode.BOSS -> Arenas.entityRealm(); GameMode.TRAINING -> Arenas.trainingArea(); GameMode.DUEL -> Arenas.provingGround() }
 
 @Composable
 private fun ModeChip(mode: GameMode, d: BotDifficulty?, modifier: Modifier, onClick: () -> Unit) {
@@ -378,7 +378,6 @@ private fun ModeChip(mode: GameMode, d: BotDifficulty?, modifier: Modifier, onCl
                 PlainText("GAME MODE", Type.Eyebrow, maxLines = 1)
                 GameText(mode.title.uppercase(), Type.Heading, color = Palette.Gold, outline = 2.dp)
                 if (mode == GameMode.DUEL) PlainText("Against a real player", Type.Small, color = Palette.Positive, maxLines = 1)
-                else if (mode == GameMode.PORTAL) PlainText("Into the Entity's world", Type.Small, color = androidx.compose.ui.graphics.Color(0xFFC9A6FF), maxLines = 1)
                 else if (d != null) Row(verticalAlignment = Alignment.CenterVertically) {
                     PlainText("${mode.tagline.substringBefore(" ·")} · Bots ", Type.Small, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     PlainText(d.label, Type.Label, color = difficultyColor(d), maxLines = 1)
@@ -405,18 +404,7 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     for (m in GameMode.entries) {
-                        // With Boss Mode picked the cards are a little shorter, to leave room for the row of bosses underneath.
-                        ModeCard(m, m == save.selectedMode, Modifier.weight(1f), showMap = ui.roomy, short = save.selectedMode == GameMode.BOSS) { repo.selectMode(m) }
-                    }
-                }
-                if (save.selectedMode == GameMode.BOSS) {
-                    // Boss Mode: which boss to fight, or leave it to chance.
-                    Spacer(Modifier.height(10.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        GameText("BOSS", Type.Heading, outline = 2.5.dp)
-                        Spacer(Modifier.width(6.dp))
-                        BossChoice("RANDOM", "Any of them", null, save.selectedBoss == null, Modifier.weight(1f)) { repo.selectBoss(null) }
-                        for (b in Balance.bosses) BossChoice(b.name.uppercase(), b.title, b, save.selectedBoss == b.boss, Modifier.weight(1f)) { repo.selectBoss(b.boss) }
+                        ModeCard(m, m == save.selectedMode, Modifier.weight(1f), showMap = ui.roomy, short = false) { repo.selectMode(m) }
                     }
                 }
                 Spacer(Modifier.height(14.dp))
@@ -434,24 +422,6 @@ private fun ModePicker(save: SaveData, repo: GameRepository, onClose: () -> Unit
                     Spacer(Modifier.width(10.dp))
                     ChunkyButton(onClose, Modifier.size(130.dp, 54.dp), ButtonStyle.GREEN) { GameText("DONE", Type.Heading) }
                 }
-            }
-        }
-    }
-}
-
-/** One boss to pick in the mode picker: its portrait (a skull for "random"), name and what it is. */
-@Composable
-private fun BossChoice(name: String, title: String, def: io.github.projectwip.data.FighterDef?, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    ChunkyButton(onClick, modifier.height(56.dp), if (selected) ButtonStyle.GOLD else ButtonStyle.PURPLE, lip = 4.dp, cut = 12.dp, sound = Sound.UI_SELECT) {
-        Row(Modifier.fillMaxSize().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
-                if (def != null) io.github.projectwip.ui.FighterView(def, 0, Modifier.fillMaxSize(), pedestal = false)
-                else GameIcon(IconKind.SKULL, Modifier.size(32.dp))
-            }
-            Spacer(Modifier.width(6.dp))
-            Column {
-                GameText(name, Type.Label, outline = 2.dp)
-                PlainText(title, Type.Small, color = if (selected) Color.White else Palette.TextDim, maxLines = 1)
             }
         }
     }
@@ -475,15 +445,12 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 }
                 Spacer(Modifier.height(6.dp))
             }
-            PlainText(if (m == GameMode.PORTAL) "${arena.name} · just you" else "${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
+            PlainText(if (m == GameMode.BOSS) "Your team of ${m.players} · the Entity" else "${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
             PlainText(
                 when (m) {
-                    GameMode.LAST_SPARK -> "Break crates for Power Cells. Outlast the poison smoke. The higher you finish, the more Cups."
-                    GameMode.KNOCKOUT_RUSH -> "Respawns on. Your team starts at the bottom. Win to earn Cups."
-                    GameMode.BOSS -> "One of three bosses, each with moves of its own: rockets, sweeping beams, charges. Watch the marked ground. Knock it out to win; you have unlimited lives. Win to earn Cups."
+                    GameMode.BOSS -> "The Entity calls your team to its ritual, then takes you into its world. Hit the shadow under it. Dodge its marked ground, its rings and sweeps, and its flares: whoever one lands on is corrupted and turns on their own side. Beat it before time runs out to earn Cups."
                     GameMode.DUEL -> "Against one real player on this server, each on their own device. First to 3 knockouts, played for Cups. Leaving a match counts as a defeat."
-                    GameMode.PORTAL -> "Into the Entity's world. No enemies: in each dimension a forgotten fighter is chained up; find three echoes to free them and the portal wakes. Endless, nothing won or lost. One life."
-                    GameMode.TRAINING -> "Four dummies, a swarm of minis and a boss that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
+                    GameMode.TRAINING -> "Four dummies, a swarm of minis and a giant that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },
                 Type.Small.copy(fontSize = Type.Small.fontSize * 0.92f, lineHeight = Type.Small.fontSize * 1.1f), color = if (selected) Color.White else Palette.TextDim, align = TextAlign.Center, maxLines = 11,
             )

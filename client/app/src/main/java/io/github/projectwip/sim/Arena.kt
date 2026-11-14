@@ -291,7 +291,8 @@ object Arenas {
             val x = i % size + 0.5f; val y = i / size + 0.5f
             if (kotlin.math.hypot(x - c, y - c) <= r) Tile.FLOOR else Tile.WATER
         }
-        val spawn = listOf(Spawn(c, c + 2f))
+        // (Where a fighter knocked out in there comes back: a spread of places at the front of the platform.)
+        val spawn = listOf(Spawn(c, c + 5f), Spawn(c - 2.5f, c + 4.5f), Spawn(c + 2.5f, c + 4.5f))
         return Arena("The Entity's Dimension", size, size, tiles, listOf(spawn, spawn), spawn)
     }
     const val ENTITY_REALM_RADIUS = 9

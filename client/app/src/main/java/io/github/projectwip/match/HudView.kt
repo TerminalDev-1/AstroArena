@@ -91,8 +91,9 @@ class HudView(
         drawWhisper(c, dt)
         drawPossessed(c)
         drawUprising(c)
-        if (snap.portalRun) drawDimension(c)
         drawHud(c, dt)
+        controls.skipShown = held && snap.uprisingPhase <= io.github.projectwip.sim.UprisingPhase.BOW.ordinal
+        if (controls.skipShown) drawSkip(c)
         if (snap.phase != Phase.ENDED && !held) controls.draw(c, snap.ammo, snap.ammoMax, snap.superCharge, snap.hyperCharge, snap.hyperLeft, snap.playerAlive && snap.phase == Phase.PLAYING, time)
         drawCoach(c)
     }
@@ -199,7 +200,7 @@ class HudView(
      */
     private fun drawWhisper(c: Canvas, dt: Float) {
         val s = snap
-        if (s.portalRun || s.phase != Phase.PLAYING || s.uprisingPhase >= 0) { lastSuper = s.superCharge; lastHyper = s.hyperLeft; return }
+        if (s.phase != Phase.PLAYING || s.uprisingPhase >= 0) { lastSuper = s.superCharge; lastHyper = s.hyperLeft; return }
         val usedSuper = lastSuper >= 0.999f && s.superCharge < 0.5f
         val usedHyper = lastHyper <= 0f && s.hyperLeft > 0f
         lastSuper = s.superCharge; lastHyper = s.hyperLeft
@@ -319,6 +320,14 @@ class HudView(
         }
     }
 
+    /** SKIP, top right, while the Entity's ritual holds everyone: a grey plate of the game's own. */
+    private fun drawSkip(c: Canvas) {
+        val r = controls.skipRect
+        chamfer(c, r.left, r.top, r.right, r.bottom, dp(9f), Color.argb(230, 70, 64, 104), Color.rgb(27, 16, 53))
+        text.textSize = dp(17f)
+        outlined(c, "SKIP  \u25B6\u25B6", r.centerX(), r.centerY() + dp(6f), Color.WHITE, dp(2.5f))
+    }
+
     /** During one of the world's glitch moments, a few letters of a word come out wrong. */
     private fun glitchText(s: String, glitch: Float): String {
         if (glitch <= 0f) return s
@@ -330,136 +339,6 @@ class HudView(
             if (b[i] != ' ') b.setCharAt(i, glyphs[(beat + k * 5) % glyphs.length])
         }
         return b.toString()
-    }
-
-    /**
-     * Dimension's layer over the world: a pointer toward the nearest echo (or the open portal), the chained fighter
-     * screaming for help, the Void's taunts (in one of its souls' voices now and then), a dark vignette that closes in
-     * the deeper it goes, and, only during the world's rare glitch moments, a quiet tear across the picture. Creepy,
-     * never loud: the user found constant glitching too much.
-     */
-    private fun drawDimension(c: Canvas) {
-        val s = snap
-        val w = width.toFloat(); val h = height.toFloat()
-        val depth = s.portalDimension
-        val glitch = s.portalGlitch
-
-        // The vignette first, under everything else on the HUD: darker the deeper it goes, up to a point.
-        val k = (0.25f + 0.07f * (depth - 1)).coerceAtMost(0.7f)
-        fill.shader = android.graphics.RadialGradient(w / 2, h / 2, maxOf(w, h) * 0.72f, intArrayOf(Color.TRANSPARENT, Color.TRANSPARENT, Color.argb((255 * k).toInt(), 6, 2, 14)), floatArrayOf(0f, 0.5f, 1f), android.graphics.Shader.TileMode.CLAMP)
-        c.drawRect(0f, 0f, w, h, fill)
-        fill.shader = null
-
-        // The chained fighter, screaming for help now and then.
-        if (s.captiveOn && s.phase == Phase.PLAYING && project(s.captiveX, 2.1f, s.captiveZ)) {
-            val cycle = time % 3.2f
-            if (cycle < 1.3f) {
-                val a = (minOf(cycle / 0.12f, 1f, (1.3f - cycle) / 0.3f)).coerceIn(0f, 1f)
-                val jx = (rng.nextFloat() - 0.5f) * dp(4f); val jy = (rng.nextFloat() - 0.5f) * dp(3f)
-                text.textSize = dp(22f + 3f * sin(time * 20f))
-                outlined(c, "HELP!", o4[0] + jx, o4[1] + jy, withAlpha(Color.rgb(255, 236, 236), a), dp(4f))
-            }
-            text.textSize = dp(11f)
-            outlined(c, s.captiveName.uppercase(), o4[0], o4[1] + dp(20f), withAlpha(Color.rgb(205, 180, 255), 0.85f), dp(2.5f))
-        }
-
-        // The freed soul, talking as they follow: a speech bubble over their head, typed out, in their colour.
-        val said = s.followerLine
-        if (s.followerOn && said != null && s.phase == Phase.PLAYING && project(s.followerX, 2.2f, s.followerZ)) {
-            val a = (minOf(s.followerAge / 0.25f, 1f, (4.2f - s.followerAge) / 0.4f)).coerceIn(0f, 1f)
-            val shown = said.take((s.followerAge * 34f).toInt().coerceAtMost(said.length))
-            text.textSize = dp(15f)
-            val tw = text.measureText(said)
-            val bx = o4[0]; val by = o4[1] - dp(26f)
-            val pad = dp(10f)
-            fill.color = withAlpha(Color.rgb(16, 8, 30), 0.85f * a)
-            c.drawRoundRect(bx - tw / 2 - pad, by - dp(22f), bx + tw / 2 + pad, by + dp(8f), dp(10f), dp(10f), fill)
-            fill.style = Paint.Style.STROKE; fill.strokeWidth = dp(2f); fill.color = withAlpha(s.followerColor or 0xFF000000.toInt(), a)
-            c.drawRoundRect(bx - tw / 2 - pad, by - dp(22f), bx + tw / 2 + pad, by + dp(8f), dp(10f), dp(10f), fill)
-            fill.style = Paint.Style.FILL
-            text.textAlign = Paint.Align.LEFT; textStroke.textAlign = Paint.Align.LEFT
-            outlined(c, shown, bx - tw / 2, by, withAlpha(Color.WHITE, a), dp(3f))
-            text.textAlign = Paint.Align.CENTER; textStroke.textAlign = Paint.Align.CENTER
-            text.textSize = dp(11f)
-            outlined(c, s.followerName.uppercase(), bx, by - dp(28f), withAlpha(s.followerColor or 0xFF000000.toInt(), a), dp(2.5f))
-        }
-
-        // The pointer: an arrow at the edge of a ring round the player, toward the target, while it is off to one side.
-        if (s.portalTargetOn && s.phase == Phase.PLAYING && project(s.portalPlayerX, 0.6f, s.portalPlayerZ)) {
-            val px = o4[0]; val py = o4[1]
-            if (project(s.portalTargetX, 0.6f, s.portalTargetZ)) {
-                val tx = o4[0]; val ty = o4[1]
-                val dx = tx - px; val dy = ty - py
-                val d = kotlin.math.hypot(dx, dy)
-                if (d > dp(120f)) {
-                    val ux = dx / d; val uy = dy / d
-                    val r = dp(78f) + dp(6f) * sin(time * 5f)
-                    val ax = px + ux * r; val ay = py + uy * r
-                    val path = android.graphics.Path().apply {
-                        moveTo(ax + ux * dp(14f), ay + uy * dp(14f))
-                        lineTo(ax - uy * dp(9f) - ux * dp(6f), ay + ux * dp(9f) - uy * dp(6f))
-                        lineTo(ax - ux * dp(1f), ay - uy * dp(1f))
-                        lineTo(ax + uy * dp(9f) - ux * dp(6f), ay - ux * dp(9f) - uy * dp(6f))
-                        close()
-                    }
-                    fill.style = Paint.Style.FILL
-                    fill.color = if (s.portalOpen) Color.rgb(196, 150, 255) else Color.rgb(150, 236, 255)
-                    c.drawPath(path, fill)
-                    fill.style = Paint.Style.STROKE; fill.strokeWidth = dp(2.5f); fill.color = INK
-                    c.drawPath(path, fill)
-                    fill.style = Paint.Style.FILL
-                }
-            }
-        }
-
-        // The Void's taunt: whispered in under the top panel, fading after a few seconds. When it speaks with one of
-        // its souls' voices, the name flickers between the Void and that fighter's.
-        val line = s.voidLine
-        if (line != null && s.voidAge in 0f..5f) {
-            val a = (minOf(s.voidAge / 0.4f, 1f, (5f - s.voidAge) / 0.8f)).coerceIn(0f, 1f)
-            val shown = line.take((s.voidAge * 38f).toInt().coerceAtMost(line.length))
-            text.textSkewX = -0.2f
-            textStroke.textSkewX = -0.2f
-            val y = h * 0.27f
-            fill.color = Color.argb((a * 110).toInt(), 10, 2, 24)
-            c.drawRect(0f, y - dp(30f), w, y + dp(14f), fill)
-            text.textSize = dp(11f)
-            val soul = s.voidSoul
-            val asSoul = soul != null && ((time * 2.5f).toInt() % 3 != 0)
-            outlined(c, if (asSoul) "THE ENTITY · ${soul!!.uppercase()}" else "THE ENTITY", w / 2, y - dp(14f),
-                withAlpha(if (asSoul) s.voidSoulColor or 0xFF000000.toInt() else Color.rgb(185, 140, 255), a), dp(2.5f))
-            text.textSize = dp(19f)
-            outlined(c, shown, w / 2, y + dp(7f), withAlpha(Color.rgb(232, 220, 255), a), dp(3.5f))
-            text.textSkewX = 0f
-            textStroke.textSkewX = 0f
-        }
-
-        // From the second dimension a faint scanline lies over everything; a glitch moment adds a dark flicker,
-        // a few torn bands split into red and cyan, and a few dead blocks. Over in a moment.
-        if (depth >= 2) {
-            fill.color = Color.argb(10 + minOf(depth, 8), 0, 0, 0)
-            var yy = 0f
-            while (yy < h) { c.drawRect(0f, yy, w, yy + dp(1f), fill); yy += dp(3f) }
-        }
-        if (glitch <= 0f) return
-        val beat = (time * 14f).toInt()
-        fun hash(a: Int, b: Int): Float { var x = a * 374761393 + b * 668265263; x = (x xor (x ushr 13)) * 1274126177; return ((x xor (x ushr 16)) and 0xFFFF) / 65535f }
-        fill.color = Color.argb((60 * glitch).toInt(), 0, 0, 0)
-        c.drawRect(0f, 0f, w, h, fill)
-        for (i in 0 until 2 + (glitch * 3).toInt()) {
-            val by = hash(beat, i * 3 + 1) * h
-            val bh = dp(3f) + hash(beat, i * 3 + 2) * dp(14f)
-            val off = (hash(beat, i * 3 + 3) - 0.5f) * dp(40f)
-            fill.color = Color.argb((80 * glitch).toInt(), 255, 50, 100)
-            c.drawRect(off, by, w + off, by + bh * 0.5f, fill)
-            fill.color = Color.argb((80 * glitch).toInt(), 50, 220, 255)
-            c.drawRect(-off, by + bh * 0.5f, w - off, by + bh, fill)
-        }
-        for (i in 0 until (glitch * 6).toInt()) {
-            val bx = hash(beat, 100 + i) * w; val by = hash(beat, 200 + i) * h
-            fill.color = if (i % 2 == 0) Color.argb(140, 8, 0, 18) else Color.argb(90, 220, 200, 255)
-            c.drawRect(bx, by, bx + dp(10f) + hash(beat, 300 + i) * dp(50f), by + dp(4f) + hash(beat, 400 + i) * dp(12f), fill)
-        }
     }
 
     private fun project(x: Float, y: Float, z: Float): Boolean {
@@ -518,59 +397,20 @@ class HudView(
             outlined(c, "TRAINING AREA", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
             text.textSize = dp(12f)
             outlined(c, "%,d DAMAGE".format(s.damage), cx + dp(40f), top + dp(46f), Color.rgb(255, 214, 64), dp(3f))
-        } else if (s.portalRun) {
-            // Which dimension (by name), and how many of its echoes are found; when the portal opens, say so.
+        } else if (s.bossMode) {
+            // The Entity's fight: times down, and how long is left to beat it once its world is open (its health is
+            // on its own plate under this).
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(120, 60, 220), null)
             text.textSize = dp(30f)
-            outlined(c, s.portalDimension.toString(), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
-            text.textSize = dp(15f)
-            outlined(c, glitchText(io.github.projectwip.data.Lore.dimensionName(s.portalDimension).uppercase(), s.portalGlitch), cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
-            text.textSize = dp(12f)
-            val shards = io.github.projectwip.data.Balance.PORTAL_SHARDS
-            outlined(c, when {
-                s.portalTravel -> "FALLING…"
-                s.portalOpen -> "THE PORTAL IS OPEN"
-                else -> "ECHOES " + "◆".repeat(s.portalFound) + "◇".repeat(shards - s.portalFound)
-            }, cx + dp(40f), top + dp(46f), Color.rgb(200, 170, 255), dp(3f))
-            if (s.phase == Phase.PLAYING && !s.portalTravel) {
-                val pulse = 0.75f + 0.25f * sin(time * 4f)
-                text.textSize = dp(17f)
-                outlined(c, if (s.portalOpen) "THE ENTITY WAITS AT THE PORTAL · STEP INSIDE" else "${s.captiveName.uppercase()} IS CHAINED · FIND THE ECHOES",
-                    cx, top + panelH + dp(30f), withAlpha(Color.rgb(205, 180, 255), if (s.portalOpen) pulse else 0.55f), dp(3.5f))
-            }
-        } else if (s.bossMode) {
-            // Lives left, and the boss's health across a wide bar under the panel.
-            chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
-            text.textSize = dp(30f)
             outlined(c, s.timesDown.toString(), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
+            val fighting = s.uprisingPhase == io.github.projectwip.sim.UprisingPhase.SKY.ordinal
             text.textSize = dp(17f)
-            outlined(c, if (s.timesDown == 1) "TIME DOWN" else "TIMES DOWN", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
+            if (fighting) {
+                val secs = ceil(io.github.projectwip.data.Balance.UPRISING_BOSS_SECONDS - s.uprisingT).toInt().coerceAtLeast(0)
+                outlined(c, "%d:%02d".format(secs / 60, secs % 60), cx + dp(40f), top + dp(27f), if (secs <= 20) Color.rgb(255, 120, 100) else Color.WHITE, dp(3.5f))
+            } else outlined(c, "THE RITUAL", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
             text.textSize = dp(12f)
-            outlined(c, "BOSS MODE", cx + dp(40f), top + dp(46f), Color.rgb(255, 214, 64), dp(3f))
-            val bw = dp(420f)
-            val by = top + panelH + dp(26f)
-            val fr = (s.bossHp.toFloat() / s.bossMaxHp).coerceIn(0f, 1f)
-            fill.color = INK
-            c.drawRoundRect(cx - bw / 2 - dp(3f), by - dp(3f), cx + bw / 2 + dp(3f), by + dp(19f), dp(10f), dp(10f), fill)
-            fill.color = Color.rgb(22, 40, 62)
-            c.drawRoundRect(cx - bw / 2, by, cx + bw / 2, by + dp(16f), dp(8f), dp(8f), fill)
-            if (fr > 0f) {
-                fill.color = ENEMY
-                c.drawRoundRect(cx - bw / 2, by, cx - bw / 2 + bw * fr, by + dp(16f), dp(8f), dp(8f), fill)
-                fill.color = Color.argb(70, 255, 255, 255)
-                c.drawRoundRect(cx - bw / 2 + dp(3f), by + dp(2f), cx - bw / 2 + bw * fr - dp(3f), by + dp(7f), dp(4f), dp(4f), fill)
-            }
-            text.textSize = dp(13f)
-            outlined(c, "${(s.bossName ?: "BOSS").uppercase()}  ·  %,d".format(s.bossHp), cx, by + dp(13f), Color.WHITE, dp(3f))
-        } else if (s.freeForAll) {
-            // Fighters left + mode name
-            chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(200, 40, 64), null)
-            text.textSize = dp(30f)
-            outlined(c, s.aliveCount.toString(), cx - panelW / 2 + dp(52f), top + panelH / 2 + dp(11f), Color.WHITE, dp(4f))
-            text.textSize = dp(19f)
-            outlined(c, "LEFT", cx + dp(30f), top + dp(29f), Color.WHITE, dp(3.5f))
-            text.textSize = dp(11f)
-            outlined(c, "LAST SPARK", cx + dp(30f), top + dp(47f), Color.rgb(255, 214, 64), dp(3f))
+            outlined(c, "THE ENTITY", cx + dp(40f), top + dp(46f), Color.rgb(201, 166, 255), dp(3f))
         } else {
             val boxW = dp(72f)
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + boxW, top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
@@ -583,25 +423,6 @@ class HudView(
             outlined(c, "%d:%02d".format(secs / 60, secs % 60), cx, top + dp(29f), if (secs <= 15 && s.phase == Phase.PLAYING) Color.rgb(255, 120, 100) else Color.WHITE, dp(3.5f))
             text.textSize = dp(11f)
             outlined(c, "FIRST TO ${s.koTarget}", cx, top + dp(47f), Color.rgb(255, 214, 64), dp(3f))
-        }
-
-        // Storm warnings
-        if (s.freeForAll && s.phase == Phase.PLAYING) {
-            val delay = io.github.projectwip.data.Balance.STORM_DELAY_SECONDS
-            if (s.stormElapsed in (delay - 5f)..(delay + 3f)) {
-                text.textSize = dp(20f)
-                val flash = if ((time * 3f).toInt() % 2 == 0) Color.rgb(150, 240, 100) else Color.WHITE
-                outlined(c, "THE POISON SMOKE IS CLOSING IN!", cx, top + panelH + dp(32f), flash, dp(4f))
-            }
-            if (s.playerOutsideStorm) {
-                val a = (0.35f + 0.2f * sin(time * 8f))
-                fill.shader = android.graphics.RadialGradient(cx, h / 2, maxOf(w, h) * 0.7f,
-                    intArrayOf(Color.TRANSPARENT, Color.argb((a * 255).toInt(), 50, 150, 30)), floatArrayOf(0.55f, 1f), android.graphics.Shader.TileMode.CLAMP)
-                c.drawRect(0f, 0f, w, h, fill)
-                fill.shader = null
-                text.textSize = dp(19f)
-                outlined(c, "YOU'RE IN THE POISON SMOKE — GET BACK INSIDE!", cx, h * 0.24f, Color.rgb(170, 255, 120), dp(4f))
-            }
         }
 
         // Kill feed
@@ -632,26 +453,22 @@ class HudView(
             text.textSize = dp(96f) * big
             outlined(c, n.toString(), cx, h * 0.45f, Color.WHITE, dp(9f))
             text.textSize = dp(21f)
-            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.portalRun) "DIMENSION · YOU AND THE ENTITY · ONE LIFE" else if (s.bossMode) "BOSS MODE · KNOCK OUT THE BOSS · UNLIMITED LIVES" else if (s.freeForAll) "LAST SPARK · LAST ONE STANDING WINS" else "KNOCKOUT RUSH · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
+            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.bossMode) "THE ENTITY IS COMING" else "1V1 · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
         } else if (s.phase == Phase.PLAYING && s.phaseTime < 0.9f) {
             text.textSize = dp(80f) * big
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))
         }
 
-        if (!s.playerAlive && s.phase == Phase.PLAYING && !s.freeForAll) {
+        if (!s.playerAlive && s.phase == Phase.PLAYING) {
             text.textSize = dp(28f)
             outlined(c, "KNOCKED OUT", cx, h * 0.4f, Color.rgb(255, 92, 92), dp(5f))
             text.textSize = dp(19f)
             outlined(c, "Back in ${ceil(s.respawnTimer).toInt().coerceAtLeast(1)}…", cx, h * 0.4f + dp(32f), Color.WHITE, dp(4f))
         }
 
-        val ffaOut = s.freeForAll && s.placement > 0
-        if (ffaOut && bannerStart < 0f) bannerStart = time
-        if (s.phase == Phase.ENDED || ffaOut) {
-            val slide = if (ffaOut) ((time - bannerStart) / 0.35f).coerceIn(0f, 1f) else (s.phaseTime / 0.35f).coerceIn(0f, 1f)
+        if (s.phase == Phase.ENDED) {
+            val slide = (s.phaseTime / 0.35f).coerceIn(0f, 1f)
             val (label, col) = when {
-                s.freeForAll && s.placement == 1 -> "VICTORY! #1" to Color.rgb(255, 214, 64)
-                s.freeForAll -> "#${s.placement} PLACE" to if (s.placement <= 4) Color.rgb(120, 230, 255) else Color.rgb(255, 92, 92)
                 s.winningTeam == s.playerTeam -> "VICTORY!" to Color.rgb(255, 214, 64)
                 s.winningTeam == -1 -> "DRAW" to Color.WHITE
                 else -> "DEFEAT" to Color.rgb(255, 92, 92)
@@ -683,10 +500,6 @@ class HudView(
         textStroke.alpha = (a * 255).toInt()
         outlined(c, "TAP = AUTO-AIM", x - dp(10f), y, withAlpha(Color.rgb(255, 214, 64), a), dp(3.5f))
         outlined(c, "DRAG = AIM · RELEASE = FIRE", x - dp(10f), y + dp(20f), withAlpha(Color.WHITE, a), dp(3.5f))
-        if (s.freeForAll) {
-            text.textSize = dp(17f)
-            outlined(c, "BREAK GLOWING CRATES FOR POWER CELLS · LAST ONE STANDING WINS", width / 2f, dp(100f), withAlpha(Color.rgb(255, 214, 64), a), dp(4f))
-        }
         textStroke.alpha = 255
     }
 

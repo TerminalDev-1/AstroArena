@@ -7,6 +7,7 @@ import io.github.projectwip.data.Balance
 import io.github.projectwip.data.BotDifficulty
 import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.GameMode
+import io.github.projectwip.data.MatchOutcome
 import io.github.projectwip.sim.Arenas
 import io.github.projectwip.sim.Fighter
 import io.github.projectwip.sim.Match
@@ -34,25 +35,12 @@ class SimulationTest {
         assertEquals("spawns must be distinct", 10, c.ffaSpawns.toSet().size)
     }
 
-    @Test fun freeForAllEndsWithUniquePlacements() {
-        repeat(3) { seed ->
-            val m = Match(MatchConfig(FighterId.KITO, 4, 0, "Test", if (seed == 0) BotDifficulty.NORMAL else BotDifficulty.HARD, mode = GameMode.LAST_SPARK, humanPlayer = false, seed = 7L + seed))
-            var t = 0f
-            while (m.world.phase != Phase.ENDED && t < 300f) { m.step(Match.STEP); t += Match.STEP }
-            println("FFA seed $seed ended at ${"%.1f".format(t)}s storm r=${"%.1f".format(m.world.storm!!.radius)}")
-            assertEquals(Phase.ENDED, m.world.phase)
-            val places = m.world.fighters.map { it.placement }.sorted()
-            assertEquals((1..10).toList(), places)
-            assertEquals(1, m.world.aliveCount)
-        }
-    }
-
     @Test fun leadAimHitsAStrafingTarget() {
         val a = Arenas.staticCanyon()
         val def = Balance.sentry
         val shooter = Fighter(0, def, 1, 0, 0, "S", true)
         val target = Fighter(1, def, 1, 0, 1, "T", true)
-        val w = World(a, listOf(shooter, target), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w = World(a, listOf(shooter, target), io.github.projectwip.sim.MatchRules())
         repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) } // past countdown
         shooter.x = 18f; shooter.y = 26f
         target.x = 18f; target.y = 19f
@@ -76,7 +64,7 @@ class SimulationTest {
         val def = Balance.fighter(FighterId.BYTE)
         val hider = Fighter(0, def, 1, 0, 0, "H", true)
         val seeker = Fighter(1, def, 1, 0, 1, "S", true)
-        val w = World(a, listOf(hider, seeker), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w = World(a, listOf(hider, seeker), io.github.projectwip.sim.MatchRules())
         fun run(seconds: Float) = repeat((seconds / Match.STEP).toInt()) { w.step(Match.STEP) }
         run(3.1f) // past countdown
         assertEquals(Tile.THICKET, a.tileAt(2f, 1f))
@@ -138,7 +126,7 @@ class SimulationTest {
         val a = Arenas.staticCanyon()
         val def = Balance.fighter(FighterId.BYTE)
         val f = Fighter(0, def, 1, 0, 0, "A", true)
-        val w = World(a, listOf(f, Fighter(1, def, 1, 0, 2, "B", true)), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w = World(a, listOf(f, Fighter(1, def, 1, 0, 2, "B", true)), io.github.projectwip.sim.MatchRules())
         // Quadrant row 1 is "gggg.c##..": a crate at (5,1) with open floor to its left and wall to its right.
         assertEquals(Tile.CRATE, a[5, 1])
         f.x = 2.5f; f.y = 1.5f
@@ -146,103 +134,6 @@ class SimulationTest {
         assertEquals("out of range", -1, w.nearestHittableCrate(f, 2f))
         f.x = 9.5f; f.y = 1.5f // the wall at (6..7, 1) is in the way now
         assertTrue(w.nearestHittableCrate(f, 6f) != 1 * a.width + 5)
-    }
-
-    /** Free-for-all bots shouldn't pile onto one fighter while the field is still crowded. */
-    @Test fun botsDoNotGangUp() {
-        var samples = 0
-        var mobbed = 0
-        repeat(3) { seed ->
-            val m = Match(MatchConfig(FighterId.BYTE, 3, 0, "T", BotDifficulty.HARD, mode = GameMode.LAST_SPARK, humanPlayer = false, seed = 300L + seed))
-            var t = 0f
-            while (!m.isOver && t < 200f) {
-                m.step(Match.STEP); t += Match.STEP
-                if (m.world.aliveCount <= 3) break
-                for (f in m.world.fighters) {
-                    if (!f.alive) continue
-                    samples++
-                    if (m.brains.count { it.target === f } > 3) mobbed++
-                }
-            }
-        }
-        println("mobbed samples: $mobbed of $samples")
-        assertTrue("fighters were mobbed by 4+ bots in $mobbed of $samples samples", mobbed < samples / 200)
-    }
-
-    /** Boss Mode: one giant with fixed stats; it ends when the boss falls or the player runs out of lives. */
-    @Test fun bossModeIsOneFixedGiant() {
-        val a = Arenas.provingGround()
-        assertEquals("room for a team of three", 3, a.spawns[0].size)
-        assertEquals(1, a.spawns[1].size)
-        assertFalse("the boss needs room", a.circleBlocked(a.spawns[1][0].x, a.spawns[1][0].y, 1.25f))
-
-        // Each boss is its own thing, and its strength ignores the player's level.
-        for (kind in io.github.projectwip.data.BossKind.entries) {
-            val low = Match(MatchConfig(FighterId.BYTE, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = kind))
-            val high = Match(MatchConfig(FighterId.BYTE, 60, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 1L, boss = kind))
-            val b1 = low.world.fighters.single { it.team != low.player.team }
-            val b2 = high.world.fighters.single { it.team != high.player.team }
-            assertEquals(kind, b1.def.boss)
-            assertEquals(io.github.projectwip.data.Balance.boss(kind).name, b1.name)
-            assertEquals("the boss does not scale with the player", b1.maxHp, b2.maxHp)
-            assertEquals(b1.attackDamage, b2.attackDamage)
-            assertTrue("drawn at two and a half times normal size", b1.scale > 2.4f)
-            assertTrue(high.player.maxHp > low.player.maxHp)
-        }
-        // Unlimited lives: the fight can only end with the boss down, however often the player falls.
-        var wins = 0
-        for (seed in 0 until 6) {
-            val m = Match(MatchConfig(FighterId.entries[seed % 3], if (seed % 2 == 0) 3 else 40, 0, "T", BotDifficulty.HARD, mode = GameMode.BOSS, humanPlayer = false, seed = 50L + seed))
-            assertEquals(2, m.world.fighters.size)
-            var t = 0f
-            while (!m.isOver && t < 240f) { m.step(Match.STEP); t += Match.STEP }
-            if (m.world.phase == Phase.ENDED) { wins++; assertEquals("only the player can win", m.player.team, m.world.winningTeam) }
-            for (f in m.world.fighters) assertFalse(m.world.arena.circleBlocked(f.x, f.y, f.radius * 0.9f))
-        }
-        println("boss fights won inside four minutes: $wins of 6")
-        assertTrue("a strong fighter should be able to beat it", wins >= 1)
-    }
-
-    /** Each boss fights with moves of its own: marked ground that goes off, and shots no fighter fires. */
-    @Test fun bossesHaveMovesOfTheirOwn() {
-        for (kind in io.github.projectwip.data.BossKind.entries) {
-            val m = Match(MatchConfig(FighterId.BRAKK, 10, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 7L, boss = kind))
-            var marks = 0; var blasts = 0; var shots = 0; var dashes = 0
-            var t = 0f
-            while (!m.isOver && t < 40f) {
-                val before = m.world.hazards.size
-                m.step(Match.STEP); t += Match.STEP
-                marks += maxOf(0, m.world.hazards.size - before)
-                for (e in m.world.events) when (e) {
-                    is io.github.projectwip.sim.GameEvent.Blast -> blasts++
-                    is io.github.projectwip.sim.GameEvent.Dash -> dashes++
-                    else -> Unit
-                }
-                m.world.events.clear()
-                shots = maxOf(shots, m.world.projectiles.count { it.team != m.player.team })
-            }
-            println("$kind: $marks marks, $blasts blasts, $shots shots in the air at once, $dashes charges")
-            assertTrue("$kind marks the ground", marks > 0)
-            assertEquals("every mark goes off", marks, blasts + m.world.hazards.size)
-            when (kind) {
-                io.github.projectwip.data.BossKind.BARRAGE -> assertTrue(shots >= 8)
-                io.github.projectwip.data.BossKind.SWEEPER -> assertTrue(shots >= 12)
-                io.github.projectwip.data.BossKind.STAMPEDE -> assertTrue(dashes > 0)
-            }
-        }
-        // A mark hurts whoever is still standing in it when it goes off, and nobody outside it.
-        val m = Match(MatchConfig(FighterId.BYTE, 1, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 3L, boss = io.github.projectwip.data.BossKind.BARRAGE))
-        while (m.world.phase != Phase.PLAYING) m.step(Match.STEP)
-        val boss = m.world.fighters.first { it.def.boss != null }
-        val me = m.player
-        val full = me.hp
-        m.world.hazards.clear()
-        m.world.hazards += io.github.projectwip.sim.Hazard(boss.id, boss.team, me.x + 6f, me.y, 1f, 0.05f, 500, io.github.projectwip.sim.HazardKind.ROCKET)
-        repeat(6) { m.world.step(Match.STEP) }
-        assertEquals("outside the mark: untouched", full, me.hp)
-        m.world.hazards += io.github.projectwip.sim.Hazard(boss.id, boss.team, me.x, me.y, 1f, 0.02f, 500, io.github.projectwip.sim.HazardKind.ROCKET)
-        m.world.step(Match.STEP); m.world.step(Match.STEP)
-        assertTrue("inside it: hurt", me.hp < full || !me.alive)
     }
 
     /** Training Area: nineteen fighters, the targets never leave their spots, and it never ends by itself. */
@@ -312,21 +203,21 @@ class SimulationTest {
 
     @Test fun fullBotMatchFinishes() {
         for (d in BotDifficulty.entries) {
-            val m = Match(MatchConfig(FighterId.BYTE, 3, 0, "Test", d, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 42L + d.ordinal))
+            val m = Match(MatchConfig(FighterId.BYTE, 3, 0, "Test", d, mode = GameMode.DUEL, humanPlayer = false, seed = 42L + d.ordinal))
             var t = 0f
             while (!m.isOver && t < 400f) { m.step(Match.STEP); t += Match.STEP }
             println("$d: ${"%.1f".format(t)}s score=${m.world.score.toList()} " +
                 m.world.fighters.joinToString { "${it.def.id}:${it.kos}/${it.deaths}/${it.damageDealt}" })
             assertEquals("match ($d) must end", Phase.ENDED, m.world.phase)
             val kos = m.world.score.sum()
-            assertTrue("bots on $d should actually fight (KOs=$kos)", kos >= 4)
+            assertTrue("bots on $d should actually fight (KOs=$kos)", kos >= 2)
             for (f in m.world.fighters) assertFalse(m.world.arena.circleBlocked(f.x, f.y, f.radius * 0.9f))
         }
     }
 
     @Test fun healingWaitsForAPauseInTheFightBotsHealMoreSlowlyAndGiantsSlowest() {
         // A human player and a bot of the same kind, in the same match.
-        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 4L))
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 4L))
         val me = m.world.fighters.first { !it.isBot }
         val bot = m.world.fighters.first { it.isBot }
         me.hp = me.maxHp / 2; bot.hp = bot.maxHp / 2
@@ -347,7 +238,7 @@ class SimulationTest {
         repeat(60) { m.world.regenerate(me, 1f) }
         assertEquals("up to full health, and no further: there are no shields", me.maxHp, me.hp)
         // A giant heals far more slowly.
-        val b = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
+        val b = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, humanPlayer = false, seed = 4L))
         val boss = b.world.fighters.first { it.scale > 1f }
         boss.hp = boss.maxHp / 2; boss.sinceDamaged = 1f
         b.world.regenerate(boss, 1f)
@@ -376,7 +267,7 @@ class SimulationTest {
         val a = Arenas.staticCanyon()
         val varun = Fighter(0, rocketeer, 1, 0, 0, "V", true)
         val target = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "T", true)
-        val w = World(a, listOf(varun, target), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w = World(a, listOf(varun, target), io.github.projectwip.sim.MatchRules())
         repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
         // Find two open spots a few tiles apart with something solid between them.
         search@ for (y in 3 until a.height - 3) for (x in 3 until a.width - 9) {
@@ -406,7 +297,7 @@ class SimulationTest {
         val varun = Fighter(0, rocketeer, 1, 0, 0, "V", true)
         val one = Fighter(1, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "A", true)
         val two = Fighter(2, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "B", true)
-        val w = World(a, listOf(varun, one, two), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w = World(a, listOf(varun, one, two), io.github.projectwip.sim.MatchRules())
         repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
         var placed = false
         search@ for (y in 3 until a.height - 3) for (x in 3 until a.width - 8) {
@@ -557,15 +448,16 @@ class SimulationTest {
     }
 
     @Test fun theHyperChargesFromHitsAndBotsUseIt() {
-        val m = Match(MatchConfig(FighterId.BUDDY, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 21L))
+        // (Against the Entity: bots charge their hypers by hitting it, and spend them on it.)
+        val m = Match(MatchConfig(FighterId.BUDDY, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.BOSS, humanPlayer = false, seed = 21L))
         var hypers = 0
         var t = 0f
-        while (m.world.phase != Phase.ENDED && t < 200f) {
+        while (m.world.phase != Phase.ENDED && t < 260f) {
             m.step(Match.STEP); t += Match.STEP
             hypers += m.world.events.count { it is io.github.projectwip.sim.GameEvent.Hyper }
             m.world.events.clear()
         }
-        println("hypers used in one Knockout Rush: $hypers")
+        println("hypers used against the Entity: $hypers")
         assertTrue("bots charge and use their hyper", hypers > 0)
     }
 
@@ -602,7 +494,7 @@ class SimulationTest {
         val a = Arenas.staticCanyon()
         val buddy = Fighter(0, Balance.fighter(FighterId.BUDDY), level, 0, 0, "B", true)
         val others = (1..count).map { Fighter(it, Balance.fighter(FighterId.BRAKK), 1, 0, 1, "T$it", true) }
-        val w = World(a, listOf(buddy) + others, io.github.projectwip.sim.MatchRules.lastSpark())
+        val w = World(a, listOf(buddy) + others, io.github.projectwip.sim.MatchRules())
         repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
         var placed = false
         search@ for (y in 3 until a.height - 3) for (x in 3 until a.width - 9) {
@@ -704,7 +596,7 @@ class SimulationTest {
         // (A new world puts everyone back on a spawn: remember the open ground the helper found.)
         val x = target.x; val y = target.y
         val brakk = Fighter(7, Balance.fighter(FighterId.BRAKK), 1, 0, 0, "D", false)
-        val w2 = World(w.arena, listOf(brakk, target), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w2 = World(w.arena, listOf(brakk, target), io.github.projectwip.sim.MatchRules())
         repeat((3.1f / Match.STEP).toInt()) { w2.step(Match.STEP) }
         fun throwAt(hp: Int): List<Int> {
             target.x = x; target.y = y
@@ -731,7 +623,7 @@ class SimulationTest {
         val thrower = Balance.fighter(FighterId.KITO).copy(superDamage = io.github.projectwip.data.StatLine(3000, 150),
             superSpec = io.github.projectwip.data.SuperSpec(io.github.projectwip.data.SuperKind.QUAKE, "Faultline", "", range = 6.5f, speed = 13f, radius = 2.6f))
         val kito = Fighter(7, thrower, 1, 0, 0, "K", false)
-        val w2 = World(w.arena, listOf(kito, hit, beside), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w2 = World(w.arena, listOf(kito, hit, beside), io.github.projectwip.sim.MatchRules())
         repeat((3.1f / Match.STEP).toInt()) { w2.step(Match.STEP) }
         kito.x = x - 3f; kito.y = y; hit.x = x; hit.y = y
         // The other stands behind the first, out of the hammer's way but inside the quake.
@@ -753,7 +645,7 @@ class SimulationTest {
     /** [me] and some others on open ground: the others two and six tiles off in a row, past the countdown and the spawn shield. */
     private fun onOpenGround(me: Fighter, vararg others: Fighter): World {
         val (w, at, spots) = buddyAndTargets(2)
-        val w2 = World(w.arena, listOf(me) + others, io.github.projectwip.sim.MatchRules.lastSpark())
+        val w2 = World(w.arena, listOf(me) + others, io.github.projectwip.sim.MatchRules())
         repeat((3.1f / Match.STEP).toInt()) { w2.step(Match.STEP) }
         me.x = at.x; me.y = at.y
         others.forEachIndexed { i, o -> o.x = spots[i].x; o.y = spots[i].y }
@@ -1082,7 +974,7 @@ class SimulationTest {
     @Test fun aBossCanDoNothingInTheRealm() {
         val a = Arenas.provingGround()
         val rocket = Fighter(0, rocketStandIn, 1, 0, 0, "R", false)
-        val boss = Fighter(1, Balance.bosses[0], 1, 0, 1, "Boss", true)
+        val boss = Fighter(1, Balance.giant, 1, 0, 1, "Boss", true)
         val w = World(a, listOf(rocket, boss), io.github.projectwip.sim.MatchRules.bossMode())
         repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
         boss.shield = 0f
@@ -1101,7 +993,7 @@ class SimulationTest {
     }
 
     @Test fun botsCanPlaySwishThroughAWholeMatch() {
-        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 33L))
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.DUEL, humanPlayer = false, seed = 33L))
         assertEquals("Swish", m.player.def.name)
         var t = 0f
         var tempests = 0
@@ -1238,7 +1130,7 @@ class SimulationTest {
     @Test fun aBossShrugsThePoisonOffAfterAWhile() {
         val a = Arenas.provingGround()
         val buddy = Fighter(0, Balance.fighter(FighterId.BUDDY), 1, 0, 0, "B", false)
-        val boss = Fighter(1, Balance.bosses[0], 1, 0, 1, "Boss", true)
+        val boss = Fighter(1, Balance.giant, 1, 0, 1, "Boss", true)
         val w = World(a, listOf(buddy, boss), io.github.projectwip.sim.MatchRules.bossMode())
         repeat((3.1f / Match.STEP).toInt()) { w.step(Match.STEP) }
         boss.shield = 0f
@@ -1257,7 +1149,7 @@ class SimulationTest {
     }
 
     @Test fun botsCanPlayBuddyThroughAWholeMatch() {
-        val m = Match(MatchConfig(FighterId.BUDDY, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.KNOCKOUT_RUSH, humanPlayer = false, seed = 33L))
+        val m = Match(MatchConfig(FighterId.BUDDY, 5, 0, "T", BotDifficulty.HARD, mode = GameMode.DUEL, humanPlayer = false, seed = 33L))
         var t = 0f
         while (m.world.phase != Phase.ENDED && t < 200f) { m.step(Match.STEP); t += Match.STEP; m.world.events.clear() }
         println("Buddy bot: ${m.player.kos} KOs, ${m.player.deaths} deaths, ${m.player.damageDealt} damage")
@@ -1269,7 +1161,7 @@ class SimulationTest {
         val (hit, other) = others
         val x = hit.x; val y = hit.y
         val kira = Fighter(7, Balance.fighter(FighterId.KIRA), 1, 0, 0, "K", false)
-        val w2 = World(w.arena, listOf(kira, hit, other), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w2 = World(w.arena, listOf(kira, hit, other), io.github.projectwip.sim.MatchRules())
         repeat((3.1f / Match.STEP).toInt()) { w2.step(Match.STEP) }
         kira.x = x - 3f; kira.y = y; hit.x = x; hit.y = y; other.x = x + 4f; other.y = y
         for (f in w2.fighters) f.shield = 0f
@@ -1316,7 +1208,7 @@ class SimulationTest {
         val (inside, outside) = others
         val x = inside.x; val y = inside.y
         val kira = Fighter(7, Balance.fighter(FighterId.KIRA), 1, 0, 0, "K", false)
-        val w2 = World(w.arena, listOf(kira, inside, outside), io.github.projectwip.sim.MatchRules.lastSpark())
+        val w2 = World(w.arena, listOf(kira, inside, outside), io.github.projectwip.sim.MatchRules())
         repeat((3.1f / Match.STEP).toInt()) { w2.step(Match.STEP) }
         kira.x = x - 3f; kira.y = y; inside.x = x; inside.y = y; outside.x = x + 4f; outside.y = y
         for (f in w2.fighters) f.shield = 0f
@@ -1337,98 +1229,9 @@ class SimulationTest {
         assertEquals("she reloads in 1.2 seconds", 1.2f, kira.def.reloadSeconds, 0f)
     }
 
-    @Test fun dimensionIsAnEndlessLoreModeOfCaptivesEchoesPortalsAndRifts() {
-        val B = io.github.projectwip.data.Balance
-        val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
-            mode = io.github.projectwip.data.GameMode.PORTAL, seed = 42L))
-        val w = m.world
-        val run = w.portal!!
-        assertEquals("nobody but the player", 1, w.fighters.size)
-        fun stepFor(seconds: Float) { repeat((seconds * 60).toInt()) { m.step(io.github.projectwip.sim.Match.STEP) } }
-        stepFor(3f + B.PORTAL_ARRIVE_SECONDS + 0.2f)
-        assertEquals(io.github.projectwip.sim.PortalState.EXPLORE, run.state)
-        // Someone is chained up somewhere away from the start, and the echoes lie away from both.
-        assertTrue(kotlin.math.hypot(run.captiveX - m.player.x, run.captiveY - m.player.y) > 2f)
-        // The echoes lie away from where the player arrives.
-        for (i in 0 until B.PORTAL_SHARDS) assertTrue(kotlin.math.hypot(run.shards[i * 2] - m.player.x, run.shards[i * 2 + 1] - m.player.y) > 3f)
-        assertTrue("no rifts in the first dimension", w.hazards.isEmpty())
-        // The gate in the middle is solid while the soul is chained: nobody walks on it or through it.
-        val gx = kotlin.math.floor(run.x).toInt(); val gy = kotlin.math.floor(run.y).toInt()
-        for (dx in -2..2) assertEquals(io.github.projectwip.sim.Tile.GATE, w.arena[gx + dx, gy])
-        assertTrue(w.arena[gx, gy].blocksMove)
-        fun collect() {
-            for (i in 0 until B.PORTAL_SHARDS) {
-                m.player.x = run.shards[i * 2]; m.player.y = run.shards[i * 2 + 1]
-                m.player.prevX = m.player.x; m.player.prevY = m.player.y
-                stepFor(0.05f)
-            }
-        }
-        collect()
-        assertEquals(B.PORTAL_SHARDS, run.found)
-        assertTrue("a taunt for each echo", run.taunt == B.PORTAL_SHARDS - 1)
-        assertEquals(io.github.projectwip.sim.PortalState.OPEN, run.state)
-        // The portal is in the very middle (where the bush was), the soul is freed, and they were a walk away from it.
-        assertEquals(w.arena.width / 2f, run.x, 1f)
-        assertEquals(w.arena.height / 2f, run.y, 1f)
-        assertTrue(run.freedAt >= 0f)
-        assertEquals("its middle opens once they are free", io.github.projectwip.sim.Tile.FLOOR, w.arena[kotlin.math.floor(run.x).toInt(), kotlin.math.floor(run.y).toInt()])
-        assertEquals("its inside opens", io.github.projectwip.sim.Tile.FLOOR, w.arena[kotlin.math.floor(run.x).toInt() - 1, kotlin.math.floor(run.y).toInt()])
-        assertEquals("its ends stay solid", io.github.projectwip.sim.Tile.GATE, w.arena[kotlin.math.floor(run.x).toInt() - 2, kotlin.math.floor(run.y).toInt()])
-        assertTrue(kotlin.math.hypot(run.captiveX - run.x, run.captiveY - run.y) > 3f)
-        for (dx in -1..1) assertTrue("no bush under the portal", w.arena[(run.x + dx).toInt(), (run.y + 1).toInt()] != io.github.projectwip.sim.Tile.THICKET)
-        assertEquals("what they say once free", 4, io.github.projectwip.data.Lore.freedLines(io.github.projectwip.data.Lore.captive(1)).size)
-        // Stepping in takes the player one dimension deeper, whole again, with new echoes to find.
-        m.player.hp = m.player.maxHp / 2
-        m.player.x = run.x; m.player.y = run.y
-        stepFor(0.05f)
-        assertEquals(2, run.dimension)
-        assertEquals(1, run.entered)
-        assertEquals(m.player.maxHp, m.player.hp)
-        assertEquals(0, run.found)
-        stepFor(B.PORTAL_TRAVEL_SECONDS + B.PORTAL_ARRIVE_SECONDS + 0.2f)
-        // From the second dimension on, the world tears open near the player now and then.
-        stepFor(B.portalRiftEvery(2) + 0.1f)
-        assertTrue("a rift", w.hazards.any { it.kind == io.github.projectwip.sim.HazardKind.RIFT })
-        assertEquals(1, m.placement)
-        assertEquals("nothing is won in Dimension", io.github.projectwip.data.MatchOutcome.DRAW, m.report().outcome)
-        // It has no bottom: ten portals down it is still going.
-        while (run.entered < 10) {
-            m.player.hp = m.player.maxHp; m.player.shield = 99f
-            stepFor(B.PORTAL_TRAVEL_SECONDS + B.PORTAL_ARRIVE_SECONDS + 0.2f)
-            collect()
-            m.player.x = run.x; m.player.y = run.y
-            stepFor(0.05f)
-        }
-        stepFor(B.PORTAL_TRAVEL_SECONDS + B.PORTAL_ARRIVE_SECONDS + 0.2f)
-        assertFalse(m.isOver)
-        assertEquals(11, run.dimension)
-        assertEquals(10, m.placement)
-        assertEquals(io.github.projectwip.sim.PortalState.EXPLORE, run.state)
-        // Whoever is chained up is one of the forgotten, and the talk has a line for each of them.
-        for (soul in io.github.projectwip.data.Lore.Soul.entries) assertEquals(3, io.github.projectwip.data.Lore.captiveTalk(soul, FighterId.KIRA).size)
-        assertEquals(io.github.projectwip.data.Lore.Soul.entries.toSet(), (1..5).map { io.github.projectwip.data.Lore.captive(it) }.toSet())
-        assertTrue(io.github.projectwip.data.Lore.dimensionName(57).startsWith("The "))
-    }
-
-    @Test fun aRiftCanEndADimensionRun() {
-        val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
-            mode = io.github.projectwip.data.GameMode.PORTAL, seed = 7L))
-        val run = m.world.portal!!
-        run.dimension = 6
-        repeat(60 * 4) { m.step(io.github.projectwip.sim.Match.STEP) }
-        m.player.shield = 0f
-        // Stand still with almost no health: the next rift lands on the player.
-        var t = 0
-        while (!m.isOver && t < 60 * 30) { m.player.hp = minOf(m.player.hp, 5); m.player.shield = 0f; m.step(io.github.projectwip.sim.Match.STEP); t++ }
-        assertTrue("one life: a rift ended it", m.isOver)
-        assertEquals(0, m.placement)
-        assertEquals(io.github.projectwip.data.MatchOutcome.DRAW, m.report().outcome)
-    }
-
-
     @Test fun aGlitchingFighterFightsOnItsOwnForAWhile() {
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
-            mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, seed = 11L))
+            mode = io.github.projectwip.data.GameMode.DUEL, seed = 11L))
         repeat(60 * 6) { m.step(io.github.projectwip.sim.Match.STEP) }
         val p = m.player
         val enemy = m.world.fighters.first { it.team != p.team && it.alive }
@@ -1499,22 +1302,8 @@ class SimulationTest {
 
     @Test fun theEntityDrivesTheTornadoOutOfABossCircle() = entityEscapesAMarkedCircle(tornado = true)
 
-    @Test fun everyFightingMatchHasTheEntitysUprising() {
-        for (mode in listOf(GameMode.KNOCKOUT_RUSH, GameMode.LAST_SPARK, GameMode.BOSS, GameMode.DUEL)) {
-            val u = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = mode, seed = 77L)).world.uprising
-            assertTrue("$mode has one", u != null)
-            assertTrue("$mode: between 30 and 60 s in", u!!.startAt in 30f..60f)
-        }
-        assertEquals(null, Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.TRAINING, seed = 77L)).world.uprising)
-        assertEquals(null, Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.PORTAL, seed = 77L)).world.uprising)
-        // Only the moment is the seed's.
-        val a = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 1L)).world.uprising!!.startAt
-        val b = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 2L)).world.uprising!!.startAt
-        assertTrue(a != b)
-    }
-
     @Test fun theEntitysUprisingTakesEveryoneToItsSkyAndBack() {
-        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 21L, uprisingAt = 2f))
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.DUEL, seed = 21L, uprisingAt = 2f))
         val w = m.world
         val u = w.uprising!!
         val seen = LinkedHashSet<io.github.projectwip.sim.UprisingPhase>()
@@ -1524,6 +1313,7 @@ class SimulationTest {
         var skyHits = 0
         var hurtEachOther = false
         var inRealm = false
+        val corrupted = HashSet<Int>()
         var charges: Map<Int, Pair<Float, Float>> = emptyMap()
         var oneSide = true
         val home = w.arena
@@ -1538,18 +1328,21 @@ class SimulationTest {
                 bowedTogether = u.members.all { id -> w.fighter(id)!!.let { kotlin.math.hypot(it.x - u.slotX.getValue(id), it.y - u.slotY.getValue(id)) < 0.2f } }
             if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) {
                 if (w.arena !== home && w.arena.name == "The Entity's Dimension") inRealm = true
-                if (u.members.any { w.fighter(it)!!.team != 0 }) oneSide = false
+                if (u.members.any { w.fighter(it)!!.let { f -> f.team != 0 && f.corruptLeft <= 0f } }) oneSide = false
             }
             for (e in w.events) {
                 if (e is io.github.projectwip.sim.GameEvent.EntityHit) skyHits++
-                if (e is io.github.projectwip.sim.GameEvent.Hit && u.phase == io.github.projectwip.sim.UprisingPhase.SKY && e.sourceId >= 0) hurtEachOther = true
+                // (Only someone the Entity has corrupted fights their own side: that is its flares, and it's allowed.)
+                if (e is io.github.projectwip.sim.GameEvent.Corrupted) { if (e.on) corrupted += e.fighterId else corrupted -= e.fighterId }
+                if (e is io.github.projectwip.sim.GameEvent.Hit && u.phase == io.github.projectwip.sim.UprisingPhase.SKY && e.sourceId >= 0 &&
+                    e.sourceId !in corrupted && e.targetId !in corrupted) hurtEachOther = true
             }
         }
         assertEquals(listOf("GAZE", "MARCH", "BOW", "ENTER", "SKY", "RETURN", "DONE"), seen.map { it.name }.filter { it != "WAITING" })
-        assertTrue("everyone came", u.members.size == before.size && u.members.size >= 4)
+        assertTrue("everyone came", u.members.size == before.size && u.members.size >= 2)
         assertTrue("everyone stood in their place round it, bowing", bowedTogether)
         assertTrue("it held them at least a minute", u.heldFor >= Balance.UPRISING_HOLD - 0.1f)
-        assertTrue("the bots struck it in its dimension ($skyHits)", skyHits > 10)
+        assertTrue("the bots struck it in its dimension ($skyHits)", skyHits > 3)
         assertFalse("nobody hurt anybody else in there", hurtEachOther)
         assertTrue("they fought on the Entity's own platform", inRealm)
         assertTrue("everyone fought on one side", oneSide)
@@ -1575,7 +1368,7 @@ class SimulationTest {
      */
     @Test fun everyFightersAttackAndSuperLandOnTheEntityInItsDimension() {
         for (id in listOf(FighterId.BYTE, FighterId.BRAKK, FighterId.KIRA, FighterId.KITO, FighterId.BUDDY)) {
-            val m = Match(MatchConfig(id, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.KNOCKOUT_RUSH, seed = 33L, uprisingAt = 1f))
+            val m = Match(MatchConfig(id, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.BOSS, seed = 33L, uprisingAt = 1f))
             val w = m.world
             val u = w.uprising!!
             val p = m.player
@@ -1611,18 +1404,61 @@ class SimulationTest {
         }
     }
 
+    /**
+     * Boss Mode is the Entity's fight (the user's direction): its ritual, then its world, and the match is decided there,
+     * beaten or out of time. Its flares come down on someone and corrupt them, and they fight their own side.
+     */
+    @Test fun bossModeIsTheEntitysFightAndItsFlaresCorrupt() {
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.HARD, mode = GameMode.BOSS, humanPlayer = false, seed = 9L))
+        val w = m.world
+        val u = w.uprising!!
+        assertTrue("the Entity's fight", u.boss)
+        assertEquals("a team of three", 3, w.fighters.size)
+        var flares = 0; var corrupted = 0; var t = 0
+        var turned = false
+        while (!m.isOver && t < 60 * 420) {
+            m.step(Match.STEP); t++
+            for (e in w.events) {
+                if (e is io.github.projectwip.sim.GameEvent.EntityFlare && !e.landed) flares++
+                if (e is io.github.projectwip.sim.GameEvent.Corrupted && e.on) corrupted++
+            }
+            w.events.clear()
+            if (w.fighters.any { it.corruptLeft > 0f && it.team == 1 }) turned = true
+        }
+        println("the Entity's fight: ${t / 60} s, beaten=${u.beaten}, hp ${u.hp}/${u.maxHp}, flares $flares, corrupted $corrupted")
+        assertTrue("it decides the match", m.isOver)
+        assertEquals(if (u.beaten) MatchOutcome.VICTORY else MatchOutcome.DEFEAT, m.report().outcome)
+        assertTrue("its flares come ()", flares >= 3)
+        assertTrue("and corrupt someone ()", corrupted >= 1 && turned)
+        assertTrue("everyone is on their own side again", w.fighters.all { it.team == 0 && it.corruptLeft <= 0f })
+    }
+
+    @Test fun skipJumpsTheRitualStraightToItsPortal() {
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.BOSS, seed = 3L))
+        val u = m.world.uprising!!
+        var t = 0
+        while (u.phase != io.github.projectwip.sim.UprisingPhase.MARCH && t < 60 * 30) { m.step(Match.STEP); t++ }
+        assertEquals(io.github.projectwip.sim.UprisingPhase.MARCH, u.phase)
+        m.player.control.skip = true
+        m.step(Match.STEP)
+        assertEquals("straight to its portal", io.github.projectwip.sim.UprisingPhase.ENTER, u.phase)
+        assertTrue(u.skipped)
+    }
+
     @Test fun theEntityTakesOverAgainAndAgainInAMatch() {
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
-            mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, seed = 12L))
+            mode = io.github.projectwip.data.GameMode.DUEL, seed = 12L))
         val p = m.player
         var glitches = 0
         var was = false
         var ticks = 0
         // Up to two minutes of attacking whenever the gun is ready, kept alive: the Entity must take over several times.
-        repeat(60 * 120) {
-            if (m.isOver) return@repeat
+        repeat(60 * 600) {
+            if (m.isOver || ticks >= 60 * 120) return@repeat
             p.hp = p.maxHp
             val e = m.world.fighters.firstOrNull { it.team != p.team && it.alive }
+            // (Both kept alive: a 1v1 would otherwise be over at three knockouts.)
+            e?.let { it.hp = it.maxHp }
             if (e != null) { p.control.aimX = e.x - p.x; p.control.aimY = e.y - p.y; p.control.aiming = true }
             p.control.attack = true
             m.step(io.github.projectwip.sim.Match.STEP)

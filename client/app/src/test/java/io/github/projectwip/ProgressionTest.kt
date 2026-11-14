@@ -200,18 +200,6 @@ class ProgressionTest {
         assertEquals(Balance.upgradeCost[0] * 3, Progression.upgradeCost(normal.copy(settings = io.github.projectwip.data.Settings(debugUpgradeCost = 3f)), FighterId.BYTE))
     }
 
-    @Test fun walkingOutOfAFreeForAllIsLastPlaceNotFirst() {
-        val config = io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 1, 0, "Me", BotDifficulty.EASY, mode = GameMode.LAST_SPARK)
-        val match = io.github.projectwip.sim.Match(config)
-        assertEquals("still standing reads as first...", 1, match.report().placement)
-        val left = match.forfeit()
-        assertEquals("...but leaving puts you behind everyone still in", GameMode.LAST_SPARK.players, left.placement)
-        assertEquals(MatchOutcome.DEFEAT, left.outcome)
-        val team = io.github.projectwip.sim.Match(config.copy(mode = GameMode.KNOCKOUT_RUSH)).forfeit()
-        assertEquals(MatchOutcome.DEFEAT, team.outcome)
-        assertEquals(0, team.placement)
-    }
-
     /** Plays a match with made-up but lively inputs, as the device would, and returns it. */
     private fun played(config: io.github.projectwip.sim.MatchConfig, ticks: Int, script: Long): io.github.projectwip.sim.Match {
         val match = io.github.projectwip.sim.Match(config)
@@ -233,7 +221,7 @@ class ProgressionTest {
     }
 
     @Test fun theRefereeReplaysAMatchExactly() {
-        for ((mode, seed) in listOf(GameMode.LAST_SPARK to 11L, GameMode.KNOCKOUT_RUSH to 12L, GameMode.BOSS to 13L, GameMode.LAST_SPARK to 14L)) {
+        for ((mode, seed) in listOf(GameMode.DUEL to 11L, GameMode.DUEL to 12L, GameMode.BOSS to 13L, GameMode.DUEL to 14L)) {
             val config = io.github.projectwip.sim.MatchConfig(if (seed % 2 == 0L) FighterId.BUDDY else FighterId.KITO, 6, 0, "Me", BotDifficulty.HARD, mode = mode, seed = seed, botNames = listOf("A", "B", "C"))
             val live = played(config, 60 * 200, script = seed * 31)
             val verdict = io.github.projectwip.sim.Referee.judge(config, live.inputs.toBytes())
@@ -245,12 +233,12 @@ class ProgressionTest {
     }
 
     @Test fun theRefereeIgnoresWhatTheDeviceClaims() {
-        val config = io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 1, 0, "Me", BotDifficulty.EASY, mode = GameMode.LAST_SPARK, seed = 5L)
+        val config = io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 1, 0, "Me", BotDifficulty.EASY, mode = GameMode.DUEL, seed = 5L)
         // No inputs at all: the player never showed up, which is walking out, in last place.
         val nothing = io.github.projectwip.sim.Referee.judge(config, ByteArray(0))
         assertFalse(nothing.finished)
         assertEquals(MatchOutcome.DEFEAT, nothing.report.outcome)
-        assertEquals(GameMode.LAST_SPARK.players, nothing.report.placement)
+        assertEquals(0, nothing.report.placement)
         // A log cut off in the middle of a record is read up to the last whole one.
         val live = played(config, 600, script = 9)
         val whole = live.inputs.toBytes()
@@ -263,7 +251,7 @@ class ProgressionTest {
     }
 
     @Test fun theServersResultReplacesTheDevices() {
-        val mine = report(MatchOutcome.VICTORY, kos = 7).copy(mode = GameMode.LAST_SPARK, placement = 1, mvp = true)
+        val mine = report(MatchOutcome.VICTORY, kos = 7).copy(mode = GameMode.DUEL, placement = 1, mvp = true)
         val judged = io.github.projectwip.data.JudgedResult(MatchOutcome.DEFEAT, placement = 6, kos = 1, deaths = 1, damage = 900, mvp = false)
         val shown = judged.over(mine)
         assertEquals(MatchOutcome.DEFEAT, shown.outcome)

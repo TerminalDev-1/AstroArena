@@ -19,12 +19,11 @@ import math
 #   max_loss    the most a defeat costs. With loss_step, a defeat costs 1 Cup for every loss_step Cups the
 #               player has, up to max_loss, so new players lose nothing.
 DEFAULT_CUPS = {
-    "LAST_SPARK": {"places": [25, 22, 20, 17, 14, 12, 7, 3, 0, 0]},
-    "KNOCKOUT_RUSH": {"win": 8, "mvp_bonus": 2, "draw": 1, "max_loss": 6, "loss_step": 80},
-    "BOSS": {"win": 5},
+    # The Entity's fight ("BOSS"): the game is a boss-fight game about the Entity now (Knockout Rush, Last Spark and
+    # Dimension were removed in build 111), so it pays what Knockout Rush did.
+    "BOSS": {"win": 8, "mvp_bonus": 2, "draw": 1, "max_loss": 6, "loss_step": 80},
     # 1v1, against another real player (the lobby replays it and says who won: duel.py).
     "DUEL": {"win": 8, "draw": 0, "max_loss": 6, "loss_step": 80},
-    # (Dimension, "PORTAL", pays nothing: it is a story, not a contest, by the user's decision in build 104.)
 }
 # The Training Area is never played for Cups (nothing referees it), whatever trophies.cfg says.
 CUP_MODES = tuple(DEFAULT_CUPS)
@@ -45,11 +44,8 @@ def fighter_rank(cups: int) -> int:
 
 OUTCOMES = ("VICTORY", "DEFEAT", "DRAW")
 
-# The bosses of Boss Mode. A player may ask for one; otherwise the match's seed picks. Keep in step with BossKind.
-BOSSES = ("BARRAGE", "SWEEPER", "STAMPEDE")
-
-# Bots in each mode (the names the server hands out).
-MODES = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 5, "BOSS": 0, "TRAINING": 0, "PORTAL": 0}
+# Bots in each mode (the names the server hands out): in the Entity's fight, two allies make up a team of three.
+MODES = {"BOSS": 2, "TRAINING": 0}
 
 
 def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, table: dict | None = None) -> int:
@@ -93,7 +89,7 @@ def earns_drop(mode: str, outcome: str, placement: int) -> bool:
 # Nobody wins a real match faster than this, and a match left open this long is abandoned.
 MIN_GOOD_RESULT_SECONDS = 20.0
 MAX_MATCH_SECONDS = 3600.0
-_MAX_KOS = {"LAST_SPARK": 9, "KNOCKOUT_RUSH": 40, "BOSS": 80, "DUEL": 40, "TRAINING": 100000, "PORTAL": 0}
+_MAX_KOS = {"BOSS": 80, "DUEL": 40, "TRAINING": 100000}
 _MAX_DAMAGE = 3_000_000
 
 
@@ -114,20 +110,7 @@ def check_result(mode: str, elapsed: float, outcome: str, placement: int, kos: i
         return "more knockouts than the mode allows"
     if damage > _MAX_DAMAGE or deaths > 1000:
         return "numbers out of range"
-    if mode == "LAST_SPARK":
-        if not 1 <= placement <= 10:
-            return "placement out of range"
-        if deaths > 1:
-            return "more than one life in Last Spark"
-        if placement == 1 and kos == 0 and damage == 0:
-            return "a win without a fight"
-    if mode == "PORTAL":
-        # Dimension is a lore mode (build 104): no enemies, no bottom (it goes on forever), one life.
-        if not 0 <= placement <= 100_000:
-            return "placement out of range"
-        if deaths > 1:
-            return "more than one life in Dimension"
-    good = outcome == "VICTORY" or (mode == "LAST_SPARK" and placement <= 4)
+    good = outcome == "VICTORY"
     # (A 1v1 is won the moment the other player walks out, and it is the lobby that says so, not the device.)
     if good and mode not in ("TRAINING", "DUEL") and elapsed < MIN_GOOD_RESULT_SECONDS:
         return "finished faster than a match can be played"

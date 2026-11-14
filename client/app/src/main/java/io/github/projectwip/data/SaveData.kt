@@ -83,9 +83,7 @@ data class SaveData(
     val credits: Int = 0,
     val fighters: Map<FighterId, FighterProgress> = defaultFighters(),
     val selectedFighter: FighterId = FighterId.BYTE,
-    val selectedMode: GameMode = GameMode.LAST_SPARK,
-    /** Boss Mode: the boss the player wants to fight. Null = a random one each time. */
-    val selectedBoss: BossKind? = null,
+    val selectedMode: GameMode = GameMode.BOSS,
     /** Cup values of claimed track milestones. */
     val claimedMilestones: Set<Int> = emptySet(),
     val lastDailyGiftDay: Long = -1,

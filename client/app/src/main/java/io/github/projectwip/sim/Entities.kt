@@ -21,9 +21,11 @@ class Control {
     var hyper = false
     /** Sets off every rocket this fighter has planted (`AttackShape.PLANT`). Nothing to anyone else. */
     var detonate = false
+    /** Skips the Entity's ritual (the player pressed SKIP while it holds everyone). */
+    var skip = false
 
     fun clear() {
-        moveX = 0f; moveY = 0f; aiming = false; attack = false; superAttack = false; hyper = false; detonate = false
+        moveX = 0f; moveY = 0f; aiming = false; attack = false; superAttack = false; hyper = false; detonate = false; skip = false
     }
 }
 
@@ -80,6 +82,8 @@ class Fighter(
      * fighter glitches, for sure, again and again all match long (the user's rule: never just once, no cap).
      */
     var entityPull = 0f
+    /** Seconds the Entity still has this fighter, corrupted by one of its flares (it fights for the Entity). */
+    var corruptLeft = 0f
     var alive = true
     var respawnTimer = 0f
     var shield = 0f
@@ -255,14 +259,16 @@ sealed interface GameEvent {
     /** The Entity's uprising moved on to [phase] (an `UprisingPhase` ordinal). */
     data class Uprising(val phase: Int) : GameEvent
     /** In the Entity's sky, [fighterId] struck it for [damage] (a super: [isSuper]). */
+    /** One of the Entity's flares locked onto [targetId] (or, [landed], came down at x, y). */
+    data class EntityFlare(val targetId: Int, val x: Float, val y: Float, val landed: Boolean) : GameEvent
+    /** The Entity corrupted a fighter ([on]) or let it go. */
+    data class Corrupted(val fighterId: Int, val on: Boolean) : GameEvent
     data class EntityHit(val fighterId: Int, val isSuper: Boolean, val damage: Int, val x: Float, val y: Float) : GameEvent
     data class Shot(val fighterId: Int, val isSuper: Boolean, val x: Float, val y: Float, val dirX: Float, val dirY: Float) : GameEvent
     data class Hit(val targetId: Int, val sourceId: Int, val damage: Int, val x: Float, val y: Float, val isSuper: Boolean) : GameEvent
     data class Blocked(val x: Float, val y: Float) : GameEvent
     data class WallHit(val x: Float, val y: Float, val style: ShotStyle) : GameEvent
     data class Ko(val killerId: Int, val victimId: Int, val x: Float, val y: Float) : GameEvent
-    data class Eliminated(val fighterId: Int, val placement: Int) : GameEvent
-    data class StormHit(val targetId: Int, val damage: Int, val x: Float, val y: Float) : GameEvent
     data class Spawned(val fighterId: Int) : GameEvent
     data class CrateHit(val tx: Int, val ty: Int) : GameEvent
     data class CrateBroken(val tx: Int, val ty: Int) : GameEvent
@@ -299,12 +305,6 @@ sealed interface GameEvent {
     /** Portal Run: wave [wave] of dimension [dimension] is coming in. */
     /** The Entity has taken over [fighterId] for a few seconds (it glitched). */
     data class Glitched(val fighterId: Int) : GameEvent
-    /** Dimension: the player found echo shard [found] of [Balance.PORTAL_SHARDS] at ([x], [y]). */
-    data class ShardFound(val dimension: Int, val found: Int, val x: Float, val y: Float) : GameEvent
-    /** Dimension: every echo is found and the portal has opened at ([x], [y]). */
-    data class PortalOpened(val x: Float, val y: Float) : GameEvent
-    /** Dimension: the player went through, into [dimension]; [entered] portals so far. */
-    data class PortalEntered(val dimension: Int, val entered: Int) : GameEvent
     /** A rocket went off. */
     data class Burst(val x: Float, val y: Float, val radius: Float) : GameEvent
     /** A lobbed star came down and burst. */
@@ -316,4 +316,21 @@ sealed interface GameEvent {
     data object CountdownTick : GameEvent
     data object MatchStart : GameEvent
     data class MatchEnd(val winningTeam: Int) : GameEvent
+}
+
+/** What kind of ground attack a [Hazard] is, for drawing it. */
+/** [BREW] is a fighter's flask on its way down: it hurts one side and heals the other. */
+/** [RIFT] is the Entity's strike: the ground tearing open under someone. */
+enum class HazardKind { ROCKET, MINE, SLAM, BREW, RIFT }
+
+/**
+ * A marked patch of ground that goes off after [delay] seconds, hurting everyone of the other team standing in
+ * it. The mark is there from the start, so it can always be walked out of.
+ */
+class Hazard(
+    val ownerId: Int, val team: Int, val x: Float, val y: Float, val radius: Float, val delay: Float, val damage: Int, val kind: HazardKind,
+    /** False: it can take a fighter down to its last point of health, but never knocks it out. */
+    val lethal: Boolean = true,
+) {
+    var age = 0f
 }

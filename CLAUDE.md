@@ -147,8 +147,8 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - adb is at `/c/Users/gamer/AppData/Local/Android/Sdk/platform-tools/adb`; the tablet is on wireless debugging
   (`adb mdns services`, the port changes). Set `MSYS_NO_PATHCONV=1` for `adb shell`.
 - Start a screen directly: `adb shell am start -S -n io.github.projectwip/.MainActivity --es screen match`
-  (`match|boss|lastspark|portal|portalN|portalNo|portalNc|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `loading` holds the loading screen up; `portal3` starts Dimension three deep, `portal3o` with its portal already open, `portal3c` with the chained fighter beside you; `crash` crashes the game on purpose to try the crash reporter;
-  `result` (first in Last Spark), `result3`, `resultwin` and `resultloss` preview the end of a match, reveal first;
+  (`match|boss|uprising|uprisingduel|intro|train|duel|fighters|roster|kira|kito|buddy|shop|road|track|settings|result|leaders|news|loading`; `uprising` / `boss` is the Entity's fight (its ritual at once), `uprisingduel` its uprising 4 s into a 1v1 against a bot, `intro` the new-player opening; `loading` holds the loading screen up; `crash` crashes the game on purpose to try the crash reporter;
+  `result` / `resultwin` and `resultloss` preview the end of a match, reveal first;
   `tryswish` / `tryspark` are the Training Area as Swish / Spark; `roster` is the fighter grid with every model shown unlocked, `tryspark` / `trybrakk` / `trykira` / `trykito` / `trybuddy` the Training Area as that fighter, or `haul` to preview an "open all", or `capsule0`..`capsule5` to preview a capsule opening, suffix `s` is a full box of eight items, `f` gives a fighter, `b` a bundle). Save file: `adb shell run-as io.github.projectwip cat files/save.json`.
 - Crashes on players' devices: `net/CrashReporter.kt` saves a crash (and, on Android 11+, Android's record of a native
   crash, a freeze or a kill for memory) and hands it to the server the next time it answers (`POST /v1/crashes`, no
@@ -160,6 +160,17 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - Phone-size check: `wm size 1080x2400 && wm density 420`, then always `wm size reset` / `wm density reset`.
 
 ## Rules of the codebase
+
+- **AstroArena is a boss-fight game about the Entity** (the user's direction, build 111): "you fight the Entity;
+  everything ties back to the Entity." The modes are the Entity's fight (`GameMode.BOSS`, "The Entity" to players: its
+  ritual, which a player can SKIP (`Control.skip`, flag 32 in the input log and on the wire), then its world, where a
+  team of three, bots filling any place, fights it until it is beaten or `UPRISING_BOSS_SECONDS` run out: that decides
+  the match), 1v1 and the Training Area. **Knockout Rush, Last Spark and Dimension were removed, and the old bosses
+  (Hailstorm, Lighthouse, Ramrod) deleted**, code and all: don't bring them back. Many notes below describe them; they
+  are history. The Entity's moves in its world are `World.entityMoves` (strikes, rings, sweeps, and corruption flares:
+  whoever one lands on fights for it, against their own side, for `CORRUPT_SECONDS`; `World.corrupt`,
+  `Match.driveCorrupted`). The Entity's fight pays what Knockout Rush did (`trophies.cfg` [BOSS]). The Training Area's
+  giant is `Balance.giant`.
 
 - `sim/`, `ai/`, `data/` and `audio/SfxSynth.kt` are pure Kotlin (no Android imports); they run in JVM tests.
 - Humans and bots drive fighters through the same `Control`. Visibility goes through `World.isVisibleTo`.

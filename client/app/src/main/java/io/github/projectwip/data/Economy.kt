@@ -215,28 +215,22 @@ object Economy {
 
     // ---------------------------------------------------------------------------- what a match pays
 
-    private val PLACEMENT_BOLTS = intArrayOf(30, 26, 22, 18, 15, 12, 10, 8, 6, 5)
-
     fun matchBolts(mode: GameMode, outcome: MatchOutcome, placement: Int, kos: Int, difficulty: BotDifficulty): Int {
         if (mode == GameMode.TRAINING) return 0
         val koBonus = 2 * kos.coerceIn(0, 6)
-        val base = if (mode == GameMode.LAST_SPARK) PLACEMENT_BOLTS[(placement - 1).coerceIn(0, PLACEMENT_BOLTS.lastIndex)]
-        else when (outcome) { MatchOutcome.VICTORY -> 24; MatchOutcome.DRAW -> 14; MatchOutcome.DEFEAT -> 10 }
+        val base = when (outcome) { MatchOutcome.VICTORY -> 24; MatchOutcome.DRAW -> 14; MatchOutcome.DEFEAT -> 10 }
         return roundHalfUp((base + koBonus) * difficulty.boltMultiplier.toDouble())
     }
 
-    /** Arena Crystals for the first victory of the day. Boss Mode and the Training Area don't count. */
+    /** Arena Crystals for the first victory of the day (the Training Area doesn't count). */
     fun firstWinPrisms(mode: GameMode, outcome: MatchOutcome, save: SaveData, day: Long): Int =
-        if (mode == GameMode.BOSS || mode == GameMode.TRAINING || outcome != MatchOutcome.VICTORY || save.lastFirstWinDay == day) 0 else Balance.FIRST_WIN_PRISMS
+        if (mode == GameMode.TRAINING || outcome != MatchOutcome.VICTORY || save.lastFirstWinDay == day) 0 else Balance.FIRST_WIN_PRISMS
 
-    private fun good(mode: GameMode, outcome: MatchOutcome, placement: Int) =
-        outcome == MatchOutcome.VICTORY || (mode == GameMode.LAST_SPARK && placement in 1..4)
-
-    /** Credits for playing a match: a few for turning up, more for a good finish. */
+    /** Credits for playing a match: a few for turning up, more for a win. */
+    @Suppress("UNUSED_PARAMETER")
     fun matchCredits(mode: GameMode, outcome: MatchOutcome, placement: Int): Int = when {
         mode == GameMode.TRAINING -> 0
-        mode == GameMode.BOSS -> if (good(mode, outcome, placement)) 3 else 1
-        else -> if (good(mode, outcome, placement)) 6 else 2
+        else -> if (outcome == MatchOutcome.VICTORY) 6 else 2
     }
 
     /** Nothing earns an Arena Box any more: they were removed in 1.3 (as `earns_drop` in rules.py). */
@@ -363,22 +357,18 @@ object Economy {
 
 /** What each mode pays in Cups. Cups don't depend on how hard the bots are, and the Training Area never pays. */
 object Trophies {
-    /** [places]: Cups by finishing place (a mode with them is paid by place alone). Otherwise a victory, a draw, and a defeat that costs 1 Cup per [lossStep] held, up to [maxLoss]. */
-    private class Pays(val places: List<Int>? = null, val win: Int = 0, val mvpBonus: Int = 0, val draw: Int = 0, val maxLoss: Int = 0, val lossStep: Int = 0, val perPortal: Int = 0, val maxPortals: Int = 0)
+    /** A victory, a draw, and a defeat that costs 1 Cup per [lossStep] held, up to [maxLoss]. */
+    private class Pays(val win: Int = 0, val mvpBonus: Int = 0, val draw: Int = 0, val maxLoss: Int = 0, val lossStep: Int = 0)
 
     private val table = mapOf(
-        GameMode.LAST_SPARK to Pays(places = listOf(25, 22, 20, 17, 14, 12, 7, 3, 0, 0)),
-        GameMode.KNOCKOUT_RUSH to Pays(win = 8, mvpBonus = 2, draw = 1, maxLoss = 6, lossStep = 80),
-        GameMode.BOSS to Pays(win = 5),
-        // (Dimension pays no Cups: nothing is won in it.)
+        // The Entity is the game now: it pays what Knockout Rush did (the server's trophies.cfg can change it).
+        GameMode.BOSS to Pays(win = 8, mvpBonus = 2, draw = 1, maxLoss = 6, lossStep = 80),
     )
 
     /** How a match changes a player's Cups. Never takes them below zero. */
     fun cupDelta(mode: GameMode, outcome: MatchOutcome, placement: Int, cups: Int, mvp: Boolean): Int {
         val pays = table[mode] ?: return 0
         val delta = when {
-            pays.perPortal > 0 -> pays.perPortal * placement.coerceIn(0, pays.maxPortals)
-            pays.places != null -> pays.places[(placement - 1).coerceIn(0, pays.places.lastIndex)]
             outcome == MatchOutcome.VICTORY -> pays.win + if (mvp) pays.mvpBonus else 0
             outcome == MatchOutcome.DRAW -> pays.draw
             else -> -(if (pays.lossStep > 0) minOf(pays.maxLoss, cups / pays.lossStep) else pays.maxLoss)

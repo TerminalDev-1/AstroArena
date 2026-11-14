@@ -93,14 +93,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             when (startScreen) {
                 "match" -> Screen.Match(startMatchConfig(repo.save.value))
                 "boss" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
-                "portal" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.PORTAL))
-                // portal3 starts in the third dimension; portal3o also with its portal open (debug previews).
-                in Regex("portal[1-9][oc]?").let { r -> listOfNotNull(startScreen?.takeIf { r.matches(it) }) } -> Screen.Match(startMatchConfig(repo.save.value).copy(
-                    mode = io.github.projectwip.data.GameMode.PORTAL, portalStart = startScreen!![6].digitToInt(), portalOpen = startScreen.endsWith("o"), portalCaptiveNear = startScreen.endsWith("c")))
-                // The Entity's uprising, four seconds into a Knockout Rush match.
-                "uprising" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.KNOCKOUT_RUSH, uprisingAt = 4f))
-                "lastspark" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.LAST_SPARK))
-                "duel" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.DUEL, boss = null))
+                // The Entity's fight (its ritual starts at once), and its uprising in the middle of a 1v1 against a bot.
+                "uprising" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
+                "uprisingduel" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.DUEL, uprisingAt = 4f))
+                "duel" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.DUEL))
                 "train" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.TRAINING))
                 "fighters" -> Screen.Fighters()
                 "roster" -> { io.github.projectwip.ui.screens.rosterPreview = true; Screen.Fighters() }
@@ -110,7 +106,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 // The Training Area as any fighter, unlocked or not, for looking at them in play.
                 // (Swish is BYTE underneath.)
                 "trybuddy", "trykito", "trykira", "trybrakk", "trybyte", "tryspark", "tryswish" -> Screen.Match(startMatchConfig(repo.save.value).copy(
-                    playerFighter = FighterId.valueOf(startScreen.removePrefix("try").uppercase().replace("SWISH", "BYTE")), playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING, boss = null))
+                    playerFighter = FighterId.valueOf(startScreen.removePrefix("try").uppercase().replace("SWISH", "BYTE")), playerSkin = 0, mode = io.github.projectwip.data.GameMode.TRAINING))
                 "shop" -> Screen.Shop
                 "road" -> Screen.Road
                 "track" -> Screen.CupTrack
@@ -272,7 +268,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         teamStart.bots?.let { server.useBots(teamStart.difficulty, it) }
         val me = teamStart.setup.players[teamStart.setup.slot]
         screen = Screen.Match(MatchConfig(me.fighter, me.level, me.skin, me.name, teamStart.difficulty, mode = teamStart.mode,
-            seed = teamStart.seed, boss = teamStart.boss, botNames = teamStart.botNames, team = teamStart.setup))
+            seed = teamStart.seed, botNames = teamStart.botNames, team = teamStart.setup))
     }
     val showReward: (RewardReveal) -> Unit = { reveal = it }
 
@@ -428,13 +424,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
 }
 
 /** Debug (`--es screen result`): the result screen with made-up numbers, without playing or touching the save. */
-/** Debug: `result` (first in Last Spark), `result3` (third), `resultwin` (a Knockout Rush win), `resultloss` (a loss). */
+/** Debug: `result` / `resultwin` (beating the Entity), `resultloss` (losing to it). */
 private fun previewResult(save: io.github.projectwip.data.SaveData, kind: String = "result"): Screen {
-    val ffa = kind == "result" || kind == "result3"
     val report = io.github.projectwip.data.MatchReport(
         outcome = if (kind == "resultloss") io.github.projectwip.data.MatchOutcome.DEFEAT else io.github.projectwip.data.MatchOutcome.VICTORY,
-        mode = if (ffa) io.github.projectwip.data.GameMode.LAST_SPARK else io.github.projectwip.data.GameMode.KNOCKOUT_RUSH,
-        placement = if (kind == "result3") 3 else 1, players = 10,
+        mode = io.github.projectwip.data.GameMode.BOSS,
+        placement = 0, players = 3,
         fighter = save.selectedFighter, kos = 4, deaths = 0, damageDealt = 5200, mvp = true, difficulty = save.settings.botDifficulty, blueScore = 0, redScore = 0,
     )
     val players = (1..10).map { i ->
@@ -474,8 +469,7 @@ fun connectToServer(server: io.github.projectwip.net.GameServer, repo: GameRepos
 
 fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
     val p = save.progress(save.selectedFighter)
-    return MatchConfig(save.selectedFighter, p.level, p.skin, save.settings.playerName, save.settings.botDifficulty, mode = save.selectedMode,
-        boss = save.selectedBoss.takeIf { save.selectedMode == io.github.projectwip.data.GameMode.BOSS })
+    return MatchConfig(save.selectedFighter, p.level, p.skin, save.settings.playerName, save.settings.botDifficulty, mode = save.selectedMode)
 }
 
 fun rewardLabel(r: Reward): String = when (r) {

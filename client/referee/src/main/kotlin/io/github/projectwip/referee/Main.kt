@@ -29,7 +29,7 @@ import java.util.Base64
  *     finished=true ticks=4328 winner=1 kos0=1 deaths0=3 damage0=4100 kos1=3 deaths1=1 damage1=6200 wrong0=false wrong1=false
  *
  * A team of real players (`players=2` or `3`, in Boss Mode or Knockout Rush) is given like any match (mode, seed,
- * difficulty, names, bot settings, boss), with each player in place of the one fighter:
+ * difficulty, names, bot settings), with each player in place of the one fighter:
  *     players=2   fighter0=KITO level0=10 frames0=<base64>   fighter1=BYTE level1=7 frames1=<base64>
  *     left=1                     (optional: the slots of players who walked out, separated by commas)
  *     check=600                  (optional: a tick to give the replay's own checksum for)
@@ -85,7 +85,6 @@ fun main() {
                 players[0].fighter, players[0].level, 0, "Player", difficulty,
                 mode = GameMode.valueOf(fields.getValue("mode")), seed = fields.getValue("seed").toLong(),
                 botNames = fields["names"].orEmpty().split(',').filter { it.isNotBlank() },
-                boss = fields["boss"]?.let { name -> io.github.projectwip.data.BossKind.entries.firstOrNull { it.name == name } },
                 team = io.github.projectwip.sim.TeamSetup(0, players),
             )
             val verdict = Referee.judgeTeam(
@@ -114,8 +113,6 @@ fun main() {
             mode = GameMode.valueOf(fields.getValue("mode")),
             seed = fields.getValue("seed").toLong(),
             botNames = fields["names"].orEmpty().split(',').filter { it.isNotBlank() },
-            // Boss Mode: the boss the player asked for, if they asked for one.
-            boss = fields["boss"]?.let { name -> io.github.projectwip.data.BossKind.entries.firstOrNull { it.name == name } },
         )
         val verdict = Referee.judge(config, Base64.getDecoder().decode(fields["inputs"].orEmpty()))
         val r = verdict.report

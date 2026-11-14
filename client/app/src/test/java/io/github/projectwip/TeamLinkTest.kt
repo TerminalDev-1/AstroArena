@@ -98,16 +98,22 @@ class TeamLinkTest {
             while (link.start == null) Thread.sleep(2)
             val start = link.start!!
             val me = start.setup.players[start.setup.slot]
-            match = Match(MatchConfig(me.fighter, me.level, me.skin, me.name, start.difficulty, mode = start.mode, seed = start.seed, boss = start.boss, botNames = start.botNames, team = start.setup))
+            match = Match(MatchConfig(me.fighter, me.level, me.skin, me.name, start.difficulty, mode = start.mode, seed = start.seed, botNames = start.botNames, team = start.setup))
             val mine = match.player
             val wanted = io.github.projectwip.sim.Control()
             var tick = 0
             var waited = 0
             while (tick < ticks && !link.calledOff && !match.isOver) {
                 if (link.sent <= tick) {
-                    val foe = match.world.fighters.first { it.team != mine.team && it.alive || it.team != mine.team }
-                    wanted.moveX = (foe.x - mine.x) * 0.2f + hands.nextFloat() - 0.5f; wanted.moveY = (foe.y - mine.y) * 0.2f + hands.nextFloat() - 0.5f
-                    wanted.aiming = true; wanted.aimX = foe.x - mine.x; wanted.aimY = foe.y - mine.y
+                    // (Against the Entity: at it, in its world; anyone on the other side, if there is one.)
+                    val foe = match.world.fighters.firstOrNull { it.team != mine.team && it.alive }
+                    val u = match.world.uprising
+                    val fx = foe?.x ?: if (u != null && match.world.inSky) u.ex else mine.x
+                    val fy = foe?.y ?: if (u != null && match.world.inSky) u.ey else mine.y - 1f
+                    wanted.moveX = (fx - mine.x) * 0.2f + hands.nextFloat() - 0.5f; wanted.moveY = (fy - mine.y) * 0.2f + hands.nextFloat() - 0.5f
+                    wanted.aiming = true; wanted.aimX = fx - mine.x; wanted.aimY = fy - mine.y
+                    // (Everyone skips the ritual once it has begun, so the test gets to the fight.)
+                    wanted.skip = tick in 400..402
                     wanted.attack = hands.nextInt(5) == 0; wanted.superAttack = hands.nextInt(25) == 0; wanted.hyper = hands.nextInt(30) == 0
                     link.sendLocal(wanted)
                 }
@@ -138,10 +144,8 @@ class TeamLinkTest {
         assertEquals("and agree on how the match stands", 1, devices.map { it.match.world.checksum() }.toSet().size)
         assertEquals("each plays a fighter of their own", setOf(0, 1, 2), devices.map { it.match.world.fighters.indexOf(it.match.player) }.toSet())
         assertTrue("and it is the one they brought", devices.all { it.match.player.def.id == it.fighter })
-        assertEquals("three players and the boss", 4, devices[0].match.world.fighters.size)
-        val boss = devices[0].match.world.fighters.last()
-        assertEquals("the boss is tougher for a team of three", Math.round(65000 * (1f + 2 * Match.TEAM_BOSS_HEALTH)), boss.maxHp)
-        assertTrue("they really fought it", boss.damageTaken() > 0)
+        assertEquals("three players, against the Entity", 3, devices[0].match.world.fighters.size)
+        assertTrue("the Entity's fight is the match", devices.all { it.match.world.uprising?.boss == true })
         // The server's replay, from the frames the lobby kept, is that match.
         repeat(2000) { if (synchronized(kept) { kept.frames.minOf { it.size() } } < 17 * (ran - DuelLink.DELAY)) Thread.sleep(5) }
         val frames = synchronized(kept) { kept.frames.map { it.toByteArray().copyOf(17 * (ran - DuelLink.DELAY)) } }
@@ -150,14 +154,14 @@ class TeamLinkTest {
         assertEquals(devices[0].match.isOver, verdict.finished)
         assertEquals(devices[0].match.humans.map { Triple(it.kos, it.deaths, it.damageDealt) }, verdict.fighters.map { Triple(it.kos, it.deaths, it.damageDealt) })
         assertTrue(verdict.checksum != null)
-        println("referee team boss: ${verdict.ticks} ticks, finished=${verdict.finished}, damage ${verdict.fighters.map { it.damageDealt }}, boss ${boss.hp}/${boss.maxHp}")
+        println("referee team boss: ${verdict.ticks} ticks, finished=${verdict.finished}, damage ${verdict.fighters.map { it.damageDealt }}")
         for (d in devices) d.link.close()
         server.close()
     }
 
-    @Test fun aTeamOfTwoPlays3v3WithABotAndOneOfThemCanLeave() {
+    @Test fun aTeamOfTwoFightsTheEntityWithABotAndOneOfThemCanLeave() {
         val kept = Kept(2)
-        val server = lobby(2, GameMode.KNOCKOUT_RUSH, kept)
+        val server = lobby(2, GameMode.BOSS, kept)
         val a = Device(server.localPort, fighters[0], 1L)
         val b = Device(server.localPort, fighters[1], 2L)
         val ta = thread { a.play(60 * 25) }
@@ -168,8 +172,8 @@ class TeamLinkTest {
         assertEquals("the one who stayed was not held up", 60 * 25, a.ticksRun)
         assertFalse(a.link.calledOff)
         val w = a.match.world
-        assertEquals("three a side: two players and a bot against three bots", listOf(3, 3), listOf(0, 1).map { t -> w.fighters.count { it.team == t } })
-        assertEquals(listOf(false, false, true, true, true, true), w.fighters.map { it.isBot })
+        assertEquals("a team of three against the Entity: two players and a bot", listOf(3, 0), listOf(0, 1).map { t -> w.fighters.count { it.team == t } })
+        assertEquals(listOf(false, false, true), w.fighters.map { it.isBot })
         assertTrue("the one who stayed did some fighting", a.match.player.damageDealt > 0)
         // The replay, told who left, is the match the one who stayed played.
         val (sa, sb) = a.match.config.team!!.slot to b.match.config.team!!.slot

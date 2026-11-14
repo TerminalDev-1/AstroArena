@@ -97,7 +97,6 @@ def daily_gift(day: int) -> dict:
 # ---------------------------------------------------------------------------- match pay
 
 BOLT_MULTIPLIER = {"EASY": 0.75, "NORMAL": 1.0, "HARD": 1.25, "ELITE": 1.5}
-PLACEMENT_BOLTS = [30, 26, 22, 18, 15, 12, 10, 8, 6, 5]
 OUTCOME_BOLTS = {"VICTORY": 24, "DRAW": 14, "DEFEAT": 10}
 FIRST_WIN_PRISMS = 10
 
@@ -107,16 +106,13 @@ def match_bolts(mode: str, outcome: str, placement: int, kos: int, difficulty: s
         return 0
     multiplier = BOLT_MULTIPLIER.get(difficulty, 1.0)
     ko_bonus = 2 * min(max(kos, 0), 6)
-    if mode == "LAST_SPARK":
-        base = PLACEMENT_BOLTS[min(max(placement - 1, 0), len(PLACEMENT_BOLTS) - 1)]
-    else:
-        base = OUTCOME_BOLTS.get(outcome, 10)
+    base = OUTCOME_BOLTS.get(outcome, 10)
     return _round((base + ko_bonus) * multiplier)
 
 
 def first_win_prisms(mode: str, outcome: str, profile: dict, day: int) -> int:
-    """Prisms for the first victory of the day. Boss Mode and the Training Area don't count."""
-    if mode in ("BOSS", "TRAINING") or outcome != "VICTORY" or profile.get("lastFirstWinDay") == day:
+    """Prisms for the first victory of the day (the Training Area doesn't count)."""
+    if mode == "TRAINING" or outcome != "VICTORY" or profile.get("lastFirstWinDay") == day:
         return 0
     return FIRST_WIN_PRISMS
 
@@ -206,13 +202,10 @@ def fighters_in(reward: dict) -> list[str]:
 
 
 def match_credits(mode: str, outcome: str, placement: int) -> int:
-    """Credits for playing a match: a few for turning up, more for a good finish."""
+    """Credits for playing a match: a few for turning up, more for a win."""
     if mode == "TRAINING":
         return 0
-    good = outcome == "VICTORY" or (mode == "LAST_SPARK" and 1 <= placement <= 4)
-    if mode == "BOSS":
-        return 3 if good else 1
-    return 6 if good else 2
+    return 6 if outcome == "VICTORY" else 2
 
 
 # ---------------------------------------------------------------------------- profiles

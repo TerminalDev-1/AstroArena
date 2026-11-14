@@ -25,7 +25,6 @@ class HudSnapshot {
     var respawnTimer = 0f
     var ammo = 0f
     var ammoMax = 3
-    /** The player's blade bar, 0..1 (full, the next swing reaches further). -1: their fighter has none. */
     var edge = -1f
     var superCharge = 0f
     var hyperCharge = 0f
@@ -36,56 +35,14 @@ class HudSnapshot {
     var autoTargetId = -1
     var matchesPlayed = 0
     var fps = 0
-    var freeForAll = false
     /** Boss Mode: the giant's health and the player's remaining lives go on the HUD instead of a score. */
     var bossMode = false
-    /** Dimension: which one, echoes found, whether the portal is open or the player is passing through. */
-    var portalRun = false
-    var portalDimension = 1
-    var portalFound = 0
-    var portalOpen = false
-    var portalTravel = false
-    /** Where the pointer points (the nearest echo, or the open portal), in world x / z, and where the player is. */
-    var portalTargetOn = false
-    var portalTargetX = 0f
-    var portalTargetZ = 0f
-    var portalPlayerX = 0f
-    var portalPlayerZ = 0f
-    /** Dimension: how hard the picture is glitching right now (0 nearly always), and whose soul the Void speaks with. */
-    var portalGlitch = 0f
     /** Seconds left of the player's glitch (the Entity fighting through them), or 0. */
     var playerGlitch = 0f
-    var voidSoul: String? = null
-    var voidSoulColor = 0
-    /** Dimension: the chained fighter, while they are still chained. */
-    var captiveOn = false
-    var captiveName = ""
-    var captiveX = 0f
-    var captiveZ = 0f
-    /** Dimension: the freed soul following the player, and what they are saying (and for how long so far). */
-    var followerOn = false
-    var followerX = 0f
-    var followerZ = 0f
-    var followerLine: String? = null
-    var followerAge = 0f
-    var followerName = ""
-    var followerColor = 0
-    /** The Void's last words, and how long ago they were said (they fade after a few seconds). */
-    var voidLine: String? = null
-    var voidAge = 99f
     /** How often the player has been knocked out (Boss Mode has no life limit, it just counts). */
     var timesDown = 0
-    /** Training Area: no clock, no target. */
     var practice = false
-    /** Damage the player has dealt so far. */
     var damage = 0
-    var bossHp = 0
-    var bossMaxHp = 1
-    var bossName: String? = null
-    var aliveCount = 0
-    var placement = 0
-    var stormElapsed = -1f
-    var playerOutsideStorm = false
 
     val count get() = n
     var n = 0
@@ -125,13 +82,10 @@ class HudSnapshot {
         playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; ammo = o.ammo; ammoMax = o.ammoMax; edge = o.edge; superCharge = o.superCharge
         hyperCharge = o.hyperCharge; hyperLeft = o.hyperLeft; duelNotice = o.duelNotice
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
-        bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; bossHp = o.bossHp; bossMaxHp = o.bossMaxHp; bossName = o.bossName
-        portalRun = o.portalRun; portalDimension = o.portalDimension; portalFound = o.portalFound; portalOpen = o.portalOpen; portalTravel = o.portalTravel; voidLine = o.voidLine; voidAge = o.voidAge
-        portalTargetOn = o.portalTargetOn; portalTargetX = o.portalTargetX; portalTargetZ = o.portalTargetZ; portalPlayerX = o.portalPlayerX; portalPlayerZ = o.portalPlayerZ
-        playerGlitch = o.playerGlitch; portalGlitch = o.portalGlitch; voidSoul = o.voidSoul; voidSoulColor = o.voidSoulColor; captiveOn = o.captiveOn; captiveName = o.captiveName; captiveX = o.captiveX; captiveZ = o.captiveZ
-        followerOn = o.followerOn; followerX = o.followerX; followerZ = o.followerZ; followerLine = o.followerLine; followerAge = o.followerAge; followerName = o.followerName; followerColor = o.followerColor
-        freeForAll = o.freeForAll; aliveCount = o.aliveCount; placement = o.placement
-        stormElapsed = o.stormElapsed; playerOutsideStorm = o.playerOutsideStorm
+        bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; 
+        
+        playerGlitch = o.playerGlitch; 
+        
         n = o.n
         for (i in 0 until n) {
             ids[i] = o.ids[i]; sx[i] = o.sx[i]; sy[i] = o.sy[i]; visible[i] = o.visible[i]

@@ -83,12 +83,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
     val r = summary.report
     val ui = LocalUi.current
     val sfx = LocalSfx.current
-    val ffa = r.mode == io.github.projectwip.data.GameMode.LAST_SPARK
     val (label, color) = when {
-        // Dimension is a story: nothing is won or lost, it only says how deep the run went.
-        r.mode == io.github.projectwip.data.GameMode.PORTAL -> Pair("DIMENSION ${r.placement + 1}", Color(0xFFC9A6FF))
-        ffa && r.placement == 1 -> Pair("VICTORY! #1", Palette.Gold)
-        ffa -> Pair("#${r.placement} PLACE", if (r.placement <= 4) Palette.Cyan else Palette.Red)
         r.outcome == MatchOutcome.VICTORY -> Pair("VICTORY!", Palette.Gold)
         r.outcome == MatchOutcome.DRAW -> Pair("DRAW", Color.White)
         else -> Pair("DEFEAT", Palette.Red)
@@ -134,7 +129,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
         delay(550)
         repeat(8) { i ->
             rowsShown = i + 1
-            if (i < rewardRowCount(rewards, r.mvp && r.mode == io.github.projectwip.data.GameMode.KNOCKOUT_RUSH)) {
+            if (i < rewardRowCount(rewards, r.mvp && r.mode == io.github.projectwip.data.GameMode.BOSS)) {
                 // Every reward lands with a pop and a cha-ching, each one a little higher than the last.
                 sfx?.play(Sound.POP, 0.6f, 0.9f + i * 0.1f); sfx?.play(Sound.CHING, 0.8f, 0.9f + i * 0.07f); sfx?.buzz(14, 110)
                 delay(260)
@@ -175,7 +170,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
         io.github.projectwip.ui.LobbyShotEffect(io.github.projectwip.render3d.LobbyShot.BACKDROP)
         androidx.compose.foundation.layout.Box(Modifier.bleed().fillMaxSize().background(io.github.projectwip.ui.SCRIM))
         // Light and motion behind everything: rays turning round the title, and confetti for a win.
-        ResultBackdrop(color, won || (ffa && r.placement == 1), if (flyFrom.isSpecified) flyFrom - flyOrigin else Offset.Unspecified)
+        ResultBackdrop(color, won, if (flyFrom.isSpecified) flyFrom - flyOrigin else Offset.Unspecified)
         Row(Modifier.fillMaxSize().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // ---------------- left: banner + scoreboard
             Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -185,32 +180,23 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         GameText(label, Type.Display.copy(fontSize = Type.Display.fontSize * if (ui.roomy) 1.6f else 1.3f), color = color, outline = 5.dp)
                         PlainText(
                             when (r.mode) {
-                                io.github.projectwip.data.GameMode.LAST_SPARK -> "Last Spark · Static Canyon · ${r.difficulty.label} bots"
-                                io.github.projectwip.data.GameMode.KNOCKOUT_RUSH -> "Knockout Rush · Foundry Yard · ${r.difficulty.label} bots"
-                                io.github.projectwip.data.GameMode.BOSS -> "Boss Mode · Proving Ground · ${r.difficulty.label} boss"
+                                io.github.projectwip.data.GameMode.BOSS -> "The Entity · its world · ${r.difficulty.label} bots"
                                 io.github.projectwip.data.GameMode.TRAINING -> "Training Area"
                                 io.github.projectwip.data.GameMode.DUEL -> "1v1 · Proving Ground"
-                                io.github.projectwip.data.GameMode.PORTAL -> io.github.projectwip.data.Lore.dimensionName(r.placement + 1) + " · ${r.placement} portal${if (r.placement == 1) "" else "s"} deep"
                             }, Type.Label, color = Palette.TextDim)
                     }
                 }
-                if (!ffa && r.mode != io.github.projectwip.data.GameMode.PORTAL) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.arrive(0, 0f, -30f)) {
+                if (r.mode == io.github.projectwip.data.GameMode.DUEL) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.arrive(0, 0f, -30f)) {
                     GameText(r.blueScore.let { if (summary.playerTeam == 0) it else r.redScore }.toString(), Type.Display, color = Palette.Ally, outline = 4.dp)
                     GameText("  –  ", Type.Title, outline = 3.dp)
                     GameText(r.redScore.let { if (summary.playerTeam == 0) it else r.blueScore }.toString(), Type.Display, color = Palette.Enemy, outline = 4.dp)
                 }
                 Spacer(Modifier.height(10.dp))
-                if (ffa) {
-                    // Standings: still-standing fighters first, then by finishing place.
-                    val order = summary.players.sortedBy { if (it.placement == 0) 0 else it.placement }
-                    Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TeamPanel("STANDINGS", order.take(5), Palette.Gold, Modifier.weight(1f), ranked = true)
-                        TeamPanel(" ", order.drop(5), Palette.Gold, Modifier.weight(1f), ranked = true, first = 5)
-                    }
-                } else Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     val bossMode = r.mode == io.github.projectwip.data.GameMode.BOSS
-                    TeamPanel(if (bossMode) "YOU" else "YOUR TEAM", summary.players.filter { it.team == summary.playerTeam }, Palette.Ally, Modifier.weight(1f))
-                    TeamPanel(if (bossMode) "THE BOSS" else "OPPONENTS", summary.players.filter { it.team != summary.playerTeam }, Palette.Enemy, Modifier.weight(1f), first = 3)
+                    // (Against the Entity everyone is on one side: one panel, the whole team.)
+                    TeamPanel(if (bossMode) "YOUR TEAM AGAINST THE ENTITY" else "YOU", summary.players.filter { it.team == summary.playerTeam }, Palette.Ally, Modifier.weight(1f))
+                    if (!bossMode) TeamPanel("OPPONENT", summary.players.filter { it.team != summary.playerTeam }, Palette.Enemy, Modifier.weight(1f), first = 3)
                 }
             }
 
@@ -225,7 +211,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                             if (celebrate || won) FighterRays(Modifier.size(300.dp), if (celebrate) Palette.Positive else Palette.Gold)
                             Pedestal(if (celebrate) Palette.Positive else Palette.Cyan, Modifier.fillMaxSize())
-                            if (me != null) FighterView(me.boss?.let { Balance.boss(it) } ?: Balance.fighter(me.fighter), me.skin, Modifier.fillMaxSize(), pedestal = false)
+                            if (me != null) FighterView(Balance.fighter(me.fighter), me.skin, Modifier.fillMaxSize(), pedestal = false)
                             RankMedallion(FighterRanks.label(shownCups), FighterRanks.progress(shownCups), rankSpin.value, rankBurst.value,
                                 Modifier.align(Alignment.BottomEnd).size(if (ui.roomy) 84.dp else 66.dp).graphicsLayer { scaleX = rankPop.value; scaleY = rankPop.value })
                         }
@@ -601,7 +587,7 @@ private fun TeamPanel(title: String, players: List<PlayerLine>, color: Color, mo
                         GameText(if (p.placement == 0) "—" else "#${p.placement}", Type.Heading,
                             color = if (p.placement == 1) Palette.Gold else Color.White, outline = 2.dp, modifier = Modifier.width(38.dp))
                     }
-                    val def = p.boss?.let { Balance.boss(it) } ?: Balance.fighter(p.fighter)
+                    val def = Balance.fighter(p.fighter)
                     if (compact) {
                         // A small badge in the fighter's colours in place of the 3D model, so a long list stays light.
                         val sk = def.skins[p.skin.coerceIn(0, def.skins.lastIndex)]

@@ -33,6 +33,8 @@ enum class UprisingPhase {
 class Uprising(
     /** Seconds of play after which it begins. */
     val startAt: Float,
+    /** Boss Mode: the Entity's fight is the whole match (it ends it, won or lost) and it fights to knock them out. */
+    val boss: Boolean = false,
 ) {
     var phase = UprisingPhase.WAITING
     /** Seconds in the current phase. */
@@ -64,10 +66,20 @@ class Uprising(
     val teams = HashMap<Int, Int>()
     /** Hexes biting the Entity. */
     val hexes = ArrayList<Hex>()
+    /** Its corruption flares on their way down, and how many times it has sent them. */
+    val flares = ArrayList<EntityFlare>()
+    var flaresFired = 0
+    /** A player skipped its ritual. */
+    var skipped = false
     /** True once it has been beaten (rather than having let them go). */
     var beaten = false
 
     val active get() = phase != UprisingPhase.WAITING && phase != UprisingPhase.DONE
     /** Everyone is the Entity's: nobody controls themselves. */
     val holding get() = phase == UprisingPhase.GAZE || phase == UprisingPhase.MARCH || phase == UprisingPhase.BOW || phase == UprisingPhase.ENTER || phase == UprisingPhase.RETURN
+}
+
+/** One of the Entity's corruption flares: locked onto [target], following them, then coming down where it is. */
+class EntityFlare(val target: Int, var x: Float, var y: Float) {
+    var age = 0f
 }

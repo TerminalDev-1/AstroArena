@@ -478,9 +478,8 @@ fun FighterView(
             }
         } else {
             val images by Portraits.images.collectAsState()
-            val bosses by Portraits.bosses.collectAsState()
-            // A boss has a portrait of its own. Portraits are always fitted into the space, never stretched to it.
-            (def.boss?.let { bosses[it] } ?: if (def.boss == null) images[def.id to skin.coerceIn(0, def.skins.lastIndex)] else null)?.let { bmp ->
+            // Portraits are always fitted into the space, never stretched to it.
+            images[def.id to skin.coerceIn(0, def.skins.lastIndex)]?.let { bmp ->
                 Image(
                     bmp.asImageBitmap(), contentDescription = def.name, modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,

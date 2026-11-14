@@ -45,40 +45,28 @@ class VersionRules(unittest.TestCase):
 
 class Rules(unittest.TestCase):
     def test_cups_match_the_client_table(self):
-        # Knockout Rush: a win pays the difficulty's bonus (+2 for MVP), a loss costs more as Cups grow.
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "VICTORY", 0, 0, False), 8)
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "VICTORY", 0, 0, True), 10)
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DRAW", 0, 0, False), 1)
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", 0, 3, False), 0)
-        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", 0, 500, False), -6)
-        # Last Spark pays by place, whatever the bots' difficulty, and last place costs nothing.
-        self.assertEqual([rules.cup_delta("LAST_SPARK", "DEFEAT", place, 100, False) for place in range(1, 11)], [25, 22, 20, 17, 14, 12, 7, 3, 0, 0])
-        # Boss Mode pays for a win and costs nothing; the Training Area is never played for Cups.
-        self.assertEqual([rules.cup_delta("BOSS", o, 0, 500, True) for o in ("VICTORY", "DRAW", "DEFEAT")], [5, 0, 0])
-        self.assertEqual(rules.cup_delta("TRAINING", "VICTORY", 0, 100, True, {"TRAINING": {"win": 50}}), 0)
-        # A 1v1 pays the winner and costs the loser, like Knockout Rush without an MVP.
-        self.assertEqual([rules.cup_delta("DUEL", o, 0, 500, True) for o in ("VICTORY", "DRAW", "DEFEAT")], [8, 0, -6])
-        # trophies.cfg's numbers are used when there are some, and Cups never go below zero.
-        table = {"BOSS": {"win": 12, "mvp_bonus": 3, "draw": 2, "max_loss": 4}, "KNOCKOUT_RUSH": {"places": [9, -2]}}
-        self.assertEqual([rules.cup_delta("BOSS", o, 0, 3, True, table) for o in ("VICTORY", "DRAW", "DEFEAT")], [15, 2, -3])
-        self.assertEqual([rules.cup_delta("KNOCKOUT_RUSH", "DEFEAT", p, 50, False, table) for p in (1, 2, 7)], [9, -2, -2])
-        # A fighter's rank follows its own Cups; the top one starts at 1000.
-        # There is no top rank: past the end of the table every rank is another FIGHTER_RANK_STEP Cups.
-        self.assertEqual([rules.fighter_rank(c) for c in (0, 9, 10, 999, 1000, 1149, 1150, 5000, 1_000_000)], [1, 1, 2, 19, 20, 20, 21, 46, 6680])
-        self.assertEqual(len(rules.FIGHTER_RANK_CUPS), 20)
+        # The Entity's fight pays what Knockout Rush did (EconomyTest checks the client's copy says the same).
+        self.assertEqual(rules.cup_delta("BOSS", "VICTORY", 0, 0, False), 8)
+        self.assertEqual(rules.cup_delta("BOSS", "VICTORY", 0, 0, True), 10)
+        self.assertEqual(rules.cup_delta("BOSS", "DRAW", 0, 0, False), 1)
+        self.assertEqual(rules.cup_delta("BOSS", "DEFEAT", 0, 3, False), 0)
+        self.assertEqual(rules.cup_delta("BOSS", "DEFEAT", 0, 500, False), -6)
+        self.assertEqual(rules.cup_delta("TRAINING", "VICTORY", 0, 0, True), 0)
+        # Removed modes pay nothing.
+        self.assertEqual(rules.cup_delta("KNOCKOUT_RUSH", "VICTORY", 0, 0, False), 0)
+        self.assertEqual(rules.cup_delta("LAST_SPARK", "VICTORY", 1, 0, False), 0)
 
     def test_unbelievable_results_are_caught(self):
-        ok = dict(outcome="VICTORY", placement=1, kos=4, deaths=0, damage=9000)
-        self.assertIsNone(rules.check_result("LAST_SPARK", 90, **ok))
-        self.assertIsNotNone(rules.check_result("LAST_SPARK", 3, **ok))  # nobody wins in three seconds
-        self.assertIsNotNone(rules.check_result("LAST_SPARK", 5000, **ok))  # left open for over an hour
-        self.assertIsNotNone(rules.check_result("LAST_SPARK", 90, **{**ok, "kos": 10}))  # only nine opponents
-        self.assertIsNotNone(rules.check_result("LAST_SPARK", 90, **{**ok, "placement": 0}))
-        self.assertIsNotNone(rules.check_result("LAST_SPARK", 90, **{**ok, "kos": 0, "damage": 0}))
-        self.assertIsNotNone(rules.check_result("KNOCKOUT_RUSH", 90, **{**ok, "outcome": "WON"}))
-        self.assertIsNotNone(rules.check_result("KNOCKOUT_RUSH", 90, **{**ok, "damage": -1}))
+        ok = dict(outcome="VICTORY", placement=0, kos=4, deaths=0, damage=9000)
+        self.assertIsNone(rules.check_result("BOSS", 90, **ok))
+        self.assertIsNotNone(rules.check_result("BOSS", 3, **ok))  # nobody beats the Entity in three seconds
+        self.assertIsNotNone(rules.check_result("BOSS", 5000, **ok))  # left open for over an hour
+        self.assertIsNotNone(rules.check_result("BOSS", 90, **{**ok, "kos": 81}))
+        self.assertIsNotNone(rules.check_result("BOSS", 90, **{**ok, "outcome": "WON"}))
+        self.assertIsNotNone(rules.check_result("BOSS", 90, **{**ok, "damage": -1}))
+        self.assertIsNotNone(rules.check_result("LAST_SPARK", 90, **ok))  # a removed mode
         # Losing quickly is believable.
-        self.assertIsNone(rules.check_result("LAST_SPARK", 6, outcome="DEFEAT", placement=10, kos=0, deaths=1, damage=0))
+        self.assertIsNone(rules.check_result("BOSS", 6, outcome="DEFEAT", placement=0, kos=0, deaths=1, damage=0))
 
     def test_drop_odds_and_luck(self):
         self.assertAlmostEqual(sum(rules.odds()), 1.0)
@@ -130,9 +118,8 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.shop_item("skin_KITO_2"), ({"type": "skin", "fighter": "KITO", "skin": 2}, 20))
         for missing in ("fighter_BYTE", "fighter_SPARK", "fighter_MIRA", "fighter_VARUN", "skin_MIRA_1", "skin_KITO_0", "skin_KITO_3", "skin_NOBODY_1", "crate_xl", ""):
             self.assertIsNone(economy.shop_item(missing))
-        self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "VICTORY", 0, 2, "NORMAL"), 28)
-        self.assertEqual(economy.match_bolts("KNOCKOUT_RUSH", "DEFEAT", 0, 9, "ELITE"), 33)
-        self.assertEqual(economy.match_bolts("LAST_SPARK", "DEFEAT", 10, 0, "EASY"), 4)
+        self.assertEqual(economy.match_bolts("BOSS", "VICTORY", 0, 2, "NORMAL"), 28)
+        self.assertEqual(economy.match_bolts("BOSS", "DEFEAT", 0, 9, "ELITE"), 33)
         self.assertEqual(economy.match_bolts("TRAINING", "VICTORY", 0, 5, "NORMAL"), 0)
         self.assertEqual(sorted(economy.CUP_TRACK), list(economy.CUP_TRACK))
 
@@ -302,7 +289,7 @@ class Api(unittest.TestCase):
         status, body = self.call("GET", "/v1/me", token=me["token"], version="10")
         self.assertEqual(status, 426)
         self.assertIn("no longer supported", body["error"])
-        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, me["token"], version="0.5.1-preview")[0], 426)
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS"}, me["token"], version="0.5.1-preview")[0], 426)
         self.assertEqual(self.call("POST", "/v1/drops/open", {}, me["token"], version=None)[0], 426)
 
     def test_bot_config(self):
@@ -596,12 +583,12 @@ class Api(unittest.TestCase):
         replay = Replay()
         self.httpd.game.referee = replay
         ada, bo, cy, di = (self.player(name) for name in ("Ada", "Bo", "Cy", "Di"))
-        # Only Boss Mode and Knockout Rush are played in teams.
-        self.assertIn("Boss Mode or Knockout Rush", said(enter(ada, action="create", mode="LAST_SPARK"), b"E"))
+        # Teams fight the Entity, and nothing else.
+        self.assertIn("fight the Entity", said(enter(ada, action="create", mode="LAST_SPARK"), b"E"))
         # The one who makes a team is given its code, and leads it.
-        a = enter(ada, action="create", mode="KNOCKOUT_RUSH")
+        a = enter(ada, action="create", mode="BOSS")
         team = said(a, b"R")
-        self.assertEqual((len(team["code"]), team["mode"], team["you"], len(team["members"])), (4, "KNOCKOUT_RUSH", 0, 1))
+        self.assertEqual((len(team["code"]), team["mode"], team["you"], len(team["members"])), (4, "BOSS", 0, 1))
         # A wrong code finds nothing. A team of one can't start.
         self.assertIn("no team", said(enter(bo, action="join", code="x" + team["code"]), b"E"))
         a.sendall(b"G")
@@ -620,7 +607,7 @@ class Api(unittest.TestCase):
         starts = [said(sock, b"S") for sock in (a, b, c)]
         self.assertEqual([s["slot"] for s in starts], [0, 1, 2])
         self.assertEqual(len({(s["seed"], s["mode"], s["difficulty"], tuple(s["botNames"])) for s in starts}), 1)
-        self.assertEqual(([p["fighter"] for p in starts[0]["players"]], len(starts[0]["botNames"])), (["BYTE"] * 3, 3))
+        self.assertEqual(([p["fighter"] for p in starts[0]["players"]], len(starts[0]["botNames"])), (["BYTE"] * 3, 0))
         self.assertIn("in a match", said(enter(di, action="join", code=team["code"]), b"E"))
         # A frame one sends reaches the others, marked with whose it is.
         frame = bytes(range(17))
@@ -640,12 +627,12 @@ class Api(unittest.TestCase):
             self.httpd.game.store._db.execute("UPDATE matches SET started_at = started_at - 120")
         a.sendall(b"F")
         first, second = said(a, b"V"), said(b, b"V")
-        self.assertEqual(replay.asked[-1], ("KNOCKOUT_RUSH", ["BYTE"] * 3, [1, 1, 1], [34, 17, 0], [2], 3))
+        self.assertEqual(replay.asked[-1], ("BOSS", ["BYTE"] * 3, [1, 1, 1], [34, 17, 0], [2], 0))
         self.assertEqual((first["report"]["outcome"], first["report"]["mvp"], first["cupDelta"], first["mvpCups"]), ("VICTORY", True, 10, 2))
         self.assertEqual((second["report"]["outcome"], second["report"]["mvp"], second["cupDelta"], second["report"]["kos"]), ("VICTORY", False, 8, 2))
         self.assertEqual((cups(ada), cups(bo), cups(cy)), (10, 8, 0))
         with self.httpd.game.store._lock:
-            rows = self.httpd.game.store._db.execute("SELECT outcome FROM matches WHERE mode = 'KNOCKOUT_RUSH' ORDER BY id").fetchall()
+            rows = self.httpd.game.store._db.execute("SELECT outcome FROM matches WHERE mode = 'BOSS' ORDER BY id").fetchall()
         self.assertEqual([row[0] for row in rows], ["VICTORY", "VICTORY", "DEFEAT"])
         # Afterwards the team is still together, without the one who left, and can go again.
         for sock in (a, b):
@@ -729,7 +716,7 @@ class Api(unittest.TestCase):
         save(edit(("\ndisabled = no", "\ndisabled = yes"), ("disabled_reason = ", "disabled_reason = Being   too fair")))
         status, body = self.call("GET", "/v1/me", token=fair["token"])
         self.assertEqual((status, body["disabled"], body["reason"], body["until"]), (403, True, "Being too fair", 0))
-        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, fair["token"])[0], 403)
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS"}, fair["token"])[0], 403)
         board = self.call("GET", "/v1/leaderboard", token=cheat["token"])[1]
         self.assertEqual([row["id"] for row in board["players"]], [cheat["id"]])
         account = self.call("GET", "/v1/me", token=cheat["token"])[1]["account"]
@@ -806,32 +793,30 @@ class Api(unittest.TestCase):
             self.age_matches()
             return self.call("POST", "/v1/matches/%d/result" % plan["matchId"], result, me["token"])[1]
 
-        # With no trophies.cfg the built-in numbers apply: a boss is worth 5, and the fighter gets them too.
+        # With no trophies.cfg the built-in numbers apply: beating the Entity is worth 8 and 2 for the MVP, and the fighter gets them too.
         body = play("BOSS", win)
-        self.assertEqual((body["cupDelta"], body["cups"], body["fighterCups"], body["mvpCups"], body["drop"]), (5, 5, 5, 0, False))
+        self.assertEqual((body["cupDelta"], body["cups"], body["fighterCups"], body["mvpCups"], body["drop"]), (10, 10, 10, 2, False))
         # The operator writes one: it applies from the next match, and what it leaves out stays as it was.
         self.write_cfg("trophies.cfg", "[boss]\nwin = 12\nmvp_bonus = 3\nmax_loss = 4\ndraw = lots\n[LAST_SPARK]\nplaces = 40, 30 20\n[TRAINING]\nwin = 99\n")
         body = play("BOSS", win)
-        self.assertEqual((body["cupDelta"], body["cups"], body["mvpCups"]), (15, 20, 3))
-        self.assertEqual(play("BOSS", {"outcome": "DEFEAT"})["cups"], 16)
-        self.assertEqual(play("LAST_SPARK", {"outcome": "DEFEAT", "placement": 9, "deaths": 1})["cupDelta"], 20)
+        self.assertEqual((body["cupDelta"], body["cups"], body["mvpCups"]), (15, 25, 3))
+        # (loss_step is left out, so the built-in one stands: beginners lose nothing.)
+        self.assertEqual(play("BOSS", {"outcome": "DEFEAT"})["cups"], 25)
         self.assertEqual(play("TRAINING", win)["cupDelta"], 0)
-        body = play("KNOCKOUT_RUSH", win)
-        self.assertEqual((body["cupDelta"], body["mvpCups"]), (10, 2))
 
     def test_the_server_awards_cups_and_drops(self):
         me = self.player()
         other = self.player("Other")
         self.assertEqual(self.call("POST", "/v1/matches", {"mode": "NOPE"}, me["token"])[0], 400)
         # An ordinary player asks for Elite bots and gets the server's difficulty.
-        status, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "fighter": "BYTE", "level": 3, "difficulty": "ELITE"}, me["token"])
+        status, plan = self.call("POST", "/v1/matches", {"mode": "BOSS", "fighter": "BYTE", "level": 3, "difficulty": "ELITE"}, me["token"])
         self.assertEqual((status, plan["difficulty"]), (201, "EASY"))
         # The level is the server's (1 here), not the 3 the device asked for, and a locked fighter can't be played.
         self.assertEqual((plan["fighter"], plan["level"], plan["refereed"]), ("BYTE", 1, False))
         self.assertEqual(plan["bots"]["reactiontime"], 0.9)
-        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "fighter": "KITO"}, me["token"])[0], 409)
-        self.assertEqual(len(plan["botNames"]), 9)
-        self.assertEqual(len(set(plan["botNames"])), 9)
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS", "fighter": "KITO"}, me["token"])[0], 409)
+        self.assertEqual(len(plan["botNames"]), 2)  # two allies against the Entity
+        self.assertEqual(len(set(plan["botNames"])), 2)
         self.assertGreater(plan["seed"], 0)
         win = {"outcome": "VICTORY", "placement": 1, "kos": 4, "deaths": 0, "damage": 12000}
         path = "/v1/matches/%d/result" % plan["matchId"]
@@ -839,24 +824,24 @@ class Api(unittest.TestCase):
         self.assertEqual(self.call("POST", path, win, other["token"])[0], 409)  # not their match
         status, body = self.call("POST", path, win, me["token"])
         self.assertEqual(status, 200)
-        self.assertEqual((body["cupDelta"], body["cups"], body["drop"]), (25, 25, False))  # 1st place; no Arena Box (removed in 1.3)
-        # Bolts and the first-win Prisms are the server's to give too: (30 + 2 x 4 KOs) x 0.75 on Easy.
-        self.assertEqual((body["bolts"], body["firstWinPrisms"]), (29, 10))
-        self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (60 + 29, 10))
-        self.assertEqual(body["account"]["profile"]["bestCups"], 25)
+        self.assertEqual((body["cupDelta"], body["cups"], body["drop"]), (8, 8, False))  # the Entity beaten; no Arena Box (removed in 1.3)
+        # Bolts and the first-win Prisms are the server's to give too: (24 + 2 x 4 KOs) x 0.75 on Easy.
+        self.assertEqual((body["bolts"], body["firstWinPrisms"]), (24, 10))
+        self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (60 + 24, 10))
+        self.assertEqual(body["account"]["profile"]["bestCups"], 8)
         self.assertEqual((body["account"]["drops"], body["account"]["dropsLeftToday"]), (0, 0))
         self.assertEqual(self.call("POST", path, win, me["token"])[0], 409)  # only once
         # Good finishes earn Cups, never an Arena Box.
         for expected_drop in (False, False, False):
-            _, plan = self.call("POST", "/v1/matches", {"mode": "KNOCKOUT_RUSH"}, me["token"])
-            self.assertEqual(len(plan["botNames"]), 5)
+            _, plan = self.call("POST", "/v1/matches", {"mode": "BOSS"}, me["token"])
+            self.assertEqual(len(plan["botNames"]), 2)
             self.age_matches()
             _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], {**win, "placement": 0, "mvp": True}, me["token"])
             self.assertEqual((body["cupDelta"], body["drop"]), (10, expected_drop))
             self.assertEqual(body["firstWinPrisms"], 0)  # only the first win of the day
-        self.assertEqual((body["account"]["cups"], body["account"]["drops"], body["account"]["dropsLeftToday"]), (55, 0, 0))
+        self.assertEqual((body["account"]["cups"], body["account"]["drops"], body["account"]["dropsLeftToday"]), (38, 0, 0))
         _, board = self.call("GET", "/v1/leaderboard")
-        self.assertEqual((board["players"][0]["name"], board["players"][0]["cups"]), ("Player", 55))
+        self.assertEqual((board["players"][0]["name"], board["players"][0]["cups"]), ("Player", 38))
         # The leaderboard is the real accounts and nobody else, and each account knows its place on it.
         self.assertEqual(len(board["players"]), 2)
         self.assertEqual((body["account"]["rank"], body["account"]["players"]), (1, 2))
@@ -865,7 +850,7 @@ class Api(unittest.TestCase):
 
     def test_a_claimed_instant_win_is_refused(self):
         me = self.player()
-        _, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, me["token"])
+        _, plan = self.call("POST", "/v1/matches", {"mode": "BOSS"}, me["token"])
         win = {"outcome": "VICTORY", "placement": 1, "kos": 9, "deaths": 0, "damage": 30000}
         path = "/v1/matches/%d/result" % plan["matchId"]
         status, body = self.call("POST", path, win, me["token"])
@@ -877,19 +862,6 @@ class Api(unittest.TestCase):
         self.assertEqual(self.store.player(me["id"])["flags"], 1)
         # A result for a match the server never planned gets nothing either.
         self.assertEqual(self.call("POST", "/v1/matches/9999/result", win, me["token"])[0], 409)
-
-    def test_the_player_picks_the_boss(self):
-        me = self.player()
-        token = me["token"]
-        # Asked for by name; anything else, or any other mode, leaves it to the seed.
-        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS", "boss": "sweeper"}, token)[1]["boss"], "SWEEPER")
-        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS", "boss": "NOPE"}, token)[1]["boss"], "")
-        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS"}, token)[1]["boss"], "")
-        _, plan = self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "boss": "SWEEPER"}, token)
-        self.assertEqual(plan["boss"], "")
-        # The choice is kept with the match, for the referee.
-        _, plan = self.call("POST", "/v1/matches", {"mode": "BOSS", "boss": "STAMPEDE"}, token)
-        self.assertEqual(self.store.open_match(me["id"], plan["matchId"])["boss"], "STAMPEDE")
 
     def test_arena_boxes_are_gone(self):
         # Arena Boxes were removed in 1.3: a save that held some brings none in, and neither way of opening works.
@@ -958,7 +930,7 @@ class Api(unittest.TestCase):
         token = me["token"]
         self.store.grant(me["id"], credits=dict(economy.SPARK_ROAD)["BRAKK"] - 3)
         win = {"outcome": "VICTORY", "placement": 0, "kos": 3, "deaths": 1, "damage": 4000}
-        _, plan = self.call("POST", "/v1/matches", {"mode": "KNOCKOUT_RUSH"}, token)
+        _, plan = self.call("POST", "/v1/matches", {"mode": "BOSS"}, token)
         self.age_matches()
         _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], win, token)
         self.assertEqual((body["credits"], body["unlocked"]), (6, ["BRAKK"]))
@@ -967,7 +939,7 @@ class Api(unittest.TestCase):
         self.assertTrue(body["account"]["profile"]["fighters"]["BRAKK"]["unlocked"])
         self.assertEqual(body["account"]["profile"]["credits"], 3)
         # The next one unlocks nobody.
-        _, plan = self.call("POST", "/v1/matches", {"mode": "KNOCKOUT_RUSH"}, token)
+        _, plan = self.call("POST", "/v1/matches", {"mode": "BOSS"}, token)
         self.age_matches()
         _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], win, token)
         self.assertEqual((body["credits"], body["unlocked"]), (6, []))
@@ -994,15 +966,6 @@ class Api(unittest.TestCase):
         economy.complete(old)
         self.assertEqual(sorted(old["fighters"]), sorted(rules.FIGHTER_SKINS))
         self.assertEqual(old["fighters"]["BYTE"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
-
-    def test_dimension_pays_nothing_and_goes_on_forever(self):
-        self.assertEqual([rules.cup_delta("PORTAL", "DRAW", 0, 100, False), rules.cup_delta("PORTAL", "DRAW", 9, 100, False)], [0, 0])
-        self.assertEqual([rules.earns_drop("PORTAL", "DRAW", 1), rules.earns_drop("PORTAL", "DRAW", 30)], [False, False])
-        # A lore mode since build 104: no enemies to knock out, and no bottom.
-        self.assertIsNone(rules.check_result("PORTAL", 300, outcome="DRAW", placement=2, kos=0, deaths=0, damage=0))
-        self.assertIsNone(rules.check_result("PORTAL", 900, outcome="DRAW", placement=40, kos=0, deaths=1, damage=0))
-        self.assertIsNotNone(rules.check_result("PORTAL", 300, outcome="DRAW", placement=5, kos=2, deaths=0, damage=500))
-        self.assertIn("PORTAL", rules.MODES)
 
     def test_cpu_chips_become_arena_crystals_at_zero_once(self):
         old = economy.new_profile()
@@ -1184,7 +1147,7 @@ class Api(unittest.TestCase):
         # Picking one the server allows: it says yes, remembers it, and plans matches with it.
         status, body = self.call("POST", "/v1/settings/difficulty", {"difficulty": "hard"}, token)
         self.assertEqual((status, body["ok"], body["account"]["difficulty"]), (200, True, "HARD"))
-        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK", "difficulty": "ELITE"}, token)[1]["difficulty"], "HARD")
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS", "difficulty": "ELITE"}, token)[1]["difficulty"], "HARD")
         self.assertEqual(self.call("POST", "/v1/settings/difficulty", {"difficulty": "IMPOSSIBLE"}, token)[0], 400)
         # The operator narrows the choice: the server says no, and a choice that is no longer allowed falls back.
         self.write_cfg("game.cfg", "[players]\ndifficulty = NORMAL\nallowed = EASY, NORMAL\n")
@@ -1193,7 +1156,7 @@ class Api(unittest.TestCase):
         self.assertIn("doesn't allow", body["error"])
         account = self.call("GET", "/v1/me", token=token)[1]["account"]
         self.assertEqual((account["difficulty"], account["difficulties"]), ("NORMAL", ["EASY", "NORMAL"]))
-        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "LAST_SPARK"}, token)[1]["difficulty"], "NORMAL")
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS"}, token)[1]["difficulty"], "NORMAL")
         # Developers may pick any.
         self.write_cfg("game.cfg", "[players]\ndifficulty = NORMAL\nallowed = EASY, NORMAL\n[developers]\nids = %s\n" % me["id"])
         self.assertEqual(self.call("POST", "/v1/settings/difficulty", {"difficulty": "ELITE"}, token)[1]["account"]["difficulty"], "ELITE")
@@ -1331,20 +1294,20 @@ class Refereed(Api):
         lie = {"outcome": "VICTORY", "placement": 1, "kos": 9, "deaths": 0, "damage": 99999, "mvp": True}
         # The player stood still for three minutes of Last Spark. The device says they won.
         still = log((60 * 180, 0, 0, 0, 0, 0))
-        plan, (status, body) = self.run_match(me["token"], "LAST_SPARK", still, lie)
+        plan, (status, body) = self.run_match(me["token"], "BOSS", still, lie)
         self.assertEqual(status, 200)
         self.assertTrue(body["verified"])
         report = body["report"]
         # The server's result is its own replay of the match, the same as running the referee by hand...
-        mine = REFEREE.judge("LAST_SPARK", "BYTE", 1, "EASY", plan["seed"], plan["botNames"], plan["bots"], decode_inputs(still))
+        mine = REFEREE.judge("BOSS", "BYTE", 1, "EASY", plan["seed"], plan["botNames"], plan["bots"], decode_inputs(still))
         self.assertEqual(report, {k: mine[k] for k in ("outcome", "placement", "kos", "deaths", "damage", "mvp")})
         # ...and nothing like what the device claimed.
         self.assertEqual((report["kos"], report["damage"]), (0, 0))
         self.assertNotEqual((report["outcome"], report["placement"]), ("VICTORY", 1))
-        self.assertEqual(body["cupDelta"], rules.cup_delta("LAST_SPARK", report["outcome"], report["placement"], 0, False))
+        self.assertEqual(body["cupDelta"], rules.cup_delta("BOSS", report["outcome"], report["placement"], 0, False))
         self.assertEqual((body["fighterCupsBefore"], body["fighterCups"]), (0, body["cupDelta"]))
         self.assertEqual(body["account"]["profile"]["fighters"][body["fighter"]]["cups"], body["cupDelta"])
-        self.assertEqual(body["bolts"], economy.match_bolts("LAST_SPARK", report["outcome"], report["placement"], 0, "EASY"))
+        self.assertEqual(body["bolts"], economy.match_bolts("BOSS", report["outcome"], report["placement"], 0, "EASY"))
         row = self.store._db.execute("SELECT outcome, placement, verified, ticks FROM matches WHERE id = ?", (plan["matchId"],)).fetchone()
         self.assertEqual((row["outcome"], row["placement"], row["verified"]), (report["outcome"], report["placement"], 1))
         self.assertGreater(row["ticks"], 0)
@@ -1353,10 +1316,10 @@ class Refereed(Api):
         me = self.player()
         win = {"outcome": "VICTORY", "placement": 1, "kos": 5, "deaths": 0, "damage": 20000}
         # Two seconds of inputs and then nothing: the match never finished.
-        _, (status, body) = self.run_match(me["token"], "LAST_SPARK", log((120, 0, 0, 0, 0, 0)), win)
-        self.assertEqual((status, body["report"]["outcome"], body["report"]["placement"]), (200, "DEFEAT", 10))
+        _, (status, body) = self.run_match(me["token"], "BOSS", log((120, 0, 0, 0, 0, 0)), win)
+        self.assertEqual((status, body["report"]["outcome"], body["report"]["placement"]), (200, "DEFEAT", 0))
         self.assertEqual((body["cupDelta"], body["drop"]), (0, False))
-        _, (status, body) = self.run_match(me["token"], "KNOCKOUT_RUSH", log((120, 0, 0, 0, 0, 0)), win)
+        _, (status, body) = self.run_match(me["token"], "BOSS", log((120, 0, 0, 0, 0, 0)), win)
         self.assertEqual((status, body["report"]["outcome"]), (200, "DEFEAT"))
         self.assertEqual(body["account"]["cups"], 0)
 
@@ -1364,14 +1327,14 @@ class Refereed(Api):
         me = self.player()
         win = {"outcome": "VICTORY", "placement": 1, "kos": 5, "deaths": 0, "damage": 20000}
         # No inputs at all.
-        plan, (status, body) = self.run_match(me["token"], "LAST_SPARK", None, win)
+        plan, (status, body) = self.run_match(me["token"], "BOSS", None, win)
         self.assertEqual(status, 422)
         self.assertIn("inputs are missing", body["error"])
         self.assertEqual(self.call("POST", "/v1/matches/%d/result" % plan["matchId"], win, me["token"])[0], 409)  # and the match is closed
         # Inputs that aren't a log.
-        self.assertEqual(self.run_match(me["token"], "LAST_SPARK", "garbage", win)[1][0], 400)
+        self.assertEqual(self.run_match(me["token"], "BOSS", "garbage", win)[1][0], 400)
         # Three minutes of match handed in two seconds after it was set up.
-        _, (status, body) = self.run_match(me["token"], "LAST_SPARK", log((60 * 180, 0, 0, 0, 0, 0)), win, age=2)
+        _, (status, body) = self.run_match(me["token"], "BOSS", log((60 * 180, 0, 0, 0, 0, 0)), win, age=2)
         self.assertEqual(status, 422)
         self.assertIn("more match than time", body["error"])
         account = self.call("GET", "/v1/me", token=me["token"])[1]["account"]
@@ -1391,7 +1354,7 @@ class Refereed(Api):
         self.assertEqual((judged["finished"], judged["ticks"], judged["winner"], judged["mvp"], len(judged["sides"])), (False, 66, -1, -1, 2))
         self.assertIsInstance(judged["checksum"], int)
         # One of them left after half a second: the match goes on for as long as the other kept playing.
-        left = REFEREE.judge_team("KNOCKOUT_RUSH", 78, "HARD", ["A", "B", "C", "D"], {}, "", ["BYTE", "KITO"], [3, 5], [bytes(17 * 30), bytes(17 * 120)], [0])
+        left = REFEREE.judge_team("BOSS", 78, "HARD", ["A", "B", "C", "D"], {}, "", ["BYTE", "KITO"], [3, 5], [bytes(17 * 30), bytes(17 * 120)], [0])
         self.assertEqual((left["finished"], left["ticks"]), (False, 126))
 
     def test_the_training_area_needs_no_referee(self):

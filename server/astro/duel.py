@@ -123,7 +123,7 @@ class DuelLobby(socketserver.ThreadingTCPServer):
         self.stall_seconds = 8.0
         self.start_seconds = 45.0
         self._closing = False
-        # Teams (two or three players in one Boss Mode or 3v3 match) meet on this port too: see team.py.
+        # Teams (two or three players against the Entity) meet on this port too: see team.py.
         self.teams = TeamLobby(game, self)
         super().__init__((host, port), _Handler)
 

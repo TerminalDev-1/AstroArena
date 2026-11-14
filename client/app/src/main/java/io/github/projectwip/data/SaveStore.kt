@@ -47,7 +47,6 @@ class SaveStore(context: Context, name: String = "save.json") {
             put("credits", s.credits)
             put("selectedFighter", s.selectedFighter.name)
             put("selectedMode", s.selectedMode.name)
-            put("selectedBoss", s.selectedBoss?.name ?: "")
             put("claimedMilestones", JSONArray(s.claimedMilestones.sorted()))
             put("lastDailyGiftDay", s.lastDailyGiftDay)
             put("lastFirstWinDay", s.lastFirstWinDay)
@@ -175,7 +174,6 @@ class SaveStore(context: Context, name: String = "save.json") {
                 fighters = fighters,
                 selectedFighter = if (fighters[selected]?.unlocked == true) selected else FighterId.BYTE,
                 selectedMode = enumOr(o.optString("selectedMode"), d.selectedMode),
-                selectedBoss = BossKind.entries.firstOrNull { it.name == o.optString("selectedBoss") },
                 claimedMilestones = o.optJSONArray("claimedMilestones")?.ints()?.toSet() ?: emptySet(),
                 lastDailyGiftDay = o.optLong("lastDailyGiftDay", -1),
                 lastFirstWinDay = o.optLong("lastFirstWinDay", -1),

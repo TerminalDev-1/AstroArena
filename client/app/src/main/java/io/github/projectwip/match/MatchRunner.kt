@@ -114,7 +114,6 @@ class MatchRunner(
 
     /** Until the tempest's wind is played again. */
     private var windLeft = 0f
-    private var airLeft = 0.5f
     private var upAirLeft = 0f
 
     private fun tick() {
@@ -143,6 +142,7 @@ class MatchRunner(
         }
         if (input.hyper && p.hyperReady) c.hyper = true
         if (input.detonate) c.detonate = true
+        if (input.skip) c.skip = true
 
         val link = duel
         val them = match.opponent
@@ -239,15 +239,6 @@ class MatchRunner(
                 upAirLeft -= Match.STEP
                 if (upAirLeft <= 0f) { upAirLeft += 1.8f; sfx.play(Sound.DIM_AIR, 0.7f, 0.75f) }
             } else upAirLeft = 0f
-        }
-
-        // Dimension: the air of the place, lower and stranger the deeper the player is.
-        match.world.portal?.let { run ->
-            airLeft -= Match.STEP
-            if (airLeft <= 0f) {
-                airLeft += 1.8f
-                sfx.play(Sound.DIM_AIR, 0.55f + 0.05f * run.dimension, (1.05f - 0.07f * (run.dimension - 1)).coerceAtLeast(0.6f))
-            }
         }
 
         if (match.isOver && match.overFor > 2.8f && !finished) {
@@ -419,7 +410,7 @@ class MatchRunner(
             is GameEvent.Ko -> {
                 val k = world.fighter(e.killerId)
                 val v = world.fighter(e.victimId)
-                if (v != null) hudEvents += HudEvent.Ko(k?.name ?: if (match.freeForAll) "Poison Smoke" else "—", k?.team ?: -2, v.name, v.team)
+                if (v != null) hudEvents += HudEvent.Ko(k?.name ?: "The Entity", k?.team ?: -2, v.name, v.team)
                 if (e.killerId == pid) { sfx.play(Sound.KO, 1f); sfx.buzz(60, 220); say(VoiceCue.KO) }
                 else if (e.victimId == pid) { sfx.play(Sound.KO, 0.9f, 0.7f); sfx.buzz(120, 255); say(VoiceCue.DOWN) }
                 else sfx.play(Sound.KO, 0.35f)
@@ -520,14 +511,9 @@ class MatchRunner(
                 sfx.play(Sound.ROCKET, (if (e.fighterId == pid) 1f else 0.6f) / (1f + hypot(f.x - match.player.x, f.y - match.player.y) * 0.15f), 0.72f)
             }
             is GameEvent.MatchEnd -> sfx.play(if (e.winningTeam == match.player.team) Sound.VICTORY else Sound.DEFEAT)
-            is GameEvent.Eliminated -> if (e.fighterId == pid) sfx.play(Sound.DEFEAT)
-            is GameEvent.PortalOpened -> sfx.play(Sound.PORTAL_OPEN)
-            is GameEvent.ShardFound -> { sfx.play(Sound.SHARD); sfx.play(Sound.VOID, 0.5f, 1.1f) }
-            // (Going through a portal: the scene with the Void plays over the paused match, DimensionCutscene.)
-            is GameEvent.StormHit -> if (e.targetId == pid) {
-                sfx.play(Sound.HURT, 0.6f, 0.8f); sfx.buzz(20, 90)
-                if (settings.showDamageNumbers) hudEvents += HudEvent.Damage(e.x, e.y, e.damage, false, false)
-            }
+            // The Entity's flares: a deep note as one locks on, and a hit when it comes down; being corrupted shakes the phone.
+            is GameEvent.EntityFlare -> if (e.landed) sfx.play(Sound.WHOOSH, 0.8f, 0.55f) else if (e.targetId == pid) sfx.play(Sound.VOID, 0.9f, 1.15f) else sfx.play(Sound.VOID, 0.4f, 1.15f)
+            is GameEvent.Corrupted -> if (e.fighterId == pid && e.on) { sfx.play(Sound.VOID, 1f, 0.8f); sfx.buzz(160, 255) }
             else -> Unit
         }
     }

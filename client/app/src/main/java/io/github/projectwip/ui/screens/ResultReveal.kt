@@ -73,28 +73,18 @@ fun ordinal(n: Int): String = n.toString() + when {
 fun ResultReveal(summary: MatchSummary, onDone: () -> Unit) {
     val r = summary.report
     val sfx = LocalSfx.current
-    val ffa = r.mode == GameMode.LAST_SPARK
-    val won = if (ffa) r.placement == 1 else r.outcome == MatchOutcome.VICTORY
-    val podium = ffa && r.placement in 2..4
-    val dimension = r.mode == GameMode.PORTAL
+    // (No mode is played for a place any more: Last Spark, with its star medallion for a place, is gone.)
+    val ffa = false
+    val won = r.outcome == MatchOutcome.VICTORY
+    val podium = false
     val (word, color) = when {
-        // Dimension is a story, not a contest (the user's decision): no victory, no defeat, only how deep it went.
-        dimension -> "DEPTH ${r.placement + 1}" to Color(0xFFC9A6FF)
-        ffa -> ordinal(r.placement) to when {
-            r.placement == 1 -> Palette.Gold
-            r.placement <= 4 -> Palette.Cyan
-            else -> Palette.Red
-        }
         r.outcome == MatchOutcome.VICTORY -> "VICTORY" to Palette.Gold
         r.outcome == MatchOutcome.DRAW -> "DRAW" to Color.White
         else -> "DEFEAT" to Palette.Red
     }
     val line = when {
-        dimension && r.deaths > 0 -> "THE ENTITY KEEPS WHAT IT CATCHES"
-        dimension -> "YOU FOUND YOUR WAY BACK"
-        ffa && r.placement == 1 -> "YOU ARE FIRST!"
-        ffa -> "YOU PLACED ${ordinal(r.placement)}"
-        r.mode == GameMode.BOSS && won -> "THE BOSS IS DOWN!"
+        r.mode == GameMode.BOSS && won -> "THE ENTITY IS BEATEN!"
+        r.mode == GameMode.BOSS && r.outcome == MatchOutcome.DEFEAT -> "IT KEEPS A PIECE OF YOU"
         won -> "YOUR TEAM WINS!"
         r.outcome == MatchOutcome.DRAW -> "NOBODY WINS THIS ONE"
         else -> "BETTER LUCK NEXT TIME"
@@ -146,7 +136,7 @@ fun ResultReveal(summary: MatchSummary, onDone: () -> Unit) {
             if (won) { celebrate++; sfx?.play(Sound.CHING, 0.8f, 1.25f); delay(900) }
         } else {
             // (After a Dimension run the fighter just stands there: there was nothing to win or lose.)
-            if (!dimension) sulk++
+            sulk++
             delay(1500)
         }
         // Away it all goes, to the stats.
@@ -186,7 +176,7 @@ fun ResultReveal(summary: MatchSummary, onDone: () -> Unit) {
 
         // The fighter, rising into the light (live, so they can celebrate).
         if (me != null) {
-            val def = me.boss?.let { Balance.boss(it) } ?: Balance.fighter(me.fighter)
+            val def = Balance.fighter(me.fighter)
             Box(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.42f).fillMaxHeight(0.66f)
                     .graphicsLayer {

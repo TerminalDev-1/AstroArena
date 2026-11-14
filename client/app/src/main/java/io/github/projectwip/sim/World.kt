@@ -12,95 +12,26 @@ import kotlin.random.Random
 enum class Phase { COUNTDOWN, PLAYING, ENDED }
 
 /**
- * Match rules.
- *  - Teams ("Knockout Rush"): two teams, respawns, first to [koTarget] KOs or most when time runs out.
- *  - Free-for-all ("Last Spark"): every fighter is its own team, one life, a shrinking Static Storm,
- *    last fighter standing wins; everyone gets a finishing place.
+ * Match rules. Two sides with respawns: first to [koTarget] KOs, or most when time runs out (a 1v1); the Training Area,
+ * which never ends; and the Entity's fight, which is decided in its world (see `Uprising`).
  */
 data class MatchRules(
-    val freeForAll: Boolean = false,
     val koTarget: Int = Balance.KO_TARGET,
     val durationSeconds: Float = Balance.MATCH_SECONDS,
     val countdownSeconds: Float = 3f,
     /** KOs the second team (index 1) needs to win, when that differs from [koTarget]. */
     val enemyKoTarget: Int = koTarget,
-    /** Boss Mode: one giant against the player; shown differently on the HUD. */
+    /** The Entity's fight (Boss Mode): no clock and no KOs to reach; the Entity decides it. */
     val boss: Boolean = false,
     /** Training Area: no clock and no score to reach, so it only ends when the player leaves. */
     val practice: Boolean = false,
-    /** Dimension: echoes to find, portals into deeper dimensions, one life ([World.portal]). */
-    val portal: Boolean = false,
 ) {
-    val respawn get() = !freeForAll
-
     companion object {
-        fun knockoutRush() = MatchRules()
-        fun lastSpark() = MatchRules(freeForAll = true, durationSeconds = Float.MAX_VALUE)
-        /** The player wins by knocking out the boss, and has unlimited lives to do it. */
-        fun bossMode() = MatchRules(koTarget = 1, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, boss = true)
+        /** The Entity's fight: nothing but the Entity ends it (its uprising ends the match, won or lost). */
+        fun bossMode() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, boss = true)
         /** One against one: first to three knockouts, or whoever is ahead after two minutes. */
         fun duel() = MatchRules(koTarget = 3, durationSeconds = 120f)
         fun training() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, practice = true)
-        /** Dimension: no clock; one knockout of the player (by a rift) ends the run. */
-        fun portal() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = 1, durationSeconds = Float.MAX_VALUE, portal = true)
-    }
-}
-
-enum class PortalState { ARRIVE, EXPLORE, OPEN, TRAVEL }
-
-/** Dimension: the portal ring spans this many tiles either side of its middle (five across). */
-const val PORTAL_HALF = 2
-
-/**
- * Dimension: which dimension the player is in, the echo shards lying about in it, and where the portal is once they
- * are all found. A lore mode (build 104, the user's decision): there are no enemies, only the world coming apart.
- */
-class PortalRun {
-    var dimension = 1
-    /** Portals stepped through so far: the run's score. */
-    var entered = 0
-    var state = PortalState.ARRIVE
-    var timer = Balance.PORTAL_ARRIVE_SECONDS
-    /** Where this dimension's chained fighter stands (the portal opens there once the chains break). */
-    var captiveX = 0f
-    var captiveY = 0f
-    /** Where this dimension's shards lie (x, y pairs), which are found, and how many. */
-    val shards = FloatArray(Balance.PORTAL_SHARDS * 2)
-    val taken = BooleanArray(Balance.PORTAL_SHARDS)
-    var found = 0
-    var x = 0f
-    var y = 0f
-    /** When ([time]) the chained soul was freed (the chains all broken), or -1: they follow the player after that. */
-    var freedAt = -1f
-    /** Seconds until the next glitch rift. */
-    var riftIn = Float.MAX_VALUE
-    /** Seconds since the run began; when the Void last spoke on screen, and which of its taunts it was. */
-    var time = 0f
-    var tauntAt = -100f
-    var taunt = -1
-}
-
-/** The Static Storm: a circle that waits, then shrinks; standing outside hurts more the longer it runs. */
-class Storm(val cx: Float, val cy: Float, val startRadius: Float) {
-    var radius = startRadius
-        private set
-    val finalRadius = Balance.STORM_FINAL_RADIUS
-    var elapsed = 0f
-        private set
-
-    fun update(dt: Float) {
-        elapsed += dt
-        val t = ((elapsed - Balance.STORM_DELAY_SECONDS) / Balance.STORM_SHRINK_SECONDS).coerceIn(0f, 1f)
-        radius = startRadius + (finalRadius - startRadius) * t
-    }
-
-    fun contains(x: Float, y: Float) = hypot(x - cx, y - cy) <= radius
-    fun distanceToEdge(x: Float, y: Float) = radius - hypot(x - cx, y - cy)
-
-    /** Damage per second as a fraction of max health. */
-    fun damageFraction(): Float {
-        val shrinking = (elapsed - Balance.STORM_DELAY_SECONDS).coerceAtLeast(0f)
-        return Balance.STORM_DAMAGE_BASE + Balance.STORM_DAMAGE_GROWTH * shrinking
     }
 }
 
@@ -119,7 +50,7 @@ class World(
         private set
     val projectiles = ArrayList<Projectile>(64)
     val pickups = ArrayList<Pickup>()
-    /** Marked patches of ground waiting to go off (Boss Mode). */
+    /** Marked patches of ground waiting to go off (the Entity's strikes, brews). */
     val hazards = ArrayList<Hazard>()
     /** The Entity's uprising in this match (see `Uprising`), or null where it doesn't come. */
     var uprising: Uprising? = null
@@ -127,7 +58,6 @@ class World(
     val planted = ArrayList<Planted>()
     /** Stars in the air (`AttackShape.STAR`), each on its way to burst where it was thrown. */
     val lobs = ArrayList<Lob>()
-    private val bossScripts = HashMap<Int, BossScript>()
     /** Remaining health of each crate, keyed by tile index (y * width + x). */
     val crateHp = HashMap<Int, Int>()
     val events = ArrayList<GameEvent>(32)
@@ -148,14 +78,6 @@ class World(
     private val tmp = FloatArray(2)
     private var lastCountdownWhole = -1
 
-    /** Free-for-all only. */
-    val storm: Storm? = if (rules.freeForAll)
-        Storm(arena.width / 2f, arena.height / 2f, hypot(arena.width / 2f, arena.height / 2f) + 1f) else null
-
-    val aliveCount get() = fighters.count { !it.eliminated }
-
-    /** Portal Run's state; null in every other mode. */
-    val portal: PortalRun? = if (rules.portal) PortalRun() else null
 
     init {
         val teams = (fighters.maxOfOrNull { it.team } ?: 0) + 1
@@ -163,18 +85,12 @@ class World(
         for (y in 0 until arena.height) for (x in 0 until arena.width) {
             if (arena[x, y] == Tile.CRATE) crateHp[y * arena.width + x] = Balance.CRATE_HP
         }
-        if (rules.freeForAll) {
-            fighters.forEachIndexed { i, f -> f.spawnIndex = i % arena.ffaSpawns.size; placeAtSpawn(f) }
-        } else {
-            for (team in 0..1) {
-                fighters.filter { it.team == team }.forEachIndexed { i, f ->
-                    f.spawnIndex = i % arena.spawns[team].size
-                    placeAtSpawn(f)
-                }
+        for (team in fighters.map { it.team }.distinct()) {
+            fighters.filter { it.team == team }.forEachIndexed { i, f ->
+                f.spawnIndex = i
+                placeAtSpawn(f)
             }
         }
-        // Dimension: the first dimension's echoes are scattered before the player arrives.
-        portal?.let { scatterShards(it) }
     }
 
     fun fighter(id: Int): Fighter? = fighters.firstOrNull { it.id == id }
@@ -212,15 +128,12 @@ class World(
         }
 
         for (f in fighters) stepFighter(f, dt)
-        if (rules.boss) for (f in fighters) if (f.def.boss != null && f.alive && !f.enthralled && !f.heldInRealm) bossScripts.getOrPut(f.id) { BossScript(this, f) }.step(dt)
         stepConcealment(dt)
         stepProjectiles(dt)
         stepPlanted(dt)
         stepLobs(dt)
         stepHazards(dt)
         stepPickups(dt)
-        storm?.let { stepStorm(it, dt) }
-        portal?.let { stepPortal(it, dt) }
 
         timeLeft -= dt
         if (phase == Phase.PLAYING && timeLeft <= 0f) {
@@ -239,7 +152,7 @@ class World(
 
     private fun beginUprising(u: Uprising) {
         // Everyone comes: whoever was waiting to come back is brought back now.
-        for (f in fighters) if (!f.alive && !f.eliminated && f.def.boss == null) respawn(f)
+        for (f in fighters) if (!f.alive && !f.eliminated) respawn(f)
         projectiles.clear(); hazards.clear(); lobs.clear()
         val centre = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 1f)
         u.cx = centre.x; u.cy = centre.y
@@ -267,6 +180,14 @@ class World(
     }
 
     private fun stepUprising(u: Uprising, dt: Float) {
+        // SKIP (any real player, while it holds them): straight to its portal, everyone in their places.
+        if (u.phase == UprisingPhase.GAZE || u.phase == UprisingPhase.MARCH || u.phase == UprisingPhase.BOW) {
+            if (fighters.any { !it.isBot && it.control.skip }) {
+                for (id in u.members) fighter(id)?.let { f -> f.x = u.slotX.getValue(id); f.y = u.slotY.getValue(id); f.prevX = f.x; f.prevY = f.y; f.vx = 0f; f.vy = 0f }
+                uprisingPhase(u, UprisingPhase.ENTER)
+                u.skipped = true
+            }
+        }
         u.t += dt
         if (u.phase != UprisingPhase.SKY && u.phase != UprisingPhase.RETURN) u.heldFor += dt
         if (u.phase != UprisingPhase.SKY) for (f in fighters) { f.prevX = f.x; f.prevY = f.y; f.control.clear() }
@@ -353,7 +274,7 @@ class World(
         val c = arena.width / 2f
         u.ex = c; u.ey = c - 2.5f
         u.hexes.clear()
-        val n = u.members.count { fighter(it)?.def?.boss == null }
+        val n = u.members.size
         var hp = 0
         var k = 0
         for (id in u.members) {
@@ -364,11 +285,6 @@ class World(
             // (Bots come in with nothing charged: they earn their supers and hypers by hitting the Entity. The user's
             // balance call. What anyone had is given back afterwards.)
             if (f.isBot) { f.superCharge = 0f; f.hyperCharge = 0f }
-            if (f.def.boss != null) {
-                // (A boss stays out of it: it waits, unseen, off the edge, until everyone is back.)
-                f.x = 0.5f; f.y = 0.5f; f.prevX = f.x; f.prevY = f.y; f.vx = 0f; f.vy = 0f
-                continue
-            }
             val a = 3.1415927f * (k++ + 0.5f) / maxOf(1, n)
             val spot = arena.nearestOpen(c + cos(a) * 5f, u.ey + 1f + sin(a) * 5f, f.radius)
             f.x = spot.x; f.y = spot.y; f.prevX = f.x; f.prevY = f.y; f.vx = 0f; f.vy = 0f
@@ -376,7 +292,8 @@ class World(
             f.pending.clear()
             hp += f.attackDamage * maxOf(1, f.def.attack.projectiles)
         }
-        u.maxHp = maxOf(1, hp * Balance.UPRISING_HP_SHOTS)
+        u.maxHp = maxOf(1, (hp * Balance.UPRISING_HP_SHOTS * (if (u.boss) Balance.UPRISING_BOSS_HP else 1f)).toInt())
+        u.flares.clear()
         u.hp = u.maxHp
         u.strikeIn = Balance.UPRISING_STRIKE_GAP
         uprisingPhase(u, UprisingPhase.SKY)
@@ -387,7 +304,6 @@ class World(
         // the Entity hits it (see [onEntity]); nobody can hurt anybody else in here, as they are all on one side.
         for (id in u.members) {
             val f = fighter(id) ?: continue
-            if (f.def.boss != null) { f.prevX = f.x; f.prevY = f.y; f.control.clear(); continue }
             stepFighter(f, dt)
             f.control.detonate = false
         }
@@ -406,7 +322,7 @@ class World(
         }
         // It drifts after the fight, over the middle of everyone (a little ahead of them), never off its platform.
         var sx = 0f; var sy = 0f; var cnt = 0
-        for (id in u.members) fighter(id)?.let { if (it.alive && it.def.boss == null) { sx += it.x; sy += it.y; cnt++ } }
+        for (id in u.members) fighter(id)?.let { if (it.alive) { sx += it.x; sy += it.y; cnt++ } }
         if (cnt > 0) {
             val dx = sx / cnt - u.ex; val dy = sy / cnt - 2f - u.ey
             val d = hypot(dx, dy)
@@ -416,20 +332,23 @@ class World(
             val od = hypot(u.ex - c, u.ey - c)
             if (od > lim) { u.ex = c + (u.ex - c) / od * lim; u.ey = c + (u.ey - c) / od * lim }
         }
-        // It strikes back: marked circles under a few of them at a time, in turn, that never knock anyone out.
-        u.strikeIn -= dt
-        if (u.strikeIn <= 0f) {
-            u.strikeIn = Balance.UPRISING_STRIKE_GAP
-            val alive = u.members.mapNotNull { fighter(it) }.filter { it.alive && it.def.boss == null }
-            if (alive.isNotEmpty()) for (j in 0 until 1 + alive.size / 3) {
-                val f = alive[(u.strikes + j) % alive.size]
-                hazards += Hazard(-1, -1, f.x + f.vx * 0.4f, f.y + f.vy * 0.4f, Balance.UPRISING_STRIKE_RADIUS, Balance.UPRISING_STRIKE_DELAY,
-                    Balance.UPRISING_STRIKE_DAMAGE, HazardKind.RIFT, lethal = false)
-            }
-            u.strikes++
+        entityMoves(u, dt)
+        stepFlares(u, dt)
+        // Whoever it corrupted is theirs again when it wears off.
+        for (id in u.members) fighter(id)?.let { f ->
+            if (f.corruptLeft > 0f) { f.corruptLeft -= dt; f.glitchLeft = maxOf(f.glitchLeft, f.corruptLeft); if (f.corruptLeft <= 0f) uncorrupt(f) }
         }
-        if (u.hp <= 0 || u.t >= Balance.UPRISING_SKY) {
+        if (u.hp <= 0 || u.t >= (if (u.boss) Balance.UPRISING_BOSS_SECONDS else Balance.UPRISING_SKY)) {
             u.beaten = u.hp <= 0
+            for (id in u.members) fighter(id)?.let { if (it.corruptLeft > 0f) uncorrupt(it) }
+            if (u.boss) {
+                // The Entity's fight is the match: won if it is beaten, lost if time runs out. Everyone stays in its
+                // world for the end of it.
+                projectiles.clear(); hazards.clear(); u.hexes.clear(); u.flares.clear()
+                for (id in u.members) fighter(id)?.let { f -> u.teams[id]?.let { f.team = it }; f.control.clear() }
+                end(if (u.beaten) 0 else 1)
+                return
+            }
             // Back in the arena, where they were, as they were, each on their own team again.
             projectiles.clear(); hazards.clear(); u.hexes.clear()
             u.home?.let { arena = it }
@@ -452,10 +371,103 @@ class World(
         }
     }
 
+    /**
+     * The Entity's moves in its world, one after another (the next always the same, never a roll; sooner and harder as
+     * it weakens, in its fight): marked strikes under some of them, a ring all round it, a line swept out at one of
+     * them, and its corruption flares. In Boss Mode they knock out; in a match's uprising they never do.
+     */
+    private fun entityMoves(u: Uprising, dt: Float) {
+        u.strikeIn -= dt
+        if (u.strikeIn > 0f) return
+        val frac = u.hp.toFloat() / u.maxHp
+        val stage = if (!u.boss || frac > 0.66f) 0 else if (frac > 0.33f) 1 else 2
+        u.strikeIn = Balance.UPRISING_STRIKE_GAP * (if (stage == 0) 1f else if (stage == 1) 0.8f else 0.65f)
+        val alive = u.members.mapNotNull { fighter(it) }.filter { it.alive && it.corruptLeft <= 0f }
+        val move = ENTITY_MOVES[u.strikes % ENTITY_MOVES.size]
+        u.strikes++
+        if (alive.isEmpty()) return
+        val hard = if (u.boss) Balance.UPRISING_BOSS_DAMAGE else 1f
+        fun mark(x: Float, y: Float, r: Float, delay: Float, damage: Int) {
+            hazards += Hazard(-1, -1, x, y, r, delay, (damage * hard).toInt(), HazardKind.RIFT, lethal = u.boss)
+        }
+        when (move) {
+            EntityMove.STRIKES -> for (j in 0 until 1 + alive.size / 3 + stage) {
+                val f = alive[(u.strikes + j) % alive.size]
+                mark(f.x + f.vx * 0.4f, f.y + f.vy * 0.4f, Balance.UPRISING_STRIKE_RADIUS, Balance.UPRISING_STRIKE_DELAY, Balance.UPRISING_STRIKE_DAMAGE)
+            }
+            EntityMove.RING -> {
+                // A ring of strikes all round it, and (harder) a second, further out, a beat later.
+                for (ring in 0..(if (stage > 0) 1 else 0)) {
+                    val r = 3.6f + ring * 2.4f
+                    val n = 10 + ring * 4
+                    for (k in 0 until n) {
+                        val a = k * (6.2831855f / n) + ring * 0.2f
+                        mark(u.ex + cos(a) * r, u.ey + sin(a) * r, 0.95f, Balance.UPRISING_STRIKE_DELAY + ring * 0.6f, Balance.UPRISING_STRIKE_DAMAGE)
+                    }
+                }
+            }
+            EntityMove.SWEEP -> {
+                // A line of strikes swept out from under it toward one of them, one after another.
+                val f = alive[u.strikes % alive.size]
+                val dx = f.x - u.ex; val dy = f.y - u.ey
+                val d = hypot(dx, dy).coerceAtLeast(0.1f)
+                for (k in 0 until 9) {
+                    val at = Balance.UPRISING_ENTITY_RADIUS + 0.4f + k * 1.15f
+                    mark(u.ex + dx / d * at, u.ey + dy / d * at, 0.9f, Balance.UPRISING_STRIKE_DELAY * 0.8f + k * 0.12f, Balance.UPRISING_STRIKE_DAMAGE)
+                }
+            }
+            EntityMove.FLARE -> {
+                // Its blue flares lock onto one of them (two, at the end), follow them, and come down: whoever is
+                // under one when it lands is corrupted.
+                for (k in 0 until (if (stage == 2) 2 else 1)) {
+                    val f = alive[(u.flaresFired + k) % alive.size]
+                    u.flares += EntityFlare(f.id, f.x, f.y)
+                    events += GameEvent.EntityFlare(f.id, f.x, f.y, landed = false)
+                }
+                u.flaresFired++
+            }
+        }
+    }
+
+    /** The Entity's flares: each follows its target while it locks on, then holds where it is and comes down there. */
+    private fun stepFlares(u: Uprising, dt: Float) {
+        val it = u.flares.iterator()
+        while (it.hasNext()) {
+            val fl = it.next()
+            fl.age += dt
+            val t = fighter(fl.target)
+            if (fl.age < Balance.FLARE_LOCK && t != null && t.alive) { fl.x = t.x; fl.y = t.y }
+            if (fl.age < Balance.FLARE_LOCK + Balance.FLARE_FALL) continue
+            it.remove()
+            events += GameEvent.EntityFlare(fl.target, fl.x, fl.y, landed = true)
+            for (id in u.members) fighter(id)?.let { f ->
+                if (f.alive && f.corruptLeft <= 0f && hypot(f.x - fl.x, f.y - fl.y) < Balance.FLARE_RADIUS + f.radius * 0.3f) corrupt(f)
+            }
+        }
+    }
+
+    /** The Entity has [f]: for a while it fights for the Entity, against its own side (the user's idea). */
+    private fun corrupt(f: Fighter) {
+        f.corruptLeft = Balance.CORRUPT_SECONDS
+        f.glitchLeft = Balance.CORRUPT_SECONDS
+        f.team = 1
+        f.control.clear()
+        events += GameEvent.Corrupted(f.id, true)
+    }
+
+    private fun uncorrupt(f: Fighter) {
+        f.corruptLeft = 0f
+        f.glitchLeft = 0f
+        f.team = 0
+        f.control.clear()
+        events += GameEvent.Corrupted(f.id, false)
+    }
+
     /** [f] lands a hit on the Entity, at (x, y): it charges their super and hyper as a hit on anyone would. */
     private fun strikeEntity(f: Fighter, damage: Int, isSuper: Boolean, x: Float, y: Float, charge: Boolean = true, chargeShare: Float = 1f) {
         val u = uprising ?: return
-        if (u.hp <= 0) return
+        // (Nobody the Entity has corrupted hurts it.)
+        if (u.hp <= 0 || f.corruptLeft > 0f) return
         val dealt = minOf(damage, u.hp)
         u.hp -= dealt
         f.damageDealt += dealt
@@ -486,8 +498,7 @@ class World(
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(lobs.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
-        portal?.let { mix(it.dimension); mix(it.found); mix(it.state.ordinal) }
-        uprising?.let { mix(it.phase.ordinal); mix(it.hp) }
+        uprising?.let { mix(it.phase.ordinal); mix(it.hp); mix(it.flares.size) }
         return h
     }
 
@@ -1535,7 +1546,9 @@ class World(
         // (Nothing crosses from the arena into a realm, or out of one; and in the Entity's dimension nobody hurts anybody
         // but the Entity.)
         if (source != null && source.realm != target.realm) return
-        if (source != null && inSky) return
+        if (source != null && inSky && source.team == target.team) return
+        // (In a match's uprising nothing knocks anyone out: only in the Entity's own fight.)
+        val lethal = lethal && !(inSky && uprising?.boss != true)
         // (A captive that may fight back in there hits softer.)
         val wantedHere = if (source != null && source.captive) (wanted * Balance.REALM_CAPTIVE_DAMAGE).toInt() else wanted
         val amount = if (lethal) wantedHere else minOf(wantedHere, target.hp - 1)
@@ -1591,28 +1604,9 @@ class World(
         // The super and hyper charges are kept: whatever was charged is still there after the respawn.
         events += GameEvent.Ko(killer?.id ?: -1, victim.id, victim.x, victim.y)
         killer?.let { it.kos++ }
-        if (rules.freeForAll) {
-            // Drop collected Power Cells (at least one) around the knockout spot.
-            val drops = maxOf(1, victim.cells)
-            for (i in 0 until drops) {
-                val a = i * 2.4f
-                val d = if (drops == 1) 0f else 0.6f
-                val spot = arena.nearestOpen(victim.x + kotlin.math.cos(a) * d, victim.y + kotlin.math.sin(a) * d, 0.3f)
-                pickups += Pickup(spot.x, spot.y)
-            }
-            victim.eliminated = true
-            victim.placement = aliveCount + 1
-            events += GameEvent.Eliminated(victim.id, victim.placement)
-            if (phase == Phase.PLAYING && aliveCount <= 1) {
-                val winner = fighters.firstOrNull { !it.eliminated }
-                winner?.placement = 1
-                end(winner?.team ?: -1)
-            }
-        } else if (rules.portal && victim.team != 0) {
-            // (Dimension has no enemies now; this stays for anything on the other side.)
-            victim.eliminated = true
-            score[0]++
-        } else {
+        // (A fighter the Entity had corrupted is its own again when it goes down.)
+        if (victim.corruptLeft > 0f) uncorrupt(victim)
+        run {
             val scoringTeam = 1 - victim.team
             score[scoringTeam]++
             val target = if (scoringTeam == 0) rules.koTarget else rules.enemyKoTarget
@@ -1654,130 +1648,6 @@ class World(
         pickups.removeAll { !it.alive }
     }
 
-    private fun stepStorm(st: Storm, dt: Float) {
-        st.update(dt)
-        for (f in fighters) {
-            if (!f.alive || st.contains(f.x, f.y)) { f.stormTick = 0f; continue }
-            f.stormTick -= dt
-            if (f.stormTick > 0f) continue
-            f.stormTick = 0.5f
-            val dmg = (f.maxHp * st.damageFraction() * 0.5f).toInt().coerceAtLeast(1)
-            f.hp -= minOf(dmg, f.hp)
-            f.sinceDamaged = 0f
-            f.hitFlash = 0.12f
-            events += GameEvent.StormHit(f.id, dmg, f.x, f.y)
-            if (f.hp <= 0) knockOut(f, null)
-        }
-    }
-
-    // ------------------------------------------------------------------ Portal Run
-
-    private fun stepPortal(run: PortalRun, dt: Float) {
-        run.time += dt
-        val player = fighters.firstOrNull { it.team == 0 } ?: return
-        when (run.state) {
-            PortalState.ARRIVE -> {
-                run.timer -= dt
-                if (run.timer > 0f) return
-                run.state = PortalState.EXPLORE
-                run.riftIn = Balance.portalRiftEvery(run.dimension)
-            }
-            PortalState.EXPLORE, PortalState.OPEN -> {
-                stepRifts(run, player, dt)
-                if (!player.alive) return
-                if (run.state == PortalState.EXPLORE) {
-                    for (i in 0 until Balance.PORTAL_SHARDS) {
-                        if (run.taken[i]) continue
-                        val sx = run.shards[i * 2]; val sy = run.shards[i * 2 + 1]
-                        if (hypot(player.x - sx, player.y - sy) >= player.radius + Balance.PORTAL_SHARD_REACH) continue
-                        run.taken[i] = true
-                        run.found++
-                        run.taunt = (run.dimension - 1) * Balance.PORTAL_SHARDS + run.found - 1
-                        run.tauntAt = run.time
-                        events += GameEvent.ShardFound(run.dimension, run.found, sx, sy)
-                    }
-                    if (run.found < Balance.PORTAL_SHARDS) return
-                    // The chains break and the soul is free; the gate in the middle of the arena opens.
-                    run.freedAt = run.time
-                    // It wakes: the inside of the ring opens (its two ends, where the ring meets the ground, stay solid).
-                    val gx = kotlin.math.floor(run.x).toInt(); val gy = kotlin.math.floor(run.y).toInt()
-                    for (dx in -(PORTAL_HALF - 1)..(PORTAL_HALF - 1)) arena[gx + dx, gy] = Tile.FLOOR
-                    run.state = PortalState.OPEN
-                    events += GameEvent.PortalOpened(run.x, run.y)
-                    return
-                }
-                if (hypot(player.x - run.x, player.y - run.y) >= player.radius + Balance.PORTAL_RADIUS) return
-                run.entered++
-                run.state = PortalState.TRAVEL
-                run.timer = Balance.PORTAL_TRAVEL_SECONDS
-                run.tauntAt = -100f
-                // A new world: everything in the air is left behind, and the player arrives whole.
-                projectiles.clear(); hazards.clear(); lobs.clear(); planted.clear(); pickups.clear()
-                if (player.inTempest) endTempest(player)
-                if (player.inRealm) closeRealm(player.realm)
-                player.hp = player.maxHp
-                run.dimension++
-                placeAtSpawn(player)
-                player.shield = Balance.SPAWN_SHIELD_SECONDS
-                scatterShards(run)
-                events += GameEvent.PortalEntered(run.dimension, run.entered)
-            }
-            PortalState.TRAVEL -> {
-                run.timer -= dt
-                if (run.timer > 0f) return
-                run.state = PortalState.ARRIVE
-                run.timer = Balance.PORTAL_ARRIVE_SECONDS
-            }
-        }
-    }
-
-    /** The world tearing open now and then near the player, from the second dimension on: a marked patch, then a hit. */
-    private fun stepRifts(run: PortalRun, player: Fighter, dt: Float) {
-        run.riftIn -= dt
-        if (run.riftIn > 0f || !player.alive) return
-        run.riftIn = Balance.portalRiftEvery(run.dimension)
-        val r = Balance.portalRiftRadius(run.dimension)
-        // Near them, a little ahead of where they are going, so standing still and running blind both get caught.
-        val a = rng.nextFloat() * 6.2832f
-        val d = rng.nextFloat() * 1.6f
-        val spot = arena.nearestOpen(player.x + player.vx * 0.5f + cos(a) * d, player.y + player.vy * 0.5f + sin(a) * d, 0.3f)
-        hazards += Hazard(-1, 1, spot.x, spot.y, r, Balance.PORTAL_RIFT_DELAY, (player.maxHp * Balance.PORTAL_RIFT_SHARE).toInt(), HazardKind.RIFT)
-    }
-
-    /**
-     * Sets up a dimension: the chained fighter somewhere toward the middle, and the echoes on open ground, far from
-     * where the player arrives, from the captive and from each other.
-     */
-    private fun scatterShards(run: PortalRun) {
-        run.found = 0
-        run.taken.fill(false)
-        val start = arena.spawns[0][0]
-        run.freedAt = -1f
-        // The portal always stands in the very middle: a great ring standing upright, five tiles across, solid until the
-        // soul is freed (nobody walks on it or through it). The chained soul is somewhere round it, a fair walk away.
-        val gx = arena.width / 2; val gy = arena.height / 2
-        for (dx in -PORTAL_HALF..PORTAL_HALF) arena[gx + dx, gy] = Tile.GATE
-        run.x = gx + 0.5f; run.y = gy + 0.5f
-        val mid = Spawn(run.x, run.y + 1.5f)
-        val ca = rng.nextFloat() * 6.2832f
-        val cd = 4f + rng.nextFloat() * 2.5f
-        val c = arena.nearestOpen(mid.x + kotlin.math.cos(ca) * cd, mid.y + kotlin.math.sin(ca) * cd, 0.9f)
-        run.captiveX = c.x; run.captiveY = c.y
-        for (i in 0 until Balance.PORTAL_SHARDS) {
-            var best = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 0.6f)
-            var bestScore = -1f
-            // A dozen tries; keep the spot furthest from where the player starts and from the shards already placed.
-            for (k in 0 until 12) {
-                val c = arena.nearestOpen(2f + rng.nextFloat() * (arena.width - 4f), 2f + rng.nextFloat() * (arena.height - 4f), 0.6f)
-                var near = minOf(hypot(c.x - start.x, c.y - start.y), hypot(c.x - run.captiveX, c.y - run.captiveY), hypot(c.x - run.x, c.y - run.y) + 1f)
-                for (j in 0 until i) near = minOf(near, hypot(c.x - run.shards[j * 2], c.y - run.shards[j * 2 + 1]))
-                if (near > bestScore) { bestScore = near; best = c }
-                if (near >= Balance.PORTAL_SHARD_SPREAD * 1.6f) break
-            }
-            run.shards[i * 2] = best.x; run.shards[i * 2 + 1] = best.y
-        }
-    }
-
     private fun respawn(f: Fighter) {
         placeAtSpawn(f)
         f.alive = true
@@ -1790,7 +1660,9 @@ class World(
     }
 
     private fun placeAtSpawn(f: Fighter) {
-        val s = if (rules.freeForAll) arena.ffaSpawns[f.spawnIndex] else arena.spawns[f.team][f.spawnIndex]
+        // (A map with no team spawns, or more teams than it has, uses its free-for-all spawns.)
+        val list = arena.spawns.getOrNull(f.team)?.takeIf { it.isNotEmpty() } ?: arena.ffaSpawns.ifEmpty { arena.spawns.first { it.isNotEmpty() } }
+        val s = list[(f.spawnIndex + (if (list === arena.ffaSpawns) f.id else 0)) % list.size]
         f.x = s.x; f.y = s.y; f.prevX = s.x; f.prevY = s.y
         f.vx = 0f; f.vy = 0f
         // Face the middle of the arena.
@@ -1882,3 +1754,10 @@ class World(
 
 /** Stands for the Entity in a shot's or a charge's list of who it has hit, and as a leap's target (its dimension). */
 const val ENTITY_TARGET = -100
+
+/** The Entity's moves in its world, in the order it makes them, round and round. */
+enum class EntityMove { STRIKES, RING, SWEEP, FLARE }
+private val ENTITY_MOVES = listOf(
+    EntityMove.STRIKES, EntityMove.STRIKES, EntityMove.RING, EntityMove.STRIKES, EntityMove.FLARE,
+    EntityMove.SWEEP, EntityMove.STRIKES, EntityMove.RING, EntityMove.FLARE, EntityMove.SWEEP,
+)

@@ -3,7 +3,7 @@ package io.github.projectwip.data
 /** What the player brought out of a match. Built by the match, applied by [Progression.applyMatch]. */
 data class MatchReport(
     val outcome: MatchOutcome,
-    val mode: GameMode = GameMode.KNOCKOUT_RUSH,
+    val mode: GameMode = GameMode.BOSS,
     /** 1-based finishing place in free-for-all modes; 0 for team modes. */
     val placement: Int = 0,
     val players: Int = 6,

@@ -18,25 +18,18 @@ data class MatchConfig(
     val playerSkin: Int,
     val playerName: String,
     val difficulty: BotDifficulty,
-    val mode: GameMode = GameMode.LAST_SPARK,
+    val mode: GameMode = GameMode.BOSS,
     /** When false, the player's slot is also a bot (used by tests and attract mode). */
     val humanPlayer: Boolean = true,
     val seed: Long = System.nanoTime(),
-    /** Boss Mode: which boss it is. Null picks one at random. */
-    val boss: io.github.projectwip.data.BossKind? = null,
     /** Names for the bots, when the game server set this match up. Any shortfall is filled from the built-in list. */
     val botNames: List<String> = emptyList(),
     /** The server's id for this match (0 = set up on the device). */
     val serverMatchId: Long = 0,
     /** A 1v1 against a real player: who they are and which side this device plays. Null: a 1v1 is against a bot. */
     val duel: DuelSetup? = null,
-    /** Boss Mode or Knockout Rush with a team of real players: who they are, and which of them this device plays. */
+    /** The Entity's fight with a team of real players: who they are, and which of them this device plays. */
     val team: TeamSetup? = null,
-    /** Debug previews of Dimension: start in this dimension, and with its echoes already found (the portal open). */
-    val portalStart: Int = 1,
-    val portalOpen: Boolean = false,
-    /** Debug preview: the chained fighter stands a step from where the player starts. */
-    val portalCaptiveNear: Boolean = false,
     /** Debug preview: the Entity's uprising begins this many seconds into play (below 0: when the seed says). */
     val uprisingAt: Float = -1f,
 )
@@ -65,11 +58,10 @@ class Match(val config: MatchConfig) {
     val brains: List<BotBrain>
     private val pathfinder: Pathfinder
     private val botLevel: Int
-    val freeForAll = config.mode == GameMode.LAST_SPARK
+    /** The Entity's fight (Boss Mode in the code): the player's team against the Entity, its ritual first. */
     val bossMode = config.mode == GameMode.BOSS
     /** Training Area: nothing at stake, and it never ends on its own. */
     val practice = config.mode == GameMode.TRAINING
-    val portalRun = config.mode == GameMode.PORTAL
 
     /** Seconds since the match became "over" for the player (ended, or eliminated in free-for-all). */
     var overFor = 0f
@@ -82,7 +74,7 @@ class Match(val config: MatchConfig) {
         val roster = ArrayList<Fighter>()
         var id = 0
         val duel = config.duel.takeIf { config.mode == GameMode.DUEL }
-        val team = config.team.takeIf { config.mode == GameMode.BOSS || config.mode == GameMode.KNOCKOUT_RUSH }
+        val team = config.team.takeIf { config.mode == GameMode.BOSS }
         // Bots are as strong as the player; in a team, as its first player, so that every device agrees.
         botLevel = team?.players?.first()?.level ?: config.playerLevel
         if (team != null) {
@@ -104,34 +96,24 @@ class Match(val config: MatchConfig) {
         } else if (config.mode == GameMode.DUEL) {
             // No real opponent (offline): a bot stands in, for practice.
             roster += botFighter(id++, 1, names.next())
-        } else if (freeForAll) {
-            repeat(config.mode.players - 1) { roster += botFighter(id, team = id, names.next()); id++ }
         } else if (practice) {
             // Everything stands where it is put, at fixed strength. Order matches the arena's spawn list:
-            // dummies, boss, sentry, swarm. Only the sentry gets a brain: the rest are targets that never
-            // fight back, so you can walk right up to the boss and the swarm and practise on them.
+            // dummies, giant, sentry, swarm. Only the sentry gets a brain: the rest are targets that never
+            // fight back, so you can walk right up to the giant and the swarm and practise on them.
             val a = Arenas.trainingArea()
             val dummies = a.spawns[1].size - 2 - TRAINING_MINIS
             repeat(dummies) { roster += Fighter(id++, Balance.dummy, 1, 0, 1, "Dummy ${it + 1}", isBot = true, rooted = true).also { d -> passive += d } }
-            val giant = Balance.boss(config.boss ?: Balance.bosses[rng.nextInt(Balance.bosses.size)].boss!!)
-            roster += Fighter(id++, giant, 1, giant.skins.lastIndex, 1, giant.name, isBot = true, rooted = true).also { passive += it }
+            roster += Fighter(id++, Balance.giant, 1, 0, 1, Balance.giant.name, isBot = true, rooted = true).also { passive += it }
             roster += Fighter(id++, Balance.sentry, 1, 1, 1, "Sentry", isBot = true, rooted = true)
             repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true).also { m -> passive += m } }
-        } else if (portalRun) {
-            // Dimension is a lore mode: the player and the Void, nobody else.
-        } else if (bossMode) {
-            // One boss, always level 1: its stats are fixed and never follow the player's level.
-            val solo = Balance.boss(config.boss ?: Balance.bosses[rng.nextInt(Balance.bosses.size)].boss!!)
-            // Against a team it has more health: as much again for every extra player.
-            val def = if (team == null) solo else solo.copy(health = io.github.projectwip.data.StatLine(Math.round(solo.health.base * (1f + TEAM_BOSS_HEALTH * (team.players.size - 1))), 0))
-            roster += Fighter(id++, def, 1, def.skins.lastIndex, 1, def.name, isBot = true)
         } else {
+            // The Entity's fight: a team of three against it, bots filling whatever places real players don't. (The
+            // Entity itself is not a fighter: it is the uprising's, see `World.stepSky`.)
             repeat(3 - (team?.players?.size ?: 1)) { roster += botFighter(id++, 0, names.next()) }
-            repeat(3) { roster += botFighter(id++, 1, names.next()) }
         }
         val oneOnOne = config.mode == GameMode.DUEL
-        val arena = if (freeForAll) Arenas.staticCanyon() else if (practice) Arenas.trainingArea() else if (bossMode || oneOnOne) Arenas.provingGround() else if (portalRun) Arenas.dimension() else Arenas.foundryYard()
-        val rules = if (freeForAll) MatchRules.lastSpark() else if (practice) MatchRules.training() else if (bossMode) MatchRules.bossMode() else if (oneOnOne) MatchRules.duel() else if (portalRun) MatchRules.portal() else MatchRules.knockoutRush()
+        val arena = if (practice) Arenas.trainingArea() else Arenas.provingGround()
+        val rules = if (practice) MatchRules.training() else if (oneOnOne) MatchRules.duel() else MatchRules.bossMode()
         world = World(arena, roster, rules, Random(rng.nextLong()))
         pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
@@ -139,12 +121,6 @@ class Match(val config: MatchConfig) {
         for (b in brains) b.others = brains
         // In the Training Area the super is there to be tried straight away.
         if (practice) player.superCharge = 1f
-        world.portal?.let { run ->
-            if (config.portalStart > 1) { run.dimension = config.portalStart; run.entered = config.portalStart - 1 }
-            // The echoes laid where the player starts, so they are found at once and the portal opens.
-            if (config.portalCaptiveNear) { val c = world.arena.nearestOpen(player.x + 3f, player.y - 4f, 0.9f); run.captiveX = c.x; run.captiveY = c.y }
-            if (config.portalOpen) for (i in 0 until Balance.PORTAL_SHARDS) { run.shards[i * 2] = player.x; run.shards[i * 2 + 1] = player.y }
-        }
     }
 
     private fun botFighter(id: Int, team: Int, name: String): Fighter {
@@ -170,10 +146,12 @@ class Match(val config: MatchConfig) {
     private val entityHeading = HashMap<Int, FloatArray>()
 
     init {
-        // The Entity's uprising comes in every fighting match (not in the Training Area or Dimension): only when is
-        // the seed's (the user's rule: it happens, it isn't a roll).
-        if (config.uprisingAt >= 0f) world.uprising = Uprising(config.uprisingAt)
-        else if (config.mode != GameMode.TRAINING && config.mode != GameMode.PORTAL)
+        // The Entity's fight is its uprising, from the start: its ritual, then its world, and the match is decided
+        // there. In a 1v1 it comes in the middle, at a moment the seed picks (the user's rule: it happens, it isn't a
+        // roll); never in the Training Area.
+        if (bossMode) world.uprising = Uprising(if (config.uprisingAt >= 0f) config.uprisingAt else Balance.UPRISING_BOSS_START, boss = true)
+        else if (config.uprisingAt >= 0f) world.uprising = Uprising(config.uprisingAt)
+        else if (config.mode != GameMode.TRAINING)
             world.uprising = Uprising(Balance.UPRISING_EARLIEST + Random(config.seed xor 0x0B5E55EDL).nextFloat() * Balance.UPRISING_SPREAD)
     }
 
@@ -187,12 +165,10 @@ class Match(val config: MatchConfig) {
         turn++
         // (In the Entity's dimension the bots are driven below: their brains know only the arena.)
         if (!world.inSky) for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
-        // A boss's brain only walks it about: what it does to the player is its script's business (see World).
-        for (f in world.fighters) if (f.def.boss != null) { f.control.attack = false; f.control.superAttack = false; f.control.hyper = false }
         // Bots hold their fire for the first seconds of a match and while their spawn shield is up, so nobody is
         // beaten up the moment they arrive (the user found the bots got stuck in too early). They still move.
         val warmingUp = world.phase == Phase.PLAYING && world.phaseTime < Balance.BOT_WARMUP_SECONDS
-        for (f in world.fighters) if (f.isBot && f.def.boss == null && (warmingUp || f.shield > 0f)) {
+        for (f in world.fighters) if (f.isBot && (warmingUp || f.shield > 0f)) {
             f.control.attack = false; f.control.superAttack = false; f.control.hyper = false
         }
         // In the Entity's dimension (its uprising) bots fight it and nobody else: they keep to their attack's reach of the
@@ -200,7 +176,9 @@ class Match(val config: MatchConfig) {
         // everyone, World moves them itself.)
         val up = world.uprising
         if (up != null && up.phase == UprisingPhase.SKY) for (f in world.fighters) {
-            if (!f.isBot || !f.alive || f.def.boss != null) continue
+            // (Whoever it has corrupted fights for it, human or bot.)
+            if (f.alive && f.corruptLeft > 0f) { driveCorrupted(f); continue }
+            if (!f.isBot || !f.alive) continue
             val c = f.control
             val dx = up.ex - f.x; val dy = up.ey - f.y
             val d = kotlin.math.hypot(dx, dy).coerceAtLeast(1e-3f)
@@ -234,7 +212,7 @@ class Match(val config: MatchConfig) {
         for (f in world.fighters) if (f.glitchCooldown > 0f) f.glitchCooldown = maxOf(0f, f.glitchCooldown - dt)
         for (f in world.fighters) if (f.glitchLeft > 0f) {
             f.glitchLeft = maxOf(0f, f.glitchLeft - dt)
-            if (!f.alive || f.def.boss != null) continue
+            if (!f.alive || world.inSky) continue
             if (f.inTempest) { autoFight(f); dodgeHazards(f) }
             else if (!f.isBot) {
                 val c = f.control
@@ -263,7 +241,7 @@ class Match(val config: MatchConfig) {
         // Using its power draws the Entity in (the user's lore): its pull fills with every attack, super and
         // hypercharge, and with time once a fighter has started fighting; full, the fighter glitches. It is sure, not a
         // roll, and it happens as many times as the pull fills: never just once in a match.
-        if (!portalRun && world.uprising?.active != true) {
+        if (world.uprising?.active != true) {
             for (i in seen until world.events.size) {
                 val e = world.events[i]
                 val (id, pull) = when (e) {
@@ -276,7 +254,7 @@ class Match(val config: MatchConfig) {
                 f.entityPull += pull
             }
             for (f in world.fighters) {
-                if (f.def.boss != null || !f.alive || f.glitchLeft > 0f || f.glitchCooldown > 0f) continue
+                if (!f.alive || f.glitchLeft > 0f || f.glitchCooldown > 0f) continue
                 // (Time only adds once a fighter has fought: the Training Area's dummies, who never attack, stay put.)
                 if (f.entityPull > 0f) f.entityPull += Balance.GLITCH_PULL_PER_SECOND * dt
                 if (f.entityPull >= 1f) {
@@ -364,20 +342,40 @@ class Match(val config: MatchConfig) {
         if (f.superCharge >= 1f && d <= f.def.attack.range) c.superAttack = true
     }
 
-    /** True once the result is decided for the player. */
-    val isOver get() = world.phase == Phase.ENDED || (freeForAll && player.eliminated)
+    /**
+     * A fighter the Entity has corrupted (one of its flares): it goes after the nearest of its own side and fights them,
+     * spending its powers as soon as it has them. Simple steering, no paths: it is in the Entity's open world.
+     */
+    private fun driveCorrupted(f: Fighter) {
+        val c = f.control
+        var t: Fighter? = null
+        var best = Float.MAX_VALUE
+        for (o in world.fighters) {
+            if (o === f || !o.alive || o.team == f.team) continue
+            val d = kotlin.math.hypot(o.x - f.x, o.y - f.y)
+            if (d < best) { best = d; t = o }
+        }
+        c.attack = false; c.superAttack = false; c.hyper = false; c.detonate = false; c.skip = false
+        if (t == null) { c.moveX = 0f; c.moveY = 0f; c.aiming = false; return }
+        val dx = t.x - f.x; val dy = t.y - f.y
+        val d = best.coerceAtLeast(1e-3f)
+        val reach = f.def.attack.range * 0.75f
+        if (d > reach) { c.moveX = dx / d; c.moveY = dy / d } else { c.moveX = -dy / d * 0.6f; c.moveY = dx / d * 0.6f }
+        c.aimX = dx; c.aimY = dy; c.aiming = true
+        c.attack = d <= f.def.attack.range
+        c.superAttack = f.superReady && d <= maxOf(f.def.attack.range, f.def.superSpec.range)
+        c.hyper = f.hyperReady
+        dodgeHazards(f)
+    }
 
-    /** Player's finishing place in free-for-all (1 if still standing); in Portal Run, how many portals they went through. */
-    val placement get() = if (portalRun) world.portal?.entered ?: 0 else if (!freeForAll) 0 else if (player.placement > 0) player.placement else 1
+    /** True once the result is decided for the player. */
+    val isOver get() = world.phase == Phase.ENDED
+
+    /** (No mode is played for a place any more; kept in the report for the server's API.) */
+    val placement get() = 0
 
     fun report(): MatchReport {
-        val outcome = if (freeForAll) {
-            if (placement == 1) MatchOutcome.VICTORY else MatchOutcome.DEFEAT
-        } else if (portalRun) {
-            // Dimension is a story, not a contest (the user's decision, build 104): nothing is won or lost in it.
-            // How deep the run went is its placement.
-            MatchOutcome.DRAW
-        } else when (world.winningTeam) {
+        val outcome = when (world.winningTeam) {
             player.team -> MatchOutcome.VICTORY
             -1 -> MatchOutcome.DRAW
             else -> MatchOutcome.DEFEAT
@@ -398,15 +396,8 @@ class Match(val config: MatchConfig) {
         )
     }
 
-    /**
-     * The report for a player who walks out: always a defeat, and in free-for-all they place behind everyone
-     * still standing (not first, which is what "not knocked out yet" would otherwise read as).
-     */
-    fun forfeit(): MatchReport {
-        val r = report()
-        val standing = world.fighters.count { !it.eliminated }
-        return r.copy(outcome = MatchOutcome.DEFEAT, placement = if (freeForAll && !player.eliminated) standing else r.placement, mvp = false)
-    }
+    /** The report for a player who walks out: always a defeat. */
+    fun forfeit(): MatchReport = report().copy(outcome = MatchOutcome.DEFEAT, mvp = false)
 
     companion object {
         /** How far past someone's edge the Entity's tornado keeps its heading through them. */
@@ -415,8 +406,6 @@ class Match(val config: MatchConfig) {
         const val HAZARD_MARGIN = 0.35f
         const val HAZARD_LOOKAHEAD = 0.9f
         const val STEP = 1f / 60f
-        /** How much more health a boss has for every player in a team beyond the first. */
-        const val TEAM_BOSS_HEALTH = 1f
         /** How many minis make up the Training Area's swarm. */
         const val TRAINING_MINIS = 12
 
