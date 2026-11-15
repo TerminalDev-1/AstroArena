@@ -622,12 +622,12 @@ class MatchRenderer(
             val pulse = 0.6f + 0.4f * sin(time * 14f)
             // (A red flare drains: drawn in its red.)
             val cr = if (fl.red) 1f else 0.45f; val cg = if (fl.red) 0.25f else 0.88f; val cb = if (fl.red) 0.3f else 1f
-            lit.v4("uTint", if (fl.red) 0.2f else 0.02f, if (fl.red) 0.02f else 0.08f, if (fl.red) 0.04f else 0.2f, 0.45f + 0.35f * k)
-            setModel(fl.x, 0.047f, fl.y, fr, 1f, fr); sector(360f).draw()
-            if (falling) { lit.v4("uTint", cr, cg, cb, 0.75f); setModel(fl.x, 0.05f, fl.y, fr * k, 1f, fr * k); sector(360f).draw() }
-            lit.v4("uTint", cr, cg, cb, if (falling) 1f else pulse)
-            setModel(fl.x, 0.054f, fl.y, fr, 1f, fr, time * 150f); dashRing.draw()
-            setModel(fl.x, 0.055f, fl.y, fr * 0.6f, 1f, fr * 0.6f, -time * 220f); dashRing.draw()
+            // (Only a soft shadow under it: it is a thing flying after them, not a spot on the floor. The user said
+            // the marked rings still read as a landing.)
+            if (falling) {
+                lit.v4("uTint", if (fl.red) 0.12f else 0.01f, 0.01f, if (fl.red) 0.03f else 0.1f, 0.4f)
+                setModel(fl.x, 0.047f, fl.y, fr, 1f, fr); sector(360f).draw()
+            }
         }
     }
 
@@ -653,20 +653,29 @@ class MatchRenderer(
             for ((n, fl) in u.flares.withIndex()) {
                 // (Rising out of it, then a tether of its light back to it as it hunts.)
                 val k = (fl.age / bal.FLARE_EMERGE).coerceIn(0f, 1f)
-                for (strand in 0 until 4) {
-                    for (j in 0 until 22) {
-                        val v = ((time * 1.3f + j / 22f + strand * 0.25f + n * 0.13f) % 1f)
-                        val arc = sin(v * 3.1416f) * (1.6f + strand * 0.35f)
-                        val side = (strand - 1.5f) * 0.35f * sin(v * 3.1416f)
-                        val x = lerp(entityX, fl.x, v) + side
-                        val y = lerp(cy0, 0.9f, v) + arc * (1f - 0.6f * k)
-                        val z = lerp(entityZ + 0.8f, fl.y, v)
-                        if (fl.red) sprites.add(x, y, z, (0.22f + 0.25f * k) * (0.6f + 0.4f * v), 1f, 0.22f, 0.28f, (0.35f + 0.5f * k) * (0.5f + 0.5f * v))
-                        else sprites.add(x, y, z, (0.22f + 0.25f * k) * (0.6f + 0.4f * v), 0.45f, 0.82f, 1f, (0.35f + 0.5f * k) * (0.5f + 0.5f * v))
-                    }
+                // A flare is an orb of its light flying after them at chest height, a comet's tail streaming out
+                // behind it along its path; while it rises out of the Entity, it pours down from its chest.
+                val cr = if (fl.red) 1f else 0.4f; val cg = if (fl.red) 0.22f else 0.78f; val cb = if (fl.red) 0.28f else 1f
+                val ox: Float; val oy: Float; val oz: Float
+                if (fl.age < bal.FLARE_EMERGE) {
+                    ox = lerp(entityX, fl.x, k); oy = lerp(cy0, 1f, smooth(k)); oz = lerp(entityZ + 0.8f, fl.y, k)
+                } else { ox = fl.x; oy = 1f + 0.08f * sin(time * 9f + n); oz = fl.y }
+                val h = if (fl.heading.isNaN()) 1.5707964f else fl.heading
+                val flick = 0.85f + 0.15f * sin(time * 31f + n * 2f)
+                // The tail, thinning and fading behind it (and climbing back to the Entity as it rises out).
+                for (j in 1..16) {
+                    val d = j * 0.13f
+                    val tx = if (fl.age < bal.FLARE_EMERGE) lerp(ox, entityX, d / 2.1f) else ox - cos(h) * d
+                    val ty = if (fl.age < bal.FLARE_EMERGE) lerp(oy, cy0, d / 2.1f) else oy + 0.02f * j
+                    val tz = if (fl.age < bal.FLARE_EMERGE) lerp(oz, entityZ + 0.8f, d / 2.1f) else oz - sin(h) * d
+                    val f = 1f - j / 17f
+                    sprites.add(tx + 0.05f * sin(time * 20f + j), ty, tz + 0.05f * cos(time * 17f + j), 0.5f * f + 0.08f, cr, cg, cb, 0.55f * f * flick)
                 }
-                if (fl.red) sprites.add(fl.x, 0.9f, fl.y, 0.7f + 0.5f * k, 1f, 0.3f, 0.35f, 0.5f + 0.4f * k)
-                else sprites.add(fl.x, 0.9f, fl.y, 0.7f + 0.5f * k, 0.5f, 0.85f, 1f, 0.5f + 0.4f * k)
+                // Its glow, and a white-hot core.
+                sprites.add(ox, oy, oz, 1.15f * flick, cr, cg, cb, 0.55f)
+                sprites.add(ox, oy, oz, 0.5f, 1f, if (fl.red) 0.75f else 0.95f, if (fl.red) 0.8f else 1f, 0.95f)
+                if (rng.nextFloat() < 0.4f) particles.spawn(ox, oy, oz, (rng.nextFloat() - 0.5f) * 2f, rng.nextFloat() * 1.5f, (rng.nextFloat() - 0.5f) * 2f, 0.35f, 0.07f,
+                    if (fl.red) 0xFFFF5A6A.toInt() else 0xFF7AD8FF.toInt(), 1f)
             }
             // Drained: red energy torn up out of them into its chest for a moment.
             for (f in world.fighters) {

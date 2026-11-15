@@ -250,7 +250,10 @@ class EntityScene {
                 if (p.cut == EntityCut.DRAIN_FAINT) fy -= 0.28f * drop
                 eBow = 12f * drainFlow
                 eFlash = 0.08f * drainFlow
-                shake = 0.045f * drainFlow * (0.4f + 0.6f * fight)
+                // A hard jolt as it rips them off their feet and as they hit the floor; a tremor while it chokes them.
+                val jolt = (1f - ((t - 1f) / 0.45f).coerceIn(0f, 1f)) * (if (t >= 1f) 1f else 0f)
+                val slam = (1f - ((t - 5.6f) / 0.4f).coerceIn(0f, 1f)) * (if (t >= 5.6f) 1f else 0f)
+                shake = 0.05f * drainFlow * (0.4f + 0.6f * fight) + 0.22f * jolt + 0.16f * slam
                 // Giving in, its blue comes into their eyes.
                 if (p.cut == EntityCut.DRAIN_OBEY) eyes = smooth((t - 5.6f) / 0.6f)
                 if (p.cut.last) {
@@ -300,7 +303,13 @@ class EntityScene {
             EntityCut.DRAIN, EntityCut.DRAIN_WEAK, EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> when {
                 t < 1.1f -> { setEye(fx0 + 2.4f, 1.7f, fz0 + 4.2f); setAt(fx0, 1.1f, fz0) }
                 // Held before its chest: from the side, low, its face above them.
-                t < 5.75f -> { val hy = ey + es * 0.42f; setEye(ex + 4.2f, hy + 1.5f, ez + 1.8f + 3.6f); setAt(fx, fy + 0.9f, fz) }
+                // Held up and choked: from the side, then slowly pushing in until their face fills the screen.
+                t < 5.75f -> {
+                    val hy = ey + es * 0.42f
+                    val k = smooth((t - 1.9f) / 3.6f)
+                    setEye(lerp(ex + 4.2f, fx + 1.1f, k), lerp(hy + 1.5f, fy + 1.25f, k), lerp(ez + 5.4f, fz + 1.5f, k))
+                    setAt(fx, fy + lerp(0.9f, 1.1f, k), fz)
+                }
                 t < 7.8f || !p.cut.last -> { val k = smooth((t - 5.75f) / 2.4f); setEye(fx0 + 0.5f, lerp(1.4f, 1f, k), fz0 + lerp(3.4f, 2.4f, k)); setAt(fx0, 0.6f, fz0 - 0.5f) }
                 else -> { setEye(c + 6.5f, 2.6f, c + 3f); setAt(fx, fy + 1f, fz) }
             }
@@ -316,7 +325,8 @@ class EntityScene {
         Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
 
         // ---- the void, the platform
-        val vr = lerp(0.05f, 0.16f, bright); val vg = lerp(0.02f, 0.1f, bright); val vb = lerp(0.12f, 0.3f, bright)
+        // (While it drains them, the void itself goes red.)
+        val vr = lerp(0.05f, 0.16f, bright) + 0.16f * drainFlow; val vg = lerp(0.02f, 0.1f, bright); val vb = lerp(0.12f, 0.3f, bright) * (1f - 0.5f * drainFlow)
         GLES30.glViewport(0, 0, width, height)
         GLES30.glClearColor(vr, vg, vb, 1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)

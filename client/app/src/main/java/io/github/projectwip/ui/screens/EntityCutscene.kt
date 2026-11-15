@@ -62,6 +62,7 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
         fade.animateTo(1f, tween(350))
         val start = withFrameNanos { it }
         var cues = 0
+        var nextBeat = 0f
         while (!leaving) {
             withFrameNanos { now ->
                 time = (now - start) / 1e9f
@@ -73,8 +74,13 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
             if (cut == EntityCut.DEFEAT && cues == 0 && time > 3.3f) { cues++; sfx?.play(Sound.PORTAL_OPEN, 0.9f) }
             if (cut == EntityCut.DEFEAT && cues == 1 && time > 8.15f) { cues++; sfx?.play(Sound.WHOOSH, 1f, 0.45f); sfx?.play(Sound.DEFEAT, 0.9f) }
             // A drain: the yank back off their feet, and (the last time) the pull inside.
-            if (cut.drain && cues == 0 && time > 1f) { cues++; sfx?.play(Sound.WHOOSH, 1f, 0.42f); sfx?.buzz(220, 200) }
-            if (cut.drain && cues == 1 && time > 5.3f) { cues++; sfx?.play(Sound.HIT, 0.7f, 0.6f) }
+            if (cut.drain && cues == 0 && time > 1f) { cues++; sfx?.play(Sound.THUNDER, 0.9f, 0.7f); sfx?.play(Sound.WHOOSH, 1f, 0.42f); sfx?.buzz(260, 255) }
+            if (cut.drain && cues == 1 && time > 5.6f) { cues++; sfx?.play(Sound.HIT, 1f, 0.4f); sfx?.play(Sound.TEMPEST_HIT, 0.7f, 0.5f); sfx?.buzz(160, 255) }
+            // Its grip: a heartbeat thudding, faster as it drains them.
+            if (cut.drain && time > nextBeat && time > 1.4f && time < 5.5f) {
+                sfx?.play(Sound.HIT, 0.75f, 0.32f)
+                nextBeat = time + lerpF(0.85f, 0.45f, ((time - 1.4f) / 4f).coerceIn(0f, 1f))
+            }
             if (cut.last && cues == 2 && time > 7.8f) { cues++; sfx?.play(Sound.VOID, 1f, 0.6f) }
             if (time >= length) leaving = true
         }
@@ -103,6 +109,20 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
                 }
             }
         }
+        // A drain: a red flash as it strikes and as they hit the floor, and red closing in at the edges, pulsing
+        // with the heartbeat, while it chokes them.
+        if (cut.drain) {
+            val hold = ((time - 1f) / 0.4f).coerceIn(0f, 1f) * (1f - ((time - 5.3f) / 0.5f).coerceIn(0f, 1f))
+            val beat = 0.55f + 0.45f * kotlin.math.abs(kotlin.math.sin(time * 4.2f))
+            val flash = maxOf(1f - ((time - 1f) / 0.3f).coerceIn(0f, 1f), 1f - ((time - 5.6f) / 0.3f).coerceIn(0f, 1f)) *
+                (if (time >= 1f) 1f else 0f)
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                if (hold > 0f) drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                    0f to Color.Transparent, 0.55f to Color.Transparent, 1f to Color(0xFFB0001C).copy(alpha = 0.75f * hold * beat),
+                    center = center, radius = size.maxDimension * 0.62f))
+                if (flash > 0f && time < 6f) drawRect(Color(0xFFFF3B4E).copy(alpha = 0.55f * flash))
+            }
+        }
         // The title, at the end.
         val titleAt = when (cut) {
             EntityCut.VICTORY -> 9.8f; EntityCut.DEFEAT -> 11.2f; EntityCut.CORRUPT -> 5.4f
@@ -128,3 +148,5 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
         }
     }
 }
+
+private fun lerpF(a: Float, b: Float, t: Float) = a + (b - a) * t

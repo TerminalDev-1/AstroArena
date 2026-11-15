@@ -771,11 +771,16 @@ class FighterModels {
                     // Its hold on them shows in their eyes: lit lightning blue, flickering (the eyes are the face's ink).
                     val eyes = anim.eyeGlow > 0f && p.slot == Slot.INK && p.bone != Bone.MOUTH
                     if (eyes) {
-                        val g = anim.eyeGlow * (0.85f + 0.15f * sin(t * 37f) * sin(t * 23f))
-                        prog.v4("uTint", c[0] + (0.55f - c[0]) * g, c[1] + (0.93f - c[1]) * g, c[2] + (1f - c[2]) * g, 1f)
+                        // Electric blue (the user found a pale glow looked like a horror pigeon): deep, saturated, with
+                        // a crackle now and then flaring white-hot, like a current running through them.
+                        val crackle = sin(t * 53f) * sin(t * 31f) * sin(t * 17f)
+                        val hot = if (crackle > 0.45f) (crackle - 0.45f) * 1.8f else 0f
+                        val g = anim.eyeGlow
+                        val er = 0.08f + 0.6f * hot; val eg = 0.42f + 0.45f * hot; val eb = 1f
+                        prog.v4("uTint", c[0] + (er - c[0]) * g, c[1] + (eg - c[1]) * g, c[2] + (eb - c[2]) * g, 1f)
                     } else prog.v4("uTint", c[0], c[1], c[2], 1f)
                     prog.f("uFlash", anim.flash)
-                    prog.f("uEmissive", if (eyes) anim.eyeGlow else if (p.emissive) (if (shade != 0L) 1f else 0.75f) else 0f)
+                    prog.f("uEmissive", if (eyes) anim.eyeGlow * 0.8f else if (p.emissive) (if (shade != 0L) 1f else 0.75f) else 0f)
                     prog.f("uGloss", if (p.gloss && shade == 0L) 1f else 0f)
                 }
                 Pass.OUTLINE -> prog.v4("uTint", ink[0], ink[1], ink[2], ink[3])
