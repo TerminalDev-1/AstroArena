@@ -769,15 +769,18 @@ class FighterModels {
                     val c = if (shade != 0L) slotColor(Slot.ACCENT, shade, shade, if (p.emissive) SHADOW_GLOW else shade)
                         else slotColor(p.slot, skin.primary, skin.secondary, skin.accent)
                     // Its hold on them shows in their eyes: lit lightning blue, flickering (the eyes are the face's ink).
-                    val eyes = anim.eyeGlow > 0f && p.slot == Slot.INK && p.bone != Bone.MOUTH
+                    // The eyes: the face's ink, and the little white highlights sitting on it (white, no outline, on the
+                    // head). Both are lit, so the whole eye is one solid electric blue: lit ink alone left white dots
+                    // ringed in blue, which the user saw as neon round white eyes.
+                    val highlight = p.slot == Slot.WHITE && !p.outline && p.bone == Bone.HEAD
+                    val eyes = anim.eyeGlow > 0f && ((p.slot == Slot.INK && p.bone != Bone.MOUTH) || highlight)
                     if (eyes) {
-                        // Electric blue (the user found a pale glow looked like a horror pigeon): deep, saturated, with
-                        // a crackle now and then flaring white-hot, like a current running through them.
-                        val crackle = sin(t * 53f) * sin(t * 31f) * sin(t * 17f)
-                        val hot = if (crackle > 0.45f) (crackle - 0.45f) * 1.8f else 0f
+                        // Electric blue, deep and saturated, with a slow steady pulse (a fast crackle read as glitching).
                         val g = anim.eyeGlow
-                        val er = 0.08f + 0.6f * hot; val eg = 0.42f + 0.45f * hot; val eb = 1f
-                        prog.v4("uTint", c[0] + (er - c[0]) * g, c[1] + (eg - c[1]) * g, c[2] + (eb - c[2]) * g, 1f)
+                        val pulse = 0.5f + 0.5f * sin(t * 3.2f)
+                        val er = if (highlight) 0.45f else 0.06f + 0.06f * pulse
+                        val eg = if (highlight) 0.8f else 0.42f + 0.1f * pulse
+                        prog.v4("uTint", c[0] + (er - c[0]) * g, c[1] + (eg - c[1]) * g, c[2] + (1f - c[2]) * g, 1f)
                     } else prog.v4("uTint", c[0], c[1], c[2], 1f)
                     prog.f("uFlash", anim.flash)
                     prog.f("uEmissive", if (eyes) anim.eyeGlow * 0.8f else if (p.emissive) (if (shade != 0L) 1f else 0.75f) else 0f)

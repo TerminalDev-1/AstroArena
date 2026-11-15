@@ -495,6 +495,15 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   `server/deleted_accounts.log`). A disabled account
   can do nothing, by the user's decision: no menus, no offline play, and no Jail mode (there was one in build 50;
   it was removed). Don't give it anything to play.
+- **Resetting is starting over as a new player** (the owner's decision, build 111). A player resetting their progress
+  (Settings > Data > RESET PROGRESS, anyone) deletes their account on the server (`POST /v1/account/delete`, logged in
+  `deleted_accounts.log`) and the game wipes itself and restarts (`net/FreshStart.kt`): a name, then the opening. A
+  **full game reset** is `python reset_game.py` in `server/` (server stopped): it backs the database up, deletes every
+  account (logged) and marks a new `generation` (`/v1/status`); any device that last played under another one, or
+  under none while it has progress, wipes itself and starts over, and is never quietly signed up again (a device
+  with no token used to re-register with its old name and have its save imported). A device whose account the
+  server no longer knows (401) starts over the same way. After a full reset the developer ids in `game.cfg` are
+  stale: the tablet's new id has to be put back there.
 - There is no GUI for running the server, by the user's decision: one was built (`server_manager/`) and removed
   as clunky. The owner edits the `.cfg` files by hand and starts the server with `run.bat`. Don't build another.
 - Bot difficulty: every player may pick, but the pick is a request (`POST /v1/settings/difficulty`); the server

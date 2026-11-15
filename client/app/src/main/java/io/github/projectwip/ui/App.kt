@@ -148,6 +148,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
     }
     // The server: is this version welcome, sign in, fetch live settings, and sync the save. The game keeps trying
     // for a minute; after that the player chooses between trying again and offline mode.
+    // The server no longer knows this account (a full game reset): start over as a new player.
+    val gone = server.status.collectAsState().value.accountGone
+    val appContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(gone) { if (gone) io.github.projectwip.net.FreshStart.wipeAndRestart(appContext) }
     LaunchedEffect(needsName) {
         if (needsName) return@LaunchedEffect
         val started = System.currentTimeMillis()

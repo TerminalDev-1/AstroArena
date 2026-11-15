@@ -9,10 +9,13 @@ class GameApp : Application() {
     companion object {
         /** The offline profile's file: what is played on while the server can't be reached. */
         const val OFFLINE_SAVE = "offline.json"
+        /** This run began with no save at all: a new install, or straight after starting over (`FreshStart`). */
+        @Volatile var startedFresh = false
     }
 
     override fun onCreate() {
         super.onCreate()
+        startedFresh = !java.io.File(filesDir, "save.json").exists()
         io.github.projectwip.net.CrashReporter.install(this)
     }
 

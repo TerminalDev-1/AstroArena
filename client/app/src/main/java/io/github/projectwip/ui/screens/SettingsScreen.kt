@@ -257,12 +257,11 @@ private fun DisplayTab(s: Settings, set: ((Settings) -> Settings) -> Unit) {
 private fun DataTab(repo: GameRepository, dev: Boolean) {
     var confirm by remember { mutableStateOf(false) }
     val ask = io.github.projectwip.ui.LocalServerCall.current
-    // Starting an account over is for developers; the server refuses anyone else.
-    if (dev) {
-    SectionTitle("RESET PROGRESS", "Erase levels, currencies and claimed rewards on the server. Your name and settings are kept. This cannot be undone.")
+    // Anyone can reset: their account is deleted on the server and the game starts over as a new player (name,
+    // opening and all). The owner's decision, build 111.
+    SectionTitle("RESET PROGRESS", "Delete your account and everything on it, and start the game over as a new player: a new name, and the opening again. This cannot be undone.")
     ChunkyButton({ confirm = true }, Modifier.width(260.dp).height(56.dp), ButtonStyle.RED) { GameText("RESET PROGRESS", Type.Heading) }
     Spacer(Modifier.height(10.dp))
-    }
     // ---- game server
     val server = io.github.projectwip.ui.LocalServer.current
     val status = server?.status?.collectAsState()?.value
@@ -294,7 +293,16 @@ private fun DataTab(repo: GameRepository, dev: Boolean) {
     }, Modifier.width(380.dp).height(56.dp), ButtonStyle.CYAN) { GameText("SOURCE ON GITHUB", Type.Heading) }
     PlainText(REPO_URL, Type.Small, color = Palette.Cyan)
     if (confirm) {
-        ConfirmDialog("RESET EVERYTHING?", "All progress will be lost.", "RESET", { confirm = false; ask({ reset() }) { repo.resetProgress() } }, { confirm = false }, ButtonStyle.RED)
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val resetScope = androidx.compose.runtime.rememberCoroutineScope()
+        val serverNow = io.github.projectwip.ui.LocalServer.current
+        ConfirmDialog("RESET EVERYTHING?", "Your account, your fighters and everything you have earned will be gone for good, and the game will start over as a new player. This cannot be undone.", "RESET", {
+            confirm = false
+            resetScope.launch {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { serverNow?.deleteAccount() }
+                io.github.projectwip.net.FreshStart.wipeAndRestart(context)
+            }
+        }, { confirm = false }, ButtonStyle.RED)
     }
 }
 

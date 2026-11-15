@@ -75,6 +75,11 @@ data class ServerStatus(
     val disabledReason: String = "",
     /** When it ends by itself, on this device's clock (ms since 1970); 0 = when the owner says. */
     val disabledUntil: Long = 0,
+    /**
+     * The server no longer knows this device's account (it was wiped, a full game reset): the game starts over as a
+     * new player (`FreshStart`) rather than quietly signing up again.
+     */
+    val accountGone: Boolean = false,
 )
 
 /** A match as the server set it up. */
@@ -284,6 +289,9 @@ class GameServer(context: Context) : GameActions {
     /** Starts this account's progress over on the server. */
     override fun reset(): Boolean? = act("/v1/reset")?.let { true }
 
+    /** Deletes this player's account on the server for good (resetting their progress). True once it is gone. */
+    fun deleteAccount(): Boolean = call("POST", "/v1/account/delete", JSONObject(), auth = true)?.code.let { it == 200 || it == 401 }
+
     /** Developer hand-outs (the server refuses anyone else). */
     override fun devGrant(drops: Int, bolts: Int, prisms: Int, credits: Int): Boolean? =
         act("/v1/dev/grant", JSONObject().put("drops", drops).put("bolts", bolts).put("prisms", prisms).put("credits", credits))?.let { true }
@@ -324,15 +332,32 @@ class GameServer(context: Context) : GameActions {
         )
         if (!state.supported) { _status.value = state; return null }
 
+        // A full reset of the game (the owner's): the server's generation isn't the one this device last played
+        // under. A device that had progress starts over as a new player; one that is new (or has just started over)
+        // simply joins this generation.
+        val generation = info.optString("generation")
+        val genKey = "generation@$baseUrl"
+        if (io.github.projectwip.GameApp.startedFresh) prefs.edit().putBoolean("freshInstall", true).apply()
+        if (generation.isNotEmpty() && prefs.getString(genKey, null) != generation) {
+            if (prefs.getString(genKey, null) == null && prefs.getBoolean("freshInstall", false)) {
+                prefs.edit().putString(genKey, generation).remove("freshInstall").apply()
+            } else {
+                prefs.edit().remove("id@$baseUrl").remove("token@$baseUrl").apply()
+                _status.value = state.copy(online = false, accountGone = true)
+                return null
+            }
+        }
+
         if (token == null && !register(playerName)) { _status.value = state.copy(online = false); return null }
         call("GET", "/v1/config")?.body?.optJSONObject("bots")?.let { applyBots(it) }
 
         var saved = call("GET", "/v1/save", auth = true)
         if (saved?.code == 401) {
-            // The server doesn't know this token (its database was reset): sign up again.
+            // The server doesn't know this account any more (a full reset wiped it): the game starts over as a new
+            // player, name and opening and all (the owner's decision: nobody is quietly given an account back).
             prefs.edit().remove("id@$baseUrl").remove("token@$baseUrl").apply()
-            if (!register(playerName)) { _status.value = state.copy(online = false); return null }
-            saved = call("GET", "/v1/save", auth = true)
+            _status.value = state.copy(online = false, accountGone = true)
+            return null
         }
         if (saved == null) { _status.value = state.copy(online = false); return null }
         if (saved.disabled) { _status.value = shutOut(state, saved.body); return null }
