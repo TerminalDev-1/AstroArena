@@ -289,7 +289,8 @@ class Match(val config: MatchConfig) {
             for (h in world.hazards) if (h.team != f.team && h.age < h.delay && kotlin.math.hypot(h.x - x, h.y - y) < h.radius + margin) return true
             // The Entity's flares too, once one has stopped following and a moment has passed to see it (a bot is not
             // instant: some still get caught).
-            if (flares != null) for (fl in flares) if (fl.age > Balance.FLARE_LOCK + FLARE_REACT && kotlin.math.hypot(fl.x - x, fl.y - y) < Balance.FLARE_RADIUS + margin) return true
+            // (Its flares hunt: a bot keeps away from any it has seen coming, which means running.)
+            if (flares != null) for (fl in flares) if (fl.age > Balance.FLARE_EMERGE + FLARE_REACT && kotlin.math.hypot(fl.x - x, fl.y - y) < Balance.FLARE_RADIUS + margin + FLARE_KEEP_AWAY) return true
             // And its sword's reach, from the moment it starts winding up.
             val up = world.uprising
             if (up != null && up.spinT >= 0f && kotlin.math.hypot(up.ex - x, up.ey - y) < Balance.ENTITY_SPIN_RADIUS + margin) return true
@@ -429,4 +430,6 @@ class Match(val config: MatchConfig) {
 }
 
 /** How long a bot takes to see that an Entity flare has stopped following and step out from under it. */
-private const val FLARE_REACT = 0.7f
+private const val FLARE_REACT = 0.25f
+/** How far a bot tries to keep from a hunting flare. */
+private const val FLARE_KEEP_AWAY = 2.6f

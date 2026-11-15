@@ -615,9 +615,10 @@ class MatchRenderer(
         // comes down: out of it in time, and it misses. Exactly the circle that corrupts (FLARE_RADIUS).
         val bal = io.github.projectwip.data.Balance
         for (fl in u.flares) {
+            // (A hunting flare: its circle on the floor under it, exactly what it hits with, as it closes in.)
             val fr = bal.FLARE_RADIUS
-            val falling = fl.age >= bal.FLARE_LOCK
-            val k = if (falling) ((fl.age - bal.FLARE_LOCK) / bal.FLARE_FALL).coerceIn(0f, 1f) else 0f
+            val falling = fl.age >= bal.FLARE_EMERGE
+            val k = (fl.age / bal.FLARE_EMERGE).coerceIn(0f, 1f)
             val pulse = 0.6f + 0.4f * sin(time * 14f)
             // (A red flare drains: drawn in its red.)
             val cr = if (fl.red) 1f else 0.45f; val cg = if (fl.red) 0.25f else 0.88f; val cb = if (fl.red) 0.3f else 1f
@@ -650,8 +651,8 @@ class MatchRenderer(
             val bal = io.github.projectwip.data.Balance
             val cy0 = ENTITY_SKY_LIFT + 0.35f * sin(time * 1.1f) + ENTITY_SKY_SCALE * 0.95f
             for ((n, fl) in u.flares.withIndex()) {
-                val falling = fl.age >= bal.FLARE_LOCK
-                val k = if (falling) ((fl.age - bal.FLARE_LOCK) / bal.FLARE_FALL).coerceIn(0f, 1f) else (fl.age / bal.FLARE_LOCK).coerceIn(0f, 1f)
+                // (Rising out of it, then a tether of its light back to it as it hunts.)
+                val k = (fl.age / bal.FLARE_EMERGE).coerceIn(0f, 1f)
                 for (strand in 0 until 4) {
                     for (j in 0 until 22) {
                         val v = ((time * 1.3f + j / 22f + strand * 0.25f + n * 0.13f) % 1f)
@@ -664,8 +665,8 @@ class MatchRenderer(
                         else sprites.add(x, y, z, (0.22f + 0.25f * k) * (0.6f + 0.4f * v), 0.45f, 0.82f, 1f, (0.35f + 0.5f * k) * (0.5f + 0.5f * v))
                     }
                 }
-                if (fl.red) sprites.add(fl.x, 0.9f, fl.y, 1.2f + 1.6f * k, 1f, 0.3f, 0.35f, 0.35f + 0.4f * k)
-                else sprites.add(fl.x, 0.9f, fl.y, 1.2f + 1.6f * k, 0.5f, 0.85f, 1f, 0.35f + 0.4f * k)
+                if (fl.red) sprites.add(fl.x, 0.9f, fl.y, 0.7f + 0.5f * k, 1f, 0.3f, 0.35f, 0.5f + 0.4f * k)
+                else sprites.add(fl.x, 0.9f, fl.y, 0.7f + 0.5f * k, 0.5f, 0.85f, 1f, 0.5f + 0.4f * k)
             }
             // Drained: red energy torn up out of them into its chest for a moment.
             for (f in world.fighters) {

@@ -451,19 +451,21 @@ class World(
                 }
             }
             EntityMove.DRAIN -> {
-                // Its red flares: they lock onto one of them and come down into them, and it drains them (see [drain]).
-                val f = alive[(u.flaresFired + 1) % alive.size]
-                u.flares += EntityFlare(f.id, f.x, f.y, red = true)
-                events += GameEvent.EntityFlare(f.id, f.x, f.y, landed = false, red = true)
+                // Its red flares (two, three once it is weak), out of it after them: one that reaches someone
+                // drains them (see [drain]).
+                for (k in 0 until 2 + (if (stage == 2) 1 else 0)) {
+                    val f = alive[(u.flaresFired + 1 + k) % alive.size]
+                    u.flares += EntityFlare(f.id, u.ex, u.ey, red = true)
+                    events += GameEvent.EntityFlare(f.id, u.ex, u.ey, landed = false, red = true)
+                }
                 u.flaresFired++
             }
             EntityMove.FLARE -> {
-                // Its blue flares lock onto one of them (two, at the end), follow them, and come down: whoever is
-                // under one when it lands is corrupted.
+                // Its blue flares (two, at the end), out of it after one of them: one that reaches someone pulls them in.
                 for (k in 0 until (if (stage == 2) 2 else 1)) {
                     val f = alive[(u.flaresFired + k) % alive.size]
-                    u.flares += EntityFlare(f.id, f.x, f.y)
-                    events += GameEvent.EntityFlare(f.id, f.x, f.y, landed = false)
+                    u.flares += EntityFlare(f.id, u.ex, u.ey)
+                    events += GameEvent.EntityFlare(f.id, u.ex, u.ey, landed = false)
                 }
                 u.flaresFired++
             }
@@ -604,19 +606,45 @@ class World(
     }
 
     /** The Entity's flares: each follows its target while it locks on, then holds where it is and comes down there. */
+    /**
+     * The Entity's flares hunt (the user's design, build 111: no longer a spot to step out of): each rises out of it,
+     * then flies after its target, turning toward them as they run, a little slower than a fighter runs, so only
+     * running gets away; the first fighter it touches gets it, and it burns out after [Balance.FLARE_LIFE].
+     */
     private fun stepFlares(u: Uprising, dt: Float) {
         val it = u.flares.iterator()
         while (it.hasNext()) {
             val fl = it.next()
             fl.age += dt
-            val t = fighter(fl.target)
-            if (fl.age < Balance.FLARE_LOCK && t != null && t.alive) { fl.x = t.x; fl.y = t.y }
-            if (fl.age < Balance.FLARE_LOCK + Balance.FLARE_FALL) continue
+            if (fl.age < Balance.FLARE_EMERGE) continue
+            // Its target gone (down, or already taken): it goes after whoever is nearest instead.
+            var t = fighter(fl.target)
+            if (t == null || !t.alive) {
+                t = u.members.mapNotNull { fighter(it) }.filter { it.alive }.minByOrNull { hypot(it.x - fl.x, it.y - fl.y) }
+                if (t != null) fl.target = t.id
+            }
+            if (t != null) {
+                val want = atan2(t.y - fl.y, t.x - fl.x)
+                if (fl.heading.isNaN()) fl.heading = want
+                var turn = want - fl.heading
+                while (turn > 3.1415927f) turn -= 6.2831855f
+                while (turn < -3.1415927f) turn += 6.2831855f
+                val most = Balance.FLARE_TURN * dt
+                fl.heading += turn.coerceIn(-most, most)
+            }
+            if (!fl.heading.isNaN()) {
+                fl.x += cos(fl.heading) * Balance.FLARE_SPEED * dt
+                fl.y += sin(fl.heading) * Balance.FLARE_SPEED * dt
+            }
+            var hit: Fighter? = null
+            for (id in u.members) fighter(id)?.let { f ->
+                if (hit == null && f.alive && f.corruptLeft <= 0f && hypot(f.x - fl.x, f.y - fl.y) < Balance.FLARE_RADIUS + f.radius * 0.5f) hit = f
+            }
+            val gone = hit != null || fl.age >= Balance.FLARE_LIFE
+            if (!gone) continue
             it.remove()
             events += GameEvent.EntityFlare(fl.target, fl.x, fl.y, landed = true, red = fl.red)
-            for (id in u.members) fighter(id)?.let { f ->
-                if (f.alive && f.corruptLeft <= 0f && hypot(f.x - fl.x, f.y - fl.y) < Balance.FLARE_RADIUS + f.radius * 0.3f) { if (fl.red) drain(f, u) else trap(f) }
-            }
+            hit?.let { f -> if (fl.red) drain(f, u) else trap(f) }
         }
     }
 
@@ -1997,7 +2025,7 @@ enum class EntityMove { STRIKES, RING, SWEEP, FLARE, SPOKES, RAIN, GRASP, PULSE,
 private val ENTITY_MOVES = listOf(
     EntityMove.STRIKES, EntityMove.SPIN, EntityMove.DRAIN, EntityMove.GRASP, EntityMove.DASH, EntityMove.FLARE,
     EntityMove.SPIN, EntityMove.RING, EntityMove.CHASE, EntityMove.DRAIN, EntityMove.SPOKES, EntityMove.DASH,
-    EntityMove.SPIN, EntityMove.RAIN, EntityMove.FLARE, EntityMove.SWEEP, EntityMove.DRAIN, EntityMove.GRASP,
+    EntityMove.SPIN, EntityMove.RAIN, EntityMove.STRIKES, EntityMove.SWEEP, EntityMove.STRIKES, EntityMove.GRASP,
     EntityMove.SPIN, EntityMove.PULSE, EntityMove.DASH, EntityMove.STRIKES, EntityMove.CHASE,
 )
 

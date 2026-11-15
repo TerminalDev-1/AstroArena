@@ -391,7 +391,7 @@ object Balance {
     /** Boss Mode (the Entity's fight): it begins this soon, lasts at most this long, is this much tougher, and hits this much harder. */
     const val UPRISING_BOSS_START = 1.5f
     const val UPRISING_BOSS_SECONDS = 210f
-    const val UPRISING_BOSS_HP = 1.1f
+    const val UPRISING_BOSS_HP = 0.85f
     // (3 since build 111: the user wanted it to "actually do some damage".)
     // (Lower again once its fight had no respawns: at 3 the whole team was down in twenty seconds.)
     const val UPRISING_BOSS_DAMAGE = 1.6f
@@ -400,7 +400,16 @@ object Balance {
     // (0.9 s from when it stops following to when it lands: being pulled in lasts until the Entity is beaten, so it
     // has to be fair to step out of. At 0.55 s a whole team was in it within a minute.)
     const val FLARE_FALL = 0.9f
-    const val FLARE_RADIUS = 1.15f
+    /**
+     * Since build 111 its flares hunt (`World.stepFlares`): they rise out of it for [FLARE_EMERGE], then fly after
+     * their target at [FLARE_SPEED] (a little under a fighter's run, 3.6 to 4 tiles a second: only running gets
+     * away), turning [FLARE_TURN] radians a second, for up to [FLARE_LIFE]; [FLARE_RADIUS] is how close is a hit.
+     */
+    const val FLARE_EMERGE = 0.6f
+    const val FLARE_SPEED = 2.6f
+    const val FLARE_TURN = 1.8f
+    const val FLARE_LIFE = 4f
+    const val FLARE_RADIUS = 0.55f
     /** A fighter caught under one fights for the Entity, against its own side, for this long. */
     const val CORRUPT_SECONDS = 6f
     /** Its hand's circle (its slam), and how far apart its chase's strikes come down. */

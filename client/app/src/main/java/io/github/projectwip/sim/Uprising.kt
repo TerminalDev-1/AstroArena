@@ -96,6 +96,8 @@ class Uprising(
 }
 
 /** One of the Entity's corruption flares: locked onto [target], following them, then coming down where it is. */
-class EntityFlare(val target: Int, var x: Float, var y: Float, val red: Boolean = false) {
+class EntityFlare(var target: Int, var x: Float, var y: Float, val red: Boolean = false) {
     var age = 0f
+    /** Which way it is flying (radians): it turns toward its target as it hunts them. */
+    var heading = Float.NaN
 }
