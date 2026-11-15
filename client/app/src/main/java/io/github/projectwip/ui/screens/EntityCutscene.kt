@@ -114,8 +114,10 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
         if (cut.drain) {
             val hold = ((time - 1f) / 0.4f).coerceIn(0f, 1f) * (1f - ((time - 5.3f) / 0.5f).coerceIn(0f, 1f))
             val beat = 0.55f + 0.45f * kotlin.math.abs(kotlin.math.sin(time * 4.2f))
-            val flash = maxOf(1f - ((time - 1f) / 0.3f).coerceIn(0f, 1f), 1f - ((time - 5.6f) / 0.3f).coerceIn(0f, 1f)) *
-                (if (time >= 1f) 1f else 0f)
+            // (Each flash only from its own moment: the second one was lit the whole time before it.)
+            val yankFlash = if (time >= 1f) 1f - ((time - 1f) / 0.3f).coerceIn(0f, 1f) else 0f
+            val slamFlash = if (time >= 5.6f) 1f - ((time - 5.6f) / 0.3f).coerceIn(0f, 1f) else 0f
+            val flash = maxOf(yankFlash, slamFlash)
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                 if (hold > 0f) drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
                     0f to Color.Transparent, 0.55f to Color.Transparent, 1f to Color(0xFFB0001C).copy(alpha = 0.75f * hold * beat),

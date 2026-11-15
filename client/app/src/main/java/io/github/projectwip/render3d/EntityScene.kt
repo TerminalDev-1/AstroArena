@@ -245,7 +245,9 @@ class EntityScene {
                 drainFlow = yank * (1f - drop)
                 struggle = maxOf(streaks, drainFlow) * fight
                 // Choking, the head thrown back; then down, more broken each time.
-                val down = when (p.cut) { EntityCut.DRAIN -> 22f; EntityCut.DRAIN_WEAK -> 48f; EntityCut.DRAIN_FAINT -> 88f; else -> 52f }
+                // (Giving in, they kneel with their head up, its blue in their eyes, facing us: a deep bow hid them.)
+                val down = when (p.cut) { EntityCut.DRAIN -> 22f; EntityCut.DRAIN_WEAK -> 48f; EntityCut.DRAIN_FAINT -> 88f; else -> 14f }
+                if (p.cut == EntityCut.DRAIN_OBEY) fy -= 0.22f * drop
                 bow = lerp(-24f * drainFlow, down, drop)
                 if (p.cut == EntityCut.DRAIN_FAINT) fy -= 0.28f * drop
                 eBow = 12f * drainFlow
@@ -310,6 +312,8 @@ class EntityScene {
                     setEye(lerp(ex + 4.2f, fx + 1.1f, k), lerp(hy + 1.5f, fy + 1.25f, k), lerp(ez + 5.4f, fz + 1.5f, k))
                     setAt(fx, fy + lerp(0.9f, 1.1f, k), fz)
                 }
+                // Giving in: close on their face as they say it, its blue lit in their eyes.
+                p.cut == EntityCut.DRAIN_OBEY && t < 7.8f -> { val k = smooth((t - 5.75f) / 2f); setEye(fx0 + 0.25f, lerp(1.25f, 1.05f, k), fz0 - 0.5f + lerp(2.2f, 1.35f, k)); setAt(fx0, 0.92f, fz0 - 0.5f) }
                 t < 7.8f || !p.cut.last -> { val k = smooth((t - 5.75f) / 2.4f); setEye(fx0 + 0.5f, lerp(1.4f, 1f, k), fz0 + lerp(3.4f, 2.4f, k)); setAt(fx0, 0.6f, fz0 - 0.5f) }
                 else -> { setEye(c + 6.5f, 2.6f, c + 3f); setAt(fx, fy + 1f, fz) }
             }
