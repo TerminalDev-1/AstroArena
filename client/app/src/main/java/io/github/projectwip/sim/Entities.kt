@@ -52,6 +52,7 @@ class Fighter(
     /** Portal Run: how much harder this enemy hits in the dimension it was brought into. */
     var dimensionDamage = 1f
     val damageMultiplier get() = dimensionDamage * (1f + io.github.projectwip.data.Balance.CELL_DAMAGE_BONUS * cells) *
+        (1f - io.github.projectwip.data.Balance.ENTITY_DRAIN_DAMAGE * drains) *
         (if (hyperActive) 1f + io.github.projectwip.data.Balance.HYPER_DAMAGE_BONUS else 1f)
     val attackDamage get() = (def.attackDamage.at(level, player = !isBot) * damageMultiplier).toInt()
     val superDamage get() = (def.superDamage.at(level, player = !isBot) * damageMultiplier).toInt()
@@ -89,6 +90,8 @@ class Fighter(
      * the fight (not alive, no respawn) until the Entity is beaten, which frees everyone it has.
      */
     var trapped = false
+    /** How many times the Entity's red flares have drained them this match: each leaves them weaker. */
+    var drains = 0
     var alive = true
     var respawnTimer = 0f
     var shield = 0f
@@ -265,7 +268,9 @@ sealed interface GameEvent {
     data class Uprising(val phase: Int) : GameEvent
     /** In the Entity's sky, [fighterId] struck it for [damage] (a super: [isSuper]). */
     /** One of the Entity's flares locked onto [targetId] (or, [landed], came down at x, y). */
-    data class EntityFlare(val targetId: Int, val x: Float, val y: Float, val landed: Boolean) : GameEvent
+    data class EntityFlare(val targetId: Int, val x: Float, val y: Float, val landed: Boolean, val red: Boolean = false) : GameEvent
+    /** The Entity's red flare drained [fighterId]: their [count]th drain this match (the last one takes them). */
+    data class Drained(val fighterId: Int, val count: Int) : GameEvent
     /** The Entity pulled [fighterId] into itself ([on]), or it was freed. */
     data class Trapped(val fighterId: Int, val on: Boolean) : GameEvent
     /** The Entity corrupted a fighter ([on]) or let it go. */

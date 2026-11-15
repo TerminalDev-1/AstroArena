@@ -57,6 +57,7 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
             EntityCut.VICTORY -> { sfx?.play(Sound.VOID, 1f, 1.2f); sfx?.play(Sound.THUNDER, 0.8f, 0.8f) }
             EntityCut.DEFEAT -> sfx?.play(Sound.VOID, 1f, 0.8f)
             EntityCut.CORRUPT -> { sfx?.play(Sound.VOID, 1f, 1.1f); sfx?.play(Sound.WHOOSH, 0.8f, 0.6f) }
+            else -> { sfx?.play(Sound.VOID, 1f, 0.75f); sfx?.play(Sound.WHOOSH, 0.7f, 0.5f) }
         }
         fade.animateTo(1f, tween(350))
         val start = withFrameNanos { it }
@@ -71,6 +72,10 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
             if (cut == EntityCut.VICTORY && cues == 1 && time > 8.6f) { cues++; sfx?.play(Sound.THUNDER, 1f, 0.6f); sfx?.play(Sound.VICTORY, 0.9f) }
             if (cut == EntityCut.DEFEAT && cues == 0 && time > 3.3f) { cues++; sfx?.play(Sound.PORTAL_OPEN, 0.9f) }
             if (cut == EntityCut.DEFEAT && cues == 1 && time > 8.15f) { cues++; sfx?.play(Sound.WHOOSH, 1f, 0.45f); sfx?.play(Sound.DEFEAT, 0.9f) }
+            // A drain: the yank back off their feet, and (the last time) the pull inside.
+            if (cut.drain && cues == 0 && time > 1f) { cues++; sfx?.play(Sound.WHOOSH, 1f, 0.42f); sfx?.buzz(220, 200) }
+            if (cut.drain && cues == 1 && time > 5.3f) { cues++; sfx?.play(Sound.HIT, 0.7f, 0.6f) }
+            if (cut.last && cues == 2 && time > 7.8f) { cues++; sfx?.play(Sound.VOID, 1f, 0.6f) }
             if (time >= length) leaving = true
         }
     }
@@ -81,7 +86,8 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
     LaunchedEffect(beat) {
         if (beat < 0 || beat == said) return@LaunchedEffect
         said = beat
-        sfx?.say(beats[beat].text, VoiceStyle.VOID, force = true, queue = true)
+        // (The fighter's own words are only shown: the Entity's are said in its voice.)
+        if (!beats[beat].fighter) sfx?.say(beats[beat].text, VoiceStyle.VOID, force = true, queue = true)
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black).graphicsLayer { alpha = fade.value }) {
@@ -91,22 +97,29 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
         if (beat >= 0) {
             Panel(Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp).widthIn(max = 640.dp), color = Color(0xFF3A2390), colorBottom = Color(0xFF1E1150)) {
                 Column(Modifier.padding(horizontal = 22.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    GameText("THE ENTITY", Type.Eyebrow, color = Color(0xFFC9A6FF))
+                    GameText(if (beats[beat].fighter) io.github.projectwip.data.Balance.fighter(fighter).name.uppercase() else "THE ENTITY", Type.Eyebrow,
+                        color = if (beats[beat].fighter) Color(0xFF8FE6FF) else Color(0xFFC9A6FF))
                     GameText(beats[beat].text, Type.Heading.copy(fontSize = 19.sp), color = Palette.Text, align = TextAlign.Center, maxLines = 2)
                 }
             }
         }
         // The title, at the end.
-        val titleAt = when (cut) { EntityCut.VICTORY -> 9.8f; EntityCut.DEFEAT -> 11.2f; EntityCut.CORRUPT -> 5.4f }
+        val titleAt = when (cut) {
+            EntityCut.VICTORY -> 9.8f; EntityCut.DEFEAT -> 11.2f; EntityCut.CORRUPT -> 5.4f
+            EntityCut.DRAIN, EntityCut.DRAIN_WEAK -> 5.9f; EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> 9.2f
+        }
         if (time >= titleAt) {
             val k = ((time - titleAt) / 0.35f).coerceIn(0f, 1f)
             val (word, color) = when (cut) {
                 EntityCut.VICTORY -> "VICTORY" to Palette.Gold
                 EntityCut.DEFEAT -> "DEFEAT" to Palette.Red
                 EntityCut.CORRUPT -> "PULLED INTO THE ENTITY" to Color(0xFFC9A6FF)
+                EntityCut.DRAIN -> "DRAINED" to Color(0xFFFF6A7A)
+                EntityCut.DRAIN_WEAK -> "WEAKER" to Color(0xFFFF6A7A)
+                EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> "PULLED INTO THE ENTITY" to Color(0xFFC9A6FF)
             }
             Box(Modifier.align(if (cut == EntityCut.VICTORY) Alignment.TopCenter else Alignment.Center).padding(top = if (cut == EntityCut.VICTORY) 44.dp else 0.dp)) {
-                GameText(word, Type.Display.copy(fontSize = if (cut == EntityCut.CORRUPT) 40.sp else 64.sp), color = color, outline = 6.dp,
+                GameText(word, Type.Display.copy(fontSize = if (cut == EntityCut.CORRUPT || cut.last) 40.sp else 64.sp), color = color, outline = 6.dp,
                     modifier = Modifier.graphicsLayer { alpha = k; scaleX = 1.4f - 0.4f * k; scaleY = 1.4f - 0.4f * k })
             }
         }

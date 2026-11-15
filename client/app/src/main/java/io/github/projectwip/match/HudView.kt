@@ -309,7 +309,10 @@ class HudView(
                 fill.color = Color.rgb(160, 110, 255)
                 c.drawRect(l + dp(14f), top + dp(24f), l + dp(14f) + (pw - dp(28f)) * frac, top + dp(36f), fill)
                 text.textSize = dp(13f)
-                outlined(c, "THE ENTITY · %,d".format(s.uprisingHp), w / 2, top + dp(18f), Color.WHITE, dp(2.5f))
+                outlined(c, (if (s.entityTier > 0) "THE ENTITY · TIER ${s.entityTier + 1} · " else "THE ENTITY · ") + "%,d".format(s.uprisingHp), w / 2, top + dp(18f), Color.WHITE, dp(2.5f))
+                // Drained by its red flares: weaker, and how close it is to taking them.
+                if (s.playerDrains > 0 && !s.playerTrapped && t >= 5f && s.trappedNames.isEmpty())
+                    entityPlate(c, "DRAINED ${s.playerDrains}/${io.github.projectwip.data.Balance.ENTITY_DRAINS_TO_TAKE}", "YOU HIT SOFTER AND MOVE SLOWER", w / 2, top + ph + dp(40f), 1f)
                 if (t < 5f) entityPlate(c, "Then fight me. All of you.", "HIT THE SHADOW UNDER IT", w / 2, h * 0.3f, minOf(1f, (5f - t) / 0.5f))
                 else if (s.trappedNames.isNotEmpty() && !s.playerTrapped)
                     entityPlate(c, "TRAPPED: " + s.trappedNames.uppercase(), "BEAT THE ENTITY TO FREE THEM", w / 2, top + ph + dp(40f), 1f)
@@ -467,6 +470,12 @@ class HudView(
             // Inside the Entity, among its souls, until the team beats it.
             // (Up under its health bar, out of the way of the teammate the camera is on.)
             entityPlate(c, "TRAPPED INSIDE THE ENTITY", "YOUR TEAM MUST BEAT IT TO FREE YOU", cx, dp(92f) + dp(46f) + dp(40f), 1f)
+        } else if (s.playerOut && s.phase == Phase.PLAYING) {
+            // No coming back in its fight: they watch their team.
+            text.textSize = dp(28f)
+            outlined(c, "KNOCKED OUT", cx, h * 0.4f, Color.rgb(255, 92, 92), dp(5f))
+            text.textSize = dp(17f)
+            outlined(c, "Out until the match ends · watching your team", cx, h * 0.4f + dp(30f), Color.WHITE, dp(3.5f))
         } else if (!s.playerAlive && s.phase == Phase.PLAYING) {
             text.textSize = dp(28f)
             outlined(c, "KNOCKED OUT", cx, h * 0.4f, Color.rgb(255, 92, 92), dp(5f))

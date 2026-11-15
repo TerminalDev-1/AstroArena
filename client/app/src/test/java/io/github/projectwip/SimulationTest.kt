@@ -1448,9 +1448,47 @@ class SimulationTest {
         if (u.beaten) assertTrue("beaten, it lets everyone go", w.fighters.none { it.trapped })
     }
 
+    @Test fun redFlaresDrainAFighterWeakerAndTheThirdTakesThem() {
+        val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L))
+        val w = m.world
+        val u = w.uprising!!
+        var t = 0
+        while (u.phase != io.github.projectwip.sim.UprisingPhase.SKY && t < 60 * 200) { m.step(Match.STEP); t++ }
+        u.strikeIn = 1e9f
+        val p = m.player
+        val fullDamage = p.attackDamage
+        var drainedEvents = 0
+        // Red flares come down on them until it has drained them three times.
+        var k = 0
+        while (!p.trapped && k < 60 * 60) {
+            if (k % 40 == 0 && p.alive) { p.x = u.ex + 4f; p.y = u.ey + 4f; u.flares += io.github.projectwip.sim.EntityFlare(p.id, p.x, p.y, red = true) }
+            p.hp = p.maxHp
+            m.step(Match.STEP); k++
+            for (e in w.events) if (e is io.github.projectwip.sim.GameEvent.Drained && e.fighterId == p.id) {
+                drainedEvents++
+                if (e.count == 1) assertTrue("weaker after one drain", p.attackDamage < fullDamage)
+            }
+            w.events.clear()
+        }
+        assertEquals("drained three times", 3, drainedEvents)
+        assertTrue("the third takes them inside", p.trapped)
+    }
+
+    @Test fun theEntityGetsHarderTierByTier() {
+        fun entityHp(tier: Int): Int {
+            val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "P", BotDifficulty.NORMAL, mode = GameMode.BOSS, humanPlayer = false, seed = 4L, entityTier = tier))
+            val u = m.world.uprising!!
+            var t = 0
+            while (u.phase != io.github.projectwip.sim.UprisingPhase.SKY && t < 60 * 200) { m.step(Match.STEP); t++ }
+            return u.maxHp
+        }
+        val first = entityHp(0); val third = entityHp(2)
+        assertTrue("tier 2 is tougher than tier 0 ($first -> $third)", third > first)
+    }
+
     @Test fun theEntityHasMovesBeyondTheBasicOnes() {
         val names = io.github.projectwip.sim.EntityMove.entries.map { it.name }.toSet()
-        assertTrue(names.containsAll(listOf("STRIKES", "RING", "SWEEP", "FLARE", "SPOKES", "RAIN", "GRASP", "PULSE", "CHASE")))
+        assertTrue(names.containsAll(listOf("STRIKES", "RING", "SWEEP", "FLARE", "SPOKES", "RAIN", "GRASP", "PULSE", "CHASE", "DASH", "SPIN", "DRAIN")))
     }
 
     @Test fun everyoneTrappedLosesTheEntitysFight() {
@@ -1467,7 +1505,7 @@ class SimulationTest {
             m.step(Match.STEP); k++
         }
         assertTrue("everyone pulled in ends it", m.isOver)
-        assertTrue(w.fighters.all { it.trapped })
+        assertTrue("everyone pulled in or knocked out for good", w.fighters.all { it.trapped || it.eliminated })
         assertEquals(MatchOutcome.DEFEAT, m.report().outcome)
     }
 

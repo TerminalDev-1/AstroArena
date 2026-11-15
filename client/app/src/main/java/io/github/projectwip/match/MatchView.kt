@@ -128,6 +128,11 @@ class MatchView(
         return InsideInfo(u.hp, u.maxHp, held, team)
     }
 
+    /** How many times its red flares have drained the player (each plays its cutscene). */
+    val drains: Int get() = runner.drains
+    /** The last time, whether this player's fighter gives in rather than passes out (fixed by the match). */
+    val obeys: Boolean get() = (runner.match.config.seed and 1L) == 1L
+
     /** How many times the Entity has corrupted the player (each plays its cutscene). */
     val corruptions: Int get() = runner.corruptions
 

@@ -13,7 +13,7 @@ import java.util.Base64
  * as `key=value` lines, and reads the verdict from standard output the same way.
  *
  * Input:
- *     mode=LAST_SPARK            fighter=KITO           level=10          difficulty=NORMAL
+ *     mode=BOSS                  fighter=KITO           level=10          difficulty=NORMAL     tier=3
  *     seed=123456                names=Rivet,Moss,...   (the bots' names, in order)
  *     bot.reactiontime=0.48      (any number of bot settings for this difficulty, as the server's bots.cfg has them)
  *     inputs=<base64>            (the player's input log: see InputLog)
@@ -86,6 +86,7 @@ fun main() {
                 mode = GameMode.valueOf(fields.getValue("mode")), seed = fields.getValue("seed").toLong(),
                 botNames = fields["names"].orEmpty().split(',').filter { it.isNotBlank() },
                 team = io.github.projectwip.sim.TeamSetup(0, players),
+                entityTier = fields["tier"]?.trim()?.toIntOrNull() ?: 0,
             )
             val verdict = Referee.judgeTeam(
                 config, (0 until teamSize).map { Base64.getDecoder().decode(fields["frames$it"].orEmpty()) },
@@ -113,6 +114,7 @@ fun main() {
             mode = GameMode.valueOf(fields.getValue("mode")),
             seed = fields.getValue("seed").toLong(),
             botNames = fields["names"].orEmpty().split(',').filter { it.isNotBlank() },
+            entityTier = fields["tier"]?.trim()?.toIntOrNull() ?: 0,
         )
         val verdict = Referee.judge(config, Base64.getDecoder().decode(fields["inputs"].orEmpty()))
         val r = verdict.report

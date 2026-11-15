@@ -39,6 +39,8 @@ class TeamLink(private val host: String, private val port: Int) : Closeable {
     class Start(
         val seed: Long, val mode: GameMode, val difficulty: BotDifficulty,
         val botNames: List<String>, val bots: JSONObject?, val setup: TeamSetup,
+        /** The Entity's tier the whole team fights (its highest member's). */
+        val tier: Int = 0,
     )
 
     private class Frame(val flags: Int, val moveX: Float, val moveY: Float, val aimX: Float, val aimY: Float) {
@@ -132,7 +134,7 @@ class TeamLink(private val host: String, private val port: Int) : Closeable {
                         start = Start(
                             j.getLong("seed"), GameMode.entries.firstOrNull { it.name == j.optString("mode") } ?: GameMode.BOSS,
                             BotDifficulty.entries.firstOrNull { it.name == j.optString("difficulty") } ?: BotDifficulty.NORMAL,
-                            names, j.optJSONObject("bots"), TeamSetup(j.getInt("slot"), team),
+                            names, j.optJSONObject("bots"), TeamSetup(j.getInt("slot"), team), j.optInt("tier"),
                         )
                     }
                     'I' -> {

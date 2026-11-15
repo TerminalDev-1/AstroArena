@@ -2,6 +2,10 @@ package io.github.projectwip.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +44,7 @@ import kotlin.math.sin
  * them (it feeds on them), and how the teammates still fighting are doing.
  */
 @Composable
-fun EntityInsideScreen(read: () -> MatchView.InsideInfo?) {
+fun EntityInsideScreen(full: Boolean = true, onToggle: (() -> Unit)? = null, read: () -> MatchView.InsideInfo?) {
     var info by remember { mutableStateOf(read()) }
     var scene by remember { mutableStateOf<EntityInsideView?>(null) }
     LaunchedEffect(Unit) {
@@ -53,6 +57,24 @@ fun EntityInsideScreen(read: () -> MatchView.InsideInfo?) {
     }
     val time by rememberAnimTime()
     val violet = Color(0xFFB46CFF)
+    // Watching the team (the user's ask: trapped, they still want to see their team fight): the match shows, with
+    // its own HUD, and the ruin in a window in the corner; a tap on it goes inside.
+    if (!full) {
+        Box(Modifier.fillMaxSize()) {
+            Box(Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).width(300.dp).height(190.dp)
+                .border(2.dp, violet, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .clickable { onToggle?.invoke() }) {
+                AndroidView(factory = { ctx -> EntityInsideView(ctx).also { scene = it } }, modifier = Modifier.fillMaxSize())
+                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xCC12062A)).padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    PlainText("YOU, INSIDE THE ENTITY", Type.Label, color = Color(0xFFE9D4FF), maxLines = 1)
+                    PlainText("TAP TO LOOK INSIDE", Type.Small, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
+                }
+            }
+        }
+        return
+    }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(factory = { ctx -> EntityInsideView(ctx).also { scene = it } }, modifier = Modifier.fillMaxSize())
         val i = info
@@ -78,6 +100,10 @@ fun EntityInsideScreen(read: () -> MatchView.InsideInfo?) {
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 46.dp).graphicsLayer { alpha = 0.6f + 0.4f * sin(time * 3f) })
         PlainText("Every fighter it holds heals it and makes it hit harder", Type.Small, Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
             color = Color.White.copy(alpha = 0.6f), maxLines = 1)
+        // Back to watching the team.
+        if (onToggle != null) io.github.projectwip.ui.ChunkyButton(onToggle, Modifier.align(Alignment.TopStart).padding(16.dp), style = io.github.projectwip.ui.ButtonStyle.GREY) {
+            GameText("WATCH YOUR TEAM", Type.Label, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+        }
         // The team still fighting out there.
         if (i != null && i.team.isNotEmpty()) Panel(Modifier.align(Alignment.BottomStart).padding(16.dp), cut = 12.dp) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

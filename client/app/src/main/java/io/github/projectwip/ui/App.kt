@@ -243,6 +243,10 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         "cutvictory" -> io.github.projectwip.render3d.EntityCut.VICTORY
         "cutdefeat" -> io.github.projectwip.render3d.EntityCut.DEFEAT
         "cutcorrupt" -> io.github.projectwip.render3d.EntityCut.CORRUPT
+        "cutdrain" -> io.github.projectwip.render3d.EntityCut.DRAIN
+        "cutweak" -> io.github.projectwip.render3d.EntityCut.DRAIN_WEAK
+        "cutfaint" -> io.github.projectwip.render3d.EntityCut.DRAIN_FAINT
+        "cutobey" -> io.github.projectwip.render3d.EntityCut.DRAIN_OBEY
         else -> null
     }) }
     LaunchedEffect(booting, needsName, save.settings.introSeen) {
@@ -273,7 +277,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         teamStart.bots?.let { server.useBots(teamStart.difficulty, it) }
         val me = teamStart.setup.players[teamStart.setup.slot]
         screen = Screen.Match(MatchConfig(me.fighter, me.level, me.skin, me.name, teamStart.difficulty, mode = teamStart.mode,
-            seed = teamStart.seed, botNames = teamStart.botNames, team = teamStart.setup))
+            seed = teamStart.seed, botNames = teamStart.botNames, team = teamStart.setup, entityTier = teamStart.tier))
     }
     val showReward: (RewardReveal) -> Unit = { reveal = it }
 
@@ -422,7 +426,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                 needsName = false
             }
             // Debug: `--es screen inside` shows the ruin inside the Entity, as if the player and a teammate were held.
-            if (startScreen == "inside" && !booting) io.github.projectwip.ui.screens.EntityInsideScreen {
+            if ((startScreen == "inside" || startScreen == "insidewatch") && !booting) io.github.projectwip.ui.screens.EntityInsideScreen(startScreen == "inside") {
                 io.github.projectwip.match.MatchView.InsideInfo(612_000, 1_400_000,
                     listOf(save.selectedFighter to (save.fighters[save.selectedFighter]?.skin ?: 0), io.github.projectwip.data.FighterId.KIRA to 0),
                     listOf(io.github.projectwip.match.MatchView.Mate("Kira", 0, 9000, false, true), io.github.projectwip.match.MatchView.Mate("Onyx", 6200, 11550, true, false)))
@@ -483,7 +487,7 @@ fun connectToServer(server: io.github.projectwip.net.GameServer, repo: GameRepos
 
 fun startMatchConfig(save: io.github.projectwip.data.SaveData): MatchConfig {
     val p = save.progress(save.selectedFighter)
-    return MatchConfig(save.selectedFighter, p.level, p.skin, save.settings.playerName, save.settings.botDifficulty, mode = save.selectedMode)
+    return MatchConfig(save.selectedFighter, p.level, p.skin, save.settings.playerName, save.settings.botDifficulty, mode = save.selectedMode, entityTier = save.entityTier)
 }
 
 fun rewardLabel(r: Reward): String = when (r) {

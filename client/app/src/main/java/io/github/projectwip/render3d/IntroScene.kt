@@ -307,6 +307,9 @@ class IntroScene {
         swishAnim.flash = 0.25f * glitchK * (if (glitch) 1f else 0f)
         swishAnim.talk = if (swishTalking) ((0.5f + 0.5f * sin(t * 17f)) * (0.55f + 0.45f * sin(t * 5.3f))).coerceIn(0f, 1f) else 0f
         swishAnim.bow = if (shot == IntroScript.Shot.KNEEL || shot == IntroScript.Shot.ADDRESS || shot == IntroScript.Shot.END) 45f * smooth((t - shotStart(IntroScript.Shot.KNEEL)) / 1.1f) else 0f
+        // Once it has her, its blue is in her eyes.
+        swishAnim.eyeGlow = if (shot == IntroScript.Shot.KNEEL || shot == IntroScript.Shot.ADDRESS || shot == IntroScript.Shot.END) 1f
+            else if (shot == IntroScript.Shot.PULL) smooth((t - shotStart(IntroScript.Shot.PULL)) / 1.5f) else 0f
         entityAnim.time = t; entityAnim.walk = 0f; entityAnim.moving = 0f; entityAnim.recoil = 0f; entityAnim.spin = 0f; entityAnim.bow = 0f
         entityAnim.scale = entityScale; entityAnim.jump = ey
         entityAnim.talk = if (entityTalking) 0.5f + 0.5f * sin(t * 9f) else 0f

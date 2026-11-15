@@ -69,6 +69,8 @@ class MatchRunner(
     @Volatile var hijack = 0
     /** How many times the Entity has corrupted the player: each one plays its cutscene (`MatchScreen`), the match waiting. */
     @Volatile var corruptions = 0
+    /** The player's drains (each plays its cutscene, `EntityCut.drain`): how many there have been. */
+    @Volatile var drains = 0
     /** Other real players are in this match: it can't be held still for one of them. */
     val shared: Boolean get() = duel != null || team != null
     fun sound(s: Sound, gain: Float) = sfx.play(s, gain)
@@ -525,8 +527,15 @@ class MatchRunner(
             // a deep rush for anyone else; freed, a burst.
             is GameEvent.Trapped -> if (!e.on) sfx.play(Sound.WHOOSH, 0.9f, 1.3f) else if (e.fighterId == pid) {
                 sfx.buzz(220, 255)
-                if (!shared) { paused = true; corruptions++ } else sfx.play(Sound.VOID, 1f, 0.7f)
+                // (Taken by its last drain, the drain's own cutscene has already shown it pulling them in.)
+                val byDrain = match.player.drains >= io.github.projectwip.data.Balance.ENTITY_DRAINS_TO_TAKE
+                if (!shared) { paused = true; if (!byDrain) corruptions++ } else sfx.play(Sound.VOID, 1f, 0.7f)
             } else sfx.play(Sound.VOID, 0.7f, 0.7f)
+            // Its red flare drained someone: the player gets its cutscene (the match waits, unless it is shared).
+            is GameEvent.Drained -> if (e.fighterId == pid) {
+                sfx.buzz(180, 220)
+                if (!shared) { paused = true; drains = e.count } else sfx.play(Sound.VOID, 1f, 0.6f)
+            } else sfx.play(Sound.VOID, 0.6f, 0.6f)
             is GameEvent.Corrupted -> if (e.fighterId == pid && e.on) {
                 sfx.buzz(160, 255)
                 // Its cutscene plays over the match, which waits (unless other real players are in it, who can't).

@@ -91,6 +91,8 @@ data class SaveData(
     val matchesPlayed: Int = 0,
     val victories: Int = 0,
     val totalKos: Int = 0,
+    /** How hard the Entity is: one more for every fight with it played out, won or lost (the server's, online). */
+    val entityTier: Int = 0,
     val settings: Settings = Settings(),
     /** Offers made with the in-game Offer Creator. */
     val customOffers: List<CustomOffer> = emptyList(),

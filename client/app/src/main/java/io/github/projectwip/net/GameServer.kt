@@ -82,6 +82,8 @@ data class MatchPlan(
     val matchId: Long, val seed: Long, val botNames: List<String>, val difficulty: BotDifficulty?,
     /** The level the server holds for the fighter; the match is played (and replayed) at this level. */
     val level: Int?,
+    /** How hard the Entity is in this match (the server's count for this player). */
+    val tier: Int = 0,
 )
 
 /** One item on the News tab, as the server wrote it. */
@@ -221,6 +223,7 @@ class GameServer(context: Context) : GameActions {
         val fighters = o.optJSONObject("fighters")
         return ServerProfile(
             bolts = o.optInt("bolts"), prisms = o.optInt("prisms"), bestCups = o.optInt("bestCups"), credits = o.optInt("credits"),
+            entityTier = o.optInt("entityTier"),
             fighters = FighterId.entries.associateWith { id ->
                 val f = fighters?.optJSONObject(id.name)
                 FighterProgress(
@@ -389,7 +392,7 @@ class GameServer(context: Context) : GameActions {
         val planned = BotDifficulty.entries.firstOrNull { it.name == o.optString("difficulty") }
         // The bots must behave exactly as the server will have them behave when it replays this match.
         o.optJSONObject("bots")?.let { useBots(planned ?: difficulty, it) }
-        return MatchPlan(o.optLong("matchId"), o.optLong("seed"), names, planned, if (o.has("level")) o.optInt("level") else null)
+        return MatchPlan(o.optLong("matchId"), o.optLong("seed"), names, planned, if (o.has("level")) o.optInt("level") else null, o.optInt("tier"))
     }
 
     /**

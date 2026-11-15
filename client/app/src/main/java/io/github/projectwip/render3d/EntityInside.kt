@@ -160,7 +160,7 @@ class EntityInsideScene {
             drawChains(x, z, t, k)
             anim.time = t + k; anim.walk = 0f; anim.moving = 0f; anim.spin = 7f * sin(t * (2.2f + k * 0.3f) + k)
             anim.recoil = 0.3f + 0.3f * sin(t * (5f + k) + k * 2f); anim.bow = 10f + 6f * sin(t * 0.9f + k)
-            anim.jump = 0f; anim.talk = 0f; anim.scale = EntityScene.FIGHTER_SCALE * (if (k < front) 1f else 0.95f)
+            anim.jump = 0f; anim.talk = 0f; anim.scale = EntityScene.FIGHTER_SCALE * (if (k < front) 1f else 0.95f); anim.eyeGlow = 1f
             // Drained: they flicker pale as it drinks.
             anim.flash = 0.12f + 0.1f * sin(t * 6f + k * 1.7f)
             lit.f("uRim", 0.6f)

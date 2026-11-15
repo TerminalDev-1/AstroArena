@@ -292,7 +292,7 @@ class MatchRenderer(
 
     private fun updateCamera(dt: Float, alpha: Float) {
         // Pulled into the Entity, the player watches their team fight to free them: the camera is on one of them.
-        val p = if (match.player.trapped) world.uprising?.members?.firstNotNullOfOrNull { id -> world.fighter(id)?.takeIf { it.alive } } ?: match.player else match.player
+        val p = if (match.player.trapped || match.player.eliminated) world.uprising?.members?.firstNotNullOfOrNull { id -> world.fighter(id)?.takeIf { it.alive } } ?: match.player else match.player
         val inp = runner.input
         val aiming = inp.aimingAttack || inp.aimingSuper
         // The look-ahead while aiming eases in and out...
@@ -475,6 +475,8 @@ class MatchRenderer(
 
     /** Fighters it has pulled in: when each was taken (they fly up into its chest), drawn pressed inside it. */
     private val trapAt = HashMap<Int, Float>()
+    /** When each fighter was last drained by a red flare (its red torn out of them, for a moment). */
+    private val drainAt = HashMap<Int, Float>()
     private val trapAnim = FighterAnim()
 
     /**
@@ -505,7 +507,7 @@ class MatchRenderer(
             trappedPlace(f, k, held.size, big, trapPlace)
             val since = time - (trapAt[f.id] ?: -10f)
             trapAnim.time = time; trapAnim.walk = time * (if (since < 1.4f) 14f else 3f); trapAnim.moving = if (since < 1.4f) 1f else 0.35f
-            trapAnim.recoil = 0f; trapAnim.spin = 0f; trapAnim.bow = -12f; trapAnim.talk = 0f
+            trapAnim.recoil = 0f; trapAnim.spin = 0f; trapAnim.bow = -12f; trapAnim.talk = 0f; trapAnim.eyeGlow = 1f
             trapAnim.jump = trapPlace[1]; trapAnim.scale = trapPlace[3]
             trapAnim.flash = 0.35f + 0.15f * sin(time * 5f + k)
             if (pass == Pass.COLOR) { lit.f("uRim", 1f); lit.f("uEmissive", 0.25f); lit.v4("uTint", 0.55f, 0.75f, 1.15f, 1f) }
@@ -617,10 +619,12 @@ class MatchRenderer(
             val falling = fl.age >= bal.FLARE_LOCK
             val k = if (falling) ((fl.age - bal.FLARE_LOCK) / bal.FLARE_FALL).coerceIn(0f, 1f) else 0f
             val pulse = 0.6f + 0.4f * sin(time * 14f)
-            lit.v4("uTint", 0.02f, 0.08f, 0.2f, 0.45f + 0.35f * k)
+            // (A red flare drains: drawn in its red.)
+            val cr = if (fl.red) 1f else 0.45f; val cg = if (fl.red) 0.25f else 0.88f; val cb = if (fl.red) 0.3f else 1f
+            lit.v4("uTint", if (fl.red) 0.2f else 0.02f, if (fl.red) 0.02f else 0.08f, if (fl.red) 0.04f else 0.2f, 0.45f + 0.35f * k)
             setModel(fl.x, 0.047f, fl.y, fr, 1f, fr); sector(360f).draw()
-            if (falling) { lit.v4("uTint", 0.45f, 0.85f, 1f, 0.75f); setModel(fl.x, 0.05f, fl.y, fr * k, 1f, fr * k); sector(360f).draw() }
-            lit.v4("uTint", 0.45f, 0.9f, 1f, if (falling) 1f else pulse)
+            if (falling) { lit.v4("uTint", cr, cg, cb, 0.75f); setModel(fl.x, 0.05f, fl.y, fr * k, 1f, fr * k); sector(360f).draw() }
+            lit.v4("uTint", cr, cg, cb, if (falling) 1f else pulse)
             setModel(fl.x, 0.054f, fl.y, fr, 1f, fr, time * 150f); dashRing.draw()
             setModel(fl.x, 0.055f, fl.y, fr * 0.6f, 1f, fr * 0.6f, -time * 220f); dashRing.draw()
         }
@@ -656,10 +660,24 @@ class MatchRenderer(
                         val x = lerp(entityX, fl.x, v) + side
                         val y = lerp(cy0, 0.9f, v) + arc * (1f - 0.6f * k)
                         val z = lerp(entityZ + 0.8f, fl.y, v)
-                        sprites.add(x, y, z, (0.22f + 0.25f * k) * (0.6f + 0.4f * v), 0.45f, 0.82f, 1f, (0.35f + 0.5f * k) * (0.5f + 0.5f * v))
+                        if (fl.red) sprites.add(x, y, z, (0.22f + 0.25f * k) * (0.6f + 0.4f * v), 1f, 0.22f, 0.28f, (0.35f + 0.5f * k) * (0.5f + 0.5f * v))
+                        else sprites.add(x, y, z, (0.22f + 0.25f * k) * (0.6f + 0.4f * v), 0.45f, 0.82f, 1f, (0.35f + 0.5f * k) * (0.5f + 0.5f * v))
                     }
                 }
-                sprites.add(fl.x, 0.9f, fl.y, 1.2f + 1.6f * k, 0.5f, 0.85f, 1f, 0.35f + 0.4f * k)
+                if (fl.red) sprites.add(fl.x, 0.9f, fl.y, 1.2f + 1.6f * k, 1f, 0.3f, 0.35f, 0.35f + 0.4f * k)
+                else sprites.add(fl.x, 0.9f, fl.y, 1.2f + 1.6f * k, 0.5f, 0.85f, 1f, 0.35f + 0.4f * k)
+            }
+            // Drained: red energy torn up out of them into its chest for a moment.
+            for (f in world.fighters) {
+                val since = time - (drainAt[f.id] ?: -10f)
+                if (since > 2.2f || !f.alive) continue
+                val k = (1f - since / 2.2f)
+                for (strand in 0 until 4) for (j in 0 until 18) {
+                    val v = ((time * 1.2f + j / 18f + strand * 0.25f) % 1f)
+                    val curl = sin(v * 3.1416f) * (0.6f + 0.2f * strand)
+                    sprites.add(lerp(f.x, entityX, v) + curl * sin(time + strand), lerp(1f, cy0, v) + curl, lerp(f.y, entityZ + 0.8f, v),
+                        0.2f + 0.15f * (1f - v), 1f, 0.2f, 0.28f, 0.7f * k * (1f - 0.4f * v))
+                }
             }
         }
         // A pale column of its light from the Entity down to its shadow.
@@ -1095,6 +1113,9 @@ class MatchRenderer(
         anim.time = time + i * 0.7f
         anim.jump = if (f.isDashing) 0.12f else 0f
         anim.bow = uprisingBow(f)
+        // Under its hold in the ritual (walked to it, bowing, through its portal): its blue in their eyes.
+        anim.eyeGlow = world.uprising?.let { u -> if (f.id in u.members && (u.phase == io.github.projectwip.sim.UprisingPhase.MARCH ||
+            u.phase == io.github.projectwip.sim.UprisingPhase.BOW || u.phase == io.github.projectwip.sim.UprisingPhase.ENTER)) 1f else 0f } ?: 0f
         anim.spin = 0f; anim.swing = 0f; anim.throwL = 0f; anim.throwR = 0f; anim.slash = -1f
         // A sword swing: the blade sweeps across, and he turns into it and steps up off the ground a little.
         if (f.def.attack.shape == AttackShape.SLASH && f.sinceAttack < SLASH_SECONDS) {
@@ -2819,6 +2840,7 @@ class MatchRenderer(
                 if (hypot(e.x - match.player.x, e.y - match.player.y) < 3f) shake = max(shake, 0.2f)
             }
             is GameEvent.Corrupted -> if (e.on) energyFlare(e.fighterId, 1f, sky = true)
+            is GameEvent.Drained -> drainAt[e.fighterId] = time
             is GameEvent.Trapped -> if (e.on) trapAt[e.fighterId] = time else {
                 trapAt.remove(e.fighterId)
                 // Let go: a burst of its blue where they land.
@@ -2867,6 +2889,9 @@ class MatchRenderer(
         s.uprisingT = upr?.t ?: 0f; s.uprisingHeld = upr?.heldFor ?: 0f; s.uprisingBowLen = upr?.bowLength ?: 0f; s.uprisingHp = upr?.hp ?: 0; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
         s.bossMode = w.rules.boss
         s.playerTrapped = p.trapped
+        s.playerOut = p.eliminated
+        s.entityTier = w.rules.entityTier
+        s.playerDrains = p.drains
         s.trappedNames = if (upr == null) "" else upr.members.mapNotNull { id -> w.fighter(id)?.takeIf { it.trapped && it !== p }?.name }.joinToString(", ")
         s.playerGlitch = p.glitchLeft
         s.timesDown = p.deaths

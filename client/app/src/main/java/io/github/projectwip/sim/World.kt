@@ -25,6 +25,8 @@ data class MatchRules(
     val boss: Boolean = false,
     /** Training Area: no clock and no score to reach, so it only ends when the player leaves. */
     val practice: Boolean = false,
+    /** How hard the Entity is (see `MatchConfig.entityTier`). */
+    val entityTier: Int = 0,
 ) {
     companion object {
         /** The Entity's fight: nothing but the Entity ends it (its uprising ends the match, won or lost). */
@@ -298,7 +300,7 @@ class World(
             f.pending.clear()
             hp += f.attackDamage * maxOf(1, f.def.attack.projectiles)
         }
-        u.maxHp = maxOf(1, (hp * Balance.UPRISING_HP_SHOTS * (if (u.boss) Balance.UPRISING_BOSS_HP else 1f)).toInt())
+        u.maxHp = maxOf(1, (hp * Balance.UPRISING_HP_SHOTS * (if (u.boss) Balance.UPRISING_BOSS_HP else 1f) * (1f + Balance.ENTITY_TIER_HP * rules.entityTier)).toInt())
         u.flares.clear()
         u.hp = u.maxHp
         u.strikeIn = Balance.UPRISING_STRIKE_GAP
@@ -352,8 +354,8 @@ class World(
         entityMoves(u, dt)
         stepChase(u, dt)
         stepFlares(u, dt)
-        // Everyone in its world pulled into it: in its fight, that is the match lost on the spot.
-        if (u.boss && u.hp > 0 && u.members.isNotEmpty() && u.members.all { fighter(it)?.trapped != false }) {
+        // Everyone in its world pulled into it or knocked out for good: in its fight, that is the match lost.
+        if (u.boss && u.hp > 0 && u.members.isNotEmpty() && u.members.all { id -> fighter(id)?.let { it.trapped || it.eliminated } != false }) {
             projectiles.clear(); hazards.clear(); u.hexes.clear(); u.flares.clear()
             for (id in u.members) fighter(id)?.let { f -> u.teams[id]?.let { f.team = it }; f.control.clear() }
             end(1)
@@ -413,7 +415,7 @@ class World(
         if (u.strikeIn > 0f) return
         val frac = u.hp.toFloat() / u.maxHp
         val stage = if (!u.boss || frac > 0.66f) 0 else if (frac > 0.33f) 1 else 2
-        u.strikeIn = Balance.UPRISING_STRIKE_GAP * (if (stage == 0) 1f else if (stage == 1) 0.8f else 0.65f)
+        u.strikeIn = Balance.UPRISING_STRIKE_GAP * (if (stage == 0) 1f else if (stage == 1) 0.8f else 0.65f) / (1f + Balance.ENTITY_TIER_PACE * rules.entityTier)
         val alive = u.members.mapNotNull { fighter(it) }.filter { it.alive && it.corruptLeft <= 0f }
         // (Never two of its own movements at once: a dash or a spin still going waits for the next move.)
         var move = ENTITY_MOVES[u.strikes % ENTITY_MOVES.size]
@@ -447,6 +449,13 @@ class World(
                     val at = Balance.UPRISING_ENTITY_RADIUS + 0.4f + k * 1.15f
                     mark(u.ex + dx / d * at, u.ey + dy / d * at, 0.9f, Balance.UPRISING_STRIKE_DELAY * 0.8f + k * 0.12f, Balance.UPRISING_STRIKE_DAMAGE)
                 }
+            }
+            EntityMove.DRAIN -> {
+                // Its red flares: they lock onto one of them and come down into them, and it drains them (see [drain]).
+                val f = alive[(u.flaresFired + 1) % alive.size]
+                u.flares += EntityFlare(f.id, f.x, f.y, red = true)
+                events += GameEvent.EntityFlare(f.id, f.x, f.y, landed = false, red = true)
+                u.flaresFired++
             }
             EntityMove.FLARE -> {
                 // Its blue flares lock onto one of them (two, at the end), follow them, and come down: whoever is
@@ -535,7 +544,8 @@ class World(
 
     /** How hard the Entity hits now: harder in its fight, and harder for every fighter it is feeding on. */
     private fun entityHard(u: Uprising): Float =
-        (if (u.boss) Balance.UPRISING_BOSS_DAMAGE else 1f) * (1f + Balance.ENTITY_FEED_DAMAGE * u.members.count { fighter(it)?.trapped == true })
+        (if (u.boss) Balance.UPRISING_BOSS_DAMAGE else 1f) * (1f + Balance.ENTITY_FEED_DAMAGE * u.members.count { fighter(it)?.trapped == true }) *
+            (1f + Balance.ENTITY_TIER_DAMAGE * rules.entityTier)
 
     /** Its dash: once wound up, it moves down its lane at [Balance.ENTITY_DASH_SPEED] (its marks do the hurting). */
     private fun stepDash(u: Uprising, dt: Float) {
@@ -603,9 +613,9 @@ class World(
             if (fl.age < Balance.FLARE_LOCK && t != null && t.alive) { fl.x = t.x; fl.y = t.y }
             if (fl.age < Balance.FLARE_LOCK + Balance.FLARE_FALL) continue
             it.remove()
-            events += GameEvent.EntityFlare(fl.target, fl.x, fl.y, landed = true)
+            events += GameEvent.EntityFlare(fl.target, fl.x, fl.y, landed = true, red = fl.red)
             for (id in u.members) fighter(id)?.let { f ->
-                if (f.alive && f.corruptLeft <= 0f && hypot(f.x - fl.x, f.y - fl.y) < Balance.FLARE_RADIUS + f.radius * 0.3f) trap(f)
+                if (f.alive && f.corruptLeft <= 0f && hypot(f.x - fl.x, f.y - fl.y) < Balance.FLARE_RADIUS + f.radius * 0.3f) { if (fl.red) drain(f, u) else trap(f) }
             }
         }
     }
@@ -627,6 +637,18 @@ class World(
         if (f.inTempest) endTempest(f)
         f.control.clear()
         events += GameEvent.Trapped(f.id, true)
+    }
+
+    /**
+     * One of its red flares came down on [f] (the user's design, build 111): it drains their energy into itself. Each
+     * drain leaves them weaker for the rest of the match (they hit softer and move slower: `Fighter.drains`) and heals
+     * it; at [Balance.ENTITY_DRAINS_TO_TAKE] they have nothing left (they pass out, or give in) and it pulls them in.
+     */
+    private fun drain(f: Fighter, u: Uprising) {
+        f.drains++
+        u.hp = minOf(u.maxHp, u.hp + (u.maxHp * Balance.ENTITY_DRAIN_HEAL).toInt())
+        events += GameEvent.Drained(f.id, f.drains)
+        if (f.drains >= Balance.ENTITY_DRAINS_TO_TAKE) trap(f)
     }
 
     /** The Entity lets [f] go: back on its platform, whole, clear of everyone (`landingClear`). */
@@ -704,7 +726,7 @@ class World(
         fun mix(v: Int) { h = h * 31 + v }
         for (f in fighters) {
             mix(f.x.toRawBits()); mix(f.y.toRawBits()); mix(f.hp); mix(f.kos)
-            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits()); mix(f.slowLeft.toRawBits()); mix(f.tempestLeft.toRawBits()); mix(if (f.trapped) 1 else 0)
+            mix(f.superCharge.toRawBits()); mix(f.hyperCharge.toRawBits()); mix(f.ammo.toRawBits()); mix(f.poisonBy); mix(f.leapTime.toRawBits()); mix(f.latchedTo); mix(f.thrallOf); mix(f.hexes.size); mix(f.realm); mix(f.edge.toRawBits()); mix(f.slowLeft.toRawBits()); mix(f.tempestLeft.toRawBits()); mix(if (f.trapped) 1 else 0); mix(f.drains)
         }
         for (p in projectiles) { mix(p.x.toRawBits()); mix(p.y.toRawBits()) }
         mix(projectiles.size); mix(hazards.size); mix(planted.size); mix(lobs.size); mix(score[0]); mix(score[1]); mix(phase.ordinal)
@@ -761,6 +783,7 @@ class World(
             val len = hypot(mx, my)
             if (len > 1f) { mx /= len; my /= len }
             val speed = f.def.moveSpeed * (if (f.slowed) Balance.SLOW_FACTOR else 1f) * (if (f.captive) Balance.REALM_CAPTIVE_SPEED else 1f) *
+                (1f - Balance.ENTITY_DRAIN_SPEED * f.drains) *
                 (if (f.inTempest) Balance.TEMPEST_SPEED else 1f)
             // (A tempest flies: over walls and water alike, only kept inside the arena.)
             val blocked = if (f.inTempest) {
@@ -1796,6 +1819,9 @@ class World(
 
     private fun knockOut(victim: Fighter, killer: Fighter?) {
         victim.alive = false
+        // In the Entity's fight nobody comes back (the user's rule, build 111): knocked out, they are out until the
+        // match ends (and when nobody is left standing, it is lost: see [stepSky]).
+        if (rules.boss && inSky) victim.eliminated = true
         victim.hp = 0
         victim.deaths++
         victim.respawnTimer = Balance.RESPAWN_SECONDS
@@ -1966,12 +1992,12 @@ class World(
 const val ENTITY_TARGET = -100
 
 /** The Entity's moves in its world, in the order it makes them, round and round. */
-enum class EntityMove { STRIKES, RING, SWEEP, FLARE, SPOKES, RAIN, GRASP, PULSE, CHASE, DASH, SPIN }
+enum class EntityMove { STRIKES, RING, SWEEP, FLARE, SPOKES, RAIN, GRASP, PULSE, CHASE, DASH, SPIN, DRAIN }
 // (Its sword spin is its main attack, the user's: it comes round most often.)
 private val ENTITY_MOVES = listOf(
-    EntityMove.SPIN, EntityMove.STRIKES, EntityMove.GRASP, EntityMove.DASH, EntityMove.FLARE,
-    EntityMove.SPIN, EntityMove.RING, EntityMove.CHASE, EntityMove.SPOKES, EntityMove.DASH,
-    EntityMove.SPIN, EntityMove.RAIN, EntityMove.FLARE, EntityMove.SWEEP, EntityMove.GRASP,
+    EntityMove.STRIKES, EntityMove.SPIN, EntityMove.DRAIN, EntityMove.GRASP, EntityMove.DASH, EntityMove.FLARE,
+    EntityMove.SPIN, EntityMove.RING, EntityMove.CHASE, EntityMove.DRAIN, EntityMove.SPOKES, EntityMove.DASH,
+    EntityMove.SPIN, EntityMove.RAIN, EntityMove.FLARE, EntityMove.SWEEP, EntityMove.DRAIN, EntityMove.GRASP,
     EntityMove.SPIN, EntityMove.PULSE, EntityMove.DASH, EntityMove.STRIKES, EntityMove.CHASE,
 )
 

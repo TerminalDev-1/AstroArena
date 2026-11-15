@@ -27,13 +27,30 @@ import kotlin.random.Random
  *    design: no longer corrupted, trapped among the souls it carries until their team beats it): its streaks pour
  *    down on them, they fight it, they are lifted and pulled into its chest, and the souls inside it flicker across
  *    it. (The match waits while it plays.)
+ *  - the drains ([DRAIN], [DRAIN_WEAK], then [DRAIN_FAINT] or [DRAIN_OBEY]): one of its red flares comes down into
+ *    the player (the user's design, build 111): it yanks them back off their feet and holds them up by the throat
+ *    while their energy pours out of them into it. Each is weaker than the last: they fight it, then they barely
+ *    can, and the third time they pass out from exhaustion or give in to make it stop, and it pulls them inside.
  */
-enum class EntityCut { VICTORY, DEFEAT, CORRUPT }
+enum class EntityCut {
+    VICTORY, DEFEAT, CORRUPT, DRAIN, DRAIN_WEAK, DRAIN_FAINT, DRAIN_OBEY;
+    val drain get() = this == DRAIN || this == DRAIN_WEAK || this == DRAIN_FAINT || this == DRAIN_OBEY
+    val last get() = this == DRAIN_FAINT || this == DRAIN_OBEY
+    companion object {
+        /** The drain cutscene for a fighter's [count]th drain ([obey]: the last time, they give in rather than pass out). */
+        fun drain(count: Int, obey: Boolean) = when { count <= 1 -> DRAIN; count == 2 -> DRAIN_WEAK; obey -> DRAIN_OBEY; else -> DRAIN_FAINT }
+    }
+}
 
 object EntityScript {
-    class Beat(val at: Float, val text: String)
+    /** A line at [at] seconds; [fighter]: said by the fighter (shown under their name), not the Entity. */
+    class Beat(val at: Float, val text: String, val fighter: Boolean = false)
 
-    fun length(cut: EntityCut) = when (cut) { EntityCut.VICTORY -> 13f; EntityCut.DEFEAT -> 12.8f; EntityCut.CORRUPT -> 7.6f }
+    fun length(cut: EntityCut) = when (cut) {
+        EntityCut.VICTORY -> 13f; EntityCut.DEFEAT -> 12.8f; EntityCut.CORRUPT -> 7.6f
+        EntityCut.DRAIN, EntityCut.DRAIN_WEAK -> 7.2f
+        EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> 10f
+    }
 
     private val CORRUPT_LINES = listOf(
         "Come. Join the others.", "In you go. They're waiting for you.", "Another voice for me.",
@@ -55,6 +72,27 @@ object EntityScript {
         EntityCut.CORRUPT -> listOf(
             Beat(0.9f, CORRUPT_LINES[Math.floorMod(line, CORRUPT_LINES.size)]),
             Beat(5.6f, "Your team can still free you. If they beat me."),
+        )
+        EntityCut.DRAIN -> listOf(
+            Beat(0.6f, "There it is. Give it to me."),
+            Beat(2.9f, "All that power you thought was yours."),
+            Beat(5.6f, "Fight on. I'll come back for more."),
+        )
+        EntityCut.DRAIN_WEAK -> listOf(
+            Beat(0.6f, "Again. You're slower now."),
+            Beat(2.9f, "Can you feel it leaving you?"),
+            Beat(5.6f, "Weaker. And weaker."),
+        )
+        EntityCut.DRAIN_FAINT -> listOf(
+            Beat(0.6f, "The last of it."),
+            Beat(2.9f, "Nothing left in you. Sleep."),
+            Beat(7.6f, "Mine."),
+        )
+        EntityCut.DRAIN_OBEY -> listOf(
+            Beat(0.6f, "The last of it."),
+            Beat(2.9f, "Say it."),
+            Beat(5.7f, "Make it stop... I'll obey.", fighter = true),
+            Beat(7.6f, "Good. Come inside."),
         )
     }
 
@@ -147,6 +185,10 @@ class EntityScene {
         var eBow = 0f
         var streaks = 0f
         var streakFromAbove = false
+        // (Its red: a drain's flare, and the energy it tears out of them.)
+        var red = false
+        var drainFlow = 0f
+        var eyes = 0f
         var cracks = 0f
         var bright = 0f
         var shake = 0f
@@ -185,6 +227,43 @@ class EntityScene {
                 eFlash = 0.18f * smooth((t - 8.1f) / 0.2f) * (1f - smooth((t - 8.6f) / 1f))
                 shake = 0.05f * streaks
             }
+            EntityCut.DRAIN, EntityCut.DRAIN_WEAK, EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> {
+                // How much fight is left in them: a lot the first time, little the second, almost none the last.
+                val fight = when (p.cut) { EntityCut.DRAIN -> 1f; EntityCut.DRAIN_WEAK -> 0.45f; else -> 0.15f }
+                red = true
+                facing = 1.5707964f
+                // Its red flare comes down into them...
+                streaks = smooth(t / 0.35f) * (1f - smooth((t - 1.05f) / 0.3f))
+                streakFromAbove = true
+                // ...it yanks them back off their feet, holds them up by the throat before its chest, and drops them.
+                val yank = smooth((t - 1f) / 0.8f)
+                val drop = smooth((t - 5.3f) / 0.45f)
+                val hx = ex; val hz = ez + 1.8f; val hy = ey + es * 0.42f
+                val gx = fx0; val gz = fz0 - 0.5f
+                fx = lerp(lerp(fx0, hx, yank), gx, drop); fz = lerp(lerp(fz0, hz, yank), gz, drop)
+                fy = lerp(lerp(0f, hy, yank), 0f, drop)
+                drainFlow = yank * (1f - drop)
+                struggle = maxOf(streaks, drainFlow) * fight
+                // Choking, the head thrown back; then down, more broken each time.
+                val down = when (p.cut) { EntityCut.DRAIN -> 22f; EntityCut.DRAIN_WEAK -> 48f; EntityCut.DRAIN_FAINT -> 88f; else -> 52f }
+                bow = lerp(-24f * drainFlow, down, drop)
+                if (p.cut == EntityCut.DRAIN_FAINT) fy -= 0.28f * drop
+                eBow = 12f * drainFlow
+                eFlash = 0.08f * drainFlow
+                shake = 0.045f * drainFlow * (0.4f + 0.6f * fight)
+                // Giving in, its blue comes into their eyes.
+                if (p.cut == EntityCut.DRAIN_OBEY) eyes = smooth((t - 5.6f) / 0.6f)
+                if (p.cut.last) {
+                    // And it takes them inside.
+                    val pull = smooth((t - 7.8f) / 1.5f)
+                    if (pull > 0f) {
+                        fx = lerp(gx, ex, pull); fz = lerp(gz, ez + 0.9f, pull); fy = lerp(fy, ey + es * 0.75f, pull)
+                        streaks = maxOf(streaks, pull * (1f - smooth((t - 9.2f) / 0.3f))); streakFromAbove = false; red = false
+                        eyes = maxOf(eyes, pull)
+                    }
+                    if (t > 9f) fScale = FIGHTER_SCALE * (1f - smooth((t - 9f) / 0.5f))
+                }
+            }
             EntityCut.CORRUPT -> {
                 // The flare's streaks pour down on them, then its own take them: lifted and pulled into its chest.
                 streaks = smooth(t / 0.4f) * (1f - smooth((t - 5f) / 0.4f))
@@ -218,6 +297,13 @@ class EntityScene {
                 t < 9.5f -> { setEye(ex + 0.3f, ey + es * 0.95f, ez + 7.5f); setAt(ex, ey + es * 0.9f, ez) }
                 else -> { val k = smooth((t - 9.5f) / 3.2f); setEye(ex, head - 0.2f, ez + lerp(10f, 6f, k)); setAt(ex, head, ez) }
             }
+            EntityCut.DRAIN, EntityCut.DRAIN_WEAK, EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> when {
+                t < 1.1f -> { setEye(fx0 + 2.4f, 1.7f, fz0 + 4.2f); setAt(fx0, 1.1f, fz0) }
+                // Held before its chest: from the side, low, its face above them.
+                t < 5.75f -> { val hy = ey + es * 0.42f; setEye(ex + 4.2f, hy + 1.5f, ez + 1.8f + 3.6f); setAt(fx, fy + 0.9f, fz) }
+                t < 7.8f || !p.cut.last -> { val k = smooth((t - 5.75f) / 2.4f); setEye(fx0 + 0.5f, lerp(1.4f, 1f, k), fz0 + lerp(3.4f, 2.4f, k)); setAt(fx0, 0.6f, fz0 - 0.5f) }
+                else -> { setEye(c + 6.5f, 2.6f, c + 3f); setAt(fx, fy + 1f, fz) }
+            }
             EntityCut.CORRUPT -> when {
                 t < 1.6f -> { setEye(fx0 + 3f, 2.2f, fz0 + 4f); setAt(fx0, 1.2f, fz0) }
                 t < 5.2f -> { setEye(c + 6.5f, 2.6f, c + 3f); setAt(fx, fy + 1f, fz) }
@@ -249,8 +335,15 @@ class EntityScene {
 
         // ---- the fighter, and the Entity
         fa.time = t; fa.walk = 0f; fa.moving = 0f; fa.scale = fScale; fa.spin = 0f; fa.jump = fy; fa.bow = bow; fa.talk = 0f
+        // (Pulled in, or given in: its blue in their eyes. Drained, they go pale.)
+        if (p.cut == EntityCut.CORRUPT) eyes = smooth((t - 1.6f) / 0.8f)
+        if (p.cut == EntityCut.DEFEAT) eyes = smooth((t - 4.2f) / 0.8f)
+        fa.eyeGlow = eyes
+        val beatNow = EntityScript.beatAt(p.cut, 0, t)
+        val talking = beatNow >= 0 && EntityScript.beats(p.cut, 0)[beatNow].fighter
         fa.recoil = if (struggle > 0f) 0.4f + 0.4f * sin(t * 13f) * struggle else 0f
-        fa.flash = if (glitch > 0f && (t * 9f).toInt() % 4 == 0) 0.12f * glitch else 0f
+        fa.flash = if (glitch > 0f && (t * 9f).toInt() % 4 == 0) 0.12f * glitch else 0.22f * drainFlow
+        if (talking) fa.talk = 0.4f + 0.4f * sin(t * 8f)
         var spin = 0f
         if (celebrate > 0f && celebrate < 0.9f) { fa.jump = sin(celebrate / 0.9f * 3.1416f) * 0.7f; spin = 360f * smooth(celebrate / 0.9f) }
         else if (celebrate > 1.6f) fa.jump = 0.18f * kotlin.math.abs(sin((celebrate - 1.6f) * 6f))
@@ -259,7 +352,7 @@ class EntityScene {
         ea.time = t; ea.walk = 0f; ea.moving = 0f; ea.recoil = 0f; ea.spin = if (soul != null) (rng.nextFloat() - 0.5f) * 30f else 0f
         ea.bow = eBow; ea.scale = es; ea.jump = ey; ea.flash = eFlash
         val beat = EntityScript.beatAt(p.cut, 0, t)
-        ea.talk = if (beat >= 0) 0.5f + 0.5f * sin(t * 9f) else 0f
+        ea.talk = if (beat >= 0 && !EntityScript.beats(p.cut, 0)[beat].fighter) 0.5f + 0.5f * sin(t * 9f) else 0f
         val drawFighter = fScale > 0.02f
         lit.f("uRim", 0.5f)
         if (drawFighter) models.draw(lit, def, p.skin, fx, fz, facing, fa, Pass.COLOR)
@@ -343,15 +436,33 @@ class EntityScene {
                 val x = lerp(sx, fx, v) + (strand - 2) * 0.3f * sin(v * 3.1416f)
                 val y = lerp(sy, fy + 1f, v) + arc
                 val z = lerp(sz, fz, v)
-                sprites.add(x, y, z, 0.2f + 0.2f * v, 0.45f, 0.82f, 1f, 0.75f * streaks * (0.4f + 0.6f * v))
+                if (red) sprites.add(x, y, z, 0.2f + 0.2f * v, 1f, 0.22f, 0.28f, 0.8f * streaks * (0.4f + 0.6f * v))
+                else sprites.add(x, y, z, 0.2f + 0.2f * v, 0.45f, 0.82f, 1f, 0.75f * streaks * (0.4f + 0.6f * v))
             }
             for (k in 0 until 36) {
                 val a = t * 5f + k * 0.55f
                 val h = (k / 36f) * 1.6f
                 val r = 0.45f + 0.15f * sin(t * 3f + k)
-                sprites.add(fx + cos(a) * r * fScale, fy + 0.2f + h * fScale / FIGHTER_SCALE, fz + sin(a) * r * fScale, 0.14f, 0.5f, 0.85f, 1f, 0.8f * streaks)
+                if (red) sprites.add(fx + cos(a) * r * fScale, fy + 0.2f + h * fScale / FIGHTER_SCALE, fz + sin(a) * r * fScale, 0.14f, 1f, 0.3f, 0.3f, 0.8f * streaks)
+                else sprites.add(fx + cos(a) * r * fScale, fy + 0.2f + h * fScale / FIGHTER_SCALE, fz + sin(a) * r * fScale, 0.14f, 0.5f, 0.85f, 1f, 0.8f * streaks)
             }
-            if (rng.nextFloat() < 0.5f) spark(fx, fy + 1f, fz, 2f, 0xFF5CC8FF.toInt())
+            if (rng.nextFloat() < 0.5f) spark(fx, fy + 1f, fz, 2f, if (red) 0xFFFF4A5A.toInt() else 0xFF5CC8FF.toInt())
+        }
+        // Their energy torn out of them: red streams from their chest up into its, and a choking grip of red at
+        // their throat.
+        if (drainFlow > 0.02f) {
+            val tx = ex; val ty = ey + es * 0.95f; val tz = ez + 1f
+            for (strand in 0 until 6) for (j in 0 until 22) {
+                val v = ((t * 1.1f + j / 22f + strand * 0.17f) % 1f)
+                val curl = sin(v * 3.1416f) * (0.5f + 0.25f * strand) * sin(t * 2f + strand)
+                sprites.add(lerp(fx, tx, v) + curl, lerp(fy + 1.05f, ty, v) + 0.3f * sin(v * 3.1416f), lerp(fz, tz, v) + curl * 0.4f,
+                    0.16f + 0.14f * (1f - v), 1f, 0.18f + 0.15f * v, 0.25f, 0.75f * drainFlow * (1f - 0.4f * v))
+            }
+            for (k in 0 until 14) {
+                val a = t * 7f + k * 0.45f
+                sprites.add(fx + cos(a) * 0.22f, fy + 1.25f + 0.04f * sin(t * 13f + k), fz + sin(a) * 0.22f, 0.11f, 1f, 0.25f, 0.3f, 0.85f * drainFlow)
+            }
+            if (rng.nextFloat() < 0.35f) spark(fx, fy + 1.1f, fz, 1.6f, 0xFFFF4A5A.toInt())
         }
         particles.emit(sprites, true)
         sprites.flush()

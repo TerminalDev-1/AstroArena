@@ -32,6 +32,11 @@ data class MatchConfig(
     val team: TeamSetup? = null,
     /** Debug preview: the Entity's uprising begins this many seconds into play (below 0: when the seed says). */
     val uprisingAt: Float = -1f,
+    /**
+     * How hard the Entity is (the user's rule, build 111: every fight with it, won or lost, makes the next harder).
+     * The server hands it out with the match and the referee replays with it; 0 is the first fight.
+     */
+    val entityTier: Int = 0,
 )
 
 /** One real player in a team. */
@@ -113,7 +118,7 @@ class Match(val config: MatchConfig) {
         }
         val oneOnOne = config.mode == GameMode.DUEL
         val arena = if (practice) Arenas.trainingArea() else Arenas.provingGround()
-        val rules = if (practice) MatchRules.training() else if (oneOnOne) MatchRules.duel() else MatchRules.bossMode()
+        val rules = (if (practice) MatchRules.training() else if (oneOnOne) MatchRules.duel() else MatchRules.bossMode()).copy(entityTier = config.entityTier.coerceAtLeast(0))
         world = World(arena, roster, rules, Random(rng.nextLong()))
         pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
@@ -285,6 +290,9 @@ class Match(val config: MatchConfig) {
             // The Entity's flares too, once one has stopped following and a moment has passed to see it (a bot is not
             // instant: some still get caught).
             if (flares != null) for (fl in flares) if (fl.age > Balance.FLARE_LOCK + FLARE_REACT && kotlin.math.hypot(fl.x - x, fl.y - y) < Balance.FLARE_RADIUS + margin) return true
+            // And its sword's reach, from the moment it starts winding up.
+            val up = world.uprising
+            if (up != null && up.spinT >= 0f && kotlin.math.hypot(up.ex - x, up.ey - y) < Balance.ENTITY_SPIN_RADIUS + margin) return true
             return false
         }
         val wantX = c.moveX; val wantY = c.moveY

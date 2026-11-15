@@ -59,6 +59,8 @@ class FighterAnim {
     var slash = -1f
     /** 0..1: how far open the mouth is, while talking (cutscenes); the head nods with it. */
     var talk = 0f
+    /** 0..1: the eyes lit lightning blue (the Entity has them: in its cutscenes and its ritual). */
+    var eyeGlow = 0f
 }
 
 enum class Pass { SHADOW, COLOR, OUTLINE, SILHOUETTE }
@@ -766,9 +768,14 @@ class FighterModels {
                 Pass.COLOR -> {
                     val c = if (shade != 0L) slotColor(Slot.ACCENT, shade, shade, if (p.emissive) SHADOW_GLOW else shade)
                         else slotColor(p.slot, skin.primary, skin.secondary, skin.accent)
-                    prog.v4("uTint", c[0], c[1], c[2], 1f)
+                    // Its hold on them shows in their eyes: lit lightning blue, flickering (the eyes are the face's ink).
+                    val eyes = anim.eyeGlow > 0f && p.slot == Slot.INK && p.bone != Bone.MOUTH
+                    if (eyes) {
+                        val g = anim.eyeGlow * (0.85f + 0.15f * sin(t * 37f) * sin(t * 23f))
+                        prog.v4("uTint", c[0] + (0.55f - c[0]) * g, c[1] + (0.93f - c[1]) * g, c[2] + (1f - c[2]) * g, 1f)
+                    } else prog.v4("uTint", c[0], c[1], c[2], 1f)
                     prog.f("uFlash", anim.flash)
-                    prog.f("uEmissive", if (p.emissive) (if (shade != 0L) 1f else 0.75f) else 0f)
+                    prog.f("uEmissive", if (eyes) anim.eyeGlow else if (p.emissive) (if (shade != 0L) 1f else 0.75f) else 0f)
                     prog.f("uGloss", if (p.gloss && shade == 0L) 1f else 0f)
                 }
                 Pass.OUTLINE -> prog.v4("uTint", ink[0], ink[1], ink[2], ink[3])

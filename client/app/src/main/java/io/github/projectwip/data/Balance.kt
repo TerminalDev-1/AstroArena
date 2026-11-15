@@ -391,9 +391,10 @@ object Balance {
     /** Boss Mode (the Entity's fight): it begins this soon, lasts at most this long, is this much tougher, and hits this much harder. */
     const val UPRISING_BOSS_START = 1.5f
     const val UPRISING_BOSS_SECONDS = 210f
-    const val UPRISING_BOSS_HP = 1.6f
+    const val UPRISING_BOSS_HP = 1.1f
     // (3 since build 111: the user wanted it to "actually do some damage".)
-    const val UPRISING_BOSS_DAMAGE = 3f
+    // (Lower again once its fight had no respawns: at 3 the whole team was down in twenty seconds.)
+    const val UPRISING_BOSS_DAMAGE = 1.6f
     /** Its corruption flares: they follow their target this long, then come down this much later, over this circle. */
     const val FLARE_LOCK = 1.6f
     // (0.9 s from when it stops following to when it lands: being pulled in lasts until the Entity is beaten, so it
@@ -416,11 +417,23 @@ object Balance {
     const val ENTITY_SPIN_SECONDS = 2.8f
     const val ENTITY_SPIN_TICK = 0.4f
     const val ENTITY_SPIN_RADIUS = 4.6f
-    const val ENTITY_SPIN_DAMAGE = 700
+    const val ENTITY_SPIN_DAMAGE = 500
     const val ENTITY_SPIN_MOVE = 2.2f
     /** Feeding on whoever it holds: health a second (a share of its whole) and harder hits, for each of them. */
     const val ENTITY_FEED_HEAL = 0.0015f
     const val ENTITY_FEED_DAMAGE = 0.2f
+    /**
+     * Its red flares drain whoever they land on: each drain takes this share off their damage and their speed for the
+     * rest of the match and heals it this share of its whole; this many and they have nothing left and it takes them.
+     */
+    const val ENTITY_DRAIN_DAMAGE = 0.15f
+    const val ENTITY_DRAIN_SPEED = 0.1f
+    const val ENTITY_DRAIN_HEAL = 0.03f
+    const val ENTITY_DRAINS_TO_TAKE = 3
+    /** Each tier (one more for every fight with it, won or lost) adds this much health, damage and pace. */
+    const val ENTITY_TIER_HP = 0.05f
+    const val ENTITY_TIER_DAMAGE = 0.03f
+    const val ENTITY_TIER_PACE = 0.015f
     /** The calling walk is paced to reach its circle at this many seconds. */
     const val UPRISING_MARCH_PACE = 10f
     /** A tornado sets her down at least this far clear of anyone (past both their edges), so nobody hides her. */

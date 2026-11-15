@@ -75,6 +75,7 @@ data class ServerProfile(
     val prisms: Int,
     val bestCups: Int,
     val credits: Int = 0,
+    val entityTier: Int = 0,
     /** [FighterProgress.skin] is not the server's business: which colourway is worn is chosen on the device. */
     val fighters: Map<FighterId, FighterProgress>,
     val claimedMilestones: Set<Int>,
@@ -106,6 +107,9 @@ object Progression {
             capsulesEarnedToday = SparkCapsules.PER_DAY - leftToday,
             matchesPlayed = save.matchesPlayed + 1,
             victories = save.victories + if (report.outcome == MatchOutcome.VICTORY) 1 else 0,
+            // Every fight with the Entity played out, won or lost, makes the next harder (the server's own count wins
+            // when the account is synced).
+            entityTier = save.entityTier + if (report.mode == GameMode.BOSS && (report.outcome == MatchOutcome.VICTORY || report.outcome == MatchOutcome.DEFEAT)) 1 else 0,
             totalKos = save.totalKos + report.kos,
         )
         val rewards = MatchRewards(verdict?.bolts ?: 0, verdict?.firstWinPrisms ?: 0, verdict?.drop == true, leftToday, online = verdict != null, credits = verdict?.credits ?: 0, unlocked = verdict?.unlocked ?: emptyList())
@@ -135,6 +139,7 @@ object Progression {
         }
         return base.copy(
             bolts = profile.bolts.coerceAtLeast(0), prisms = profile.prisms.coerceAtLeast(0), credits = profile.credits.coerceAtLeast(0),
+            entityTier = profile.entityTier.coerceAtLeast(0),
             bestCups = maxOf(profile.bestCups, cups),
             fighters = fighters,
             selectedFighter = if (fighters[save.selectedFighter]?.unlocked == true) save.selectedFighter else FighterId.BYTE,

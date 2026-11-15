@@ -52,6 +52,7 @@ class SaveStore(context: Context, name: String = "save.json") {
             put("lastFirstWinDay", s.lastFirstWinDay)
             put("matchesPlayed", s.matchesPlayed)
             put("victories", s.victories)
+            put("entityTier", s.entityTier)
             put("totalKos", s.totalKos)
             put("capsules", s.capsules)
             put("capsuleDay", s.capsuleDay)
@@ -179,6 +180,7 @@ class SaveStore(context: Context, name: String = "save.json") {
                 lastFirstWinDay = o.optLong("lastFirstWinDay", -1),
                 matchesPlayed = o.optInt("matchesPlayed", 0),
                 victories = o.optInt("victories", 0),
+                entityTier = o.optInt("entityTier", 0).coerceAtLeast(0),
                 totalKos = o.optInt("totalKos", 0),
                 // Arena Boxes were removed in 1.3: any still held are wiped (the owner's decision).
                 capsules = 0,

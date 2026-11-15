@@ -128,6 +128,7 @@ fun MatchScreen(
             else config.copy(
                 seed = plan.seed, botNames = plan.botNames, serverMatchId = plan.matchId,
                 difficulty = plan.difficulty ?: config.difficulty, playerLevel = plan.level ?: config.playerLevel,
+                entityTier = plan.tier,
             )
         match = Match(planned)
     }
@@ -298,12 +299,19 @@ private fun MatchBody(
     var corruptSeen by remember { mutableStateOf(0) }
     /** Inside the Entity: the player is trapped in it (its ruin shows until they are freed or the match ends). */
     var inside by remember { mutableStateOf(false) }
+    /** Trapped: the ruin full screen (true), or watching the team with the ruin in a corner (false, the default). */
+    var insideFull by remember { mutableStateOf(false) }
+    /** A drain cutscene showing (the player's drain count), or -1; and the last one shown. */
+    var draining by remember { mutableStateOf(-1) }
+    var drainSeen by remember { mutableStateOf(0) }
     if (!shared) androidx.compose.runtime.LaunchedEffect(Unit) {
         while (true) {
             androidx.compose.runtime.withFrameNanos { }
             if (!hijacking && view?.hijack == 2) hijacking = true
             val c = view?.corruptions ?: 0
             if (corrupting < 0 && c > corruptSeen) { corruptSeen = c; corrupting = c }
+            val d = view?.drains ?: 0
+            if (draining < 0 && d > drainSeen) { drainSeen = d; draining = d }
         }
     }
     // (In every match, team matches too: whoever is trapped sees inside it.)
@@ -351,7 +359,11 @@ private fun MatchBody(
         )
         if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
         // (Under its pulled-in cutscene, which plays first.)
-        if (inside && !done) EntityInsideScreen { view?.insideInfo() }
+        if (inside && !done) EntityInsideScreen(insideFull, { insideFull = !insideFull }) { view?.insideInfo() }
+        if (draining >= 0) EntityCutscene(io.github.projectwip.render3d.EntityCut.drain(draining, view?.obeys == true), match.config.playerFighter, match.config.playerSkin, draining, sfx) {
+            draining = -1
+            if (!paused) view?.resumeGame()
+        }
         if (corrupting >= 0) EntityCutscene(io.github.projectwip.render3d.EntityCut.CORRUPT, match.config.playerFighter, match.config.playerSkin, corrupting, sfx) {
             corrupting = -1
             if (!paused) view?.resumeGame()

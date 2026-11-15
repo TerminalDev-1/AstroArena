@@ -182,7 +182,20 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   `World.stepSpin`; the blade is drawn exactly `ENTITY_SPIN_RADIUS` long, ringed on the floor), and it dashes
   (`EntityMove.DASH`, its lane marked first). No soul wisps in its body in the fight (the user had them removed).
   "Come to me" is a walk the camera follows from behind, paced to last `UPRISING_MARCH_PACE` (everyone starts close
-  in its fight, and a full-speed walk was over at once). Bots step out from
+  in its fight, and a full-speed walk was over at once).
+  **Red flares drain** (the user's design): `EntityMove.DRAIN`, `World.drain`, `Fighter.drains`. Each drain leaves the
+  fighter weaker for the match (`ENTITY_DRAIN_DAMAGE`, `ENTITY_DRAIN_SPEED`) and heals it; the third
+  (`ENTITY_DRAINS_TO_TAKE`) takes them inside. The player sees a drain cutscene each time (`EntityCut.DRAIN`,
+  `DRAIN_WEAK`, then `DRAIN_FAINT` or `DRAIN_OBEY`, fixed by the seed): yanked back, held up by the throat while their
+  energy pours into it, weaker every time, the last ending in passing out or "Make it stop... I'll obey." and being
+  pulled in. Blue flares still trap at once. **No respawns in its fight** (the user's rule): knocked out in its world
+  is `Fighter.eliminated`; everyone out (trapped or knocked out) is the match lost. Trapped or out, the player watches
+  the team (the camera follows a teammate), with the ruin in a corner window (tap: full screen, "WATCH YOUR TEAM" back).
+  **It gets harder every run** (the user's rule): `MatchConfig.entityTier` (`ENTITY_TIER_*`), one more for every fight
+  with it played out, won or lost; the server keeps it (`profile["entityTier"]`, the `tier` column of matches), hands
+  it out with the plan (a team fights at its highest member's), and the referee replays with `tier=`. In cutscenes
+  and the ritual, whoever the Entity holds has lightning-blue eyes (`FighterAnim.eyeGlow`: the face's ink parts lit).
+  Debug previews: `cutdrain`, `cutweak`, `cutfaint`, `cutobey`, `insidewatch`. Bots step out from
   under a flare after `FLARE_REACT` (they still get caught about half the matches; at 0.55 s of fall a whole team was
   in it within a minute). Corruption (`World.corrupt`, `Match.driveCorrupted`) is kept with nothing using it. In the
   ritual, "Kneel." is followed by a beat with no words (`RitualShot.KNEEL`, `UprisingScript.KNEEL_BEAT`) where the

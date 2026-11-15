@@ -25,6 +25,11 @@ class HudSnapshot {
     var respawnTimer = 0f
     /** Pulled into the Entity (the player), and the names of everyone on the player's side it has pulled in. */
     var playerTrapped = false
+    /** Knocked out for good (the Entity's fight has no respawns). */
+    var playerOut = false
+    /** The Entity's tier in this match, and how many times it has drained the player. */
+    var entityTier = 0
+    var playerDrains = 0
     var trappedNames = ""
     var ammo = 0f
     var ammoMax = 3
@@ -82,7 +87,7 @@ class HudSnapshot {
         System.arraycopy(o.viewProj, 0, viewProj, 0, 16)
         phase = o.phase; phaseTime = o.phaseTime; countdownSeconds = o.countdownSeconds; timeLeft = o.timeLeft
         myScore = o.myScore; theirScore = o.theirScore; koTarget = o.koTarget; winningTeam = o.winningTeam; playerTeam = o.playerTeam
-        playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; playerTrapped = o.playerTrapped; trappedNames = o.trappedNames; ammo = o.ammo; ammoMax = o.ammoMax; edge = o.edge; superCharge = o.superCharge
+        playerAlive = o.playerAlive; respawnTimer = o.respawnTimer; playerTrapped = o.playerTrapped; playerOut = o.playerOut; entityTier = o.entityTier; playerDrains = o.playerDrains; trappedNames = o.trappedNames; ammo = o.ammo; ammoMax = o.ammoMax; edge = o.edge; superCharge = o.superCharge
         hyperCharge = o.hyperCharge; hyperLeft = o.hyperLeft; duelNotice = o.duelNotice
         autoTargetId = o.autoTargetId; matchesPlayed = o.matchesPlayed; fps = o.fps
         bossMode = o.bossMode; timesDown = o.timesDown; practice = o.practice; damage = o.damage; 
