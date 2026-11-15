@@ -122,6 +122,10 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   `IntroCutscene`, `Settings.introSeen`; older saves count as seen). `--es screen intro` previews it.
 - **No `Sound.GLITCH` blip in the Entity's cutscenes** (the user hated it, "annihilate that"), including when the
   Entity flickers into another soul.
+- **Gate on the tablet checks, don't just print them.** A script that echoed `mCurrentFocus` and went on launched the
+  game over the user's Settings. Stop unless the focus is the game or the home screen (and nobody is touching it).
+- **Leave the tablet on a normal launch after a debug preview.** `--es screen insidewatch` left a window pinned over
+  the user's home screen with nothing to tap, and they took it for a bug. Relaunch with no `screen` extra when done.
 - **Shell traps on this machine** (Git Bash on Windows): adb under `MSYS_NO_PATHCONV=1` needs Windows paths
   (`C:/Users/...`), not `/c/Users/...`; Gradle runs from `client/` (a `cd` that is a level off fails silently behind a
   `grep`); long Python edits with quotes in them go in a script file in the scratchpad (run with `python -I`), not a
@@ -183,6 +187,8 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   (`EntityMove.DASH`, its lane marked first). No soul wisps in its body in the fight (the user had them removed).
   "Come to me" is a walk the camera follows from behind, paced to last `UPRISING_MARCH_PACE` (everyone starts close
   in its fight, and a full-speed walk was over at once).
+  **Its flares hunt** (build 111, the user's ask): they rise out of it and chase their target (`World.stepFlares`,
+  `FLARE_SPEED` a little under a fighter's run, `FLARE_TURN`, `FLARE_LIFE`), hitting whoever they touch.
   **Red flares drain** (the user's design): `EntityMove.DRAIN`, `World.drain`, `Fighter.drains`. Each drain leaves the
   fighter weaker for the match (`ENTITY_DRAIN_DAMAGE`, `ENTITY_DRAIN_SPEED`) and heals it; the third
   (`ENTITY_DRAINS_TO_TAKE`) takes them inside. The player sees a drain cutscene each time (`EntityCut.DRAIN`,
