@@ -71,6 +71,11 @@ CREATE TABLE IF NOT EXISTS deal_purchases (
     count       INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (player_id, deal_id)
 );
+-- Things about the whole server: "generation" changes with every full game reset (reset_game.py).
+CREATE TABLE IF NOT EXISTS meta (
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS players_by_cups ON players(cups DESC);
 CREATE INDEX IF NOT EXISTS matches_by_player ON matches(player_id, outcome);
 CREATE INDEX IF NOT EXISTS matches_by_player ON matches(player_id);
@@ -252,6 +257,20 @@ class Store:
             economy.settle_road(profile)
             self._keep(player_id, profile)
         return True
+
+    def generation(self) -> str:
+        """Which full reset of the game this is ("" if it was never reset). A device that last played under another
+        one starts over as a new player."""
+        with self._lock:
+            row = self._db.execute("SELECT value FROM meta WHERE key = 'generation'").fetchone()
+        return row[0] if row else ""
+
+    def new_generation(self) -> str:
+        """Marks a full reset of the game: every device that played before it starts over as a new player."""
+        value = "%d-%s" % (int(time.time()), secrets.token_hex(4))
+        with self._lock, self._db:
+            self._db.execute("INSERT INTO meta (key, value) VALUES ('generation', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", (value,))
+        return value
 
     def delete(self, player_id: str) -> dict | None:
         """Deletes an account and everything that hangs off it, for good. Returns what it held (so the caller can

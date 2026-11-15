@@ -22,6 +22,7 @@ Only the Python standard library is used, so there is nothing to install.
     POST /v1/shop/daily/<n>/buy {day}   buy one of today's offers -> {reward}                 (token)
     POST /v1/settings/difficulty {difficulty}  choose the bot difficulty; the server says yes or no  (token)
     POST /v1/reset                      start this account's progress over                    (token, developer)
+    POST /v1/account/delete             delete this account for good (the game starts over)   (token)
     POST /v1/dev/grant      {...}       developer hand-outs                                   (token, developer)
     POST /v1/dev/deals      {...}       put a deal in everyone's shop -> {id}                 (token, developer)
     POST /v1/dev/deals/<id>/delete      take a deal out of the shop                           (token, developer)
@@ -259,6 +260,8 @@ def make_handler(game: Game, quiet: bool = False):
                     "supported": message is None,
                     "message": message or "",
                     "notice": game.config.notice(version),
+                    # Which full reset of the game this is: a device that last played under another starts over.
+                    "generation": game.store.generation(),
                 })
             if url.path == "/v1/config":
                 return self._send(200, {"bots": game.config.bots()})
@@ -324,6 +327,17 @@ def make_handler(game: Game, quiet: bool = False):
                 return self._error(410, "the Cup Track was removed")
             if url.path == "/v1/reset":
                 return self._act(lambda p, d: game.store.reset(p["id"]), developer=True)
+            if url.path == "/v1/account/delete":
+                # A player resetting their own progress: their account is gone for good (build 111, the owner's
+                # decision); the game then starts over as a new player.
+                if self._body() is None:
+                    return None
+                player = self._player()
+                if player is None:
+                    return None
+                game.accounts.delete(player["id"], "the player reset it")
+                game.accounts.sync()
+                return self._send(200, {"deleted": True})
             if url.path == "/v1/settings/difficulty":
                 return self._act(self._set_difficulty)
             m = _DAILY_BUY.match(url.path)

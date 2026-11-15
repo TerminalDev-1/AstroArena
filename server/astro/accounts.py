@@ -247,15 +247,21 @@ class Accounts:
                     asked = None
             if asked and player is not None:
                 # Deleting wins over anything else written for that account. What it held is kept in a log first.
-                gone = self.store.delete(player_id)
+                gone = self.delete(player_id, "accounts.cfg")
                 if gone is not None:
-                    with open(os.path.join(os.path.dirname(self.path), DELETED), "a", encoding="utf-8") as log:
-                        log.write(json.dumps({"deleted": time.strftime(_DATE), **gone}) + "\n")
                     if not self.quiet:
                         _say("%s (%s) deleted. What it held is in %s." % (gone["name"], player_id, DELETED))
             elif change and self.store.force(player_id, change) and not self.quiet:
                 _say("%s forced: %s" % (player_id, change))
         return True
+
+    def delete(self, player_id: str, why: str) -> dict | None:
+        """Deletes an account for good, keeping what it held in deleted_accounts.log first (`why`: who asked)."""
+        gone = self.store.delete(player_id)
+        if gone is not None:
+            with open(os.path.join(os.path.dirname(self.path), DELETED), "a", encoding="utf-8") as log:
+                log.write(json.dumps({"deleted": time.strftime(_DATE), "why": why, **gone}) + "\n")
+        return gone
 
     def sync(self) -> None:
         with self._lock:

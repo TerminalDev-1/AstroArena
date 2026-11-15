@@ -750,6 +750,14 @@ class Api(unittest.TestCase):
         with open(os.path.join(self.dir, "deleted_accounts.log"), encoding="utf-8") as log:
             record = json.loads(log.read().splitlines()[-1])
         self.assertEqual((record["id"], record["profile"]["bolts"], "token" in record), (spare["id"], 60, False))
+        # A player can delete their own account (resetting their progress): it is gone, logged, and their token refused.
+        mine = self.player("Rese")
+        self.assertEqual(self.call("POST", "/v1/account/delete", {}, mine["token"])[0], 200)
+        self.assertIsNone(self.store.player(mine["id"]))
+        self.assertEqual(self.call("GET", "/v1/me", token=mine["token"])[0], 401)
+        with open(os.path.join(self.dir, "deleted_accounts.log"), encoding="utf-8") as log:
+            record = json.loads(log.read().splitlines()[-1])
+        self.assertEqual((record["id"], record["why"]), (mine["id"], "the player reset it"))
         # Nobody else is touched, and taking a section out of the file deletes nothing.
         self.assertEqual((self.store.player(fair["id"])["cups"], self.store.player(cheat["id"])["cups"]), (65, 12))
         text = edit()
