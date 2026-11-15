@@ -97,6 +97,7 @@ MATCH_COLUMNS = [
     ("ticks", "INTEGER"),                     # how long the match ran, as the referee counted it
     ("verified", "INTEGER NOT NULL DEFAULT 0"),  # 1 = the referee replayed it and this is its result; 0 = the device's claim
     ("boss", "TEXT"),                         # Boss Mode: the boss the player asked for ('' or NULL = the seed picks)
+    ("tier", "INTEGER NOT NULL DEFAULT 0"),   # the Entity's fight: how hard it was (the player's tier when it was set up)
 ]
 
 BOT_NAMES = [
@@ -432,7 +433,12 @@ class Store:
 
     # ------------------------------------------------------------------ matches
 
-    def plan_match(self, player_id: str, mode: str, fighter: str, difficulty: str, bots: int, bot_settings: dict | None = None, boss: str = "", seed: int | None = None) -> dict:
+    def entity_tier(self, player_id: str) -> int:
+        """How hard the Entity is for this player now (one more for every fight with it they finished)."""
+        with self._lock:
+            return int(self._profile(player_id).get("entityTier") or 0)
+
+    def plan_match(self, player_id: str, mode: str, fighter: str, difficulty: str, bots: int, bot_settings: dict | None = None, boss: str = "", seed: int | None = None, tier: int | None = None) -> dict:
         """The server decides the match: its seed (which fixes the bots' fighters and behaviour), the bots' names,
         the difficulty and how the bots behave. The fighter has to be one the player has unlocked, and it plays at
         the level the server holds for it. All of this is kept, so the referee can replay the match later.
@@ -445,12 +451,17 @@ class Store:
             if not entry or not entry.get("unlocked"):
                 raise Refused(409, "that fighter isn't unlocked")
             level = int(entry["level"])
+            # The Entity's tier (its fight only): the player's own, or the one a team shares.
+            if mode != "BOSS":
+                tier = 0
+            elif tier is None:
+                tier = int(self._profile(player_id).get("entityTier") or 0)
             cur = self._db.execute(
-                "INSERT INTO matches (player_id, mode, fighter, level, difficulty, seed, started_at, names, bots, boss) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (player_id, mode[:24], fighter, level, difficulty[:12], seed, time.time(), json.dumps(names), json.dumps(bot_settings), boss),
+                "INSERT INTO matches (player_id, mode, fighter, level, difficulty, seed, started_at, names, bots, boss, tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (player_id, mode[:24], fighter, level, difficulty[:12], seed, time.time(), json.dumps(names), json.dumps(bot_settings), boss, tier),
             )
             match_id = cur.lastrowid
-        return {"matchId": match_id, "seed": seed, "botNames": names, "difficulty": difficulty, "fighter": fighter, "level": level, "bots": bot_settings, "boss": boss}
+        return {"matchId": match_id, "seed": seed, "botNames": names, "difficulty": difficulty, "fighter": fighter, "level": level, "bots": bot_settings, "boss": boss, "tier": tier}
 
     def open_match(self, player_id: str, match_id: int) -> dict | None:
         """A match this player was given that hasn't been reported yet, with everything needed to replay it."""
@@ -521,6 +532,9 @@ class Store:
             profile["prisms"] += prisms
             if prisms:
                 profile["lastFirstWinDay"] = day
+            # Every fight with the Entity that was played out, won or lost, makes the next one harder (the user's rule).
+            if mode == "BOSS" and outcome in ("VICTORY", "DEFEAT"):
+                profile["entityTier"] = int(profile.get("entityTier") or 0) + 1
             # Credits for the Spark Road: they may unlock the fighter they were filling. (Bolts instead, once it is finished.)
             paid = economy.grant(profile, {"type": "credits", "amount": economy.match_credits(mode, outcome, placement)})
             if paid["type"] == "bolts":
@@ -529,7 +543,7 @@ class Store:
             return {
                 "cupDelta": 0, "cups": 0, "drop": drop, "bolts": bolts, "firstWinPrisms": prisms,
                 "credits": economy.credits_in(paid), "unlocked": economy.fighters_in(paid), "mvpCups": 0,
-                "fighter": match["fighter"],
+                "fighter": match["fighter"], "entityTier": profile["entityTier"],
             }
 
     # ------------------------------------------------------------------ Arena Boxes ("drops")

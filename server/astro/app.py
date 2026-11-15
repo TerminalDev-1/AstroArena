@@ -433,7 +433,7 @@ def make_handler(game: Game, quiet: bool = False):
                         raise Refused(422, "result refused: more match than time")
                     judged = game.referee.judge(
                         match["mode"], match["fighter"], match["level"], match["difficulty"], match["seed"], match["names"], match["bots"], raw,
-                        match.get("boss") or "",
+                        match.get("boss") or "", int(match.get("tier") or 0),
                     )
                 except Refused as refused:
                     if refused.status != 503:  # 503: the referee itself broke; that isn't the player's doing

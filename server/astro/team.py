@@ -51,6 +51,7 @@ MAX_PLAYERS = 3
 class _Team:
     def __init__(self, code: str, mode: str, boss: str, version: str):
         self.code, self.mode, self.boss, self.version = code, mode, boss, version
+        self.tier = 0
         self.members: list = []          # seats, the leader first; a member's slot is its place here
         self.playing = False
         self.settling = False
@@ -125,6 +126,8 @@ class TeamLobby:
             team.difficulty = self.game.difficulty(store.player(me.player_id))
             team.bots = self.game.config.bots().get(team.difficulty, {})
             bots = 3 - len(team.members)  # (bots make up a team of three against the Entity)
+            # Every device runs the same Entity: the team fights it at its highest member's tier.
+            team.tier = max(store.entity_tier(seat.player_id) for seat in team.members) if team.mode == "BOSS" else 0
             now = time.monotonic()
             for seat in team.members:
                 seat.frames, seat.record, seat.gone, seat.heard = 0, bytearray(), False, now
@@ -132,7 +135,7 @@ class TeamLobby:
                 entry = store.profile(seat.player_id)["fighters"].get(seat.fighter) or {}
                 seat.level = int(entry.get("level") or seat.level)
                 try:
-                    plan = store.plan_match(seat.player_id, team.mode, seat.fighter, team.difficulty, bots, team.bots, team.boss, seed=team.seed)
+                    plan = store.plan_match(seat.player_id, team.mode, seat.fighter, team.difficulty, bots, team.bots, team.boss, seed=team.seed, tier=team.tier)
                     seat.match_id, team.names = plan["matchId"], plan["botNames"]
                 except Refused:
                     seat.match_id = 0
@@ -140,7 +143,7 @@ class TeamLobby:
             for slot, seat in enumerate(team.members):
                 seat.send(self.duel.text(b"S", {
                     "seed": team.seed, "slot": slot, "mode": team.mode, "boss": team.boss, "difficulty": team.difficulty,
-                    "botNames": team.names, "bots": team.bots, "players": players,
+                    "botNames": team.names, "bots": team.bots, "players": players, "tier": team.tier,
                 }))
         self.duel.log(f"team {team.code}: a {team.mode} match starts for {', '.join(p['name'] for p in players)}")
 
@@ -243,7 +246,7 @@ class TeamLobby:
                     team.mode, team.seed, team.difficulty, team.names, team.bots, team.boss,
                     [seat.fighter for seat in members], [seat.level for seat in members],
                     [bytes(seat.record[:len(seat.record) // FRAME_BYTES * FRAME_BYTES]) for seat in members],
-                    [seat.slot for seat in members if seat.gone],
+                    [seat.slot for seat in members if seat.gone], tier=team.tier,
                 )
             except Refused as refused:
                 self.duel.log(f"team {team.code}: {refused.message}")

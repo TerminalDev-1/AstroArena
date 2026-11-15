@@ -209,7 +209,7 @@ def new_profile() -> dict:
     return {
         "bolts": STARTING_BOLTS, "prisms": STARTING_PRISMS, "credits": 0, "bestCups": 0,
         "fighters": {name: {"unlocked": name == rules.STARTING_FIGHTER, "level": 1, "ownedSkins": [0], "cups": 0} for name in rules.FIGHTER_SKINS},
-        "claimedMilestones": [], "lastDailyGiftDay": -1, "lastFirstWinDay": -1,
+        "claimedMilestones": [], "lastDailyGiftDay": -1, "lastFirstWinDay": -1, "entityTier": 0,
         "crystalsReset": True,
     }
 
@@ -217,6 +217,8 @@ def new_profile() -> dict:
 def complete(profile: dict) -> dict:
     """Fills in what a profile stored by an older server doesn't have yet."""
     profile.setdefault("credits", 0)
+    # How hard the Entity is for this player: one more for every fight with it, won or lost (build 111).
+    profile["entityTier"] = max(0, int(profile.get("entityTier") or 0))
     # CPU Chips became Arena Crystals in 1.0 (build 103), and every account's were set to 0, once, by the user's decision.
     if not profile.get("crystalsReset"):
         profile["prisms"] = 0

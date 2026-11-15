@@ -73,7 +73,7 @@ class Referee:
             return "referee.jar is missing (build it with `gradlew :referee:installReferee` in client/)"
         return "Java was not found (install Java 17 or newer, or set JAVA_HOME)"
 
-    def judge(self, mode: str, fighter: str, level: int, difficulty: str, seed: int, names: list[str], bots: dict, raw: bytes, boss: str = "") -> dict:
+    def judge(self, mode: str, fighter: str, level: int, difficulty: str, seed: int, names: list[str], bots: dict, raw: bytes, boss: str = "", tier: int = 0) -> dict:
         """Plays the match back and returns {outcome, placement, kos, deaths, damage, mvp, ticks, finished}."""
         lines = [
             "mode=%s" % mode, "fighter=%s" % fighter, "level=%d" % level, "difficulty=%s" % difficulty,
@@ -81,6 +81,8 @@ class Referee:
         ]
         if boss:
             lines.append("boss=%s" % boss)
+        if tier:
+            lines.append("tier=%d" % tier)
         for key, value in sorted(bots.items()):
             lines.append("bot.%s=%s" % (key, ("true" if value else "false") if isinstance(value, bool) else repr(float(value))))
         lines.append("inputs=%s" % base64.b64encode(raw).decode("ascii"))
@@ -128,7 +130,7 @@ class Referee:
         }
 
     def judge_team(self, mode: str, seed: int, difficulty: str, names: list[str], bots: dict, boss: str,
-                   fighters: list[str], levels: list[int], frames: list[bytes], left: list[int], check: int | None = None) -> dict:
+                   fighters: list[str], levels: list[int], frames: list[bytes], left: list[int], check: int | None = None, tier: int = 0) -> dict:
         """Plays a team's match back from every player's input frames (in slot order), as the lobby recorded them.
 
         `left` are the slots of players who walked out: their fighters stand still once their frames run out.
@@ -138,6 +140,8 @@ class Referee:
         lines = ["mode=%s" % mode, "seed=%d" % seed, "difficulty=%s" % difficulty, "names=%s" % ",".join(names), "players=%d" % len(fighters)]
         if boss:
             lines.append("boss=%s" % boss)
+        if tier:
+            lines.append("tier=%d" % tier)
         for key, value in sorted(bots.items()):
             lines.append("bot.%s=%s" % (key, ("true" if value else "false") if isinstance(value, bool) else repr(float(value))))
         for slot, fighter in enumerate(fighters):

@@ -534,7 +534,7 @@ class Api(unittest.TestCase):
             """Stands in for the referee: answers what it is told to, and keeps what it was asked."""
             answer, asked = None, []
 
-            def judge_team(self, mode, seed, difficulty, names, bots, boss, fighters, levels, frames, left, check=None):
+            def judge_team(self, mode, seed, difficulty, names, bots, boss, fighters, levels, frames, left, check=None, tier=0):
                 self.asked.append((mode, fighters, levels, [len(f) for f in frames], left, len(names)))
                 return self.answer
 
@@ -1262,6 +1262,10 @@ class Refereed(Api):
         self.assertTrue(report["kos"] < 9 and report["damage"] < 99999)
         self.assertNotEqual(report["placement"], 1)
         self.assertEqual(body["cupDelta"], 0)  # (Cups were removed)
+        # Every fight with the Entity played out, won or lost, makes the next one harder: its tier goes up by one,
+        # and the next match it plans is at that tier.
+        self.assertEqual(body["entityTier"], 1)
+        self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS", "fighter": "BYTE", "level": 1, "difficulty": "EASY"}, me["token"])[1]["tier"], 1)
         # (Paid by the replay, KOs included: a corrupted fighter fights for the Entity, even one left idle.)
         self.assertEqual(body["bolts"], economy.match_bolts("BOSS", report["outcome"], report["placement"], report["kos"], "EASY"))
         row = self.store._db.execute("SELECT outcome, placement, verified, ticks FROM matches WHERE id = ?", (plan["matchId"],)).fetchone()
