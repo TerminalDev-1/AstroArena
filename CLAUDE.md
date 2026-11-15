@@ -607,5 +607,9 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   `vN.0` form because older installs (0.4.2 to v11.1) can only read tags like that.
   The newest release must always be the newest build, so nobody downloads a stale APK.
   Smoke-test the release APK on the tablet when it is free, then put the debug build back.
+- **Always update the README after a release** (the user's rule): `README.md` must describe the game as it is in
+  that release (modes, the Entity, fighters, currencies, what was removed, debug screens), and the GitHub repo
+  description (`gh repo edit --description`) must match it. Commit and push it as part of the release, without being
+  asked. (1.3's README still described Last Spark, Cups and Arena Boxes long after they were gone.)
 - `gh` needs normal path conversion: don't run it with `MSYS_NO_PATHCONV=1` set.
 - End commit messages with the co-author line used in history. `screenshots/` is gitignored scratch.
