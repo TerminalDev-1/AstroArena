@@ -61,6 +61,45 @@ class MatchView(
         keepScreenOn = true
     }
 
+    /** Stops listening to [io.github.projectwip.gl.PowerWatch] when the match goes. */
+    private var unlisten: (() -> Unit)? = null
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // The phone warming up (or cooling down, or being plugged in) mid-match: draw it smaller or larger and at the
+        // frame rate that goes with it, without waiting for the next match.
+        unlisten = io.github.projectwip.gl.PowerWatch.listen {
+            if (width > 0 && height > 0) applyBuffer(width, height)
+            applyFrameRate()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        unlisten?.invoke(); unlisten = null
+        super.onDetachedFromWindow()
+    }
+
+    private fun applyFrameRate() {
+        val fps = io.github.projectwip.gl.PowerWatch.cap(settings.frameRate, menu = false)
+        if (Build.VERSION.SDK_INT >= 30) try {
+            if (surface.holder.surface.isValid) surface.holder.surface.setFrameRate(fps.toFloat(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+        } catch (_: Throwable) {}
+        var c: Context? = context
+        while (c is android.content.ContextWrapper && c !is io.github.projectwip.MainActivity) c = c.baseContext
+        (c as? io.github.projectwip.MainActivity)?.applyRefreshRate(fps)
+    }
+
+    private var bufW = 0
+    private var bufH = 0
+
+    /** The match's buffer for a view of [w] x [h] (smaller on a tall screen, on battery or when the phone is warm). */
+    private fun applyBuffer(w: Int, h: Int) {
+        val (bw, bh) = gfx.bufferSize(w, h)
+        if (bw == bufW && bh == bufH) return
+        bufW = bw; bufH = bh
+        if (bw != w || bh != h) surface.holder.setFixedSize(bw, bh) else surface.holder.setSizeFromLayout()
+    }
+
     override fun surfaceCreated(holder: SurfaceHolder) {
         if (Build.VERSION.SDK_INT >= 30) {
             holder.surface.setFrameRate(io.github.projectwip.gl.PowerWatch.cap(settings.frameRate, menu = false).toFloat(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
@@ -77,8 +116,7 @@ class MatchView(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         // A tall screen is drawn smaller and scaled up by the display hardware (the graphics preset's render scale).
-        val (bw, bh) = gfx.bufferSize(w, h)
-        if (bw != w || bh != h) surface.holder.setFixedSize(bw, bh) else surface.holder.setSizeFromLayout()
+        applyBuffer(w, h)
         renderer?.let { it.viewWidth = w; it.viewHeight = h }
     }
 

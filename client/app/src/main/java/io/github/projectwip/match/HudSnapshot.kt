@@ -113,9 +113,13 @@ class HudChannel {
     @Volatile var hasFrame = false
         private set
 
+    /** Called (on the GL thread) once a new frame is published: the HUD redraws only then, never more often. */
+    @Volatile var onFrame: (() -> Unit)? = null
+
     fun publish() {
         synchronized(lock) { front.copyFrom(back) }
         hasFrame = true
+        onFrame?.invoke()
     }
 
     fun <T> read(block: (HudSnapshot) -> T): T = synchronized(lock) { block(front) }

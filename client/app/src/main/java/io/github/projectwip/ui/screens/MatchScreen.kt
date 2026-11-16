@@ -305,8 +305,9 @@ private fun MatchBody(
     var draining by remember { mutableStateOf(-1) }
     var drainSeen by remember { mutableStateOf(0) }
     if (!shared) androidx.compose.runtime.LaunchedEffect(Unit) {
+        // (Looked at twenty times a second, not on every refresh of the screen: that kept the phone busy for nothing.)
         while (true) {
-            androidx.compose.runtime.withFrameNanos { }
+            kotlinx.coroutines.delay(50)
             if (!hijacking && view?.hijack == 2) hijacking = true
             val c = view?.corruptions ?: 0
             if (corrupting < 0 && c > corruptSeen) { corruptSeen = c; corrupting = c }
@@ -316,7 +317,7 @@ private fun MatchBody(
     }
     // (In every match, team matches too: whoever is trapped sees inside it.)
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        while (true) { androidx.compose.runtime.withFrameNanos { }; inside = view?.playerTrapped == true }
+        while (true) { kotlinx.coroutines.delay(50); inside = view?.playerTrapped == true }
     }
     val context = LocalContext.current
 

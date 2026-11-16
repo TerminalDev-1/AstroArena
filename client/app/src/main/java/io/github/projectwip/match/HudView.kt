@@ -27,7 +27,12 @@ class HudView(
     private val channel: HudChannel,
     private val runner: MatchRunner,
 ) : View(context) {
-    private val density = resources.displayMetrics.density
+    /**
+     * What one dp is on this HUD. A short screen (a phone on its side is only about 360 dp tall, a tablet two or three
+     * times that) gets everything a little smaller ([hudScale]), so the plates, the Entity's bar and its words fit
+     * above the fight instead of on top of it.
+     */
+    private var density = resources.displayMetrics.density
     private val controls = runner.controls
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND }
@@ -61,7 +66,21 @@ class HudView(
 
     private fun dp(v: Float) = v * density
 
-    init { setWillNotDraw(false) }
+    init {
+        setWillNotDraw(false)
+        // The HUD is drawn once for every frame of the match, not on every refresh of the screen: drawing it again
+        // when nothing has moved only warmed the phone.
+        channel.onFrame = { postInvalidateOnAnimation() }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val base = resources.displayMetrics.density
+        density = base * hudScale(h / base)
+    }
+
+    /** Where the Entity's words go under its health bar (or the score plate, before its world opens). */
+    private fun underBar(): Float = dp(BAR_TOP) + dp(46f) + dp(50f)
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean = controls.onTouch(event)
@@ -71,8 +90,7 @@ class HudView(
         val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceAtMost(0.1f)
         last = now
         time += dt
-        postInvalidateOnAnimation()
-        if (!channel.hasFrame) return
+        if (!channel.hasFrame) { postInvalidateOnAnimation(); return }
         channel.read { snap.copyFrom(it) }
 
         while (true) {
@@ -256,7 +274,8 @@ class HudView(
         if (sub != null) { text.textSize = dp(13f); wSub = text.measureText(sub) }
         val pw = maxOf(wMain, wSub) + dp(48f)
         val ph = if (sub != null) dp(62f) else dp(42f)
-        val l = x - pw / 2; val t = y - ph / 2
+        val yy = maxOf(y, dp(10f) + dp(58f) + dp(20f) + ph / 2)
+        val l = x - pw / 2; val t = yy - ph / 2
         val ink = Color.argb(alpha, 27, 16, 53)
         chamfer(c, l, t, l + pw, t + ph, dp(11f), Color.argb((235 * a).toInt(), 45, 29, 116), ink)
         // The nameplate tab.
@@ -266,10 +285,10 @@ class HudView(
         chamfer(c, l + dp(14f), t - dp(12f), l + dp(14f) + tw, t + dp(10f), dp(6f), Color.argb(alpha, 120, 60, 220), ink)
         outlined(c, tag, l + dp(14f) + tw / 2, t + dp(3f), Color.argb(alpha, 255, 255, 255), dp(2.5f))
         text.textSize = dp(20f)
-        outlined(c, words, x, if (sub != null) y - dp(2f) else y + dp(7f), Color.argb(alpha, 255, 255, 255), dp(3.5f))
+        outlined(c, words, x, if (sub != null) yy - dp(2f) else yy + dp(7f), Color.argb(alpha, 255, 255, 255), dp(3.5f))
         if (sub != null) {
             text.textSize = dp(13f)
-            outlined(c, sub, x, y + dp(20f), Color.argb(alpha, 214, 200, 255), dp(2.5f))
+            outlined(c, sub, x, yy + dp(20f), Color.argb(alpha, 214, 200, 255), dp(2.5f))
         }
     }
 
@@ -300,7 +319,7 @@ class HudView(
             io.github.projectwip.sim.UprisingPhase.SKY -> {
                 // Its health, across the top on a purple plate.
                 val pw = minOf(w * 0.56f, dp(560f)); val ph = dp(46f)
-                val l = w / 2 - pw / 2; val top = dp(92f)
+                val l = w / 2 - pw / 2; val top = dp(BAR_TOP)
                 val ink = Color.rgb(27, 16, 53)
                 chamfer(c, l, top, l + pw, top + ph, dp(12f), Color.argb(235, 45, 29, 116), ink)
                 val frac = if (s.uprisingMaxHp > 0) s.uprisingHp.toFloat() / s.uprisingMaxHp else 0f
@@ -312,10 +331,10 @@ class HudView(
                 outlined(c, (if (s.entityTier > 0) "THE ENTITY · TIER ${s.entityTier + 1} · " else "THE ENTITY · ") + "%,d".format(s.uprisingHp), w / 2, top + dp(18f), Color.WHITE, dp(2.5f))
                 // Drained by its red flares: weaker, and how close it is to taking them.
                 if (s.playerDrains > 0 && !s.playerTrapped && t >= 5f && s.trappedNames.isEmpty())
-                    entityPlate(c, "DRAINED ${s.playerDrains}/${io.github.projectwip.data.Balance.ENTITY_DRAINS_TO_TAKE}", "YOU HIT SOFTER AND MOVE SLOWER", w / 2, top + ph + dp(40f), 1f)
-                if (t < 5f) entityPlate(c, "Then fight me. All of you.", "HIT THE SHADOW UNDER IT", w / 2, h * 0.3f, minOf(1f, (5f - t) / 0.5f))
+                    entityPlate(c, "DRAINED ${s.playerDrains}/${io.github.projectwip.data.Balance.ENTITY_DRAINS_TO_TAKE}", "YOU HIT SOFTER AND MOVE SLOWER", w / 2, underBar(), 1f)
+                if (t < 5f) entityPlate(c, "Then fight me. All of you.", "HIT THE SHADOW UNDER IT", w / 2, maxOf(h * 0.3f, underBar()), minOf(1f, (5f - t) / 0.5f))
                 else if (s.trappedNames.isNotEmpty() && !s.playerTrapped)
-                    entityPlate(c, "TRAPPED: " + s.trappedNames.uppercase(), "BEAT THE ENTITY TO FREE THEM", w / 2, top + ph + dp(40f), 1f)
+                    entityPlate(c, "TRAPPED: " + s.trappedNames.uppercase(), "BEAT THE ENTITY TO FREE THEM", w / 2, underBar(), 1f)
                 // Through the portal: a flash, fading.
                 if (t < 0.7f) { fill.color = Color.argb((255 * (1f - t / 0.7f)).toInt(), 230, 220, 255); c.drawRect(0f, 0f, w, h, fill) }
             }
@@ -469,7 +488,7 @@ class HudView(
         if (s.playerTrapped && s.phase == Phase.PLAYING) {
             // Inside the Entity, among its souls, until the team beats it.
             // (Up under its health bar, out of the way of the teammate the camera is on.)
-            entityPlate(c, "TRAPPED INSIDE THE ENTITY", "YOUR TEAM MUST BEAT IT TO FREE YOU", cx, dp(92f) + dp(46f) + dp(40f), 1f)
+            entityPlate(c, "TRAPPED INSIDE THE ENTITY", "YOUR TEAM MUST BEAT IT TO FREE YOU", cx, underBar(), 1f)
         } else if (s.playerOut && s.phase == Phase.PLAYING) {
             // No coming back in its fight: they watch their team.
             text.textSize = dp(28f)
@@ -520,26 +539,38 @@ class HudView(
         textStroke.alpha = 255
     }
 
-    private fun chamfer(c: Canvas, l: Float, t: Float, r: Float, b: Float, cut: Float, color: Int, outline: Int?) {
-        path.reset()
-        path.moveTo(l + cut, t); path.lineTo(r - cut * 0.4f, t); path.lineTo(r, t + cut * 0.4f); path.lineTo(r, b - cut)
-        path.lineTo(r - cut, b); path.lineTo(l + cut * 0.4f, b); path.lineTo(l, b - cut * 0.4f); path.lineTo(l, t + cut); path.close()
-        fill.color = color
-        c.drawPath(path, fill)
+    /**
+     * A plate's three shapes (its face, the gloss over its top and the shade under it), kept for as long as the plate
+     * stays where it is: a fresh path every frame made Android shape it again every frame.
+     */
+    private class PlatePaths(val face: Path, val gloss: Path, val shade: Path)
+    private val plates = HashMap<Long, PlatePaths>()
+
+    private fun platePaths(l: Float, t: Float, r: Float, b: Float, cut: Float): PlatePaths {
+        fun q(v: Float) = (v * 2f).toLong() and 0xFFFF
+        val key = ((q(l) shl 48) or (q(t) shl 32) or (q(r) shl 16) or q(b)) xor (q(cut) * -7046029254386353131L)
+        plates[key]?.let { return it }
+        if (plates.size >= 64) plates.clear() // plates that move (a jittering whisper) never pile up
+        val face = Path().apply {
+            moveTo(l + cut, t); lineTo(r - cut * 0.4f, t); lineTo(r, t + cut * 0.4f); lineTo(r, b - cut)
+            lineTo(r - cut, b); lineTo(l + cut * 0.4f, b); lineTo(l, b - cut * 0.4f); lineTo(l, t + cut); close()
+        }
         val mid = maxOf(t + cut, t + (b - t) * 0.45f)
-        path.reset()
-        path.moveTo(l + cut, t); path.lineTo(r - cut * 0.4f, t); path.lineTo(r, t + cut * 0.4f); path.lineTo(r, mid); path.lineTo(l, mid); path.lineTo(l, t + cut); path.close()
-        fill.color = Color.argb(46, 255, 255, 255)
-        c.drawPath(path, fill)
+        val gloss = Path().apply { moveTo(l + cut, t); lineTo(r - cut * 0.4f, t); lineTo(r, t + cut * 0.4f); lineTo(r, mid); lineTo(l, mid); lineTo(l, t + cut); close() }
         val low = minOf(b - cut, b - (b - t) * 0.25f)
-        path.reset()
-        path.moveTo(l, low); path.lineTo(r, low); path.lineTo(r, b - cut); path.lineTo(r - cut, b); path.lineTo(l + cut * 0.4f, b); path.lineTo(l, b - cut * 0.4f); path.close()
+        val shade = Path().apply { moveTo(l, low); lineTo(r, low); lineTo(r, b - cut); lineTo(r - cut, b); lineTo(l + cut * 0.4f, b); lineTo(l, b - cut * 0.4f); close() }
+        return PlatePaths(face, gloss, shade).also { plates[key] = it }
+    }
+
+    private fun chamfer(c: Canvas, l: Float, t: Float, r: Float, b: Float, cut: Float, color: Int, outline: Int?) {
+        val p = platePaths(l, t, r, b, cut)
+        fill.color = color
+        c.drawPath(p.face, fill)
+        fill.color = Color.argb(46, 255, 255, 255)
+        c.drawPath(p.gloss, fill)
         fill.color = Color.argb(60, 0, 0, 0)
-        c.drawPath(path, fill)
-        path.reset()
-        path.moveTo(l + cut, t); path.lineTo(r - cut * 0.4f, t); path.lineTo(r, t + cut * 0.4f); path.lineTo(r, b - cut)
-        path.lineTo(r - cut, b); path.lineTo(l + cut * 0.4f, b); path.lineTo(l, b - cut * 0.4f); path.lineTo(l, t + cut); path.close()
-        if (outline != null) { stroke.color = outline; stroke.strokeWidth = dp(3f); c.drawPath(path, stroke) }
+        c.drawPath(p.shade, fill)
+        if (outline != null) { stroke.color = outline; stroke.strokeWidth = dp(3f); c.drawPath(p.face, stroke) }
     }
 
     private fun outlined(c: Canvas, s: String, x: Float, y: Float, color: Int, outline: Float) {
@@ -560,6 +591,10 @@ class HudView(
     private fun withAlpha(c: Int, a: Float) = Color.argb((a * 255).toInt().coerceIn(0, 255), Color.red(c), Color.green(c), Color.blue(c))
 
     companion object {
+        /** The Entity's health bar: just under the score plate. */
+        private const val BAR_TOP = 76f
+        /** How much smaller the HUD is drawn on a screen [heightDp] tall: full size from 430 dp up, never under 0.8. */
+        fun hudScale(heightDp: Float): Float = (heightDp / 430f).coerceIn(0.8f, 1f)
         val INK = Color.rgb(20, 36, 53)
         val PLAYER = Color.rgb(92, 255, 122)
         val ALLY = Color.rgb(63, 182, 255)

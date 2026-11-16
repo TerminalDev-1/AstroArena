@@ -123,7 +123,9 @@ class TouchControls(private val density: Float) {
         width = w.toFloat(); height = h.toFloat()
         safeLeft = insetLeft.toFloat(); safeRight = insetRight.toFloat()
         // Keep controls thumb-sized in physical terms, but never let them crowd a small screen.
-        val k = s.controlScale * min(1f, height / dp(360f)).coerceAtLeast(0.8f)
+        // (A phone on its side is about 360 dp tall: there the buttons are drawn a little smaller, as the HUD is, so the
+        // super and hyper buttons stay low and clear of the Entity's bar.)
+        val k = s.controlScale * HudView.hudScale(height / density)
         moveRadius = dp(64f) * k
         attackRadius = dp(60f) * k
         superRadius = dp(42f) * k
