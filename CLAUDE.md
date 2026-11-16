@@ -81,6 +81,13 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   app on phones that refuse the mismatch. Set formats explicitly (`MatchView` asks for RGBA_8888), and keep every
   graphics step inside `GlThread`'s handling: it retries without MSAA, and a failure is reported
   (`CrashReporter.record`) and leaves a black view the player can leave, never a crash.
+- **Phones are short.** On its side the S26 is 360 dp tall (the tablet far more): the match HUD and controls scale
+  down below 430 dp (`HudView.hudScale`), and the Entity's plates are kept under the score plate and its bar. Check
+  any HUD change on a phone-sized screen. **Heat:** the `Perf` log's `draw=` includes waiting for the screen (ANGLE
+  blocks in the first GL call of a frame), so 15 ms there is not 15 ms of work; time sections, and read
+  `top -H` and `dumpsys gfxinfo` before blaming the renderer. The S26's thermal headroom reads about 0.64 cool
+  (skin 34 C) and 1.0 at its SEVERE line; `PowerWatch` backs a match off at 0.75 and 0.88.
+  `adb shell cmd thermalservice override-status 3` (then `reset`) fakes a hot phone mid-match.
 - **A phone that can't reach the server can't send its reports.** So the game offers saved reports to the player to
   share (the "SOMETHING WENT WRONG" message after loading, `CrashReporter.pendingText`/`shouldOffer`), and the home
   screen says why it is offline (`GameServer.unreachable`, or that the player chose Offline mode). Ask for the shared
