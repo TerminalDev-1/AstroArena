@@ -88,6 +88,12 @@ class FighterModels {
         // Ninja, the only fighter since build 114 (the owner's decision), on the starter's id. Swish's model is kept with
         // the other removed fighters' in render3d/legacy, as Rocket's and Spark's were before.
         models[FighterId.BYTE] = buildNinja()
+        // The Dragon's minions (build 116). (The Juggernaut is the Crusher, drawn far bigger: `MatchRenderer`.)
+        models[FighterId.MINION_BOT] = buildCrusher()
+        models[FighterId.MINION_BRUTE] = models.getValue(FighterId.MINION_BOT)
+        models[FighterId.MINION_LASER] = buildZapper()
+        models[FighterId.MINION_HOUND] = buildLurcher()
+        models[FighterId.DRAGONLING] = buildDragonling()
         // (Spark was retired in build 102: [buildSpark] is kept, unregistered, like Rocket's model.)
         // The removed fighters' models (render3d/legacy), still under their ids: nobody plays them.
         with(io.github.projectwip.render3d.legacy.LegacyModels) {
@@ -569,6 +575,108 @@ class FighterModels {
 
 
     // ------------------------------------------------------------------ Kito — a ninja with a sword, and a hammer for his super
+
+    // ------------------------------------------------------------------ the Dragon's minions (build 116)
+
+    /** A melee robot: a heavy box of a body, one red visor eye, cracks of glitching light, and a piston fist. */
+    private fun buildCrusher(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 1.02f, hipY = 0.4f, hipZ = 0.17f, shoulder = floatArrayOf(0.06f, 0.78f, 0.34f), shoulderL = floatArrayOf(0.06f, 0.78f, -0.34f))
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.DARK) { at(0f, -0.14f, 0f) { roundedBox(0.16f, 0.3f, 0.16f, 0.05f) } }
+            a.add(bone, Slot.PRIMARY) { at(0.05f, -0.36f, 0f) { roundedBox(0.3f, 0.1f, 0.22f, 0.04f) } }
+        }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.68f, 0f) { roundedBox(0.52f, 0.5f, 0.6f, 0.1f) } }
+        a.add(Bone.BODY, Slot.DARK) { at(0.27f, 0.66f, 0f) { roundedBox(0.04f, 0.3f, 0.4f, 0.02f) } }
+        a.add(Bone.BODY, Slot.METAL) { at(0f, 0.95f, 0f) { roundedBox(0.4f, 0.08f, 0.5f, 0.03f) } }
+        for ((k, z) in listOf(-0.16f, 0.12f).withIndex()) {
+            a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.29f, 0.62f + k * 0.08f, z) { rotate(20f - k * 40f, 1f, 0f, 0f); roundedBox(0.012f, 0.22f, 0.025f, 0.006f) } }
+        }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(0.02f, 0.14f, 0f) { roundedBox(0.36f, 0.28f, 0.36f, 0.08f) } }
+        a.add(Bone.HEAD, Slot.DARK) { at(0.2f, 0.16f, 0f) { roundedBox(0.04f, 0.1f, 0.28f, 0.02f) } }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.22f, 0.16f, 0f) { roundedBox(0.03f, 0.05f, 0.2f, 0.015f) } }
+        a.add(Bone.HEAD, Slot.METAL) { at(-0.06f, 0.36f, 0.1f) { cylinder(0.015f, 0.16f, 6) } }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(-0.06f, 0.45f, 0.1f) { sphere(0.03f, 6, 8) } }
+        // The fist: a heavy piston on the striking arm; a plain claw on the other.
+        a.add(Bone.WEAPON, Slot.DARK) { at(0f, -0.14f, 0f) { capsule(0.08f, 0.16f) } }
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.06f, -0.36f, 0f) { roundedBox(0.26f, 0.22f, 0.24f, 0.06f) } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.19f, -0.36f, 0f) { roundedBox(0.02f, 0.14f, 0.16f, 0.01f) } }
+        a.add(Bone.ARM, Slot.DARK) { at(0f, -0.14f, 0f) { capsule(0.07f, 0.16f) } }
+        a.add(Bone.ARM, Slot.METAL) { at(0.04f, -0.33f, 0f) { roundedBox(0.16f, 0.14f, 0.16f, 0.04f) } }
+        return a.build(rig)
+    }
+
+    /** A laser bot: slim, floating on a hover pad, one great lens for an eye, and a laser cannon for an arm. */
+    private fun buildZapper(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 1.06f, hipY = 0.38f, hipZ = 0.12f, shoulder = floatArrayOf(0.05f, 0.8f, 0.3f), shoulderL = floatArrayOf(0.05f, 0.8f, -0.3f))
+        a.add(Bone.BODY, Slot.DARK) { at(0f, 0.16f, 0f) { cylinder(0.3f, 0.1f, 16, topRadius = 0.22f) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0f, 0.1f, 0f) { torus(0.24f, 0.025f, 18, 6) } }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.56f, 0f) { cylinder(0.2f, 0.62f, 14, topRadius = 0.26f) } }
+        a.add(Bone.BODY, Slot.METAL) { at(0f, 0.88f, 0f) { torus(0.24f, 0.04f, 16, 6) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(0f, 0.14f, 0f) { sphere(0.24f, 12, 16) } }
+        a.add(Bone.HEAD, Slot.DARK) { at(0.18f, 0.14f, 0f) { rotate(-90f, 0f, 0f, 1f); cylinder(0.13f, 0.08f, 16) } }
+        a.add(Bone.HEAD, Slot.ACCENT, outline = false, emissive = true) { at(0.23f, 0.14f, 0f) { sphere(0.08f, 8, 10) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0f, -0.12f, 0f) { capsule(0.06f, 0.14f) } }
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.2f, -0.28f, 0f) { alongX { cylinder(0.07f, 0.42f, 10) } } }
+        a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.42f, -0.28f, 0f) { alongX { cylinder(0.045f, 0.05f, 10) } } }
+        a.add(Bone.ARM, Slot.DARK) { at(0f, -0.14f, 0f) { capsule(0.06f, 0.16f) } }
+        return a.build(rig)
+    }
+
+    /** A hound: a robot dog on four legs, a long jaw, two glowing eyes, spikes down its back. */
+    private fun buildLurcher(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 0.9f, hipY = 0.4f, hipZ = 0.17f, shoulder = floatArrayOf(0.42f, 0.66f, 0f), shoulderL = floatArrayOf(-0.46f, 0.62f, 0f),
+            foreX = 0.28f, hindX = -0.3f)
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R, Bone.FORE_L, Bone.FORE_R)) {
+            a.add(bone, Slot.DARK) { at(0f, -0.14f, 0f) { capsule(0.06f, 0.18f) } }
+            a.add(bone, Slot.METAL) { at(0.04f, -0.34f, 0f) { roundedBox(0.16f, 0.07f, 0.13f, 0.03f) } }
+        }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(-0.02f, 0.56f, 0f) { roundedBox(0.8f, 0.3f, 0.34f, 0.13f) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.02f, 0.5f, 0.175f) { roundedBox(0.5f, 0.02f, 0.01f, 0.005f) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.02f, 0.5f, -0.175f) { roundedBox(0.5f, 0.02f, 0.01f, 0.005f) } }
+        for (k in 0 until 4) a.add(Bone.BODY, Slot.DARK) { at(-0.3f + k * 0.18f, 0.74f, 0f) { rotate(30f, 0f, 0f, 1f); cylinder(0.04f, 0.14f, 6, topRadius = 0f) } }
+        // Its head on the weapon bone (it snaps forward as it bites), and its tail on the arm bone.
+        a.add(Bone.WEAPON, Slot.PRIMARY) { at(0.1f, 0.06f, 0f) { roundedBox(0.28f, 0.24f, 0.26f, 0.09f) } }
+        a.add(Bone.WEAPON, Slot.METAL) { at(0.32f, 0f, 0f) { roundedBox(0.26f, 0.12f, 0.18f, 0.04f) } }
+        a.add(Bone.WEAPON, Slot.DARK) { at(0.3f, -0.1f, 0f) { roundedBox(0.22f, 0.05f, 0.16f, 0.02f) } }
+        for (z in listOf(0.08f, -0.08f)) {
+            a.add(Bone.WEAPON, Slot.ACCENT, outline = false, emissive = true) { at(0.22f, 0.12f, z) { sphere(0.035f, 6, 8) } }
+            a.add(Bone.WEAPON, Slot.DARK) { at(0.02f, 0.26f, z) { cylinder(0.05f, 0.16f, 6, topRadius = 0f) } }
+        }
+        a.add(Bone.ARM, Slot.DARK) { at(-0.12f, 0.02f, 0f) { rotate(55f, 0f, 0f, 1f); cylinder(0.035f, 0.32f, 6, topRadius = 0.01f) } }
+        return a.build(rig)
+    }
+
+    /** A Dragonling: a small copy of the Dragon, upright, with its blue eyes, horns, little wings and a tail. */
+    private fun buildDragonling(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 0.86f, hipY = 0.32f, hipZ = 0.15f, shoulder = floatArrayOf(0.14f, 0.6f, 0.2f), shoulderL = floatArrayOf(0.14f, 0.6f, -0.2f))
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.PRIMARY) { at(0f, -0.04f, 0f) { ellipsoid(0.13f, 0.16f, 0.12f, 8, 10) } }
+            a.add(bone, Slot.DARK) { at(0.08f, -0.26f, 0f) { roundedBox(0.18f, 0.07f, 0.12f, 0.03f) } }
+        }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0f, 0.5f, 0f) { rotate(-15f, 0f, 0f, 1f); ellipsoid(0.25f, 0.32f, 0.24f, 10, 14) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0.14f, 0.5f, 0f) { rotate(-15f, 0f, 0f, 1f); ellipsoid(0.12f, 0.26f, 0.16f, 8, 12) } }
+        a.add(Bone.BODY, Slot.ACCENT, outline = false, emissive = true) { at(0.24f, 0.5f, 0f) { roundedBox(0.015f, 0.18f, 0.02f, 0.006f) } }
+        for (s in listOf(1f, -1f)) {
+            a.add(Bone.BODY, Slot.DARK) { at(-0.08f, 0.72f, 0.14f * s) { rotate(20f, 0f, 0f, 1f); rotate(s * 55f, 1f, 0f, 0f); at(0f, 0.25f, 0f) { cylinder(0.025f, 0.5f, 6, topRadius = 0.01f) } } }
+            a.add(Bone.BODY, Slot.SECONDARY) { at(-0.08f, 0.72f, 0.14f * s) { rotate(20f, 0f, 0f, 1f); rotate(s * 55f, 1f, 0f, 0f); rotate(30f, 0f, 0f, 1f); at(-0.06f, 0.22f, 0f) { ellipsoid(0.16f, 0.24f, 0.015f, 6, 10) } } }
+        }
+        for ((k, r) in listOf(0.12f, 0.1f, 0.08f, 0.06f).withIndex()) a.add(Bone.BODY, Slot.PRIMARY) { at(-0.26f - k * 0.13f, 0.24f - k * 0.04f, k * 0.05f) { sphere(r, 6, 8) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(0.16f, 0.02f, 0f) { ellipsoid(0.15f, 0.12f, 0.13f, 8, 12) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(0.32f, -0.01f, 0f) { ellipsoid(0.14f, 0.07f, 0.08f, 8, 10) } }
+        for (z in listOf(0.07f, -0.07f)) {
+            a.add(Bone.HEAD, Slot.EYE, outline = false, emissive = true) { at(0.25f, 0.06f, z * 1.4f) { ellipsoid(0.035f, 0.025f, 0.02f, 6, 8) } }
+            a.add(Bone.HEAD, Slot.DARK) { at(0.08f, 0.13f, z * 1.2f) { rotate(45f, 0f, 0f, 1f); at(0f, 0.11f, 0f) { cylinder(0.035f, 0.22f, 6, topRadius = 0f) } } }
+        }
+        for (bone in listOf(Bone.WEAPON, Bone.ARM)) {
+            a.add(bone, Slot.PRIMARY) { at(0.02f, -0.1f, 0f) { capsule(0.05f, 0.12f) } }
+            a.add(bone, Slot.WHITE) { at(0.08f, -0.24f, 0f) { rotate(140f, 0f, 0f, 1f); cylinder(0.02f, 0.08f, 6, topRadius = 0f) } }
+        }
+        return a.build(rig)
+    }
 
     // ------------------------------------------------------------------ Ninja — hooded, faceless, with a gun
 

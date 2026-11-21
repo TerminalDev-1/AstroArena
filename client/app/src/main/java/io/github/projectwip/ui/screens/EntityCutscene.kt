@@ -45,7 +45,7 @@ import io.github.projectwip.ui.Type
  * voice, the moments' sounds, the title at the end, and SKIP. [line] picks which of its lines (corruption has several).
  */
 @Composable
-fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx: Sfx?, onDone: () -> Unit) {
+fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx: Sfx?, modifier: Modifier = Modifier, onDone: () -> Unit) {
     var time by remember { mutableStateOf(0f) }
     var said by remember { mutableIntStateOf(-1) }
     var leaving by remember { mutableStateOf(false) }
@@ -93,10 +93,10 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
         if (beat < 0 || beat == said) return@LaunchedEffect
         said = beat
         // (The fighter's own words are only shown: the Entity's are said in its voice.)
-        if (!beats[beat].fighter) sfx?.say(beats[beat].text, VoiceStyle.VOID, force = true, queue = true)
+        if (!beats[beat].fighter && io.github.projectwip.data.Balance.DRAGON_SPEAKS) sfx?.say(beats[beat].text, VoiceStyle.VOID, force = true, queue = true)
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black).graphicsLayer { alpha = fade.value }) {
+    Box(modifier.fillMaxSize().background(Color.Black).graphicsLayer { alpha = fade.value }) {
         AndroidView({ ctx -> EntitySceneView(ctx).also { v -> v.params.cut = cut; v.params.fighter = fighter; v.params.skin = skin; view = v } }, Modifier.fillMaxSize())
         Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().fillMaxHeight(0.07f).background(Color.Black))
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.07f).background(Color.Black))

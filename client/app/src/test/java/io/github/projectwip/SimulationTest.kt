@@ -1427,7 +1427,8 @@ class SimulationTest {
         val w = m.world
         val u = w.uprising!!
         assertTrue("the Entity's fight", u.boss)
-        assertEquals("a team of three", 3, w.fighters.size)
+        // (Its minions wait in a pool from the start, since build 116: they are not the team.)
+        assertEquals("a team of three", 3, w.fighters.count { !it.def.minion })
         var flares = 0; var trapped = 0; var t = 0
         val moves = HashSet<Int>()
         var outside = 0
@@ -1457,7 +1458,7 @@ class SimulationTest {
         // minions, next, are what will.)
         assertTrue("trapped fighters stay out of the fight", heldWhileTrapped)
         assertEquals("every strike lands on its platform", 0, outside)
-        assertTrue("nobody fights for it any more", w.fighters.all { it.team == 0 && it.corruptLeft <= 0f })
+        assertTrue("nobody fights for it any more", w.fighters.filter { !it.def.minion }.all { it.team == 0 && it.corruptLeft <= 0f })
         if (u.beaten) assertTrue("beaten, it lets everyone go", w.fighters.none { it.trapped })
     }
 
@@ -1515,11 +1516,12 @@ class SimulationTest {
         // Its flares keep coming at whoever is still free (the bots dodge them) until all of them are pulled in.
         var k = 0
         while (!m.isOver && k < 60 * 120) {
-            if (k % 30 == 0) for (f in w.fighters) if (f.alive && !f.trapped) u.flares += io.github.projectwip.sim.EntityFlare(f.id, f.x, f.y)
+            if (k % 30 == 0) for (f in w.fighters) if (f.alive && !f.trapped && !f.def.minion) u.flares += io.github.projectwip.sim.EntityFlare(f.id, f.x, f.y)
             m.step(Match.STEP); k++
         }
-        assertTrue("everyone pulled in ends it", m.isOver)
-        assertTrue("everyone pulled in or knocked out for good", w.fighters.all { it.trapped || it.eliminated })
+        // (Since build 115 nothing pulls anyone in: its flares hit, and everyone knocked out for good ends it.)
+        assertTrue("everyone out ends it", m.isOver)
+        assertTrue("everyone knocked out for good", w.fighters.filter { !it.def.minion }.all { it.eliminated })
         assertEquals(MatchOutcome.DEFEAT, m.report().outcome)
     }
 

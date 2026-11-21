@@ -343,9 +343,9 @@ private fun RoadButton(save: SaveData, modifier: Modifier, onClick: () -> Unit) 
 
 // ---------------------------------------------------------------------------------------------- mode
 
-fun modeIcon(m: GameMode) = when (m) { GameMode.BOSS -> IconKind.SKULL; GameMode.TRAINING -> IconKind.FIGHTERS; GameMode.DUEL -> IconKind.SWORDS }
+fun modeIcon(m: GameMode) = when (m) { GameMode.BOSS -> IconKind.SKULL; GameMode.SWARM -> IconKind.SWORDS; GameMode.TRAINING -> IconKind.FIGHTERS; GameMode.DUEL -> IconKind.SWORDS }
 
-fun arenaFor(m: GameMode): Arena = when (m) { GameMode.BOSS -> Arenas.entityRealm(); GameMode.TRAINING -> Arenas.trainingArea(); GameMode.DUEL -> Arenas.provingGround() }
+fun arenaFor(m: GameMode): Arena = when (m) { GameMode.BOSS, GameMode.SWARM -> Arenas.entityRealm(); GameMode.TRAINING -> Arenas.trainingArea(); GameMode.DUEL -> Arenas.provingGround() }
 
 @Composable
 private fun ModeChip(mode: GameMode, d: BotDifficulty?, modifier: Modifier, onClick: () -> Unit) {
@@ -417,10 +417,11 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 }
                 Spacer(Modifier.height(6.dp))
             }
-            PlainText(if (m == GameMode.BOSS) "Your team of ${m.players} · the Dragon" else "${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
+            PlainText(if (m == GameMode.BOSS) "Your team of ${m.players} · the Dragon" else if (m == GameMode.SWARM) "You alone · the Dragon's world" else "${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
             PlainText(
                 when (m) {
-                    GameMode.BOSS -> "The Dragon calls your team to its ritual, then takes you into its world. Hit the shadow under it. Dodge its marked ground, its rings and sweeps, and its flares: whoever one lands on is corrupted and turns on their own side. Beat it before time runs out to earn Cups."
+                    GameMode.BOSS -> "The Dragon calls your team to its ritual, then takes you into its world. It is immune while the jewel on its neck is on: break it, then hit the shadow under it before it gets its jewel back. Dodge its marked ground, its sword, its flares and the minions it calls. Nobody comes back in there."
+                    GameMode.SWARM -> "Endless waves of the Dragon's minions, from every side. Every kill makes you stronger. Every fifth wave a Juggernaut comes, and each one beaten makes the minions stronger. Beat three, and the Dragon comes for you: break its jewel to open the way out, and get through it. One life."
                     GameMode.DUEL -> "Against one real player on this server, each on their own device. First to 3 knockouts. Leaving a match counts as a defeat."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a giant that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },

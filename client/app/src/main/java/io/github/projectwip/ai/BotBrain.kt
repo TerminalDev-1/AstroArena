@@ -189,6 +189,7 @@ class BotBrain(
         AttackShape.STAR -> 0.72f
         AttackShape.ARROW -> 0.78f
         AttackShape.BULLET -> 0.72f
+        AttackShape.LASER -> 0.75f
     }
 
     private fun chooseEngageGoal(t: Fighter) {

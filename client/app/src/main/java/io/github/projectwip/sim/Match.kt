@@ -67,6 +67,8 @@ class Match(val config: MatchConfig) {
     val bossMode = config.mode == GameMode.BOSS
     /** Training Area: nothing at stake, and it never ends on its own. */
     val practice = config.mode == GameMode.TRAINING
+    /** Swarm (build 116): the player alone in the Dragon's world against endless minions. */
+    val swarmMode = config.mode == GameMode.SWARM
 
     /** Seconds since the match became "over" for the player (ended, or eliminated in free-for-all). */
     var overFor = 0f
@@ -111,14 +113,24 @@ class Match(val config: MatchConfig) {
             roster += Fighter(id++, Balance.giant, 1, 0, 1, Balance.giant.name, isBot = true, rooted = true).also { passive += it }
             roster += Fighter(id++, Balance.sentry, 1, 1, 1, "Sentry", isBot = true, rooted = true)
             repeat(TRAINING_MINIS) { roster += Fighter(id++, Balance.mini, 1, 2, 1, "Mini ${it + 1}", isBot = true, rooted = true).also { m -> passive += m } }
-        } else {
+        } else if (!swarmMode) {
             // The Entity's fight: a team of three against it, bots filling whatever places real players don't. (The
             // Entity itself is not a fighter: it is the uprising's, see `World.stepSky`.)
             repeat(3 - (team?.players?.size ?: 1)) { roster += botFighter(id++, 0, names.next()) }
         }
+        // Minions (build 116): every one that can be called in is made now, dead and out, and called from there
+        // (`World.spawnMinion`), so every device and the referee have the same fighters from the first tick.
+        if (bossMode || swarmMode) {
+            val pool = if (swarmMode) listOf(FighterId.MINION_BOT to 9, FighterId.MINION_LASER to 5, FighterId.MINION_HOUND to 4, FighterId.MINION_BRUTE to 1, FighterId.DRAGONLING to 7)
+                else listOf(FighterId.MINION_BOT to 2, FighterId.MINION_LASER to 1, FighterId.MINION_HOUND to 1, FighterId.DRAGONLING to 5)
+            for ((kind, count) in pool) repeat(count) {
+                val def = Balance.fighter(kind)
+                roster += Fighter(id++, def, 1, 0, 1, def.name, isBot = true).also { m -> m.alive = false; m.eliminated = true; m.hp = 0 }
+            }
+        }
         val oneOnOne = config.mode == GameMode.DUEL
-        val arena = if (practice) Arenas.trainingArea() else Arenas.provingGround()
-        val rules = (if (practice) MatchRules.training() else if (oneOnOne) MatchRules.duel() else MatchRules.bossMode()).copy(entityTier = config.entityTier.coerceAtLeast(0))
+        val arena = if (practice) Arenas.trainingArea() else if (swarmMode) Arenas.entityRealm() else Arenas.provingGround()
+        val rules = (if (practice) MatchRules.training() else if (oneOnOne) MatchRules.duel() else if (swarmMode) MatchRules.swarm() else MatchRules.bossMode()).copy(entityTier = config.entityTier.coerceAtLeast(0))
         world = World(arena, roster, rules, Random(rng.nextLong()))
         pathfinder = Pathfinder(world.arena)
         val profile = BotProfile.of(config.difficulty)
@@ -155,6 +167,8 @@ class Match(val config: MatchConfig) {
         // there. In a 1v1 it comes in the middle, at a moment the seed picks (the user's rule: it happens, it isn't a
         // roll); never in the Training Area.
         if (bossMode) world.uprising = Uprising(if (config.uprisingAt >= 0f) config.uprisingAt else Balance.UPRISING_BOSS_START, boss = true)
+        // Swarm: the Dragon waits until it is called (three Juggernauts down, the last minion gone): never on a clock.
+        else if (swarmMode) world.uprising = Uprising(Float.MAX_VALUE, boss = true).also { it.swarm = true }
         else if (config.uprisingAt >= 0f) world.uprising = Uprising(config.uprisingAt)
         else if (config.mode != GameMode.TRAINING)
             world.uprising = Uprising(Balance.UPRISING_EARLIEST + Random(config.seed xor 0x0B5E55EDL).nextFloat() * Balance.UPRISING_SPREAD)
@@ -183,7 +197,8 @@ class Match(val config: MatchConfig) {
         if (up != null && up.phase == UprisingPhase.SKY) for (f in world.fighters) {
             // (Whoever it has corrupted fights for it, human or bot.)
             if (f.alive && f.corruptLeft > 0f) { driveCorrupted(f); continue }
-            if (!f.isBot || !f.alive) continue
+            // (Minions fight with their own brains.)
+            if (!f.isBot || !f.alive || f.def.minion) continue
             val c = f.control
             // (Its jewel while it is on, or lying on the platform: the only way to hurt it. Otherwise, it.)
             val jewel = world.jewelSpot()
@@ -203,10 +218,13 @@ class Match(val config: MatchConfig) {
             val wantX = ux * inward - uy * circle * (1f - kotlin.math.abs(inward))
             val wantY = uy * inward + ux * circle * (1f - kotlin.math.abs(inward))
             if (jewel != null && !up.jewelBroken) {
-                // The jewel on its neck can only be hit from in front of it: each holds a spot out in front, a little
-                // to one side, and shoots straight in.
-                val gx = up.ex + (f.id % 3 - 1) * 1.2f
-                val gy = up.ey + Balance.JEWEL_OFFSET + maxOf(big, f.def.attack.range * 0.6f)
+                // The jewel on its neck can only be hit from in front of it (it faces its prey): each holds a spot out
+                // in front, a little to one side, and shoots straight in.
+                val fx = kotlin.math.cos(up.facing); val fy = kotlin.math.sin(up.facing)
+                val out = Balance.JEWEL_OFFSET + maxOf(big, f.def.attack.range * 0.6f)
+                val side = (f.id % 3 - 1) * 1.2f
+                val gx = up.ex + fx * out - fy * side
+                val gy = up.ey + fy * out + fx * side
                 val ox = gx - f.x; val oy = gy - f.y
                 val od = kotlin.math.hypot(ox, oy)
                 val k = if (od < 0.4f) 0f else (od / 1.5f).coerceAtMost(1f)
@@ -218,6 +236,15 @@ class Match(val config: MatchConfig) {
             }
             c.aimX = dx; c.aimY = dy; c.aiming = true
             c.attack = d < reach - 0.3f
+            // A minion on top of them comes first: they shoot it, and go back to the Dragon.
+            run {
+                var near: Fighter? = null; var nd = 3.5f
+                for (m in world.fighters) if (m.def.minion && m.alive) {
+                    val md = kotlin.math.hypot(m.x - f.x, m.y - f.y)
+                    if (md < nd) { nd = md; near = m }
+                }
+                near?.let { m -> c.aimX = m.x - f.x; c.aimY = m.y - f.y; c.attack = true }
+            }
             val sRange = when (f.def.superSpec.kind) {
                 SuperKind.TEMPEST -> 6f
                 SuperKind.RAM -> f.def.superSpec.range + big

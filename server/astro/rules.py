@@ -21,7 +21,8 @@ DIFFICULTIES = ("EASY", "NORMAL", "HARD", "ELITE")
 OUTCOMES = ("VICTORY", "DEFEAT", "DRAW")
 
 # Bots in each mode (the names the server hands out): in the Entity's fight, two allies make up a team of three.
-MODES = {"BOSS": 2, "TRAINING": 0}
+# Swarm (build 116): the player alone against endless minions, then the Dragon.
+MODES = {"BOSS": 2, "SWARM": 0, "TRAINING": 0}
 
 
 def cup_delta(mode: str, outcome: str, placement: int, cups: int, mvp: bool, table: dict | None = None) -> int:
@@ -50,7 +51,7 @@ def earns_drop(mode: str, outcome: str, placement: int) -> bool:
 # Nobody wins a real match faster than this, and a match left open this long is abandoned.
 MIN_GOOD_RESULT_SECONDS = 20.0
 MAX_MATCH_SECONDS = 3600.0
-_MAX_KOS = {"BOSS": 80, "DUEL": 40, "TRAINING": 100000}
+_MAX_KOS = {"BOSS": 200, "SWARM": 3000, "DUEL": 40, "TRAINING": 100000}
 _MAX_DAMAGE = 3_000_000
 
 

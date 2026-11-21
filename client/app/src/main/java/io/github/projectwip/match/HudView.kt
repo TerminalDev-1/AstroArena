@@ -430,7 +430,35 @@ class HudView(
         val panelW = dp(260f)
         val panelH = dp(58f)
         chamfer(c, cx - panelW / 2, top, cx + panelW / 2, top + panelH, dp(13f), Color.argb(235, 20, 44, 72), INK)
-        if (s.practice) {
+        if (s.swarm) {
+            // Swarm: the wave, and how strong the player has become; the Juggernauts beaten toward the Dragon.
+            chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(200, 40, 90), null)
+            text.textSize = dp(12f)
+            outlined(c, "WAVE", cx - panelW / 2 + dp(52f), top + dp(22f), Color.WHITE, dp(3f))
+            text.textSize = dp(24f)
+            outlined(c, s.swarmWave.toString(), cx - panelW / 2 + dp(52f), top + dp(47f), Color.WHITE, dp(4f))
+            text.textSize = dp(13f)
+            outlined(c, if (s.swarmDragon) "THE DRAGON" else "JUGGERNAUTS ${s.swarmBosses}/${io.github.projectwip.data.Balance.SWARM_BOSSES_FOR_DRAGON}", cx + dp(40f), top + dp(25f), Color.WHITE, dp(3f))
+            text.textSize = dp(12f)
+            outlined(c, "POWER +${s.swarmPower * 3}%", cx + dp(40f), top + dp(45f), Color.rgb(255, 214, 64), dp(3f))
+            // The way out, once open: a line telling them, and an arrow at the screen's edge toward it if it is off it.
+            if (s.portalOpen) {
+                text.textSize = dp(14f)
+                if ((time * 3f).toInt() % 2 == 0) outlined(c, "THE WAY OUT IS OPEN · GET TO IT", cx, top + panelH + dp(26f), Color.rgb(200, 150, 255), dp(3f))
+                val px = s.portalSx * w; val py = s.portalSy * h
+                if (px < 0f || px > w || py < 0f || py > h) {
+                    val ax = px.coerceIn(dp(40f), w - dp(40f)); val ay = py.coerceIn(dp(90f), h - dp(40f))
+                    val ang = kotlin.math.atan2(py - h / 2f, px - w / 2f)
+                    fill.color = Color.rgb(190, 120, 255)
+                    val p = android.graphics.Path()
+                    p.moveTo(ax + kotlin.math.cos(ang) * dp(22f), ay + kotlin.math.sin(ang) * dp(22f))
+                    p.lineTo(ax + kotlin.math.cos(ang + 2.5f) * dp(16f), ay + kotlin.math.sin(ang + 2.5f) * dp(16f))
+                    p.lineTo(ax + kotlin.math.cos(ang - 2.5f) * dp(16f), ay + kotlin.math.sin(ang - 2.5f) * dp(16f))
+                    p.close()
+                    c.drawPath(p, fill)
+                }
+            }
+        } else if (s.practice) {
             // Knockouts so far + running damage total: it is a practice ground, so show the numbers.
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + dp(92f), top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
             text.textSize = dp(30f)
@@ -495,7 +523,7 @@ class HudView(
             text.textSize = dp(96f) * big
             outlined(c, n.toString(), cx, h * 0.45f, Color.WHITE, dp(9f))
             text.textSize = dp(21f)
-            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.bossMode) "THE DRAGON IS COMING" else "1V1 · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
+            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.swarm) "SWARM · THEY COME FROM EVERY SIDE" else if (s.bossMode) "THE DRAGON IS COMING" else "1V1 · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
         } else if (s.phase == Phase.PLAYING && s.phaseTime < 0.9f) {
             text.textSize = dp(80f) * big
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))

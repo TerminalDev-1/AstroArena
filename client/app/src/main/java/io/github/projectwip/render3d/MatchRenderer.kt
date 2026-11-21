@@ -166,7 +166,8 @@ class MatchRenderer(
         sprite = Program(Shaders.SPRITE_VS, Shaders.SPRITE_FS, "sprite")
         models = FighterModels()
         val t0 = System.nanoTime()
-        arena = ArenaModel(world.arena)
+        // (Swarm is set in the Dragon's world: its platform looks like it from the start.)
+        arena = ArenaModel(world.arena, realm = world.rules.swarm)
         homeModel = arena
         Log.i("MatchRenderer", "arena built in ${(System.nanoTime() - t0) / 1_000_000} ms")
         sprites = SpriteBatch(4096)
@@ -448,11 +449,15 @@ class MatchRenderer(
      * at the height of a fighter, the blade exactly as long as the reach it cuts (`ENTITY_SPIN_RADIUS`).
      */
     private val swordM = FloatArray(16)
+    /** Which way it faces as drawn: its own way in its world (it turns to what it wants), toward everyone otherwise. */
+    private fun dragonFacing(u: io.github.projectwip.sim.Uprising) = if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) u.facing else 1.5707964f
+
     private fun swordAngle(u: io.github.projectwip.sim.Uprising): Float {
         val wind = io.github.projectwip.data.Balance.ENTITY_SPIN_WIND
-        if (u.spinT < 0f) return 1.5707964f
+        val f = dragonFacing(u)
+        if (u.spinT < 0f) return f
         // Drawn back as it winds up, then round and round.
-        return if (u.spinT < wind) 1.5707964f + 0.7f * smooth(u.spinT / wind) else 1.5707964f + 0.7f - (u.spinT - wind) * 13f
+        return if (u.spinT < wind) f + 0.7f * smooth(u.spinT / wind) else f + 0.7f - (u.spinT - wind) * 13f
     }
     private fun drawSword(u: io.github.projectwip.sim.Uprising, pass: Pass) {
         val r = io.github.projectwip.data.Balance.ENTITY_SPIN_RADIUS
@@ -618,8 +623,8 @@ class MatchRenderer(
         // Its jewel: exactly where a shot has to land to hit it (on its neck in front of it, or where a broken one lies).
         world.jewelSpot()?.let { j ->
             val onNeck = !u.jewelBroken
-            val jx = if (onNeck) entityX else j[0]
-            val jz = if (onNeck) entityZ + io.github.projectwip.data.Balance.JEWEL_OFFSET else j[1]
+            val jx = if (onNeck) entityX + cos(u.facing) * io.github.projectwip.data.Balance.JEWEL_OFFSET else j[0]
+            val jz = if (onNeck) entityZ + sin(u.facing) * io.github.projectwip.data.Balance.JEWEL_OFFSET else j[1]
             val jr = j[2]
             val beat = 0.75f + 0.25f * sin(time * 6f)
             lit.v4("uTint", 0.55f, 0.15f, 1f, 0.32f * beat)
@@ -644,6 +649,22 @@ class MatchRenderer(
                 lit.v4("uTint", if (fl.red) 0.12f else 0.01f, 0.01f, if (fl.red) 0.03f else 0.1f, 0.4f)
                 setModel(fl.x, 0.047f, fl.y, fr, 1f, fr); sector(360f).draw()
             }
+        }
+    }
+
+    /** Swarm: the way out, once it is open: a swirling violet vortex on the platform, exactly the circle that takes you through. */
+    private fun drawSwarmPortal() {
+        if (!world.portalOpen) return
+        val r = io.github.projectwip.data.Balance.SWARM_PORTAL_RADIUS
+        val x = world.portalX; val z = world.portalY
+        lit.v4("uTint", 0.08f, 0.02f, 0.2f, 0.9f)
+        setModel(x, 0.06f, z, r, 1f, r); sector(360f).draw()
+        for (k in 0 until 4) {
+            val rr = r * (1f - k * 0.2f)
+            val g = 0.55f + 0.1f * k
+            lit.v4("uTint", 0.6f + 0.1f * k, 0.35f + 0.15f * k, 1f, 0.95f)
+            setModel(x, 0.062f + k * 0.002f, z, rr, 1f, rr, (if (k % 2 == 0) 1f else -1f) * time * (90f + 40f * k)); dashRing.draw()
+            if (g < 0f) return
         }
     }
 
@@ -738,7 +759,7 @@ class MatchRenderer(
             } else entityPlaced = false
         }
         val u = world.uprising
-        val on = u != null && u.active && u.phase != io.github.projectwip.sim.UprisingPhase.RETURN
+        val on = world.rules.swarm || (u != null && u.active && u.phase != io.github.projectwip.sim.UprisingPhase.RETURN)
         upDark += ((if (on) 1f else 0f) - upDark) * (1f - exp(-frameDt * (if (on) 1.2f else 2.5f)))
         val sky = u?.phase == io.github.projectwip.sim.UprisingPhase.SKY
         val want0 = lerp(1f, if (sky) 0.5f else 0.62f, upDark); val want1 = lerp(1f, if (sky) 0.4f else 0.5f, upDark); val want2 = lerp(1f, if (sky) 0.75f else 0.8f, upDark)
@@ -760,10 +781,10 @@ class MatchRenderer(
         val souls = io.github.projectwip.data.Lore.Soul.entries
         val soul = if (upGlitchLeft > 0f && (time * 18f).toInt() % 3 != 0) souls[(time * 0.7f).toInt() % souls.size] else null
         entityAnim.time = time; entityAnim.walk = 0f; entityAnim.moving = 0f; entityAnim.recoil = 0f; entityAnim.bow = 0f
-        entityAnim.spin = if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY && u.spinT >= 0f) (swordAngle(u) - 1.5707964f) * 57.29578f else 0f
+        entityAnim.spin = if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY && u.spinT >= 0f) (swordAngle(u) - dragonFacing(u)) * 57.29578f else 0f
         val hit = (1f - (time - entityHitAt) / 0.12f).coerceIn(0f, 1f)
         entityAnim.flash = maxOf(if (upGlitchLeft > 0f) 0.4f else 0f, 0.3f * hit)
-        entityAnim.talk = if (u.phase == io.github.projectwip.sim.UprisingPhase.MARCH || u.phase == io.github.projectwip.sim.UprisingPhase.BOW) 0.5f + 0.5f * sin(time * 9f) else 0f
+        entityAnim.talk = if (io.github.projectwip.data.Balance.DRAGON_SPEAKS && u.phase == io.github.projectwip.sim.UprisingPhase.MARCH || u.phase == io.github.projectwip.sim.UprisingPhase.BOW) 0.5f + 0.5f * sin(time * 9f) else 0f
         entityAnim.jump = entityAt[1]
         entityAnim.scale = entityScale(u)
         // (In its world it flies, wings beating hard; in the ritual they stir.)
@@ -772,7 +793,7 @@ class MatchRenderer(
         entityAnim.jewelGone = u.phase == io.github.projectwip.sim.UprisingPhase.SKY && u.jewelBroken
         if (pass == Pass.COLOR) { lit.f("uRim", 0.9f); lit.f("uEmissive", (if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) 0.05f else 0.15f) * upDark) }
         // (It looks down at everyone: straight toward the camera's side of the arena.)
-        models.drawSoul(lit, soul, entityAt[0], entityAt[2], 1.5707964f, entityAnim, pass)
+        models.drawSoul(lit, soul, entityAt[0], entityAt[2], dragonFacing(u), entityAnim, pass)
         if (pass == Pass.COLOR) { lit.f("uRim", 0.45f); lit.f("uGloss", 0f); lit.f("uEmissive", 0f); lit.f("uFlash", 0f); lit.v4("uTint", 1f, 1f, 1f, 1f); lit.mat4("uModel", identity) }
         if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) drawSword(u, pass)
         // A broken jewel that has turned up again, lying on the platform and turning slowly, its wings beating.
@@ -1085,7 +1106,7 @@ class MatchRenderer(
         GLES30.glDepthMask(false)
         lit.i("uMode", 1)
         drawDecals(alpha)
-        drawEntityShadow()
+        drawEntityShadow(); drawSwarmPortal()
         lit.i("uMode", 0)
 
         // Shields
@@ -1227,7 +1248,7 @@ class MatchRenderer(
             anim.jump = 0.35f + 0.08f * sin(time * 6f + i)
             anim.moving = 0f
         }
-        anim.scale = FIGHTER_SCALE * f.scale
+        anim.scale = FIGHTER_SCALE * f.scale * (if (f.def.id == FighterId.MINION_BRUTE) 2.4f else 1f)
     }
 
     /** Fighters slipping into or out of cover: colour and outline through the dissolve shader. */
@@ -2272,6 +2293,13 @@ class MatchRenderer(
                     tint(0xFFFFC46B)
                     setModel(x - dx * pr.radius * 3.4f, 0.72f, z - dz * pr.radius * 3.4f, pr.radius * 4.4f, pr.radius * 0.32f, pr.radius * 0.32f, yaw); sphere.draw()
                 }
+                ShotStyle.LASER -> {
+                    // A minion's laser: a long thin red bolt with a hot white core.
+                    tint(0xFFFF2B3A)
+                    setModel(x, 0.75f, z, pr.radius * 5.5f, pr.radius * 0.7f, pr.radius * 0.7f, yaw); sphere.draw()
+                    tint(0xFFFFE0E0)
+                    setModel(x, 0.75f, z, pr.radius * 3.2f, pr.radius * 0.32f, pr.radius * 0.32f, yaw); sphere.draw()
+                }
                 ShotStyle.COSMIC -> {
                     // A cosmic bullet: a blinding white core in a shell of electric blue, pulsing as it flies.
                     val pulse = 1f + 0.12f * sin(pr.age * 40f)
@@ -2578,6 +2606,12 @@ class MatchRenderer(
             // (A thrown computer only gets a faint glow, so the thing itself can be seen.)
             sprites.add(x, 0.72f, z, if (pr.style == ShotStyle.COMPUTER) 1.1f else s, r(c), g(c), b(c), if (pr.style == ShotStyle.COMPUTER) 0.22f else 0.85f)
         }
+        // The portal's light, standing up off the platform.
+        if (world.portalOpen) for (k in 0 until 6) {
+            val a = time * 2.2f + k * 1.047f
+            sprites.add(world.portalX + cos(a) * 0.8f, 0.4f + k * 0.3f, world.portalY + sin(a) * 0.8f, 0.7f, 0.75f, 0.5f, 1f, 0.55f)
+        }
+        if (world.portalOpen) sprites.add(world.portalX, 0.8f, world.portalY, 3.2f, 0.6f, 0.35f, 1f, 0.5f)
         if (!world.inSky) for (pk in world.pickups) sprites.add(pk.x, 0.6f + sin(time * 3f + pk.x) * 0.12f, pk.y, 0.9f, 1f, 0.85f, 0.3f, 0.6f)
         addRealmSprites()
         for (l in arena.lamps) sprites.add(l[0], l[1], l[2], 1.1f + 0.05f * sin(time * 3f + l[0]), 1f, 0.9f, 0.55f, 0.55f)
@@ -2641,6 +2675,7 @@ class MatchRenderer(
             ShotStyle.SPARK, ShotStyle.BIT -> s.accent.toInt()
             ShotStyle.ROCKET -> 0xFFFF9A2E.toInt()
             ShotStyle.BULLET -> 0xFFFFD58A.toInt()
+            ShotStyle.LASER -> 0xFFFF3040.toInt()
             ShotStyle.COSMIC -> 0xFF3FA9FF.toInt()
             else -> s.secondary.toInt()
         }
@@ -2933,6 +2968,15 @@ class MatchRenderer(
                     particles.spawn(f.x, 0.6f + rng.nextFloat(), f.y, cos(a) * sp, 1f + rng.nextFloat() * 3f, sin(a) * sp, 0.6f, 0.12f, 0xFF5CC8FF.toInt(), 1f)
                 } }
             }
+            is GameEvent.MinionSpawned -> repeat(18) {
+                // Called in: torn out of the dark in a burst of glitching violet smoke and sparks.
+                val a = rng.nextFloat() * 6.28f
+                val sp = 1f + rng.nextFloat() * 2.5f
+                particles.spawn(e.x + cos(a) * 0.3f, 0.2f + rng.nextFloat() * 1.2f, e.y + sin(a) * 0.3f, cos(a) * sp, 1f + rng.nextFloat() * 2f, sin(a) * sp, 0.6f, 0.22f + rng.nextFloat() * 0.2f,
+                    if (it % 3 == 0) 0xFFFF3B6B.toInt() else 0xFF3A1A6A.toInt(), 0.85f, add = it % 3 == 0)
+            }
+            is GameEvent.DragonComing -> shake = max(shake, 0.6f)
+            is GameEvent.PortalOpened -> { shake = max(shake, 0.3f) }
             is GameEvent.EntityImmune -> {
                 // Off its scales while its jewel is on: a few pale sparks and nothing else.
                 repeat(3) {
@@ -2999,6 +3043,13 @@ class MatchRenderer(
         s.jewelFrac = if (upr != null && upr.jewelMaxHp > 0) (if (upr.jewelBroken) upr.jewelDropHp else upr.jewelHp).toFloat() / upr.jewelMaxHp else 0f
         s.jewelLoose = upr != null && upr.phase == io.github.projectwip.sim.UprisingPhase.SKY && upr.jewelBroken && upr.jewelDropped; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
         s.bossMode = w.rules.boss
+        s.swarm = w.rules.swarm; s.swarmWave = w.swarmWave; s.swarmBosses = w.swarmBosses; s.swarmPower = match.player.power
+        s.swarmDragon = w.swarmDragonCalled; s.portalOpen = w.portalOpen
+        if (w.portalOpen) {
+            val v = FloatArray(4); val o = floatArrayOf(w.portalX, 1f, w.portalY, 1f)
+            Matrix.multiplyMV(v, 0, viewProj, 0, o, 0)
+            if (v[3] > 0.01f) { s.portalSx = (v[0] / v[3] + 1f) / 2f; s.portalSy = (1f - v[1] / v[3]) / 2f } else { s.portalSx = 0.5f; s.portalSy = 1.2f }
+        }
         s.playerTrapped = p.trapped
         s.playerOut = p.eliminated
         s.entityTier = w.rules.entityTier
@@ -3054,6 +3105,10 @@ class MatchRenderer(
         FighterId.KIRA -> 2.25f
         FighterId.KITO -> 1.9f
         FighterId.BUDDY -> 2.05f
+        FighterId.MINION_BOT, FighterId.MINION_LASER -> 1.5f
+        FighterId.MINION_HOUND -> 1.1f
+        FighterId.MINION_BRUTE -> 3.1f
+        FighterId.DRAGONLING -> 1.3f
     }
 
     override fun onDestroyed() {}

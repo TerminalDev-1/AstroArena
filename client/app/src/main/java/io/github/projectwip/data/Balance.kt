@@ -22,7 +22,12 @@ data class StatLine(val base: Int, val perLevel: Int) {
 }
 
 /** [BYTE] is Swish, the starter (the id has been Byte, Rocket, Spark and now her). Spark had an id of his own from build 96 until he was retired (build 102). */
-enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
+/**
+ * The fighters ([BYTE] is Ninja; the next four are legacy), and from build 116 the minions: [MINION_BOT] a melee
+ * robot, [MINION_LASER] a laser bot, [MINION_HOUND] a hound that pounces, [MINION_BRUTE] Swarm's boss and
+ * [DRAGONLING] the Dragon's own small copies. Minions are never anyone's to play.
+ */
+enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY, MINION_BOT, MINION_LASER, MINION_HOUND, MINION_BRUTE, DRAGONLING }
 
 /**
  * [ROCKETS] leave in rows, packed side by side in lanes, and each bursts where it lands. [SMASH] is heavy things hurled a
@@ -43,7 +48,8 @@ enum class FighterId { BYTE, BRAKK, KIRA, KITO, BUDDY }
  * of reach. Walls still stop it.
  */
 /** [BULLET] is one bullet from a gun (Ninja's), fast and straight. */
-enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH, STAR, ARROW, BULLET }
+/** [LASER] is a bolt of red laser (minions). */
+enum class AttackShape { BURST, SPREAD, LANCE, ROCKETS, SMASH, PAWS, HEX, PLANT, SLASH, STAR, ARROW, BULLET, LASER }
 
 /** The bosses of Boss Mode. Each fights through moves of its own (see `sim/Boss.kt`), not a fighter's attack and super. */
 /**
@@ -195,6 +201,10 @@ data class FighterDef(
     val notice: String? = null,
     /** False for a fighter that can no longer be levelled up: it stays at whatever level it has. */
     val upgradable: Boolean = true,
+    /** A minion (build 116): called into a match from its pool, never respawned, never anyone's to play. */
+    val minion: Boolean = false,
+    /** Its super charges by itself, this much a second (minions: they pounce and blink on their own clock). */
+    val superPerSecond: Float = 0f,
 )
 
 /**
@@ -249,6 +259,8 @@ enum class MatchOutcome { VICTORY, DEFEAT, DRAW }
  * against the Entity itself, its ritual first.
  */
 enum class GameMode(val title: String, val tagline: String, val players: Int) {
+    /** Endless minions, every kill making you stronger; bosses make them stronger; then the Dragon, and a way out (build 116). */
+    SWARM("Swarm", "Endless minions · every kill makes you stronger · earn your way out", 1),
     /** Your team against the Entity: its ritual, then its world. */
     BOSS("The Dragon", "Your team against the Dragon · its ritual, then its world", 3),
     /** Practice: dummies, a swarm and a giant that just stand there, plus one sentry gun. No timer, nothing won or lost. */
@@ -299,6 +311,8 @@ object Balance {
     // Every fighter's third ability. It charges as main-attack hits land (more slowly than the super), and for a
     // few seconds makes the fighter hit harder, with more health. Hits landed while one is
     // running charge the next, so a fighter who keeps hitting can go from one hyper into another.
+    /** The Dragon cannot speak (the owner's decision, build 115): no voice and no talking jaw; its words are only text. */
+    const val DRAGON_SPEAKS = false
     /** Hypers are switched off: they don't exist in the game since build 114 (the owner's decision). */
     const val HYPERS = false
     const val HYPER_SECONDS = 8f
@@ -399,7 +413,7 @@ object Balance {
     /** Boss Mode (the Entity's fight): it begins this soon, lasts at most this long, is this much tougher, and hits this much harder. */
     const val UPRISING_BOSS_START = 1.5f
     const val UPRISING_BOSS_SECONDS = 210f
-    const val UPRISING_BOSS_HP = 2.0f
+    const val UPRISING_BOSS_HP = 1.6f
     // (3 since build 111: the user wanted it to "actually do some damage".)
     // (Lower again once its fight had no respawns: at 3 the whole team was down in twenty seconds.)
     const val UPRISING_BOSS_DAMAGE = 1.6f
@@ -609,8 +623,63 @@ object Balance {
         ),
     )
 
+    // ---- Minions (build 116, the owner's design: glitched robots of our own, the Dragon's small copies) ----
+    private fun minionDef(id: FighterId, name: String, role: String, health: Int, damage: Int, superDamage: Int, speed: Float, attack: AttackSpec,
+                          superSpec: SuperSpec, reload: Float, radius: Float, primary: Long, secondary: Long, accent: Long, superPerSecond: Float = 0f) =
+        FighterDef(id = id, name = name, title = "Minion", role = role, lore = "One of the Dragon's.", attackName = role,
+            health = StatLine(health, 0), attackDamage = StatLine(damage, 0), superDamage = StatLine(superDamage, 0), moveSpeed = speed,
+            attack = attack, superSpec = superSpec, ammoMax = 1, reloadSeconds = reload, superChargePerHit = 0f, radius = radius,
+            skins = listOf(Skin(name, primary, secondary, accent, 0)), minion = true, superPerSecond = superPerSecond, upgradable = false)
+    private val NO_SUPER = SuperSpec(SuperKind.VOLLEY, "None", "", range = 0f, speed = 0f, radius = 0f)
+
+    val minions: List<FighterDef> = listOf(
+        // A melee robot: walks up to you and crushes.
+        minionDef(FighterId.MINION_BOT, "Crusher", "Melee robot", 2800, 420, 0, 3.1f,
+            AttackSpec(AttackShape.SLASH, projectiles = 1, spreadDegrees = 100f, range = 1.7f, speed = 40f, radius = 0f, burstInterval = 0f), NO_SUPER, 1.1f, 0.42f,
+            0xFF3A3F55, 0xFF1C1E2A, 0xFFFF3B6B),
+        // A laser bot: keeps its distance and shoots red bolts.
+        minionDef(FighterId.MINION_LASER, "Zapper", "Laser bot", 2200, 380, 0, 3.0f,
+            AttackSpec(AttackShape.LASER, projectiles = 1, spreadDegrees = 0f, range = 8.5f, speed = 20f, radius = 0.13f, burstInterval = 0f), NO_SUPER, 1.7f, 0.4f,
+            0xFF2E3550, 0xFF14182A, 0xFFFF3030),
+        // A hound: fast, scratches, and pounces (a charge that knocks you back).
+        minionDef(FighterId.MINION_HOUND, "Lurcher", "Hound", 2400, 360, 600, 4.4f,
+            AttackSpec(AttackShape.SLASH, projectiles = 1, spreadDegrees = 90f, range = 1.5f, speed = 40f, radius = 0f, burstInterval = 0f),
+            SuperSpec(SuperKind.RAM, "Pounce", "", range = 5.5f, speed = 16f, radius = 0.5f), 0.9f, 0.4f, 0xFF4A3B5A, 0xFF231B2E, 0xFFFF7A3B, superPerSecond = 0.25f),
+        // Swarm's boss: a giant robot.
+        minionDef(FighterId.MINION_BRUTE, "Juggernaut", "Boss", 24000, 1100, 1500, 2.6f,
+            AttackSpec(AttackShape.SLASH, projectiles = 1, spreadDegrees = 140f, range = 2.7f, speed = 40f, radius = 0f, burstInterval = 0f),
+            SuperSpec(SuperKind.RAM, "Stampede", "", range = 6f, speed = 13f, radius = 1.1f), 1.4f, 1.05f, 0xFF3A2F55, 0xFF1A1430, 0xFFFF3B6B, superPerSecond = 0.15f),
+        // The Dragon's own: a small copy of it, a short deadly laser, and it blinks to you and strikes.
+        minionDef(FighterId.DRAGONLING, "Drakeling", "Dragonling", 2000, 700, 1100, 3.8f,
+            AttackSpec(AttackShape.LASER, projectiles = 1, spreadDegrees = 0f, range = 4.5f, speed = 22f, radius = 0.16f, burstInterval = 0f),
+            SuperSpec(SuperKind.BLINK, "Blink Strike", "", range = 9f, speed = 40f, radius = 0f), 1.3f, 0.36f, 0xFF2A1856, 0xFF130A2C, 0xFF3FB4FF, superPerSecond = 0.2f),
+    )
+
     /** A fighter's def; a removed fighter's comes from [io.github.projectwip.data.legacy.LegacyFighters] (old saves, tests). */
-    fun fighter(id: FighterId): FighterDef = fighters.firstOrNull { it.id == id } ?: io.github.projectwip.data.legacy.LegacyFighters.def(id)
+    fun fighter(id: FighterId): FighterDef = fighters.firstOrNull { it.id == id } ?: minions.firstOrNull { it.id == id } ?: io.github.projectwip.data.legacy.LegacyFighters.def(id)
+
+    // ---- Swarm (build 116) ----
+    /** Every kill makes you this much stronger, damage and health, for the rest of the run. */
+    const val SWARM_KILL_POWER = 0.03f
+    /** ...and heals them this share of their health. */
+    const val SWARM_KILL_HEAL = 0.06f
+    /** A wave comes when the last one is cleared, or after this long, whichever is first. */
+    const val SWARM_WAVE_SECONDS = 22f
+    /** Every this many waves is a boss (the Juggernaut). */
+    const val SWARM_BOSS_EVERY = 5
+    /** Bosses beaten before the waves stop and the Dragon comes. */
+    const val SWARM_BOSSES_FOR_DRAGON = 3
+    /** Each boss beaten makes minions this much stronger (and more of them come). */
+    const val SWARM_LEVEL_STRENGTH = 0.25f
+    /** How close to the portal is through it. */
+    const val SWARM_PORTAL_RADIUS = 1.4f
+
+    // ---- The Dragon's own mind (build 116) ----
+    /** How fast it turns to face what it wants, in radians a second. */
+    const val DRAGON_TURN = 1.8f
+    /** Seconds between its calls for minions, and how many of its own can be out at once. */
+    const val DRAGON_SUMMON_GAP = 18f
+    const val DRAGON_MINION_CAP = 8
 
     /** Ninja's super: the gap between its three cosmic bullets, how much harder each hits the Entity, and how long it stuns it. */
     const val COSMIC_GAP_SECONDS = 0.12f

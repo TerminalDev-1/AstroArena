@@ -149,7 +149,7 @@ class TeamLinkTest {
         assertEquals("and agree on how the match stands", 1, devices.map { it.match.world.checksum() }.toSet().size)
         assertEquals("each plays a fighter of their own", setOf(0, 1, 2), devices.map { it.match.world.fighters.indexOf(it.match.player) }.toSet())
         assertTrue("and it is the one they brought", devices.all { it.match.player.def.id == it.fighter })
-        assertEquals("three players, against the Entity", 3, devices[0].match.world.fighters.size)
+        assertEquals("three players, against the Entity", 3, devices[0].match.world.fighters.count { !it.def.minion })
         assertTrue("the Entity's fight is the match", devices.all { it.match.world.uprising?.boss == true })
         // The server's replay, from the frames the lobby kept, is that match.
         repeat(2000) { if (synchronized(kept) { kept.frames.minOf { it.size() } } < 17 * (ran - DuelLink.DELAY)) Thread.sleep(5) }
@@ -177,8 +177,8 @@ class TeamLinkTest {
         assertEquals("the one who stayed was not held up", 60 * 25, a.ticksRun)
         assertFalse(a.link.calledOff)
         val w = a.match.world
-        assertEquals("a team of three against the Entity: two players and a bot", listOf(3, 0), listOf(0, 1).map { t -> w.fighters.count { it.team == t } })
-        assertEquals(listOf(false, false, true), w.fighters.map { it.isBot })
+        assertEquals("a team of three against the Entity: two players and a bot", listOf(3, 0), listOf(0, 1).map { t -> w.fighters.count { it.team == t && !it.def.minion } })
+        assertEquals(listOf(false, false, true), w.fighters.filter { !it.def.minion }.map { it.isBot })
         assertTrue("the one who stayed did some fighting", a.match.player.damageDealt > 0)
         // The replay, told who left, is the match the one who stayed played.
         val (sa, sb) = a.match.config.team!!.slot to b.match.config.team!!.slot

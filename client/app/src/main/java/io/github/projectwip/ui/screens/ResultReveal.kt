@@ -83,6 +83,8 @@ fun ResultReveal(summary: MatchSummary, onDone: () -> Unit) {
         else -> "DEFEAT" to Palette.Red
     }
     val line = when {
+        r.mode == GameMode.SWARM && won -> "YOU GOT OUT! · ${r.kos} DOWN"
+        r.mode == GameMode.SWARM -> "THE SWARM TOOK YOU · ${r.kos} DOWN"
         r.mode == GameMode.BOSS && won -> "THE DRAGON IS BEATEN!"
         r.mode == GameMode.BOSS && r.outcome == MatchOutcome.DEFEAT -> "IT KEEPS A PIECE OF YOU"
         won -> "YOUR TEAM WINS!"

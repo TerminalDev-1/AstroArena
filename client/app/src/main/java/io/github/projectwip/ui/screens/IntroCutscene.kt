@@ -69,7 +69,7 @@ fun IntroCutscene(sfx: Sfx?, onDone: () -> Unit) {
         if (beat < 0 || beat == said) return@LaunchedEffect
         said = beat
         val b = IntroScript.BEATS[beat]
-        if (b.who == IntroScript.Who.ENTITY) sfx?.say(b.text, VoiceStyle.VOID, force = true, queue = true)
+        if (b.who == IntroScript.Who.ENTITY && io.github.projectwip.data.Balance.DRAGON_SPEAKS) sfx?.say(b.text, VoiceStyle.VOID, force = true, queue = true)
         else sfx?.say(b.text, VoiceStyle.PLAIN, force = true, queue = true)
         val first = IntroScript.BEATS.indexOfFirst { it.shot == b.shot } == beat
         if (first) when (b.shot) {

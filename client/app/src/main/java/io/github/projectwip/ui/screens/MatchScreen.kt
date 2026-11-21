@@ -69,7 +69,8 @@ fun summarize(match: Match, report: MatchReport): MatchSummary {
     val mvp = match.world.mvp()
     return MatchSummary(
         report,
-        match.world.fighters.map {
+        // (Minions that never came out of their pool are nobody's business on the result screen.)
+        match.world.fighters.filter { !it.def.minion || it.damageDealt > 0 || it.deaths > 0 }.map {
             PlayerLine(it.name, it.def.id, it.skin, it.team, it.kos, it.deaths, it.damageDealt, it === match.player, it === mvp, it.isBot,
                 placement = if (it === match.player) report.placement else it.placement)
         },

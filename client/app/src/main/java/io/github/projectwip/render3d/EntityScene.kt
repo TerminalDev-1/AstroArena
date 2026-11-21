@@ -366,7 +366,7 @@ class EntityScene {
         ea.time = t; ea.walk = 0f; ea.moving = 0f; ea.recoil = 0f; ea.spin = if (soul != null) (rng.nextFloat() - 0.5f) * 30f else 0f
         ea.bow = eBow; ea.scale = es; ea.jump = ey; ea.flash = eFlash
         val beat = EntityScript.beatAt(p.cut, 0, t)
-        ea.talk = if (beat >= 0 && !EntityScript.beats(p.cut, 0)[beat].fighter) 0.5f + 0.5f * sin(t * 9f) else 0f
+        ea.talk = if (io.github.projectwip.data.Balance.DRAGON_SPEAKS && beat >= 0 && !EntityScript.beats(p.cut, 0)[beat].fighter) 0.5f + 0.5f * sin(t * 9f) else 0f
         val drawFighter = fScale > 0.02f
         lit.f("uRim", 0.5f)
         if (drawFighter) models.draw(lit, def, p.skin, fx, fz, facing, fa, Pass.COLOR)

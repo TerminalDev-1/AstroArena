@@ -127,6 +127,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         PlainText(
                             when (r.mode) {
                                 io.github.projectwip.data.GameMode.BOSS -> "The Dragon · its world · ${r.difficulty.label} bots"
+                                io.github.projectwip.data.GameMode.SWARM -> "Swarm · ${r.kos} minions down"
                                 io.github.projectwip.data.GameMode.TRAINING -> "Training Area"
                                 io.github.projectwip.data.GameMode.DUEL -> "1v1 · Proving Ground"
                             }, Type.Label, color = Palette.TextDim)
@@ -191,7 +192,9 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
             val me = summary.players.firstOrNull { it.isPlayer }
             if (summary.report.mode == io.github.projectwip.data.GameMode.BOSS && me != null && summary.report.outcome != MatchOutcome.DRAW)
                 EntityCutscene(if (summary.report.outcome == MatchOutcome.VICTORY) io.github.projectwip.render3d.EntityCut.VICTORY else io.github.projectwip.render3d.EntityCut.DEFEAT,
-                    me.fighter, me.skin, 0, LocalSfx.current) { revealed = true }
+                    // (Over the camera cut-out too: the result screen is laid out clear of it, and the match showed
+                    // through down that edge.)
+                    me.fighter, me.skin, 0, LocalSfx.current, Modifier.bleed()) { revealed = true }
             else ResultReveal(summary) { revealed = true }
         }
     }

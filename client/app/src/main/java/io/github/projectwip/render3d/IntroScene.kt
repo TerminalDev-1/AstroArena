@@ -312,7 +312,7 @@ class IntroScene {
             else if (shot == IntroScript.Shot.PULL) smooth((t - shotStart(IntroScript.Shot.PULL)) / 1.5f) else 0f
         entityAnim.time = t; entityAnim.walk = 0f; entityAnim.moving = 0f; entityAnim.recoil = 0f; entityAnim.spin = 0f; entityAnim.bow = 0f
         entityAnim.scale = entityScale; entityAnim.jump = ey
-        entityAnim.talk = if (entityTalking) 0.5f + 0.5f * sin(t * 9f) else 0f
+        entityAnim.talk = if (io.github.projectwip.data.Balance.DRAGON_SPEAKS && entityTalking) 0.5f + 0.5f * sin(t * 9f) else 0f
         entityAnim.flash = 0f
         val showEntity = ey > -14f
 

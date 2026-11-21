@@ -94,11 +94,11 @@ class MatchRunner(
         val cue = UprisingScript.cue(u.phase, u.t, u.bowLength, u.beaten, match.player.name) ?: return
         if (cue.id == lastEntityCue) return
         lastEntityCue = cue.id
-        if (cue.text.isNotEmpty()) sfx.say(cue.text, io.github.projectwip.data.VoiceStyle.VOID, force = true)
+        if (cue.text.isNotEmpty() && io.github.projectwip.data.Balance.DRAGON_SPEAKS) sfx.say(cue.text, io.github.projectwip.data.VoiceStyle.VOID, force = true)
     }
 
     /** The Entity says [line] in its own voice (its whispers; [soft] for those). */
-    fun entitySays(line: String, soft: Boolean = false) = sfx.say(line, io.github.projectwip.data.VoiceStyle.VOID, force = true, loudness = if (soft) 0.55f else 1f)
+    fun entitySays(line: String, soft: Boolean = false) = if (!io.github.projectwip.data.Balance.DRAGON_SPEAKS) Unit else sfx.say(line, io.github.projectwip.data.VoiceStyle.VOID, force = true, loudness = if (soft) 0.55f else 1f)
 
     fun update(dt: Float): Float {
         speakUprising()
@@ -400,6 +400,7 @@ class MatchRunner(
                     AttackShape.STAR -> Sound.STAR
                     AttackShape.ARROW -> Sound.ARROW
                     AttackShape.BULLET -> Sound.GUNSHOT
+                    AttackShape.LASER -> Sound.SHOOT_PRISM
                 }, gain, (if (f.def.attack.shape == AttackShape.SLASH) 1.5f else 0.95f) + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }

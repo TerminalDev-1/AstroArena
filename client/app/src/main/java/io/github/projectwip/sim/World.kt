@@ -2,6 +2,7 @@ package io.github.projectwip.sim
 
 import io.github.projectwip.data.AttackShape
 import io.github.projectwip.data.Balance
+import io.github.projectwip.data.FighterId
 import io.github.projectwip.data.SuperKind
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -27,12 +28,15 @@ data class MatchRules(
     val practice: Boolean = false,
     /** How hard the Entity is (see `MatchConfig.entityTier`). */
     val entityTier: Int = 0,
+    /** Swarm (build 116): endless waves, one life, a way out to earn. */
+    val swarm: Boolean = false,
 ) {
     companion object {
         /** The Entity's fight: nothing but the Entity ends it (its uprising ends the match, won or lost). */
         fun bossMode() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, boss = true)
         /** One against one: first to three knockouts, or whoever is ahead after two minutes. */
         fun duel() = MatchRules(koTarget = 3, durationSeconds = 120f)
+        fun swarm() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, swarm = true)
         fun training() = MatchRules(koTarget = Int.MAX_VALUE, enemyKoTarget = Int.MAX_VALUE, durationSeconds = Float.MAX_VALUE, practice = true)
     }
 }
@@ -129,6 +133,8 @@ class World(
             if (u.active) { stepUprising(u, dt); return }
         }
 
+        if (rules.swarm) stepSwarm(dt)
+        if (phase != Phase.PLAYING) return
         for (f in fighters) stepFighter(f, dt)
         stepConcealment(dt)
         stepProjectiles(dt)
@@ -159,7 +165,7 @@ class World(
         val centre = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 1f)
         u.cx = centre.x; u.cy = centre.y
         u.members.clear()
-        for (f in fighters) if (f.alive) {
+        for (f in fighters) if (f.alive && !f.def.minion) {
             u.members += f.id
             // (A hypercharge running when it comes is put away, ready to use again afterwards.)
             if (f.hyperActive) { endHyper(f); f.hyperCharge = 1f }
@@ -262,7 +268,7 @@ class World(
     fun jewelSpot(): FloatArray? {
         val u = uprising ?: return null
         if (u.phase != UprisingPhase.SKY || u.hp <= 0) return null
-        return if (!u.jewelBroken) floatArrayOf(u.ex, u.ey + Balance.JEWEL_OFFSET, Balance.JEWEL_RADIUS)
+        return if (!u.jewelBroken) floatArrayOf(u.ex + cos(u.facing) * Balance.JEWEL_OFFSET, u.ey + sin(u.facing) * Balance.JEWEL_OFFSET, Balance.JEWEL_RADIUS)
         else if (u.jewelDropped) floatArrayOf(u.jewelX, u.jewelY, Balance.JEWEL_DROP_RADIUS) else null
     }
 
@@ -280,7 +286,10 @@ class World(
                 // Broken: it is open to everything now, until it gets the jewel back.
                 u.jewelBroken = true
                 u.jewelBackIn = Balance.JEWEL_BACK_MIN + random.nextFloat() * Balance.JEWEL_BACK_SPREAD
+                u.lastBreaker = f.id
                 events += GameEvent.JewelBroken(f.id, x, y, false)
+                // Swarm: breaking it the first time opens the way out (it has to be earned).
+                if (u.swarm) openPortal()
             }
         } else if (u.jewelDropped) {
             val dealt = minOf(damage, u.jewelDropHp)
@@ -323,7 +332,9 @@ class World(
         }
         if (stunned || u.dashT >= 0f || u.spinT >= 0f) return
         // It rushes for it (its neck comes down onto it: the jewel sits in front of it).
-        val tx = u.jewelX; val ty = u.jewelY - Balance.JEWEL_OFFSET
+        // (It turns to its jewel as it goes for it, and brings its neck down onto it.)
+        turnDragon(u, atan2(u.jewelY - u.ey, u.jewelX - u.ex), dt)
+        val tx = u.jewelX - cos(u.facing) * Balance.JEWEL_OFFSET; val ty = u.jewelY - sin(u.facing) * Balance.JEWEL_OFFSET
         val dx = tx - u.ex; val dy = ty - u.ey
         val d = hypot(dx, dy)
         if (d < 0.5f) {
@@ -405,6 +416,10 @@ class World(
             stepFighter(f, dt)
             f.control.detonate = false
         }
+        // Its minions fight in there too.
+        for (m in fighters) if (m.def.minion && m.alive) stepFighter(m, dt)
+        // Swarm: through the portal, once it is open, and the run is won.
+        if (u.swarm && swarmPortalCheck()) return
         stepProjectiles(dt)
         stepHazards(dt)
         // Hexes bite it as they would anyone.
@@ -439,7 +454,9 @@ class World(
         // (not while it dashes or spins: those move it themselves).
         var sx = 0f; var sy = 0f; var cnt = 0
         for (id in u.members) fighter(id)?.let { if (it.alive) { sx += it.x; sy += it.y; cnt++ } }
-        if (!stunned && !rushing && cnt > 0 && u.dashT < 0f && u.spinT < 0f) {
+        if (u.summonIn > 0f) u.summonIn -= dt
+        if (!stunned && !rushing && u.dashT < 0f && u.spinT < 0f) dragonFly(u, dt)
+        if (false) {
             val dx = sx / cnt - u.ex; val dy = sy / cnt - 2f - u.ey
             val d = hypot(dx, dy)
             if (d > 0.3f) { val step = minOf(d, Balance.UPRISING_ENTITY_SPEED * dt); u.ex += dx / d * step; u.ey += dy / d * step }
@@ -461,6 +478,17 @@ class World(
         // Whoever it corrupted is theirs again when it wears off.
         for (id in u.members) fighter(id)?.let { f ->
             if (f.corruptLeft > 0f) { f.corruptLeft -= dt; f.glitchLeft = maxOf(f.glitchLeft, f.corruptLeft); if (f.corruptLeft <= 0f) uncorrupt(f) }
+        }
+        // Swarm: its fight has no clock, and beaten it is gone: the way out is open, and the run goes on until they
+        // reach it (minions it called still about).
+        if (u.swarm) {
+            if (u.hp <= 0 && !u.beaten) {
+                u.beaten = true
+                openPortal()
+                projectiles.removeAll { fighter(it.ownerId)?.def?.minion != true && false }
+                uprisingPhase(u, UprisingPhase.DONE)
+            }
+            return
         }
         if (u.hp <= 0 || u.t >= (if (u.boss) Balance.UPRISING_BOSS_SECONDS else Balance.UPRISING_SKY)) {
             u.beaten = u.hp <= 0
@@ -515,13 +543,14 @@ class World(
         u.strikeIn = Balance.UPRISING_STRIKE_GAP * (if (stage == 0) 1f else if (stage == 1) 0.8f else 0.65f) / (1f + Balance.ENTITY_TIER_PACE * rules.entityTier)
         val alive = u.members.mapNotNull { fighter(it) }.filter { it.alive && it.corruptLeft <= 0f }
         // (Never two of its own movements at once: a dash or a spin still going waits for the next move.)
-        var move = ENTITY_MOVES[u.strikes % ENTITY_MOVES.size]
+        var move = if (u.boss) chooseDragonMove(u, alive, stage) else ENTITY_MOVES[u.strikes % ENTITY_MOVES.size]
         if ((move == EntityMove.DASH || move == EntityMove.SPIN) && (u.dashT >= 0f || u.spinT >= 0f)) move = EntityMove.STRIKES
         u.strikes++
         if (alive.isEmpty()) return
         events += GameEvent.EntityAttack(move.ordinal)
         fun mark(x: Float, y: Float, r: Float, delay: Float, damage: Int) = markEntity(u, x, y, r, delay, damage)
         when (move) {
+            EntityMove.SUMMON -> summonMinions(u, stage)
             EntityMove.STRIKES -> for (j in 0 until 1 + alive.size / 3 + stage) {
                 val f = alive[(u.strikes + j) % alive.size]
                 mark(f.x + f.vx * 0.4f, f.y + f.vy * 0.4f, Balance.UPRISING_STRIKE_RADIUS, Balance.UPRISING_STRIKE_DELAY, Balance.UPRISING_STRIKE_DAMAGE)
@@ -877,6 +906,8 @@ class World(
         f.prevY = f.y
         val c = f.control
         if (f.eliminated || f.trapped) { c.attack = false; c.superAttack = false; c.hyper = false; c.detonate = false; return }
+        // (Minions' supers charge on their own clock.)
+        if (f.alive && f.def.superPerSecond > 0f && f.superCharge < 1f) f.superCharge = minOf(1f, f.superCharge + f.def.superPerSecond * dt)
         if (!f.alive) {
             f.respawnTimer -= dt
             if (f.respawnTimer <= 0f) respawn(f)
@@ -1525,6 +1556,7 @@ class World(
             // (Swish's Frost Gale; the giant arrow it replaced, [ShotStyle.ARROW], is kept with nobody using it.)
             AttackShape.ARROW -> ShotStyle.GUST
             AttackShape.BULLET -> ShotStyle.BULLET
+            AttackShape.LASER -> ShotStyle.LASER
         }
         val baseAng = atan2(dy, dx)
         val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
@@ -1973,6 +2005,22 @@ class World(
 
     private fun knockOut(victim: Fighter, killer: Fighter?) {
         victim.alive = false
+        // A minion goes back to its pool: it never respawns. In Swarm every kill makes its killer stronger, and a
+        // Juggernaut down makes the minions stronger.
+        if (victim.def.minion) {
+            victim.eliminated = true
+            if (rules.swarm && killer != null && !killer.def.minion) {
+                killer.power++
+                val gain = (killer.baseMaxHp * Balance.SWARM_KILL_POWER).toInt()
+                killer.maxHp += gain; killer.hp = minOf(killer.maxHp, killer.hp + gain + (killer.maxHp * Balance.SWARM_KILL_HEAL).toInt())
+                if (victim.def.id == FighterId.MINION_BRUTE) {
+                    swarmBosses++; swarmLevel++
+                    if (swarmBosses >= Balance.SWARM_BOSSES_FOR_DRAGON) swarmDragonCalled = true
+                }
+            }
+        }
+        // Swarm: one life.
+        if (rules.swarm && !victim.def.minion) victim.eliminated = true
         // In the Entity's fight nobody comes back (the user's rule, build 111): knocked out, they are out until the
         // match ends (and when nobody is left standing, it is lost: see [stepSky]).
         if (rules.boss && inSky) victim.eliminated = true
@@ -1996,12 +2044,241 @@ class World(
         killer?.let { it.kos++ }
         // (A fighter the Entity had corrupted is its own again when it goes down.)
         if (victim.corruptLeft > 0f) uncorrupt(victim)
+        // Swarm: down, and the run is over.
+        if (rules.swarm && !victim.def.minion && fighters.none { !it.def.minion && it.alive }) { if (phase == Phase.PLAYING) end(1); return }
         run {
             val scoringTeam = 1 - victim.team
             score[scoringTeam]++
             val target = if (scoringTeam == 0) rules.koTarget else rules.enemyKoTarget
             if (phase == Phase.PLAYING && score[scoringTeam] >= target) end(scoringTeam)
         }
+    }
+
+    // ------------------------------------------------------------------ minions (build 116)
+
+    /**
+     * Calls a minion of [id] in at (x, y), near there on open ground, [strength] times as tough and as hard-hitting:
+     * one waiting in its pool (made with the match: dead and out). Null when every one of that kind is already out.
+     */
+    fun spawnMinion(id: FighterId, x: Float, y: Float, strength: Float): Fighter? {
+        val m = fighters.firstOrNull { it.def.id == id && it.def.minion && !it.alive && it.eliminated } ?: return null
+        val spot = arena.nearestOpen(x, y, m.radius)
+        m.x = spot.x; m.y = spot.y; m.prevX = m.x; m.prevY = m.y; m.vx = 0f; m.vy = 0f
+        m.team = 1
+        m.dimensionDamage = strength
+        m.maxHp = maxOf(1, (m.baseMaxHp * strength).toInt()); m.hp = m.maxHp
+        m.alive = true; m.eliminated = false
+        m.ammo = m.def.ammoMax.toFloat(); m.superCharge = 0f
+        m.pending.clear(); m.control.clear(); m.respawnTimer = 0f
+        m.facing = atan2(arena.height / 2f - m.y, arena.width / 2f - m.x)
+        events += GameEvent.MinionSpawned(m.id, m.x, m.y)
+        return m
+    }
+
+    /** How many minions are out. */
+    val minionsOut: Int get() = fighters.count { it.def.minion && it.alive }
+
+    // ------------------------------------------------------------------ Swarm (build 116)
+
+    var swarmWave = 0; private set
+    var swarmBosses = 0; private set
+    var swarmLevel = 0; private set
+    var swarmDragonCalled = false; private set
+    private var swarmWaveT = 0f
+    var portalOpen = false; private set
+    var portalX = 0f; private set
+    var portalY = 0f; private set
+
+    /**
+     * Swarm: the next wave comes when this one is cleared or its time is up, from every side round them (more of
+     * them, and tougher, with every Juggernaut beaten; every fifth wave is a Juggernaut). Three Juggernauts down, the
+     * waves stop; when the last minion is gone, the Dragon comes.
+     */
+    private fun stepSwarm(dt: Float) {
+        val u = uprising
+        if (u != null && (u.active || u.beaten)) { if (u.beaten) swarmPortalCheck(); return }
+        val humans = fighters.filter { !it.def.minion && it.alive }
+        if (humans.isEmpty()) return
+        if (swarmDragonCalled) {
+            if (minionsOut == 0 && u != null && u.phase == UprisingPhase.WAITING) swarmCallDragon(u)
+            return
+        }
+        swarmWaveT += dt
+        if (minionsOut > 0 && swarmWaveT < Balance.SWARM_WAVE_SECONDS) return
+        swarmWaveT = 0f
+        swarmWave++
+        val boss = swarmWave % Balance.SWARM_BOSS_EVERY == 0
+        events += GameEvent.SwarmWave(swarmWave, boss)
+        // (Soft at first: the first waves are a warm-up.)
+        val strength = 0.55f + Balance.SWARM_LEVEL_STRENGTH * swarmLevel + 0.05f * swarmWave
+        val h = humans[swarmWave % humans.size]
+        val kinds = ArrayList<FighterId>()
+        if (boss) { kinds += FighterId.MINION_BRUTE; repeat(2 + swarmLevel) { kinds += FighterId.MINION_BOT } }
+        else {
+            val n = 2 + swarmWave / 2 + swarmLevel * 2
+            for (k in 0 until n) kinds += when {
+                swarmWave >= 3 && k % 4 == 3 -> FighterId.MINION_HOUND
+                swarmWave >= 2 && k % 3 == 2 -> FighterId.MINION_LASER
+                swarmLevel >= 1 && k % 5 == 4 -> FighterId.DRAGONLING
+                else -> FighterId.MINION_BOT
+            }
+        }
+        // All round them, a ring that closes in: the further into the run, the closer they start.
+        val ring = (9f - swarmLevel * 1.2f).coerceAtLeast(5f)
+        val c = arena.width / 2f
+        val lim = Arenas.ENTITY_REALM_RADIUS - 1.5f
+        for ((k, kind) in kinds.withIndex()) {
+            val a = k * (6.2831855f / kinds.size) + swarmWave * 0.7f
+            var x = h.x + cos(a) * ring; var y = h.y + sin(a) * ring
+            val od = hypot(x - c, y - c)
+            if (od > lim) { x = c + (x - c) / od * lim; y = c + (y - c) / od * lim }
+            spawnMinion(kind, x, y, if (kind == FighterId.MINION_BRUTE) strength * (1f + 0.3f * swarmBosses) else strength)
+        }
+    }
+
+    /** Swarm: the Dragon comes for them, into its own world, where they already are. */
+    private fun swarmCallDragon(u: Uprising) {
+        u.swarm = true
+        val c = arena.nearestOpen(arena.width / 2f, arena.height / 2f, 1f)
+        u.cx = c.x; u.cy = c.y
+        u.members.clear()
+        for (f in fighters) if (f.alive && !f.def.minion) {
+            u.members += f.id
+            u.teams[f.id] = f.team
+            u.saved[f.id] = floatArrayOf(f.x, f.y, f.hp.toFloat(), f.superCharge, f.hyperCharge, f.ammo, f.edge, f.entityPull)
+        }
+        events += GameEvent.DragonComing(c.x, c.y)
+        beginSky(u)
+    }
+
+    /** Swarm: the way out opens, on the far side of its platform from the Dragon (or the middle, once it is gone). */
+    private fun openPortal() {
+        if (portalOpen) return
+        val u = uprising
+        val c = arena.width / 2f
+        val lim = Arenas.ENTITY_REALM_RADIUS - 2.5f
+        if (u != null && !u.beaten) {
+            val dx = c - u.ex; val dy = c - u.ey
+            val d = hypot(dx, dy).coerceAtLeast(0.1f)
+            val p = arena.nearestOpen(c + dx / d * lim, c + dy / d * lim, 1f)
+            portalX = p.x; portalY = p.y
+        } else { val p = arena.nearestOpen(c, c, 1f); portalX = p.x; portalY = p.y }
+        portalOpen = true
+        events += GameEvent.PortalOpened(portalX, portalY)
+    }
+
+    /** Swarm: anyone through the open portal wins the run. True when it is over. */
+    private fun swarmPortalCheck(): Boolean {
+        if (!portalOpen || phase != Phase.PLAYING) return false
+        for (f in fighters) if (!f.def.minion && f.alive && hypot(f.x - portalX, f.y - portalY) < Balance.SWARM_PORTAL_RADIUS + f.radius) {
+            uprising?.let { u -> for (id in u.members) fighter(id)?.let { m -> u.teams[id]?.let { m.team = it } } }
+            end(0)
+            return true
+        }
+        return false
+    }
+
+    // ------------------------------------------------------------------ the Dragon's own mind (build 116)
+
+    /** Turns it toward [want] (radians), no faster than it can. */
+    private fun turnDragon(u: Uprising, want: Float, dt: Float) {
+        var d = want - u.facing
+        while (d > 3.1415927f) d -= 6.2831855f
+        while (d < -3.1415927f) d += 6.2831855f
+        val step = Balance.DRAGON_TURN * dt
+        u.facing += d.coerceIn(-step, step)
+    }
+
+    /**
+     * Where it flies, by what it has in mind (re-thought every few seconds): hunting its prey (whoever last broke its
+     * jewel, or the weakest of them), hovering just out of their reach in front of them; circling over a crowd; or,
+     * badly hurt, pulling back to the edge of its platform. It always turns to face its prey.
+     */
+    private fun dragonFly(u: Uprising, dt: Float) {
+        val alive = u.members.mapNotNull { fighter(it) }.filter { it.alive }
+        if (alive.isEmpty()) return
+        u.mindT -= dt
+        var sx = 0f; var sy = 0f
+        for (f in alive) { sx += f.x; sy += f.y }
+        val mx = sx / alive.size; val my = sy / alive.size
+        if (u.mindT <= 0f) {
+            u.mindT = 3.5f + random.nextFloat() * 2.5f
+            val frac = u.hp.toFloat() / u.maxHp.coerceAtLeast(1)
+            val crowd = alive.count { hypot(it.x - mx, it.y - my) < 3f } >= 2
+            u.mind = when {
+                frac < 0.35f && random.nextFloat() < 0.5f -> 2
+                crowd && random.nextFloat() < 0.6f -> 1
+                else -> 0
+            }
+            val breaker = fighter(u.lastBreaker)?.takeIf { it.alive && it.id in u.members }
+            u.prey = (breaker ?: alive.minByOrNull { it.hp.toFloat() / it.maxHp })!!.id
+        }
+        val prey = fighter(u.prey)?.takeIf { it.alive } ?: alive[0]
+        val c = arena.width / 2f
+        val lim = Arenas.ENTITY_REALM_RADIUS - Balance.UPRISING_ENTITY_RADIUS
+        var tx: Float; var ty: Float
+        var speed = Balance.UPRISING_ENTITY_SPEED
+        when (u.mind) {
+            1 -> { u.orbit += dt * 0.55f; tx = mx + cos(u.orbit) * 4.5f; ty = my + sin(u.orbit) * 4.5f }
+            2 -> {
+                val dx = c - mx; val dy = c - my
+                val d = hypot(dx, dy).coerceAtLeast(0.1f)
+                tx = c + dx / d * lim; ty = c + dy / d * lim
+                speed *= 1.3f
+            }
+            else -> {
+                val dx = u.ex - prey.x; val dy = u.ey - prey.y
+                val d = hypot(dx, dy).coerceAtLeast(0.1f)
+                // (Just outside its sword's reach: the sword is something it decides to use, not a place to stand.)
+                tx = prey.x + dx / d * 6.2f; ty = prey.y + dy / d * 6.2f
+                speed *= 1.35f
+            }
+        }
+        val dx = tx - u.ex; val dy = ty - u.ey
+        val d = hypot(dx, dy)
+        if (d > 0.25f) { val step = minOf(d, speed * dt); u.ex += dx / d * step; u.ey += dy / d * step }
+        val od = hypot(u.ex - c, u.ey - c)
+        if (od > lim) { u.ex = c + (u.ex - c) / od * lim; u.ey = c + (u.ey - c) / od * lim }
+        turnDragon(u, atan2(prey.y - u.ey, prey.x - u.ex), dt)
+    }
+
+    /** What it does next, by what is in front of it, not from a list (build 116). */
+    private fun chooseDragonMove(u: Uprising, alive: List<Fighter>, stage: Int): EntityMove {
+        if (alive.isEmpty()) return EntityMove.STRIKES
+        val prey = fighter(u.prey)?.takeIf { it.alive } ?: alive[0]
+        val dPrey = hypot(prey.x - u.ex, prey.y - u.ey)
+        val near = alive.count { hypot(it.x - u.ex, it.y - u.ey) < Balance.ENTITY_SPIN_RADIUS }
+        val far = alive.count { hypot(it.x - u.ex, it.y - u.ey) > 7f }
+        val roll = random.nextFloat()
+        val moving = u.dashT >= 0f || u.spinT >= 0f
+        return when {
+            u.summonIn <= 0f && minionsOut < Balance.DRAGON_MINION_CAP && (u.jewelBroken || u.mind == 2 || roll < 0.4f) -> EntityMove.SUMMON
+            near >= 2 && !moving -> EntityMove.SPIN
+            dPrey > 7f && !moving && roll < 0.55f -> EntityMove.DASH
+            far > 0 && roll < 0.3f -> EntityMove.DRAIN
+            (far > 0 && roll < 0.55f) || roll > 0.8f -> EntityMove.FLARE
+            dPrey < 4.5f -> listOf(EntityMove.GRASP, EntityMove.PULSE, EntityMove.STRIKES)[u.strikes % 3]
+            else -> listOf(EntityMove.STRIKES, EntityMove.RING, EntityMove.SWEEP, EntityMove.SPOKES, EntityMove.RAIN, EntityMove.CHASE)[u.strikes % 6]
+        }
+    }
+
+    /** It calls its minions: its own Dragonlings, many at once, and every other time robots with them. */
+    private fun summonMinions(u: Uprising, stage: Int) {
+        u.summonIn = Balance.DRAGON_SUMMON_GAP
+        val strength = 1f + 0.12f * rules.entityTier + (if (u.swarm) Balance.SWARM_LEVEL_STRENGTH * swarmLevel else 0f)
+        val n = 2 + stage + rules.entityTier / 3
+        for (k in 0 until n) {
+            val a = u.facing + (k - (n - 1) / 2f) * 0.55f
+            spawnMinion(FighterId.DRAGONLING, u.ex + cos(a) * 3.4f, u.ey + sin(a) * 3.4f, strength)
+        }
+        if (u.summons % 2 == 1) {
+            val kinds = listOf(FighterId.MINION_BOT, FighterId.MINION_LASER, FighterId.MINION_HOUND)
+            for (k in 0 until 2 + stage) {
+                val a = u.facing + 3.1415927f + (k - 0.5f) * 0.8f
+                spawnMinion(kinds[(u.summons + k) % kinds.size], u.ex + cos(a) * 3.8f, u.ey + sin(a) * 3.8f, strength)
+            }
+        }
+        u.summons++
     }
 
     private fun damageCrate(tx: Int, ty: Int, amount: Int) {
@@ -2148,7 +2425,8 @@ const val ENTITY_TARGET = -100
 const val JEWEL_TARGET = -101
 
 /** The Entity's moves in its world, in the order it makes them, round and round. */
-enum class EntityMove { STRIKES, RING, SWEEP, FLARE, SPOKES, RAIN, GRASP, PULSE, CHASE, DASH, SPIN, DRAIN }
+/** [SUMMON] (build 116): it calls minions, its own Dragonlings and robots. */
+enum class EntityMove { STRIKES, RING, SWEEP, FLARE, SPOKES, RAIN, GRASP, PULSE, CHASE, DASH, SPIN, DRAIN, SUMMON }
 // (Its sword spin is its main attack, the user's: it comes round most often.)
 private val ENTITY_MOVES = listOf(
     EntityMove.STRIKES, EntityMove.SPIN, EntityMove.DRAIN, EntityMove.GRASP, EntityMove.DASH, EntityMove.FLARE,

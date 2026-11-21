@@ -52,7 +52,9 @@ class Fighter(
     var cells = 0
     /** Portal Run: how much harder this enemy hits in the dimension it was brought into. */
     var dimensionDamage = 1f
-    val damageMultiplier get() = dimensionDamage * (1f + io.github.projectwip.data.Balance.CELL_DAMAGE_BONUS * cells) *
+    /** Swarm: kills this run (each makes them stronger, [io.github.projectwip.data.Balance.SWARM_KILL_POWER]). */
+    var power = 0
+    val damageMultiplier get() = dimensionDamage * (1f + io.github.projectwip.data.Balance.SWARM_KILL_POWER * power) * (1f + io.github.projectwip.data.Balance.CELL_DAMAGE_BONUS * cells) *
         (1f - io.github.projectwip.data.Balance.ENTITY_DRAIN_DAMAGE * drains) *
         (if (hyperActive) 1f + io.github.projectwip.data.Balance.HYPER_DAMAGE_BONUS else 1f)
     val attackDamage get() = (def.attackDamage.at(level, player = !isBot) * damageMultiplier).toInt()
@@ -207,7 +209,7 @@ class Fighter(
 class Hex(val by: Int, val damage: Int, var tick: Float, var left: Float)
 
 /** [BULLET] is Ninja's gun; [COSMIC] his super's blinding electric-blue bullets. */
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, STAR, ARROW, GUST, BULLET, COSMIC }
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, STAR, ARROW, GUST, BULLET, COSMIC, LASER }
 
 class Projectile(
     val ownerId: Int,
@@ -278,6 +280,14 @@ sealed interface GameEvent {
     /** The Entity corrupted a fighter ([on]) or let it go. */
     data class Corrupted(val fighterId: Int, val on: Boolean) : GameEvent
     data class EntityHit(val fighterId: Int, val isSuper: Boolean, val damage: Int, val x: Float, val y: Float) : GameEvent
+    /** A minion was called in at ([x], [y]). */
+    data class MinionSpawned(val fighterId: Int, val x: Float, val y: Float) : GameEvent
+    /** Swarm: wave [wave] is coming ([boss]: the Juggernaut). */
+    data class SwarmWave(val wave: Int, val boss: Boolean) : GameEvent
+    /** Swarm: the waves have stopped and the Dragon is coming. */
+    data class DragonComing(val x: Float, val y: Float) : GameEvent
+    /** Swarm: the way out has opened at ([x], [y]). */
+    data class PortalOpened(val x: Float, val y: Float) : GameEvent
     /** A shot landed on the Entity while its jewel is on: no damage. */
     data class EntityImmune(val x: Float, val y: Float) : GameEvent
     /** The jewel on its neck was broken ([dropped]: the one lying on the platform), by [fighterId]. */

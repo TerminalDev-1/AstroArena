@@ -64,6 +64,20 @@ class Uprising(
     var jewelX = 0f
     var jewelY = 0f
     var jewelDropHp = 0
+    /** Which way it faces (radians, sim convention): it turns to face what it wants. Its jewel is in front of it. */
+    var facing = 1.5707964f
+    /** Its mind: 0 hunting [prey], 1 circling over a crowd, 2 pulling back to the edge; re-thought in [mindT] seconds. */
+    var mind = 0
+    var mindT = 0f
+    var prey = -1
+    var orbit = 0f
+    /** Whoever last broke its jewel (it goes after them). */
+    var lastBreaker = -1
+    /** Seconds until it can call minions again, and how many times it has. */
+    var summonIn = 4f
+    var summons = 0
+    /** Swarm: its fight is the end of a Swarm run, not a match's uprising. */
+    var swarm = false
     /** Seconds the Entity is still stunned (Ninja's cosmic bullets): it does nothing while it lasts. */
     var stunLeft = 0f
     /** Seconds until it can be stunned again ([io.github.projectwip.data.Balance.COSMIC_STUN_GUARD] after a stun). */

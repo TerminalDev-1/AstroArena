@@ -86,9 +86,20 @@ class HudSnapshot {
     var jewelLoose = false
     var uprisingMaxHp = 0
     var uprisingBeaten = false
+    /** Swarm: its wave, Juggernauts beaten, the player's kills (their power), the Dragon called, the way out open. */
+    var swarm = false
+    var swarmWave = 0
+    var swarmBosses = 0
+    var swarmPower = 0
+    var swarmDragon = false
+    var portalOpen = false
+    /** Where the portal is on screen (0..1 of the width and height), for the arrow to it. */
+    var portalSx = 0f
+    var portalSy = 0f
 
     fun copyFrom(o: HudSnapshot) {
         uprisingPhase = o.uprisingPhase; uprisingT = o.uprisingT; uprisingHeld = o.uprisingHeld; uprisingBowLen = o.uprisingBowLen; uprisingHp = o.uprisingHp; uprisingStunned = o.uprisingStunned; jewelOn = o.jewelOn; jewelFrac = o.jewelFrac; jewelLoose = o.jewelLoose; uprisingMaxHp = o.uprisingMaxHp; uprisingBeaten = o.uprisingBeaten
+        swarm = o.swarm; swarmWave = o.swarmWave; swarmBosses = o.swarmBosses; swarmPower = o.swarmPower; swarmDragon = o.swarmDragon; portalOpen = o.portalOpen; portalSx = o.portalSx; portalSy = o.portalSy
         width = o.width; height = o.height
         System.arraycopy(o.viewProj, 0, viewProj, 0, 16)
         phase = o.phase; phaseTime = o.phaseTime; countdownSeconds = o.countdownSeconds; timeLeft = o.timeLeft

@@ -91,6 +91,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
             when (startScreen) {
                 "match" -> Screen.Match(startMatchConfig(repo.save.value))
                 "boss" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
+                "swarm" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.SWARM))
                 // The Entity's fight (its ritual starts at once), and its uprising in the middle of a 1v1 against a bot.
                 "uprising" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.BOSS))
                 "uprisingduel" -> Screen.Match(startMatchConfig(repo.save.value).copy(mode = io.github.projectwip.data.GameMode.DUEL, uprisingAt = 4f))
