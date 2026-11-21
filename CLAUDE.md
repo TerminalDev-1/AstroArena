@@ -4,6 +4,9 @@ AstroArena (the package id is still `io.github.projectwip`, so saves carry over)
 menus + custom OpenGL ES 3.0 renderer, no engine. All art and sound is generated in code and must stay
 original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Arena Boxes", "Coins" and "Arena Crystals"; the code (and the server's files and API) still call them capsules (or drops), bolts and prisms. (They were Spark Drops then Glitch Drops; Power Ups, then Upgrade Credits, then Coins; Crystals, then CPU Chips, then Arena Crystals: the user renamed them. Coins pay for every fighter upgrade; their icon is a plain gold coin with a star. Arena Crystals are the shop currency; their icon is a cut violet gem. When CPU Chips became Arena Crystals (1.0, build 103) everyone's were set to 0, once: `crystalsReset` in `economy.complete` and `SaveStore.fromJson`. Road "Credits" are a separate thing and keep their name.)
 
+**The owner's decisions live in `tracked-docs/`** (untracked Markdown, one file per topic, listed in its README):
+read the one for your task first, and write new decisions there, not here. Never commit that folder.
+
 ## Branding guidelines (the user's, ARENA 1.4)
 
 - **The name is ARENA** (it was AstroArena until 1.4, build 112). Players see "ARENA" everywhere: the app label,
