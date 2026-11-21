@@ -255,7 +255,7 @@ class Api(unittest.TestCase):
         self.assertIn("no longer supported", old["message"])
         _, new = self.call("GET", "/v1/status?version=11")
         self.assertTrue(new["supported"])
-        self.assertEqual(new["notice"], "Welcome to the AstroArena servers!")
+        self.assertEqual(new["notice"], "Welcome to the ARENA servers!")
 
     def test_cfg_edits_apply_without_restart(self):
         self.assertTrue(self.call("GET", "/v1/status?version=11")[1]["supported"])
