@@ -46,13 +46,11 @@ import kotlin.math.sin
  * ARENA's reveal (the user's transition build, 2026-11-21). Until the server says so (`[reveal]` in game.cfg, 8:30 pm
  * that evening) the game is nothing but this: black, a white black hole that turns but never grows, the ARENA logo,
  * and the Entity's cryptic words fading in and out, silent. Then the hole opens, swallows the screen in white, and the
- * game is there. Once seen, it never closes again on this device.
+ * game is there. Only the server opens it: the owner opens the game to everyone when the transition is done. Once seen, it never closes again on this device.
  */
 object ArenaReveal {
     private const val PREFS = "arena"
     private const val KEY = "revealed"
-    /** If the server can't be asked: 8:30 pm UK time on 21 November 2026 (GMT, so 20:30 UTC). */
-    const val FALLBACK_AT_MS = 1_795_293_000_000L
 
     fun revealed(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY, false)
     fun markRevealed(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY, true).apply()
@@ -79,15 +77,15 @@ fun BlackHoleScreen(askServer: suspend () -> Double?, previewSeconds: Float? = n
     var openAt by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(Unit) {
         val shown = SystemClock.elapsedRealtime()
-        var heard = false
         var deadline: Long? = null
         while (true) {
             if (previewSeconds != null) {
                 if (previewSeconds > 0f) deadline = shown + (previewSeconds * 1000).toLong()
             } else {
                 val r = withContext(Dispatchers.IO) { runCatching { askServer() }.getOrNull() }
-                if (r != null) { heard = true; deadline = if (r < 0) null else SystemClock.elapsedRealtime() + (r * 1000).toLong() }
-                else if (!heard) deadline = SystemClock.elapsedRealtime() + (ArenaReveal.FALLBACK_AT_MS - System.currentTimeMillis()).coerceAtLeast(0)
+                // Only the server opens it (the owner's call, build 113): a device that can't reach it stays shut, and
+                // one that has heard a time keeps it while the server is out of reach.
+                if (r != null) deadline = if (r < 0) null else SystemClock.elapsedRealtime() + (r * 1000).toLong()
             }
             val d = deadline
             if (d != null && SystemClock.elapsedRealtime() >= d) break

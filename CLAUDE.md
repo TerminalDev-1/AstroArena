@@ -77,8 +77,8 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - **ARENA's reveal** (build 112, the transition build): until the server's `[reveal]` time in `game.cfg` (`hold = yes`
   keeps it shut, `at = now` opens it) the game shows only `BlackHoleScreen`: a white black hole that never grows, the
   ARENA title and the Entity's silent lines. Then the hole opens and swallows the screen in white. Once opened it
-  never closes on that device (`ArenaReveal`); with no server it opens at 20:30 UK on 2026-11-21 by the device's
-  clock. Previews: `--es screen blackhole` (held), `reveal` (opens after 6 s). The Entity also whispers, silent, on
+  never closes on that device (`ArenaReveal`). Since build 113 only the server opens it (the owner opens the game to
+  everyone when the transition is done): a device that can't reach the server stays shut. Previews: `--es screen blackhole` (held), `reveal` (opens after 6 s). The Entity also whispers, silent, on
   the home screen (`MenuWhisper`).
 - **Name clashes in the simulation.** The free-for-all already has a Static Storm (`GameEvent.StormHit`,
   `Fighter.stormTick`, `STORM_*`); Swish's super had to become "tempest". Grep a name before adding it, and never
