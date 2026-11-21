@@ -1,4 +1,6 @@
-# CLAUDE.md
+# agent.md
+
+> **Claude:** Before touching anything in this repo, read [shit.md](shit.md) first. (Also see [hello.md](hello.md).)
 
 AstroArena (the package id is still `io.github.projectwip`, so saves carry over): original mobile 3D arena brawler for Android (landscape, touch, bots), with an optional Python game server. Kotlin + Compose
 menus + custom OpenGL ES 3.0 renderer, no engine. All art and sound is generated in code and must stay
