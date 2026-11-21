@@ -97,7 +97,8 @@ CREDIT_BUFF = 12
 MAX_OPEN_ALL = 10000
 
 # Every fighter and how many colourways it has (index 0 is the one it comes with). Keep in step with Balance.kt.
-FIGHTER_SKINS = {name: 3 for name in ("BYTE", "BRAKK", "KIRA", "KITO", "BUDDY")}
+# Only Ninja (BYTE) since build 114: the other fighters were removed, with nothing paid back.
+FIGHTER_SKINS = {"BYTE": 3}
 STARTING_FIGHTER = "BYTE"
 
 

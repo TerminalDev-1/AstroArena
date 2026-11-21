@@ -77,40 +77,15 @@ class EconomyTest {
         assertEquals(s.prisms + 30, twice.save.prisms)
     }
 
-    @Test fun creditsFillTheRoadAndTheFighterUnlocksTheMomentItIsFull() {
-        val first = SparkRoad.steps.first()
-        assertEquals("the road's prices", listOf(2500, 4200, 6500, 7000), SparkRoad.steps.map { it.cost })
-        // Not enough yet: the Credits just sit on the road.
-        val some = Economy.grant(SaveData(), Reward.Credits(first.cost - 1))
-        assertEquals(Reward.Credits(first.cost - 1), some.value)
-        assertEquals(first.cost - 1, some.save.credits)
-        assertFalse(some.save.progress(first.fighter).unlocked)
-        // One more and the fighter is theirs, on the spot, with the leftover carried on toward the next.
-        val full = Economy.grant(some.save, Reward.Credits(8))
-        assertTrue(full.save.progress(first.fighter).unlocked)
-        assertEquals(7, full.save.credits)
-        assertEquals(listOf(first.fighter), Economy.fightersIn(full.value))
-        assertEquals(8, Economy.creditsIn(full.value))
-        // A big grant can unlock several in a row.
-        val two = Economy.grant(SaveData(), Reward.Credits(SparkRoad.steps[0].cost + SparkRoad.steps[1].cost + 3))
-        assertEquals(SparkRoad.steps.take(2).map { it.fighter }, Economy.fightersIn(two.value))
-        assertEquals(3, two.save.credits)
-        // Unlocking the last fighter pays the leftovers out as Upgrade Credits, and so does everything after it.
-        val lastStep = SparkRoad.steps.last()
-        val nearly = SaveData(credits = lastStep.cost - 5, fighters = FighterId.entries.associateWith { FighterProgress(unlocked = it != lastStep.fighter) })
-        val finished = Economy.grant(nearly, Reward.Credits(30))
-        assertEquals(0 to nearly.bolts + 25, finished.save.credits to finished.save.bolts)
-        assertEquals(null, SparkRoad.next(finished.save))
-        val all = SaveData(fighters = FighterId.entries.associateWith { FighterProgress(unlocked = true) })
-        val after = Economy.grant(all, Reward.Credits(40))
+    @Test fun creditsAreCoinsNowNobodyIsLeftOnTheRoad() {
+        // Build 114: Ninja is the only fighter, so the Spark Road has nobody on it and every Credit is paid as Coins
+        // (as the server does once the road is done).
+        assertTrue(SparkRoad.steps.isEmpty())
+        assertEquals(null, SparkRoad.next(SaveData()))
+        val after = Economy.grant(SaveData(), Reward.Credits(40))
         assertEquals(Reward.Bolts(40), after.value)
-        assertEquals(all.bolts + 40, after.save.bolts)
+        assertEquals(SaveData().bolts + 40, after.save.bolts)
         assertEquals(0, after.save.credits)
-        // A jackpot whose Credits unlock someone comes back as one flat list, the fighter beside the Credits.
-        val jackpot = Economy.grant(SaveData(credits = first.cost - 10), Reward.Bundle(listOf(Reward.Credits(1000), Reward.Prisms(1200))))
-        assertEquals(Reward.Bundle(listOf(Reward.Credits(1000), Reward.UnlockFighter(first.fighter), Reward.Prisms(1200))), jackpot.value)
-        // A gift of Credits (the Cup Track, a drop, the debug menu) fills the road in the same way.
-        assertTrue(Economy.devGrant(SaveData(), credits = first.cost).progress(first.fighter).unlocked)
     }
 
     // ---------------------------------------------------------------- the shop
@@ -123,11 +98,12 @@ class EconomyTest {
         assertEquals(s.bolts + 400, crate.save.bolts)
         refused(404) { Economy.buy(s, "nonsense") }
         refused(402) { Economy.buy(SaveData(prisms = 1), "crate_s") }
-        val kito = Economy.buy(s, "fighter_KITO")
-        assertTrue(kito.save.progress(FighterId.KITO).unlocked)
-        refused(409) { Economy.buy(kito.save, "fighter_KITO") }
-        refused(409) { Economy.buy(s, "skin_KITO_1") }   // the fighter has to be unlocked first
-        assertTrue(Economy.buy(kito.save, "skin_KITO_1").save.progress(FighterId.KITO).ownedSkins.contains(1))
+        // (Removed fighters can't be bought: since build 114 Ninja is the only one, and nobody is for sale.)
+        assertTrue(Shop.fighterOffers.isEmpty())
+        refused(404) { Economy.buy(s, "fighter_KITO") }
+        val skin = Economy.buy(s, "skin_BYTE_1")
+        assertTrue(skin.save.progress(FighterId.BYTE).ownedSkins.contains(1))
+        refused(409) { Economy.buy(skin.save, "skin_BYTE_1") }
         assertEquals("every shop item can be found by its key", 0, (Shop.boltCrates + Shop.creditPacks + Shop.fighterOffers + Shop.skinOffers).count { Economy.shopItem(it.key) == null })
         assertEquals(20, Economy.shopItem("skin_BYTE_1")!!.second)
     }
@@ -221,13 +197,14 @@ class EconomyTest {
         assertFalse(v.drop)  // no Arena Boxes since 1.3
         assertEquals(0, v.drops)
         assertEquals(0, v.dropsLeftToday)
-        assertEquals(28, v.bolts)
+        // (The 6 Credits a win pays are Coins now: nobody is left on the road.)
+        assertEquals(28 + 6, v.bolts)
         assertEquals(10, v.firstWinPrisms)
-        assertEquals(6, v.credits)
-        assertEquals(before.bolts + 28, done.save.bolts)
+        assertEquals(0, v.credits)
+        assertEquals(before.bolts + 34, done.save.bolts)
         assertEquals(before.prisms + 10, done.save.prisms)
         assertEquals(day, done.save.lastFirstWinDay)
-        assertEquals(6, done.save.credits)
+        assertEquals(0, done.save.credits)
         // The same day's second win pays no first-win CPU Chips.
         assertEquals(0, Economy.settleMatch(done.save, report(GameMode.BOSS, MatchOutcome.VICTORY), day).value.firstWinPrisms)
         // Applying it: the win is counted, nothing else moves.
@@ -310,9 +287,10 @@ class EconomyTest {
     @Test fun theDebugMenusHandOutsChangeTheSave() {
         val s = Economy.devGrant(SaveData(), drops = 5, bolts = 1000, prisms = 100, credits = 100)
         assertEquals("no boxes, even as a hand-out", 0, s.capsules)
-        assertEquals(Balance.STARTING_BOLTS + 1000, s.bolts)
+        // (Credits are Coins once nobody is left on the road.)
+        assertEquals(Balance.STARTING_BOLTS + 1000 + 100, s.bolts)
         assertEquals(100, s.prisms)
-        assertEquals(100, s.credits)
+        assertEquals(0, s.credits)
         assertEquals(Balance.upgradeCostFrom(1), Progression.upgradeCost(SaveData(), FighterId.BYTE))
     }
 

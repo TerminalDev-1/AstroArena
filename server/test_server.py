@@ -105,12 +105,10 @@ class Economy(unittest.TestCase):
         self.assertEqual(economy.upgrade_cost(3, 0.0), 0)
         self.assertEqual(economy.upgrade_cost(3, 99), 105)  # the factor is capped at x3
         self.assertEqual(economy.shop_item("crate_l"), ({"type": "bolts", "amount": 3000}, 50))
-        self.assertEqual(economy.shop_item("fighter_KITO"), ({"type": "fighter", "fighter": "KITO"}, 90))
-        self.assertEqual(economy.shop_item("fighter_BUDDY"), ({"type": "fighter", "fighter": "BUDDY"}, 160))
-        self.assertEqual(economy.SPARK_ROAD[-1], ("BUDDY", 7000))
-        self.assertEqual(economy.shop_item("skin_BUDDY_2"), ({"type": "skin", "fighter": "BUDDY", "skin": 2}, 20))
-        self.assertEqual(economy.shop_item("skin_KITO_2"), ({"type": "skin", "fighter": "KITO", "skin": 2}, 20))
-        for missing in ("fighter_BYTE", "fighter_SPARK", "fighter_MIRA", "fighter_VARUN", "skin_MIRA_1", "skin_KITO_0", "skin_KITO_3", "skin_NOBODY_1", "crate_xl", ""):
+        # (Build 114: Ninja, BYTE, is the only fighter. Nobody is sold and nobody is on the road.)
+        self.assertEqual(economy.SPARK_ROAD, [])
+        self.assertEqual(economy.shop_item("skin_BYTE_2"), ({"type": "skin", "fighter": "BYTE", "skin": 2}, 20))
+        for missing in ("fighter_KITO", "fighter_BUDDY", "skin_KITO_2", "skin_BUDDY_2", "fighter_BYTE", "fighter_SPARK", "fighter_MIRA", "fighter_VARUN", "skin_MIRA_1", "skin_KITO_0", "skin_KITO_3", "skin_NOBODY_1", "crate_xl", ""):
             self.assertIsNone(economy.shop_item(missing))
         self.assertEqual(economy.match_bolts("BOSS", "VICTORY", 0, 2, "NORMAL"), 28)
         self.assertEqual(economy.match_bolts("BOSS", "DEFEAT", 0, 9, "ELITE"), 33)
@@ -136,20 +134,17 @@ class Economy(unittest.TestCase):
     def test_shop_gift_and_track(self):
         p = economy.new_profile()
         p["prisms"] = 100
+        # (Removed fighters, build 114: nothing to buy, and nothing of theirs.)
+        for gone in ("fighter_BRAKK", "skin_BRAKK_1", "fighter_KITO"):
+            with self.assertRaises(Refused):
+                economy.buy(p, gone)
+        self.assertEqual(p["prisms"], 100)
+        economy.buy(p, "skin_BYTE_1")
+        self.assertEqual((p["prisms"], p["fighters"]["BYTE"]["ownedSkins"]), (80, [0, 1]))
         with self.assertRaises(Refused):
-            economy.buy(p, "skin_BRAKK_1")  # the fighter comes first
-        self.assertEqual(economy.buy(p, "fighter_BRAKK"), {"type": "fighter", "fighter": "BRAKK"})
-        self.assertEqual(p["prisms"], 60)
-        with self.assertRaises(Refused):
-            economy.buy(p, "fighter_BRAKK")  # already owned, and not charged again
-        self.assertEqual(p["prisms"], 60)
-        economy.buy(p, "skin_BRAKK_1")
-        self.assertEqual((p["prisms"], p["fighters"]["BRAKK"]["ownedSkins"]), (40, [0, 1]))
-        with self.assertRaises(Refused) as caught:
-            economy.buy(p, "fighter_KITO")
-        self.assertEqual(caught.exception.status, 402)
+            economy.buy(p, "skin_BYTE_1")  # already owned, and not charged again
         economy.buy(p, "crate_s")
-        self.assertEqual((p["prisms"], p["bolts"]), (30, 460))
+        self.assertEqual((p["prisms"], p["bolts"]), (70, 460))
 
         self.assertEqual(economy.claim_gift(p, 20000), {"type": "bolts", "amount": 40})
         with self.assertRaises(Refused):
@@ -161,16 +156,15 @@ class Economy(unittest.TestCase):
                 "fighters": {"KITO": {"unlocked": True, "level": 4, "ownedSkins": [0, 2, 9]}, "BYTE": {"unlocked": False, "level": -3}}}
         p = economy.profile_from_save(save)
         self.assertEqual((p["bolts"], p["prisms"], p["bestCups"], p["claimedMilestones"], p["lastDailyGiftDay"]), (900, 0, 77, [], 5))  # (the Cup Track was removed: nothing claimed is kept)
-        self.assertEqual(p["fighters"]["KITO"], {"unlocked": True, "level": 4, "ownedSkins": [0, 2], "cups": 0})
+        # (Kito was removed in build 114: an old save's Kito is gone, and nothing comes back for him.)
+        self.assertEqual(sorted(p["fighters"]), ["BYTE"])
         self.assertEqual(p["fighters"]["BYTE"], {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0})
-        self.assertFalse(p["fighters"]["BUDDY"]["unlocked"])
         # A fighter who has been removed is gone from an old save, and what he cost on the road comes back.
         old = economy.new_profile()
         old["fighters"]["VARUN"] = {"unlocked": True, "level": 6, "ownedSkins": [0, 1], "cups": 40}
         economy.complete(old)
         self.assertNotIn("VARUN", old["fighters"])
-        self.assertTrue(old["fighters"]["BRAKK"]["unlocked"] and old["fighters"]["KIRA"]["unlocked"])
-        self.assertEqual(economy.shop_item("fighter_KIRA"), ({"type": "fighter", "fighter": "KIRA"}, 70))
+        self.assertIsNone(economy.shop_item("fighter_KIRA"))
         self.assertEqual(economy.profile_from_save({}), economy.new_profile())
 
 
@@ -676,16 +670,15 @@ class Api(unittest.TestCase):
         self.assertNotIn(cheat["token"], text)
         # The operator takes the cheat down a peg. While the file was open, the other player won some Cups.
         text = edit(("cups = 900", "cups = 12"), ("prisms = 5000", "prisms = 1,000"),
-                    ("byte = unlocked, level 1, cups 0", "byte = locked, level 3, cups 7"), ("kito = locked, level 1, cups 0", "kito = unlocked, level 99999"))
+                    ("byte = unlocked, level 1, cups 0", "byte = locked, level 99999, cups 7"))
         self.store.grant(fair["id"], cups=25)
         accounts.sync()  # the server writes the file again; the operator's editor still has the older one
         save(text)
         account = self.call("GET", "/v1/me", token=cheat["token"])[1]["account"]
         self.assertEqual((account["cups"], account["profile"]["prisms"]), (12, 1000))
         # The fighter everyone starts with stays unlocked; levels stop at the limit; what wasn't written stays.
-        juno, kito = account["profile"]["fighters"]["BYTE"], account["profile"]["fighters"]["KITO"]
-        self.assertEqual((juno["unlocked"], juno["level"], juno["cups"]), (True, 3, 7))
-        self.assertEqual((kito["unlocked"], kito["level"], kito["cups"]), (True, economy.LEVEL_LIMIT, 0))
+        ninja = account["profile"]["fighters"]["BYTE"]
+        self.assertEqual((ninja["unlocked"], ninja["level"], ninja["cups"]), (True, economy.LEVEL_LIMIT, 7))
         # Only what was changed is forced: the other player keeps the Cups won in the meantime.
         self.assertEqual(self.store.player(fair["id"])["cups"], 65)
         # The file is written out again as things stand now, with the other player on top.
@@ -794,9 +787,10 @@ class Api(unittest.TestCase):
         status, body = self.call("POST", path, win, me["token"])
         self.assertEqual(status, 200)
         self.assertEqual((body["cupDelta"], body["cups"], body["drop"]), (0, 0, False))  # no Cups (removed in 111), no Arena Box (removed in 1.3)
-        # Bolts and the first-win Prisms are the server's to give too: (24 + 2 x 4 KOs) x 0.75 on Easy.
-        self.assertEqual((body["bolts"], body["firstWinPrisms"]), (24, 10))
-        self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (60 + 24, 10))
+        # Bolts and the first-win Prisms are the server's to give too: (24 + 2 x 4 KOs) x 0.75 on Easy, and the 6
+        # Credits of a win as Coins (nobody is left on the road since build 114).
+        self.assertEqual((body["bolts"], body["firstWinPrisms"]), (24 + 6, 10))
+        self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (60 + 30, 10))
 
         self.assertEqual((body["account"]["drops"], body["account"]["dropsLeftToday"]), (0, 0))
         self.assertEqual(self.call("POST", path, win, me["token"])[0], 409)  # only once
@@ -850,86 +844,52 @@ class Api(unittest.TestCase):
         self.assertEqual(again.player(me["id"])["drops"], 0)
         again.close()
 
-    def test_credits_unlock_fighters_along_the_spark_road(self):
+    def test_credits_are_coins_now_nobody_is_left_on_the_road(self):
+        # Build 114: Ninja is the only fighter, so the Spark Road is empty and every Credit is paid as Bolts (Coins).
         me = self.player()
         token = me["token"]
         road = self.call("GET", "/v1/me", token=token)[1]["account"]["road"]
-        order = [f for f, _ in economy.SPARK_ROAD]
-        cost = dict(economy.SPARK_ROAD)
-        self.assertEqual([s["fighter"] for s in road["steps"]], order)
-        self.assertEqual(order, ["BRAKK", "KIRA", "KITO", "BUDDY"])
-        self.assertEqual([s["cost"] for s in road["steps"]], [2500, 4200, 6500, 7000])
-        self.assertEqual(road["steps"][0], {"fighter": "BRAKK", "cost": 2500, "rarity": "RARE"})
-        self.assertEqual(len(road["steps"]), len(rules.FIGHTER_SKINS) - 1)
-        # The road has a fixed order: the Credits go toward the first fighter along it that is still locked.
-        self.assertEqual(road["target"], "BRAKK")
-        # There is nothing to claim any more: the road unlocks by itself, and the Spark Pass is gone.
+        self.assertEqual((road["steps"], road["target"]), ([], ""))
         self.assertEqual(self.call("POST", "/v1/road/unlock", {}, token)[0], 404)
         self.assertEqual(self.call("POST", "/v1/pass/claim", {"tier": 1}, token)[0], 404)
-        self.assertNotIn("pass", self.call("GET", "/v1/me", token=token)[1]["account"])
-        # Not covered yet: the Credits sit on the road.
-        self.store.grant(me["id"], prisms=5000, credits=cost["BRAKK"] - 50)
-        account = self.call("GET", "/v1/me", token=token)[1]["account"]
-        self.assertEqual((account["profile"]["credits"], account["profile"]["fighters"]["BRAKK"]["unlocked"]), (cost["BRAKK"] - 50, False))
-        # The shop sells Credits for Prisms. The moment the bar is full the fighter is unlocked, and what is left
-        # over carries on toward the next one.
-        status, body = self.call("POST", "/v1/shop/buy", {"item": "credits_s"}, token)
-        self.assertEqual((status, body["reward"]), (200, {"type": "bundle", "items": [{"type": "credits", "amount": 60}, {"type": "fighter", "fighter": "BRAKK"}]}))
-        self.assertTrue(body["account"]["profile"]["fighters"]["BRAKK"]["unlocked"])
-        self.assertEqual((body["account"]["profile"]["credits"], body["account"]["road"]["target"]), (10, order[1]))
-        # A fighter bought in the shop is simply skipped on the road.
-        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "fighter_" + order[1]}, token)[0], 200)
-        self.assertEqual(self.call("GET", "/v1/me", token=token)[1]["account"]["road"]["target"], order[2])
-        # Enough for all the rest at once: they unlock in order, in one go.
+        self.store.grant(me["id"], prisms=5000)
         before = self.store.profile(me["id"])["bolts"]
-        self.store.grant(me["id"], credits=sum(c for name, c in economy.SPARK_ROAD[2:]))
-        account = self.call("GET", "/v1/me", token=token)[1]["account"]
-        profile = account["profile"]
-        self.assertTrue(all(f["unlocked"] for f in profile["fighters"].values()))
-        self.assertEqual(account["road"]["target"], "")
-        # The road is finished: the Credits left on it were paid as Bolts, and so are any earned from here on.
-        self.assertEqual((profile["credits"], profile["bolts"]), (0, before + 10))
         status, body = self.call("POST", "/v1/shop/buy", {"item": "credits_s"}, token)
-        self.assertEqual(body["reward"], {"type": "bolts", "amount": 60})
-        self.assertEqual((body["account"]["profile"]["credits"], body["account"]["profile"]["bolts"]), (0, before + 70))
+        self.assertEqual((status, body["reward"]), (200, {"type": "bolts", "amount": 60}))
+        self.assertEqual((body["account"]["profile"]["credits"], body["account"]["profile"]["bolts"]), (0, before + 60))
         self.assertNotIn("glory", body["account"]["profile"])
-        self.assertNotIn("glory", self.call("GET", "/v1/leaderboard")[1]["players"][0])
 
-    def test_a_match_that_fills_the_road_says_who_it_unlocked(self):
+    def test_a_match_unlocks_nobody_now(self):
+        # (Build 114: nobody is left on the road. A win's Credits are Coins, and no match unlocks anyone.)
         me = self.player()
         token = me["token"]
-        self.store.grant(me["id"], credits=dict(economy.SPARK_ROAD)["BRAKK"] - 3)
         win = {"outcome": "VICTORY", "placement": 0, "kos": 3, "deaths": 1, "damage": 4000}
         _, plan = self.call("POST", "/v1/matches", {"mode": "BOSS"}, token)
         self.age_matches()
         _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], win, token)
-        self.assertEqual((body["credits"], body["unlocked"]), (6, ["BRAKK"]))
+        self.assertEqual((body["credits"], body["unlocked"]), (0, []))
+        self.assertEqual(body["account"]["profile"]["credits"], 0)
         self.assertNotIn("passPoints", body)
-        self.assertNotIn("glory", body)
-        self.assertTrue(body["account"]["profile"]["fighters"]["BRAKK"]["unlocked"])
-        self.assertEqual(body["account"]["profile"]["credits"], 3)
-        # The next one unlocks nobody.
-        _, plan = self.call("POST", "/v1/matches", {"mode": "BOSS"}, token)
-        self.age_matches()
-        _, body = self.call("POST", "/v1/matches/%d/result" % plan["matchId"], win, token)
-        self.assertEqual((body["credits"], body["unlocked"]), (6, []))
 
     def test_fighters_that_were_taken_out_are_paid_back(self):
-        # A profile from the builds that had more fighters: one it unlocked, one it never did.
+        # A profile from the builds that had more fighters: one it unlocked, one it never did. With nobody left on the
+        # road (build 114) what comes back is Bolts.
         profile = economy.new_profile()
         profile["fighters"]["PIP"] = {"unlocked": True, "level": 4, "ownedSkins": [0]}
         profile["fighters"]["ZERO"] = {"unlocked": False, "level": 1, "ownedSkins": [0]}
         economy.complete(profile)
         self.assertEqual(sorted(profile["fighters"]), sorted(rules.FIGHTER_SKINS))
-        self.assertEqual(profile["credits"], 160)
-        # With the road already finished, the Credits come back as Bolts.
-        done = economy.new_profile()
-        for entry in done["fighters"].values():
-            entry["unlocked"] = True
-        done["fighters"]["AURA"] = {"unlocked": True, "level": 1, "ownedSkins": [0]}
-        economy.complete(done)
-        self.assertEqual((done["credits"], done["bolts"]), (0, economy.STARTING_BOLTS + 1600))
-        # An account from when Juno was the starter: she is gone, with her levels and Cups, and Byte is there instead.
+        self.assertEqual((profile["credits"], profile["bolts"]), (0, economy.STARTING_BOLTS + 160))
+        # The fighters removed in build 114 go for nothing: the owner's decision.
+        had = economy.new_profile()
+        for name in ("BRAKK", "KIRA", "KITO", "BUDDY"):
+            had["fighters"][name] = {"unlocked": True, "level": 9, "ownedSkins": [0, 1, 2], "cups": 50}
+        had["fighters"]["BYTE"]["level"] = 6
+        economy.complete(had)
+        self.assertEqual(sorted(had["fighters"]), ["BYTE"])
+        self.assertEqual((had["credits"], had["bolts"], had["prisms"]), (0, economy.STARTING_BOLTS, economy.STARTING_PRISMS))
+        self.assertEqual(had["fighters"]["BYTE"]["level"], 6)
+        # An account from when Juno was the starter: she is gone, with her levels and Cups, and the starter is there instead.
         old = economy.new_profile()
         del old["fighters"]["BYTE"]
         old["fighters"]["JUNO"] = {"unlocked": True, "level": 9, "ownedSkins": [0, 1], "cups": 300}
@@ -949,59 +909,42 @@ class Api(unittest.TestCase):
         self.assertEqual(economy.complete(economy.new_profile())["prisms"], economy.STARTING_PRISMS, "new players start as before")
 
     def test_spark_is_retired_and_paid_back(self):
-        # Spark was retired in build 102: whoever had him gets his road cost back, as Credits while there is road
-        # left, Coins after; Swish, the starter, is untouched.
+        # Spark was retired in build 102: whoever had him gets his road cost back (Coins now, with nobody left on the
+        # road); the starter is untouched.
         old = economy.new_profile()
         old["fighters"]["SPARK"] = {"unlocked": True, "level": 7, "ownedSkins": [0, 2], "cups": 340}
         old["fighters"]["BYTE"]["level"] = 7
+        bolts = old["bolts"]
         economy.complete(old)
         self.assertNotIn("SPARK", old["fighters"])
         self.assertEqual(old["fighters"]["BYTE"]["level"], 7)
-        self.assertGreaterEqual(old["credits"] + sum(1 for f, _ in economy.SPARK_ROAD if old["fighters"][f]["unlocked"]), 1)
-        done = economy.new_profile()
-        for f, _ in economy.SPARK_ROAD:
-            done["fighters"][f]["unlocked"] = True
-        done["fighters"]["SPARK"] = {"unlocked": True, "level": 1, "ownedSkins": [0], "cups": 0}
-        bolts = done["bolts"]
-        economy.complete(done)
-        self.assertEqual(done["bolts"], bolts + 7000)
+        self.assertEqual(old["bolts"], bolts + 7000)
         # Reading it again changes nothing more, and nobody new has him.
-        again = json.loads(json.dumps(done))
+        again = json.loads(json.dumps(old))
         economy.complete(again)
-        self.assertEqual(again, done)
+        self.assertEqual(again, old)
         self.assertNotIn("SPARK", economy.complete(economy.new_profile())["fighters"])
 
     def test_profiles_from_before_glory_and_the_pass_were_removed(self):
-        # Stored before the change: some Glory, a Spark Pass, no entry for the newest fighter, and Credits that
-        # used to be nearly enough for the next fighter.
+        # Stored before the change: some Glory, a Spark Pass, and Credits left on the road (Coins now: nobody is left on it).
         old = economy.new_profile()
-        del old["fighters"]["BUDDY"]
         old.update({"glory": 340, "pass": {"season": 3, "points": 250, "claimed": [1]}, "credits": 150})
         economy.complete(old)
         self.assertNotIn("glory", old)
         self.assertNotIn("pass", old)
-        self.assertEqual(old["bolts"], economy.STARTING_BOLTS + 340)
-        self.assertEqual(old["fighters"]["BUDDY"], {"unlocked": False, "level": 1, "ownedSkins": [0], "cups": 0})
-        self.assertEqual(old["credits"], 150)
+        self.assertEqual((old["bolts"], old["credits"]), (economy.STARTING_BOLTS + 340 + 150, 0))
         # Reading it again changes nothing more.
         again = json.loads(json.dumps(old))
         economy.complete(again)
         self.assertEqual(again, old)
-        # Credits that already cover the next fighter unlock it as soon as the profile is read.
-        rich = economy.new_profile()
-        rich["credits"] = dict(economy.SPARK_ROAD)["BRAKK"] + 5
-        economy.complete(rich)
-        self.assertEqual((rich["fighters"]["BRAKK"]["unlocked"], rich["credits"]), (True, 5))
 
-    def test_a_jackpot_whose_credits_unlock_a_fighter_comes_back_as_one_flat_list(self):
+    def test_a_jackpots_credits_are_coins_now(self):
+        # (Build 114: nobody is left on the road, so a jackpot's Credits come back as Bolts.)
         profile = economy.new_profile()
-        profile["credits"] = dict(economy.SPARK_ROAD)["BRAKK"] - 10
         jackpot = {"type": "bundle", "items": [{"type": "credits", "amount": 1000}, {"type": "prisms", "amount": 1200}, {"type": "bolts", "amount": 6000}]}
         given = economy.grant(profile, jackpot)
-        self.assertEqual(given, {"type": "bundle", "items": [
-            {"type": "credits", "amount": 1000}, {"type": "fighter", "fighter": "BRAKK"}, {"type": "prisms", "amount": 1200}, {"type": "bolts", "amount": 6000}]})
-        self.assertTrue(profile["fighters"]["BRAKK"]["unlocked"])
-        self.assertEqual(profile["credits"], 990)
+        self.assertEqual(given, {"type": "bundle", "items": [{"type": "bolts", "amount": 1000}, {"type": "prisms", "amount": 1200}, {"type": "bolts", "amount": 6000}]})
+        self.assertEqual(profile["credits"], 0)
 
     def test_drops_give_twelve_times_the_credits(self):
         rng = random.Random(8)
@@ -1042,17 +985,17 @@ class Api(unittest.TestCase):
         # A later save can't change any of it.
         body = self.call("PUT", "/v1/save", {"save": {"bolts": 999999, "prisms": 999999, "fighters": {"KITO": {"unlocked": True, "level": 50}}}}, token)[1]
         self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["prisms"]), (500, 100))
-        self.assertFalse(body["account"]["profile"]["fighters"]["KITO"]["unlocked"])
+        self.assertNotIn("KITO", body["account"]["profile"]["fighters"])  # (removed in build 114)
 
         status, body = self.call("POST", "/v1/fighters/upgrade", {"fighter": "BYTE", "costFactor": 0, "noCap": True}, token)
         self.assertEqual((status, body["cost"]), (200, 10))  # an ordinary player's cost factor is ignored
         self.assertEqual((body["account"]["profile"]["bolts"], body["account"]["profile"]["fighters"]["BYTE"]["level"]), (490, 2))
         self.assertEqual(self.call("POST", "/v1/fighters/upgrade", {"fighter": "KITO"}, token)[0], 409)
 
-        status, body = self.call("POST", "/v1/shop/buy", {"item": "fighter_BRAKK"}, token)
-        self.assertEqual((status, body["reward"], body["account"]["profile"]["prisms"]), (200, {"type": "fighter", "fighter": "BRAKK"}, 60))
-        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "fighter_KITO"}, token)[0], 402)
-        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "fighter_BRAKK"}, token)[0], 409)
+        status, body = self.call("POST", "/v1/shop/buy", {"item": "skin_BYTE_1"}, token)
+        self.assertEqual((status, body["reward"], body["account"]["profile"]["prisms"]), (200, {"type": "skin", "fighter": "BYTE", "skin": 1}, 80))
+        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "fighter_KITO"}, token)[0], 404)  # (nobody is sold since build 114)
+        self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "skin_BYTE_1"}, token)[0], 409)
         self.assertEqual(self.call("POST", "/v1/shop/buy", {"item": "everything"}, token)[0], 404)
 
         status, body = self.call("POST", "/v1/shop/gift", {}, token)
@@ -1091,9 +1034,10 @@ class Api(unittest.TestCase):
         self.assertEqual([(d["id"], d["title"], d["price"], d["purchased"]) for d in shown], [(deal_id, "Starter pack", 30, 0)])
         status, body = self.call("POST", "/v1/shop/deals/%d/buy" % deal_id, {}, buyer["token"])
         self.assertEqual(status, 200)
-        self.assertEqual(body["reward"], {"type": "bundle", "items": [{"type": "bolts", "amount": 500}, {"type": "fighter", "fighter": "BRAKK"}]})
+        # (A removed fighter in a deal is dropped from it: since build 114 there is nobody but Ninja to give.)
+        self.assertEqual(body["reward"], {"type": "bolts", "amount": 500})
         profile = body["account"]["profile"]
-        self.assertEqual((profile["bolts"], profile["prisms"], profile["fighters"]["BRAKK"]["unlocked"]), (600, 20, True))
+        self.assertEqual((profile["bolts"], profile["prisms"], "BRAKK" in profile["fighters"]), (600, 20, False))
         self.assertEqual(body["account"]["deals"][0]["purchased"], 1)
         self.assertEqual(self.call("POST", "/v1/shop/deals/%d/buy" % deal_id, {}, buyer["token"])[0], 409)  # limit 1
         self.assertEqual(self.call("GET", "/v1/me", token=dev["token"])[1]["account"]["deals"][0]["purchased"], 0)
@@ -1250,7 +1194,7 @@ class Refereed(Api):
     def test_a_claimed_instant_win_is_refused(self):
         pass
 
-    def test_a_match_that_fills_the_road_says_who_it_unlocked(self):
+    def test_a_match_unlocks_nobody_now(self):
         pass
 
     def test_the_referee_decides_the_result(self):
@@ -1275,7 +1219,9 @@ class Refereed(Api):
         self.assertEqual(body["entityTier"], 1)
         self.assertEqual(self.call("POST", "/v1/matches", {"mode": "BOSS", "fighter": "BYTE", "level": 1, "difficulty": "EASY"}, me["token"])[1]["tier"], 1)
         # (Paid by the replay, KOs included: a corrupted fighter fights for the Entity, even one left idle.)
-        self.assertEqual(body["bolts"], economy.match_bolts("BOSS", report["outcome"], report["placement"], report["kos"], "EASY"))
+        # (A match's Credits are Coins too, with nobody left on the road since build 114.)
+        self.assertEqual(body["bolts"], economy.match_bolts("BOSS", report["outcome"], report["placement"], report["kos"], "EASY")
+                         + economy.match_credits("BOSS", report["outcome"], report["placement"]))
         row = self.store._db.execute("SELECT outcome, placement, verified, ticks FROM matches WHERE id = ?", (plan["matchId"],)).fetchone()
         self.assertEqual((row["outcome"], row["placement"], row["verified"]), (report["outcome"], report["placement"], 1))
         self.assertGreater(row["ticks"], 0)

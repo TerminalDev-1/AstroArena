@@ -30,7 +30,8 @@ class Control {
 }
 
 /** [side]: how far to the left (+) or right (-) of the fighter the shot leaves from, in tiles. */
-class PendingShot(var delay: Float, val dirX: Float, val dirY: Float, val side: Float = 0f)
+/** A shot still to come; [cosmic]: one of a [io.github.projectwip.data.SuperKind.COSMIC] super's bullets, not the main attack. */
+class PendingShot(var delay: Float, val dirX: Float, val dirY: Float, val side: Float = 0f, val cosmic: Boolean = false)
 
 class Fighter(
     val id: Int,
@@ -205,7 +206,8 @@ class Fighter(
 /** One hex on a fighter: who did it, what each bite does, the time to the next bite, and how long it has left. */
 class Hex(val by: Int, val damage: Int, var tick: Float, var left: Float)
 
-enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, STAR, ARROW, GUST }
+/** [BULLET] is Ninja's gun; [COSMIC] his super's blinding electric-blue bullets. */
+enum class ShotStyle { SPARK, PELLET, PRISM, VOLLEY, LANCE, ROCKET, BIT, COMPUTER, PAW, HAMMER, HEX, STAR, ARROW, GUST, BULLET, COSMIC }
 
 class Projectile(
     val ownerId: Int,
@@ -276,6 +278,8 @@ sealed interface GameEvent {
     /** The Entity corrupted a fighter ([on]) or let it go. */
     data class Corrupted(val fighterId: Int, val on: Boolean) : GameEvent
     data class EntityHit(val fighterId: Int, val isSuper: Boolean, val damage: Int, val x: Float, val y: Float) : GameEvent
+    /** A cosmic bullet stunned the Entity, for [seconds]. */
+    data class EntityStunned(val fighterId: Int, val seconds: Float) : GameEvent
     /** The Entity began a move ([move]: an `EntityMove` ordinal), for its sound. */
     data class EntityAttack(val move: Int) : GameEvent
     data class Shot(val fighterId: Int, val isSuper: Boolean, val x: Float, val y: Float, val dirX: Float, val dirY: Float) : GameEvent

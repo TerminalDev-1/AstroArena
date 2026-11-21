@@ -151,7 +151,7 @@ object Shop {
     )
 
     val fighterOffers: List<ShopItem.FighterOffer> =
-        FighterId.entries.mapNotNull { id -> Balance.unlockPrismPrice(id)?.let { ShopItem.FighterOffer(id, it) } }
+        Balance.fighters.mapNotNull { f -> Balance.unlockPrismPrice(f.id)?.let { ShopItem.FighterOffer(f.id, it) } }
 
     val skinOffers: List<ShopItem.SkinOffer> = Balance.fighters.flatMap { f ->
         f.skins.indices.drop(1).map { ShopItem.SkinOffer(f.id, it) }

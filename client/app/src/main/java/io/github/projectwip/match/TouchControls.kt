@@ -176,7 +176,7 @@ class TouchControls(private val density: Float) {
         if (pr.contains(x, y)) { pendingPause = true; return }
         if (skipShown && RectF(skipRect).apply { inset(-dp(10f), -dp(10f)) }.contains(x, y)) { pendingSkip = true; return }
 
-        if (hyperReady && hypot(x - hyperCx, y - hyperCy) < hyperRadius * 1.4f) { pendingHyper = true; return }
+        // (No hyper button since build 114.)
         if (rocketsDown >= 0 && hypot(x - detonateCx, y - detonateCy) < detonateRadius * 1.3f) { pendingDetonate = true; return }
 
         // Aim sticks measure from where the thumb lands, so a tap anywhere on them is a clean
@@ -433,53 +433,7 @@ class TouchControls(private val density: Float) {
             c.drawText("SUPER", bx, by + sr * 1.02f, text)
         }
 
-        // ---- Hyper button
-        val hr = hyperRadius
-        val hReady = hyperCharge >= 1f && hyperLeft <= 0f && alive
-        val hOn = hyperLeft > 0f
-        val hPulse = if (hReady) 1f + 0.07f * kotlin.math.sin(time * 7f) else 1f
-        if (hReady) {
-            fill.color = Color.argb(a * 90 / 255, 200, 110, 255)
-            c.drawCircle(hyperCx, hyperCy, hr * 1.4f * hPulse, fill)
-        }
-        fill.color = when {
-            hReady -> Color.argb(a, 168, 72, 255)
-            hOn -> Color.argb(a * 220 / 255, 96, 44, 170)
-            else -> Color.argb(a * 170 / 255, 40, 30, 70)
-        }
-        c.drawCircle(hyperCx, hyperCy, hr, fill)
-        arc.set(hyperCx - hr * 1.18f, hyperCy - hr * 1.18f, hyperCx + hr * 1.18f, hyperCy + hr * 1.18f)
-        line.strokeWidth = dp(6f)
-        if (!hReady) {
-            // The rim fills as it charges, and drains while the hyper runs.
-            line.color = Color.argb(a * 120 / 255, 11, 6, 32)
-            c.drawArc(arc, 0f, 360f, false, line)
-            line.color = if (hOn) Color.argb(a, 255, 255, 255) else Color.argb(a, 200, 110, 255)
-            c.drawArc(arc, -90f, 360f * (if (hOn) hyperLeft else hyperCharge).coerceIn(0f, 1f), false, line)
-        }
-        line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(3.5f)
-        c.drawCircle(hyperCx, hyperCy, hr, line)
-        // The emblem: two chevrons pointing up.
-        line.strokeJoin = Paint.Join.ROUND
-        for (k in 0..1) {
-            val cy = hyperCy + hr * (0.02f + 0.34f * k)
-            glyph.reset()
-            glyph.moveTo(hyperCx - hr * 0.44f, cy); glyph.lineTo(hyperCx, cy - hr * 0.42f); glyph.lineTo(hyperCx + hr * 0.44f, cy)
-            line.color = Color.argb(a, 11, 6, 32); line.strokeWidth = dp(7f)
-            c.drawPath(glyph, line)
-            line.color = if (hReady || hOn) Color.argb(a, 255, 255, 255) else Color.argb(a * 150 / 255, 176, 164, 214)
-            line.strokeWidth = dp(3.5f)
-            c.drawPath(glyph, line)
-        }
-        if (hReady) {
-            text.textSize = hr * 0.46f
-            text.style = Paint.Style.STROKE; text.strokeWidth = dp(4f); text.strokeJoin = Paint.Join.ROUND
-            text.color = Color.argb(a, 11, 6, 32)
-            c.drawText("HYPER", hyperCx, hyperCy + hr * 1.08f, text)
-            text.style = Paint.Style.FILL
-            text.color = Color.argb(a, 255, 255, 255)
-            c.drawText("HYPER", hyperCx, hyperCy + hr * 1.08f, text)
-        }
+        // (No hyper button: hypers don't exist in the game since build 114.)
 
         // ---- Detonate button: a plunger, and how many rockets are waiting in the ground
         val down = rocketsDown

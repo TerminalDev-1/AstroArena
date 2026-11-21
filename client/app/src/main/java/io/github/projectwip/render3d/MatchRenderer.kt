@@ -646,6 +646,18 @@ class MatchRenderer(
             sprites.add(c + cos(a) * d, y, c + sin(a) * d, 0.3f + 0.5f * siteHash(i, 6, 11),
                 if (violet) 0.7f else 0.45f, if (violet) 0.4f else 0.9f, 1f, 0.55f * tw)
         }
+        // Stunned by Ninja's cosmic rounds: electric-blue crackle all over it, and a pulse of blue light round it.
+        if (u.stunLeft > 0f) {
+            val cy = ENTITY_SKY_LIFT + ENTITY_SKY_SCALE * 0.95f
+            val br = io.github.projectwip.data.Balance.UPRISING_ENTITY_RADIUS * 1.1f
+            for (i in 0 until 5) {
+                val a = rng.nextFloat() * 6.28f; val r = rng.nextFloat() * br
+                particles.spawn(u.ex + cos(a) * r, cy + (rng.nextFloat() - 0.5f) * ENTITY_SKY_SCALE * 1.8f, u.ey + sin(a) * r,
+                    (rng.nextFloat() - 0.5f) * 5f, (rng.nextFloat() - 0.5f) * 5f, (rng.nextFloat() - 0.5f) * 5f,
+                    0.2f, 0.16f + rng.nextFloat() * 0.18f, if (i == 0) 0xFFFFFFFF.toInt() else 0xFF5CC8FF.toInt(), 1f)
+            }
+            sprites.add(u.ex, cy, u.ey, ENTITY_SKY_SCALE * 2.4f * (1f + 0.1f * sin(time * 30f)), 0.36f, 0.72f, 1f, 0.3f)
+        }
         // Its flares: blinding blue streaks from its chest down to whoever they are locked onto, thickening as they fall.
         run {
             val bal = io.github.projectwip.data.Balance
@@ -2039,6 +2051,7 @@ class MatchRenderer(
                     val s = p.def.superSpec
                     when (s.kind) {
                         SuperKind.VOLLEY -> fan(s.range, s.spreadDegrees + 8f)
+                        SuperKind.COSMIC -> beam(clip(a, px, pz, dx, dz, s.range), s.radius * 3.2f)
                         SuperKind.PIERCE -> beam(clip(a, px, pz, dx, dz, s.range), s.radius * 3.2f)
                         SuperKind.RAM -> beam(s.range, p.radius * 2.2f)
                         // The hammer's path, and the ground that will quake where it comes down.
@@ -2219,6 +2232,23 @@ class MatchRenderer(
             val z = lerp(pr.prevY, pr.y, alpha)
             val yaw = -Math.toDegrees(atan2(pr.vy, pr.vx).toDouble()).toFloat()
             when (pr.style) {
+                ShotStyle.BULLET -> {
+                    // Ninja's bullet: a short bright slug, with a thin tracer streak behind it.
+                    val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
+                    val dx = pr.vx / len; val dz = pr.vy / len
+                    tint(0xFFFFF4D6)
+                    setModel(x, 0.72f, z, pr.radius * 2.2f, pr.radius, pr.radius, yaw); sphere.draw()
+                    tint(0xFFFFC46B)
+                    setModel(x - dx * pr.radius * 3.4f, 0.72f, z - dz * pr.radius * 3.4f, pr.radius * 4.4f, pr.radius * 0.32f, pr.radius * 0.32f, yaw); sphere.draw()
+                }
+                ShotStyle.COSMIC -> {
+                    // A cosmic bullet: a blinding white core in a shell of electric blue, pulsing as it flies.
+                    val pulse = 1f + 0.12f * sin(pr.age * 40f)
+                    tint(0xFF3FA9FF)
+                    setModel(x, 0.75f, z, pr.radius * 2.6f * pulse, pr.radius * 1.9f * pulse, pr.radius * 1.9f * pulse, yaw); sphere.draw()
+                    tint(0xFFFFFFFF)
+                    setModel(x, 0.75f, z, pr.radius * 1.5f, pr.radius * 1.1f, pr.radius * 1.1f, yaw); sphere.draw()
+                }
                 ShotStyle.SPARK, ShotStyle.VOLLEY -> {
                     tint(if (pr.style == ShotStyle.VOLLEY) 0xFFFFD640 else skin.accent)
                     setModel(x, 0.7f, z, pr.radius * 1.6f, pr.radius * 1.1f, pr.radius * 1.1f, yaw); sphere.draw()
@@ -2485,6 +2515,15 @@ class MatchRenderer(
                 particles.spawn(x + sx * side, 0.7f, z + sz * side, -pr.vx / len * 1.5f + sx * side * 2f, 0.15f, -pr.vy / len * 1.5f + sz * side * 2f,
                     0.38f, pr.radius * 0.9f, 0xFFE4F5FF.toInt(), 0.42f, growth = 0.9f, add = false)
                 if (rng.nextFloat() < 0.4f) particles.spawn(x + sx * side, 0.75f, z + sz * side, 0f, 0.3f, 0f, 0.3f, 0.07f, 0xFFCFF0FF.toInt(), 0.9f)
+            } else if (pr.style == ShotStyle.COSMIC) {
+                // Electric-blue sparks crackling off it, and a long streak of light behind.
+                val len = hypot(pr.vx, pr.vy).coerceAtLeast(0.001f)
+                for (j in 0 until 3) {
+                    val back = rng.nextFloat() * 0.5f
+                    particles.spawn(x - pr.vx / len * back, 0.75f, z - pr.vy / len * back, (rng.nextFloat() - 0.5f) * 3f, (rng.nextFloat() - 0.3f) * 2f, (rng.nextFloat() - 0.5f) * 3f,
+                        0.22f, 0.12f + rng.nextFloat() * 0.1f, if (j == 0) 0xFFFFFFFF.toInt() else 0xFF5CC8FF.toInt(), 0.95f)
+                }
+                particles.spawn(x, 0.75f, z, 0f, 0f, 0f, 0.25f, pr.radius * 3f, 0xFF3FA9FF.toInt(), 0.7f)
             } else if (pr.style == ShotStyle.ROCKET) {
                 // A rocket leaves fire behind it, and a puff of smoke that hangs in the air.
                 particles.spawn(x, 0.72f, z, 0f, 0.2f, 0f, 0.2f, 0.3f, c, 0.6f)
@@ -2502,7 +2541,9 @@ class MatchRenderer(
             val owner = world.fighter(pr.ownerId) ?: continue
             val c = colorOf(pr.style, owner)
             val x = lerp(pr.prevX, pr.x, alpha); val z = lerp(pr.prevY, pr.y, alpha)
-            val s = if (pr.style == ShotStyle.LANCE) 1.3f else if (pr.style == ShotStyle.ROCKET) 0.8f else pr.radius * 4.5f
+            val s = if (pr.style == ShotStyle.LANCE) 1.3f else if (pr.style == ShotStyle.ROCKET) 0.8f else if (pr.style == ShotStyle.COSMIC) 2.2f else pr.radius * 4.5f
+            // (A cosmic bullet blinds: a white-hot centre in its blue glow.)
+            if (pr.style == ShotStyle.COSMIC) sprites.add(x, 0.75f, z, 0.9f, 1f, 1f, 1f, 0.95f)
             // (A thrown computer only gets a faint glow, so the thing itself can be seen.)
             sprites.add(x, 0.72f, z, if (pr.style == ShotStyle.COMPUTER) 1.1f else s, r(c), g(c), b(c), if (pr.style == ShotStyle.COMPUTER) 0.22f else 0.85f)
         }
@@ -2568,6 +2609,8 @@ class MatchRenderer(
             ShotStyle.VOLLEY -> 0xFFFFD640.toInt()
             ShotStyle.SPARK, ShotStyle.BIT -> s.accent.toInt()
             ShotStyle.ROCKET -> 0xFFFF9A2E.toInt()
+            ShotStyle.BULLET -> 0xFFFFD58A.toInt()
+            ShotStyle.COSMIC -> 0xFF3FA9FF.toInt()
             else -> s.secondary.toInt()
         }
     }
@@ -2896,7 +2939,7 @@ class MatchRenderer(
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
         val upr = w.uprising
         s.uprisingPhase = if (upr != null && upr.active) upr.phase.ordinal else -1
-        s.uprisingT = upr?.t ?: 0f; s.uprisingHeld = upr?.heldFor ?: 0f; s.uprisingBowLen = upr?.bowLength ?: 0f; s.uprisingHp = upr?.hp ?: 0; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
+        s.uprisingT = upr?.t ?: 0f; s.uprisingHeld = upr?.heldFor ?: 0f; s.uprisingBowLen = upr?.bowLength ?: 0f; s.uprisingHp = upr?.hp ?: 0; s.uprisingStunned = (upr?.stunLeft ?: 0f) > 0f; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
         s.bossMode = w.rules.boss
         s.playerTrapped = p.trapped
         s.playerOut = p.eliminated
@@ -2947,7 +2990,8 @@ class MatchRenderer(
 
     private fun headHeight(def: io.github.projectwip.data.FighterDef) = headHeight(def.id)
     private fun headHeight(id: FighterId) = FIGHTER_SCALE * when (id) {
-        FighterId.BYTE -> 2.05f
+        // (Ninja, in his hood.)
+        FighterId.BYTE -> 1.9f
         FighterId.BRAKK -> 1.6f
         FighterId.KIRA -> 2.25f
         FighterId.KITO -> 1.9f

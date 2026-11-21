@@ -456,8 +456,9 @@ private fun FixedStats(def: io.github.projectwip.data.FighterDef) {
     if (def.attack.shape == io.github.projectwip.data.AttackShape.STAR) PlainText("${def.attackName}: lobbed like dynamite wherever you aim, over any wall. Where it lands it bursts, and every enemy in the burst is hit and slowed to ${pct(Balance.SLOW_FACTOR)} of their speed for ${def.attack.slowSeconds.toInt()} seconds.", Type.Small, color = Palette.Text)
     if (def.attack.shape == io.github.projectwip.data.AttackShape.ARROW) PlainText("${def.attackName}: a blast of freezing wind that knocks back whoever it hits. Once it is flying it curves a little toward the nearest enemy ahead of it, so a near miss can still find them, but a quick sidestep beats it.", Type.Small, color = Palette.Text)
     if (def.attack.healthShare > 0f) PlainText("${def.attackName}: each one takes ${pct(def.attack.healthShare)} of the health its target has left, and never less than its own damage.", Type.Small, color = Palette.Text)
-    PlainText("Hyper: for ${(def.hyper?.seconds ?: Balance.HYPER_SECONDS).toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage and +${pct(Balance.HYPER_HEALTH_BONUS)} health.", Type.Small, color = Palette.Text)
-    def.hyper?.let { PlainText("${it.name}, ${def.name}'s own hyper: ${it.description}", Type.Small, color = Palette.Gold) }
+    // (Hypers don't exist since build 114.)
+    if (Balance.HYPERS) PlainText("Hyper: for ${(def.hyper?.seconds ?: Balance.HYPER_SECONDS).toInt()} seconds, +${pct(Balance.HYPER_DAMAGE_BONUS)} damage and +${pct(Balance.HYPER_HEALTH_BONUS)} health.", Type.Small, color = Palette.Text)
+    if (Balance.HYPERS) def.hyper?.let { PlainText("${it.name}, ${def.name}'s own hyper: ${it.description}", Type.Small, color = Palette.Gold) }
     PlainText("Upgrades raise Health, ${def.attackName} and ${def.superSpec.name} by the same amount every level.", Type.Small, color = Palette.Text.copy(alpha = 0.85f))
 }
 

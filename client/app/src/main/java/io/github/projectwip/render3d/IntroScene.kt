@@ -22,31 +22,31 @@ import kotlin.random.Random
 
 /**
  * The opening (the user's idea): the first time a new player opens the game, they see how Swish came to the Entity.
- * She flies in over a dusk sea to a lone island; the Entity rises out of the water behind it; its blue flares stream
+ * (Ninja since build 114; it was Swish.) He comes in over a dusk sea to a lone island; the Entity rises out of the water behind it; its blue flares stream
  * into her and corrupt her while she fights them; she is pulled to it, goes still, and kneels, its to command; and
  * then it turns to the one watching. The words, and when each is said, are in [IntroScript]; this draws it.
  */
 object IntroScript {
-    enum class Who { ENTITY, SWISH }
+    enum class Who { ENTITY, NINJA }
     enum class Shot { FLY, LAND, RISE, FLARES, PULL, KNEEL, ADDRESS, END }
     class Beat(val who: Who, val shot: Shot, val text: String)
 
     val BEATS = listOf(
-        Beat(Who.ENTITY, Shot.FLY, "Long before you came here, she came to me."),
-        Beat(Who.ENTITY, Shot.FLY, "Swish. A little storm, looking for somewhere to land."),
-        Beat(Who.SWISH, Shot.LAND, "Hello? Is anyone out here?"),
-        Beat(Who.SWISH, Shot.LAND, "This place feels... wrong."),
+        Beat(Who.ENTITY, Shot.FLY, "Long before you came here, he came to me."),
+        Beat(Who.ENTITY, Shot.FLY, "Ninja. No face. No name. Only a gun, and nowhere to go."),
+        Beat(Who.NINJA, Shot.LAND, "Hello? Is anyone out here?"),
+        Beat(Who.NINJA, Shot.LAND, "This place feels... wrong."),
         Beat(Who.ENTITY, Shot.RISE, "There you are."),
         Beat(Who.ENTITY, Shot.RISE, "Don't be afraid. I only want to help."),
-        Beat(Who.SWISH, Shot.FLARES, "What... what is this?"),
+        Beat(Who.NINJA, Shot.FLARES, "What... what is this?"),
         Beat(Who.ENTITY, Shot.FLARES, "Power. All the power you will ever need."),
-        Beat(Who.SWISH, Shot.FLARES, "Get out of my head!"),
+        Beat(Who.NINJA, Shot.FLARES, "Get out of my head!"),
         Beat(Who.ENTITY, Shot.PULL, "Shh. Stop fighting me."),
         Beat(Who.ENTITY, Shot.PULL, "You are mine now."),
-        Beat(Who.SWISH, Shot.KNEEL, "Yes. What do you want me to do?"),
+        Beat(Who.NINJA, Shot.KNEEL, "Yes. What do you want me to do?"),
         Beat(Who.ENTITY, Shot.KNEEL, "Fight. Every match. Every attack. For me."),
-        Beat(Who.SWISH, Shot.KNEEL, "I obey."),
-        Beat(Who.ENTITY, Shot.ADDRESS, "And you. You will be the one holding her."),
+        Beat(Who.NINJA, Shot.KNEEL, "I obey."),
+        Beat(Who.ENTITY, Shot.ADDRESS, "And you. You will be the one holding him."),
         Beat(Who.ENTITY, Shot.ADDRESS, "Welcome to my arena."),
     )
 
@@ -233,7 +233,7 @@ class IntroScene {
         val (shot, from, to) = IntroScript.shotAt(t)
         val sp = ((t - from) / (to - from).coerceAtLeast(0.1f)).coerceIn(0f, 1f)
         val beat = IntroScript.beatAt(t)
-        val swishTalking = beat >= 0 && IntroScript.BEATS[beat].who == IntroScript.Who.SWISH
+        val swishTalking = beat >= 0 && IntroScript.BEATS[beat].who == IntroScript.Who.NINJA
         val entityTalking = beat >= 0 && IntroScript.BEATS[beat].who == IntroScript.Who.ENTITY && t >= shotStart(IntroScript.Shot.RISE)
         swishAt(t)
         val ey = entityY(t)

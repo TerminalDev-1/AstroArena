@@ -325,10 +325,15 @@ class HudView(
                 val frac = if (s.uprisingMaxHp > 0) s.uprisingHp.toFloat() / s.uprisingMaxHp else 0f
                 fill.color = Color.argb(200, 12, 6, 30)
                 c.drawRect(l + dp(14f), top + dp(24f), l + pw - dp(14f), top + dp(36f), fill)
-                fill.color = Color.rgb(160, 110, 255)
+                // (Stunned by Ninja's cosmic rounds, its bar flickers electric blue.)
+                fill.color = if (s.uprisingStunned && (t * 12f).toInt() % 2 == 0) Color.rgb(92, 200, 255) else Color.rgb(160, 110, 255)
                 c.drawRect(l + dp(14f), top + dp(24f), l + dp(14f) + (pw - dp(28f)) * frac, top + dp(36f), fill)
                 text.textSize = dp(13f)
                 outlined(c, (if (s.entityTier > 0) "THE ENTITY · TIER ${s.entityTier + 1} · " else "THE ENTITY · ") + "%,d".format(s.uprisingHp), w / 2, top + dp(18f), Color.WHITE, dp(2.5f))
+                if (s.uprisingStunned) {
+                    text.textSize = dp(15f)
+                    outlined(c, "STUNNED", w / 2, top + ph + dp(20f), Color.rgb(92, 200, 255), dp(3f))
+                }
                 // Drained by its red flares: weaker, and how close it is to taking them.
                 if (s.playerDrains > 0 && !s.playerTrapped && t >= 5f && s.trappedNames.isEmpty())
                     entityPlate(c, "DRAINED ${s.playerDrains}/${io.github.projectwip.data.Balance.ENTITY_DRAINS_TO_TAKE}", "YOU HIT SOFTER AND MOVE SLOWER", w / 2, underBar(), 1f)

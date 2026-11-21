@@ -380,6 +380,7 @@ class MatchRunner(
                 val gain = if (e.fighterId == pid) 1f else near * 0.6f
                 // (The storm has a sound of its own, when it rises.)
                 if (e.isSuper && f.def.superSpec.kind == io.github.projectwip.data.SuperKind.TEMPEST) Unit
+                else if (e.isSuper && f.def.superSpec.kind == io.github.projectwip.data.SuperKind.COSMIC) sfx.play(Sound.COSMIC, gain)
                 else if (e.isSuper) sfx.play(Sound.SUPER, gain)
                 else sfx.play(when (f.def.attack.shape) {
                     AttackShape.BURST -> Sound.SHOOT_SPARK
@@ -394,6 +395,7 @@ class MatchRunner(
                     AttackShape.SLASH -> Sound.WHOOSH
                     AttackShape.STAR -> Sound.STAR
                     AttackShape.ARROW -> Sound.ARROW
+                    AttackShape.BULLET -> Sound.GUNSHOT
                 }, gain, (if (f.def.attack.shape == AttackShape.SLASH) 1.5f else 0.95f) + (e.x % 0.1f))
                 if (e.fighterId == pid) sfx.buzz(if (e.isSuper) 40 else 12, if (e.isSuper) 200 else 60)
             }

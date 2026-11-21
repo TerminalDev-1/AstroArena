@@ -199,6 +199,14 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 
 ## Rules of the codebase
 
+- **Ninja is the only fighter** (build 114, the owner's decision; details in `tracked-docs/ninja.md`). He is on the
+  starter's id (`FighterId.BYTE`): a hooded ninja with a black void for a face (`Slot.VOID`, `buildNinja`) and a gun
+  (`AttackShape.BULLET`, 900 a bullet). His super (`SuperKind.COSMIC`) is three cosmic bullets that hit the Entity
+  `COSMIC_ENTITY_MULT` harder and stun it `COSMIC_STUN_SECONDS` (not again for `COSMIC_STUN_GUARD` after). **Hypers
+  are gone** (`Balance.HYPERS = false`: no button, nothing charges). Swish, Bark, Kira, Kito and Buddy are **legacy**:
+  defs in `data/legacy/LegacyFighters.kt`, models in `render3d/legacy/LegacyModels.kt`, ids still in `FighterId` so
+  old saves load (every save drops them, and nobody got anything back). Most fighter notes below are history now.
+
 - **AstroArena is a boss-fight game about the Entity** (the user's direction, build 111): "you fight the Entity;
   everything ties back to the Entity." The modes are the Entity's fight (`GameMode.BOSS`, "The Entity" to players: its
   ritual, which a player can SKIP (`Control.skip`, flag 32 in the input log and on the wire), then its world, where a

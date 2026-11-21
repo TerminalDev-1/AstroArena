@@ -12,7 +12,7 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 enum class Sound {
-    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX, STAR, STAR_BURST, ARROW, TEMPEST, TEMPEST_HIT, THUNDER, TEMPEST_WIND,
+    SHOOT_SPARK, SHOOT_HEAVY, SHOOT_PRISM, GUNSHOT, COSMIC, SUPER, HIT, HURT, KO, SUPER_READY, HYPER, ROCKET, ROCKET_BOOM, BARK, GLASS, EMPTY, HEX, STAR, STAR_BURST, ARROW, TEMPEST, TEMPEST_HIT, THUNDER, TEMPEST_WIND,
     TICK, GO, TAP, UPGRADE, REWARD, VICTORY, DEFEAT, DENIED,
     PICKUP, CRATE_BREAK, DROP_TAP, DROP_UPGRADE, DROP_OPEN, WHOOSH, VERSUS,
     UI_BACK, UI_SELECT, UI_TOGGLE, UI_OPEN, BANNER, COUNT, POP, CHING, BOLT_LAND, PRISM_LAND, GLITCH, CREDIT_LAND,
@@ -51,6 +51,8 @@ object SfxSynth {
         Sound.RIFT -> riftTear().finish(0.8f)
         Sound.DIM_AIR -> dimensionAir().finish(0.6f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
+        Sound.GUNSHOT -> gunshot().finish(0.8f)
+        Sound.COSMIC -> cosmicRounds().finish(0.9f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
         Sound.HURT -> hurt().finish(0.8f)
@@ -614,6 +616,36 @@ object SfxSynth {
             noise(310 + k, 0.04f + r.nextFloat() * 0.25f, 0.03f, Band.HIGH, { 6000f + 2500f * r.nextFloat() }, 1f, { perc(it, 0.0005f, 0.008f) * 0.12f })
         }
         filter(Band.LOW, 0.8f) { 9500f }
+    }
+
+    // Ninja's gun is a real thing, so it is made from shaped noise with natural envelopes (no tones): the user hears
+    // the difference between real sound design and beeps.
+
+    /** One gunshot: the crack of the round, the thump of the charge, and the report rolling off into the distance. */
+    private fun gunshot() = Clip(0.6f).apply {
+        noise(401, 0f, 0.06f, Band.HIGH, { 2400f }, 0.7f, { perc(it, 0.0004f, 0.012f) * 0.9f })
+        noise(402, 0f, 0.2f, Band.LOW, { glide(it, 0.12f, 520f, 140f) }, 0.9f, { perc(it, 0.001f, 0.045f) * 0.85f })
+        noise(403, 0.004f, 0.55f, Band.BAND, { glide(it, 0.5f, 1500f, 420f) }, 0.9f, { perc(it, 0.004f, 0.12f) * 0.32f })
+        // (The action cycling, a beat later: a short dry tick.)
+        noise(404, 0.11f, 0.03f, Band.HIGH, { 5200f }, 1.2f, { perc(it, 0.0005f, 0.006f) * 0.1f })
+        filter(Band.LOW, 0.8f) { 11000f }
+    }
+
+    /**
+     * Ninja's super: three cosmic rounds [io.github.projectwip.data.Balance.COSMIC_GAP_SECONDS] apart, each a heavy
+     * blast of air with electric crackle torn through it (stuttered noise, not zaps), and a deep boom under the first.
+     */
+    private fun cosmicRounds() = Clip(1.2f).apply {
+        noise(420, 0f, 0.8f, Band.LOW, { glide(it, 0.6f, 160f, 60f) }, 0.8f, { perc(it, 0.002f, 0.22f) * 0.8f })
+        for (k in 0 until 3) {
+            val at = k * 0.12f
+            noise(421 + k, at, 0.08f, Band.HIGH, { 3000f }, 0.7f, { perc(it, 0.0004f, 0.015f) * 0.8f })
+            noise(430 + k, at, 0.3f, Band.LOW, { glide(it, 0.2f, 700f, 180f) }, 0.9f, { perc(it, 0.001f, 0.06f) * 0.7f })
+            // Crackle: bursts of bright noise switching on and off quickly as the charge spits off it.
+            noise(440 + k, at + 0.01f, 0.35f, Band.BAND, { 4200f }, 2.2f, { t -> perc(t, 0.002f, 0.12f) * (if (((t * 90f).toInt() % 3) == 0) 0.45f else 0.06f) })
+        }
+        noise(450, 0.02f, 1.1f, Band.BAND, { glide(it, 1f, 2200f, 500f) }, 0.9f, { perc(it, 0.01f, 0.3f) * 0.25f })
+        filter(Band.LOW, 0.8f) { 12000f }
     }
 
     /** Swish loosing an arrow: the deep twang of a big bowstring, air tearing past, and a glint off the diamond tip. */

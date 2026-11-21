@@ -74,7 +74,8 @@ class ProgressionTest {
         val verdict = ServerVerdict(8, 8, false, 1, 3, bolts = 28, credits = 6, unlocked = listOf(FighterId.BRAKK))
         val (_, rewards) = Progression.applyMatch(SaveData(), report(MatchOutcome.VICTORY), today = 100, verdict = verdict)
         assertEquals(6 to listOf(FighterId.BRAKK), rewards.credits to rewards.unlocked)
-        assertEquals("the road's prices, as the server charges them", listOf(2500, 4200, 6500, 7000), io.github.projectwip.data.SparkRoad.steps.map { it.cost })
+        // (Since build 114 nobody is left on the road: the server sends no unlocks any more, but one still shows.)
+        assertTrue(io.github.projectwip.data.SparkRoad.steps.isEmpty())
     }
 
     @Test fun offlineMatchesEarnNothing() {
@@ -265,24 +266,29 @@ class ProgressionTest {
         assertFalse(v.isNewer("0.5.1-preview", "6"))
     }
 
-    @Test fun rosterHasFourFightersAtGenreScale() {
-        assertEquals(FighterId.entries.size, Balance.fighters.size)
-        assertEquals("the roster lists fighters in id order", FighterId.entries.toList(), Balance.fighters.map { it.id })
-        val kito = Balance.fighter(FighterId.KITO)
-        assertEquals("Kito", kito.name)
-        assertFalse("new fighters start locked", SaveData().progress(FighterId.KITO).unlocked)
-        assertNotNull(Balance.unlockPrismPrice(FighterId.KITO))
-        // Fighters are unlocked on the Spark Road; the Cup Track pays Credits towards it instead of handing one out.
-        assertTrue(io.github.projectwip.data.SparkRoad.steps.any { it.fighter == FighterId.KITO })
-        assertEquals("the last one on the road is Buddy (Spark was retired)", FighterId.BUDDY, io.github.projectwip.data.SparkRoad.steps.last().fighter)
-        assertEquals(io.github.projectwip.data.SparkRoad.steps.first(), io.github.projectwip.data.SparkRoad.next(SaveData()))
-        // The floor every fighter stands on: enough health, and enough damage from one ammo when it all lands.
-        for (f in Balance.fighters.filter { it.upgradable }) {
-            assertTrue("${f.name} health ${f.health.base}", f.health.base >= Balance.MIN_HEALTH)
-            // (A hex does its damage again with every bite.)
-            val bites = if (f.attack.hexSeconds > 0f) (f.attack.hexSeconds / Balance.HEX_TICK_SECONDS).toInt() else 1
-            assertTrue("${f.name} damage an ammo ${f.attackDamage.base * f.attack.projectiles * bites}", f.attackDamage.base * f.attack.projectiles * bites >= Balance.MIN_AMMO_DAMAGE)
-        }
+    @Test fun ninjaIsTheWholeRoster() {
+        // Build 114 (the owner's decision): Ninja, on the starter's id, is the only fighter. The others' ids are kept
+        // (old saves, legacy defs), but nobody can unlock, buy or play them, and every save drops them.
+        assertEquals(listOf(FighterId.BYTE), Balance.fighters.map { it.id })
+        assertEquals("Ninja", Balance.fighter(FighterId.BYTE).name)
+        assertTrue(SaveData().progress(FighterId.BYTE).unlocked)
+        assertTrue(io.github.projectwip.data.SparkRoad.steps.isEmpty())
+        // The owner's numbers: 900 a bullet, a super of three bullets of double that.
+        val ninja = Balance.fighter(FighterId.BYTE)
+        assertEquals(900, ninja.attackDamage.base)
+        assertEquals(1800, ninja.superDamage.base)
+        assertTrue("health ${ninja.health.base}", ninja.health.base >= Balance.MIN_HEALTH)
+    }
+
+    @Test fun aSaveWithRemovedFightersLosesThemForNothing() {
+        val json = io.github.projectwip.data.SaveStore.toJson(SaveData(selectedFighter = FighterId.KIRA, bolts = 77,
+            fighters = FighterId.entries.associateWith { io.github.projectwip.data.FighterProgress(unlocked = true, level = 7) }))
+        val back = io.github.projectwip.data.SaveStore.fromJson(json)
+        assertEquals(FighterId.BYTE, back.selectedFighter)
+        assertEquals(77, back.bolts)
+        assertTrue(back.progress(FighterId.BYTE).unlocked)
+        assertEquals(7, back.progress(FighterId.BYTE).level)
+        for (id in FighterId.entries.filter { it != FighterId.BYTE }) assertFalse("$id is gone", back.progress(id).unlocked)
     }
 
     @Test fun serverCanRetuneBotsAndFreshSavesAreRecognised() {

@@ -53,6 +53,10 @@ class Uprising(
     /** How each one was, to put them back afterwards: x, y, hp, super charge, hyper charge, ammo, blade bar, the Entity's pull. */
     val saved = HashMap<Int, FloatArray>()
     /** The Entity's health in the sky. */
+    /** Seconds the Entity is still stunned (Ninja's cosmic bullets): it does nothing while it lasts. */
+    var stunLeft = 0f
+    /** Seconds until it can be stunned again ([io.github.projectwip.data.Balance.COSMIC_STUN_GUARD] after a stun). */
+    var stunGuard = 0f
     var hp = 0
     var maxHp = 0
     var strikeIn = 0f

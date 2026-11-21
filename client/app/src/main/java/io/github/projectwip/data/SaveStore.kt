@@ -119,6 +119,9 @@ class SaveStore(context: Context, name: String = "save.json") {
             val fightersJson = o.optJSONObject("fighters")
             val fighters = FighterId.entries.associateWith { id ->
                 val def = d.progress(id)
+                // (A fighter removed from the game, as everyone but Ninja was in build 114, is gone from every save,
+                // the offline profile's too, with nothing back: the owner's decision.)
+                if (Balance.fighters.none { it.id == id }) return@associateWith def
                 val f = fightersJson?.optJSONObject(id.name) ?: return@associateWith def
                 FighterProgress(
                     unlocked = f.optBoolean("unlocked", def.unlocked),

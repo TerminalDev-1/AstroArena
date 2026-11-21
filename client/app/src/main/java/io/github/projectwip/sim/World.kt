@@ -336,13 +336,18 @@ class World(
             val whole = u.fed.toInt()
             if (whole > 0) { u.fed -= whole; u.hp = minOf(u.maxHp, u.hp + whole) }
         }
-        stepDash(u, dt)
-        stepSpin(u, dt)
+        // Stunned (Ninja's cosmic bullets), it does nothing: no moves, no dash or spin, no drifting after the fight.
+        // What it already let loose (its flares, its marked circles) carries on.
+        val stunned = u.stunLeft > 0f
+        if (stunned) u.stunLeft = maxOf(0f, u.stunLeft - dt)
+        if (u.stunGuard > 0f) u.stunGuard = maxOf(0f, u.stunGuard - dt)
+        if (!stunned) stepDash(u, dt)
+        if (!stunned) stepSpin(u, dt)
         // It drifts after the fight, over the middle of everyone (a little ahead of them), never off its platform
         // (not while it dashes or spins: those move it themselves).
         var sx = 0f; var sy = 0f; var cnt = 0
         for (id in u.members) fighter(id)?.let { if (it.alive) { sx += it.x; sy += it.y; cnt++ } }
-        if (cnt > 0 && u.dashT < 0f && u.spinT < 0f) {
+        if (!stunned && cnt > 0 && u.dashT < 0f && u.spinT < 0f) {
             val dx = sx / cnt - u.ex; val dy = sy / cnt - 2f - u.ey
             val d = hypot(dx, dy)
             if (d > 0.3f) { val step = minOf(d, Balance.UPRISING_ENTITY_SPEED * dt); u.ex += dx / d * step; u.ey += dy / d * step }
@@ -351,8 +356,8 @@ class World(
             val od = hypot(u.ex - c, u.ey - c)
             if (od > lim) { u.ex = c + (u.ex - c) / od * lim; u.ey = c + (u.ey - c) / od * lim }
         }
-        entityMoves(u, dt)
-        stepChase(u, dt)
+        if (!stunned) entityMoves(u, dt)
+        if (!stunned) stepChase(u, dt)
         stepFlares(u, dt)
         // Everyone in its world pulled into it or knocked out for good: in its fight, that is the match lost.
         if (u.boss && u.hp > 0 && u.members.isNotEmpty() && u.members.all { id -> fighter(id)?.let { it.trapped || it.eliminated } != false }) {
@@ -878,7 +883,11 @@ class World(
                 val p = it.next()
                 p.delay -= dt
                 if (p.delay <= 0f) {
-                    fireMain(f, p.dirX, p.dirY, p.side)
+                    if (p.cosmic) {
+                        val s = f.def.superSpec
+                        // (The super's one Shot event, when it was fired, carries the sound of all three.)
+                        spawnProjectile(f, atan2(p.dirY, p.dirX), s.speed, s.radius, f.superDamage, s.range, false, true, ShotStyle.COSMIC)
+                    } else fireMain(f, p.dirX, p.dirY, p.side)
                     it.remove()
                 }
             }
@@ -898,7 +907,9 @@ class World(
         c.superAttack = false
 
         // --- hyper
-        if (c.hyper && f.hyperReady) startHyper(f)
+        // (Hypers don't exist in the game any more, the owner's decision in build 114: nothing charges or starts one.
+        // The code is kept with nobody using it.)
+        if (Balance.HYPERS && c.hyper && f.hyperReady) startHyper(f)
         c.hyper = false
         if (f.hyperActive) {
             f.hyperTime -= dt
@@ -1417,6 +1428,7 @@ class World(
             AttackShape.STAR -> ShotStyle.STAR
             // (Swish's Frost Gale; the giant arrow it replaced, [ShotStyle.ARROW], is kept with nobody using it.)
             AttackShape.ARROW -> ShotStyle.GUST
+            AttackShape.BULLET -> ShotStyle.BULLET
         }
         val baseAng = atan2(dy, dx)
         val n = if (a.shape == AttackShape.SPREAD) a.projectiles else 1
@@ -1435,6 +1447,8 @@ class World(
         val s = f.def.superSpec
         val baseAng = atan2(dy, dx)
         when (s.kind) {
+            // Three cosmic bullets, one after another (the owner's design for Ninja).
+            SuperKind.COSMIC -> for (i in 0 until s.projectiles) f.pending += PendingShot(i * Balance.COSMIC_GAP_SECONDS, dx, dy, cosmic = true)
             SuperKind.VOLLEY -> {
                 val spread = Math.toRadians(s.spreadDegrees.toDouble()).toFloat()
                 for (i in 0 until s.projectiles) {
@@ -1719,7 +1733,11 @@ class World(
                 if (ENTITY_TARGET !in p.hit && onEntity(p.x, p.y, p.radius)) {
                     p.hit += ENTITY_TARGET
                     fighter(p.ownerId)?.let { o ->
-                        strikeEntity(o, if (p.share > 0f) p.damage * Balance.SHARE_GIANT_HITS else p.damage, p.isSuper, p.x, p.y)
+                        val cosmic = p.style == ShotStyle.COSMIC
+                        val dmg = if (p.share > 0f) p.damage * Balance.SHARE_GIANT_HITS else if (cosmic) (p.damage * Balance.COSMIC_ENTITY_MULT).toInt() else p.damage
+                        strikeEntity(o, dmg, p.isSuper, p.x, p.y)
+                        // Ninja's cosmic bullets stun it (the owner's: 2.5 seconds).
+                        uprising?.let { u -> if (cosmic && u.hp > 0 && u.stunLeft <= 0f && u.stunGuard <= 0f) { u.stunLeft = Balance.COSMIC_STUN_SECONDS; u.stunGuard = Balance.COSMIC_STUN_SECONDS + Balance.COSMIC_STUN_GUARD; events += GameEvent.EntityStunned(o.id, Balance.COSMIC_STUN_SECONDS) } }
                         if (p.hex > 0f) uprising?.hexes?.add(Hex(p.ownerId, p.damage, Balance.HEX_TICK_SECONDS, p.hex - Balance.HEX_TICK_SECONDS / 2f))
                     }
                     if (!p.pierce || p.blast > 0f) { p.alive = false; break@loop }
@@ -1839,7 +1857,7 @@ class World(
         source.superCharge = (source.superCharge + source.def.superChargePerHit * faster * chargeShare).coerceAtMost(1f)
         if (!before && source.superReady) events += GameEvent.SuperReady(source.id)
         // Hits charge the hyper even while one is running, so the next can follow straight on.
-        if (source.hyperCharge < 1f) {
+        if (Balance.HYPERS && source.hyperCharge < 1f) {
             source.hyperCharge = (source.hyperCharge + source.def.superChargePerHit * chargeShare * Balance.HYPER_CHARGE_RATE * (source.def.hyper?.charge ?: 1f)).coerceAtMost(1f)
             if (source.hyperCharge >= 1f) events += GameEvent.HyperReady(source.id)
         }

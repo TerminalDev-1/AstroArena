@@ -70,7 +70,7 @@ fun IntroCutscene(sfx: Sfx?, onDone: () -> Unit) {
         said = beat
         val b = IntroScript.BEATS[beat]
         if (b.who == IntroScript.Who.ENTITY) sfx?.say(b.text, VoiceStyle.VOID, force = true, queue = true)
-        else sfx?.say(b.text, VoiceStyle.STORM, force = true, queue = true)
+        else sfx?.say(b.text, VoiceStyle.PLAIN, force = true, queue = true)
         val first = IntroScript.BEATS.indexOfFirst { it.shot == b.shot } == beat
         if (first) when (b.shot) {
             IntroScript.Shot.RISE -> { sfx?.play(Sound.THUNDER, 0.9f, 0.6f); sfx?.play(Sound.VOID, 1f) }
@@ -98,7 +98,7 @@ fun IntroCutscene(sfx: Sfx?, onDone: () -> Unit) {
                 colorBottom = if (entity) Color(0xFF1E1150) else Color(0xFF0E2A5C),
             ) {
                 Column(Modifier.padding(horizontal = 22.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    GameText(if (entity) "THE ENTITY" else "SWISH", Type.Eyebrow, color = if (entity) Color(0xFFC9A6FF) else Color(0xFF9FDBFF))
+                    GameText(if (entity) "THE ENTITY" else "NINJA", Type.Eyebrow, color = if (entity) Color(0xFFC9A6FF) else Color(0xFF9FDBFF))
                     GameText(b.text, Type.Heading.copy(fontSize = 19.sp), color = Palette.Text, align = TextAlign.Center, maxLines = 2)
                 }
             }
