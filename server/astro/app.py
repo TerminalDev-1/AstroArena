@@ -263,7 +263,9 @@ def make_handler(game: Game, quiet: bool = False):
                     # Which full reset of the game this is: a device that last played under another starts over.
                     "generation": game.store.generation(),
                     # The transition build's black hole: seconds until it opens (0: open), or -1 while held shut.
-                    "reveal_in": (lambda r: -1 if r is None else round(r, 1))(game.config.reveal_in()),
+                    # (A build the server turns away can be let through it with open_old, onto its update screen.)
+                    "reveal_in": 0 if (message is not None and game.config.reveal_opens_old())
+                    else (lambda r: -1 if r is None else round(r, 1))(game.config.reveal_in()),
                 })
             if url.path == "/v1/config":
                 return self._send(200, {"bots": game.config.bots()})

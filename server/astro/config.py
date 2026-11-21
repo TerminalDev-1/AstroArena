@@ -203,6 +203,10 @@ class Config:
             return 0.0
         return max(0.0, when - _time.time())
 
+    def reveal_opens_old(self) -> bool:
+        """`open_old = yes` under [reveal]: builds the server turns away see the black hole open (onto their update screen)."""
+        return self._setting("reveal", "open_old", "no").lower() in ("yes", "true", "on", "1")
+
     def default_difficulty(self) -> str:
         """The bot difficulty ordinary players are given."""
         value = self._setting("players", "difficulty", "EASY").upper()
