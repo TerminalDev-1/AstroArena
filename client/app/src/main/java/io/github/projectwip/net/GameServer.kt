@@ -126,6 +126,16 @@ class GameServer(context: Context) : GameActions {
     /** This install's id on the current server, once it has registered. */
     val playerId: String? get() = prefs.getString("id@$baseUrl", null)
     private val token: String? get() = prefs.getString("token@$baseUrl", null)
+    /**
+     * ARENA's reveal: seconds until the server opens the transition build's black hole (0: open), -1 while the
+     * owner holds it, or null when the server can't be asked. Blocking: call it off the main thread.
+     */
+    fun revealIn(): Double? {
+        if (baseUrl.isEmpty()) return null
+        val r = call("GET", "/v1/status?version=" + java.net.URLEncoder.encode(version, "UTF-8")) ?: return null
+        return if (r.code == 200) r.body?.optDouble("reveal_in", 0.0) else null
+    }
+
     private val usable get() = _status.value.online && _status.value.supported
 
     /** Why the server couldn't be reached the last time it wasn't ("" when the last request got through). */

@@ -155,6 +155,50 @@ enum class ButtonStyle(val top: Color, val bottom: Color, val lip: Color, val ri
     GOLD(Color(0xFFFFE066), Palette.Gold, Color(0xFFA8650A), Color(0xFFFFF6C8)),
     /** Translucent purple plate that lets the 3D lobby show through. */
     GLASS(Color(0xD8200C4A), Color(0xE00C0420), Color(0xFF05020D), Palette.Rim),
+    /** Star purple: a dark purple plate full of shining stars (the wins plate). */
+    STAR(Color(0xFF2E1366), Color(0xFF120630), Color(0xFF07021A), Palette.Rim),
+}
+
+/** Plates that carry the star-purple sky. */
+private val ButtonStyle.starry get() = this == ButtonStyle.PURPLE || this == ButtonStyle.GLASS || this == ButtonStyle.STAR
+
+/**
+ * Seconds, for the stars' twinkle. Ticked 20 times a second, not every frame: the stars redraw their plate, and
+ * nothing that slow needs more (phones on battery run warm).
+ */
+@Composable
+fun rememberStarTime(): State<Float> = produceState(0f) {
+    val start = System.nanoTime()
+    while (true) { value = (System.nanoTime() - start) / 1e9f; kotlinx.coroutines.delay(50) }
+}
+
+/**
+ * Star purple (the user's menu style): little four-point stars scattered over the area, each shining on its own
+ * beat: a soft violet glow, a white cross of light that swells and fades. The same plate always has the same stars.
+ */
+fun DrawScope.starField(time: Float, density: Float = 1f, bright: Float = 1f) {
+    if (size.width < 4f || size.height < 4f) return
+    val cell = 64.dp.toPx()
+    val count = ((size.width * size.height) / (cell * cell) * density).toInt().coerceIn(2, 60)
+    var h = (size.width.toInt() * 73856093) xor (size.height.toInt() * 19349663) xor 0x5bd1e995
+    fun rnd(): Float { h = h * 1103515245 + 12345; return ((h ushr 9) and 0xFFFF) / 65535f }
+    val unit = 1.dp.toPx()
+    repeat(count) {
+        val x = rnd() * size.width; val y = rnd() * size.height
+        val phase = rnd() * 6.2832f; val speed = 0.7f + rnd() * 1.6f; val big = 0.55f + rnd() * 0.9f
+        val s = 0.5f + 0.5f * kotlin.math.sin(time * speed + phase)
+        val tw = s * s * s
+        val glow = (3.5f + 4f * big) * unit
+        drawCircle(Color(0xFFD9A8FF).copy(alpha = (0.10f + 0.28f * tw) * bright), glow * (0.6f + 0.5f * tw), Offset(x, y))
+        val r = (1.6f + 4.2f * big * tw) * unit
+        val w = r * 0.2f
+        val star = Path().apply {
+            moveTo(x, y - r); lineTo(x + w, y - w); lineTo(x + r, y); lineTo(x + w, y + w)
+            lineTo(x, y + r); lineTo(x - w, y + w); lineTo(x - r, y); lineTo(x - w, y - w); close()
+        }
+        drawPath(star, Color.White.copy(alpha = ((0.3f + 0.7f * tw) * bright).coerceAtMost(1f)))
+        drawCircle(Color.White.copy(alpha = ((0.45f + 0.55f * tw) * bright).coerceAtMost(1f)), (0.9f + 0.5f * big) * unit, Offset(x, y))
+    }
 }
 
 /** Soft drop shadow under a plate, so it reads as sitting above the scene. */
@@ -215,6 +259,7 @@ fun ChunkyButton(
     val s = if (enabled) style else ButtonStyle.GREY
     val shape = remember(cut) { plateShape(cut, cut * 0.4f) }
     val time = if (sheen && enabled) rememberAnimTime() else null
+    val stars = if (s.starry) rememberStarTime() else null
     Box(
         modifier
             .graphicsLayer { val k = 1f - 0.03f * press; scaleX = k; scaleY = k }
@@ -233,6 +278,9 @@ fun ChunkyButton(
                     // A button squeezed shorter than its lip (small screens, big font) must not get a negative face.
                     val face = Size(size.width, (size.height - lipPx).coerceAtLeast(0f))
                     plate(shape, face, Brush.verticalGradient(listOf(lerp(s.top, Color.White, 0.18f), s.top, s.bottom)), Palette.Ink, ink, gloss = true)
+                    if (stars != null) clipPath(Path().apply { addOutline(shape.createOutline(face, layoutDirection, this@drawBehind)) }) {
+                        drawIntoFace(face) { starField(stars.value, if (s == ButtonStyle.STAR) 2.6f else 1.2f) }
+                    }
                     if (time != null) {
                         // A band of light sweeps across every few seconds.
                         val t = (time.value % 3.2f) / 0.7f
@@ -252,6 +300,13 @@ fun ChunkyButton(
     )
 }
 
+/** Runs [block] with the draw size set to [face] (a button's face is shorter than the whole button by its lip). */
+private inline fun DrawScope.drawIntoFace(face: Size, block: DrawScope.() -> Unit) {
+    val whole = drawContext.size
+    drawContext.size = face
+    try { block() } finally { drawContext.size = whole }
+}
+
 /** A raised panel plate: thick ink edge, brushed face, a sheen across the top and a lit inner rim. */
 @Composable
 fun Panel(
@@ -263,6 +318,7 @@ fun Panel(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = remember(cut) { plateShape(cut, cut * 0.35f) }
+    val stars = rememberStarTime()
     Box(
         modifier.drawBehind {
             val ink = 3.dp.toPx()
@@ -281,6 +337,8 @@ fun Panel(
                     x += step
                 }
                 drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.13f), Color.Transparent), 0f, minOf(size.height * 0.35f, 90.dp.toPx())), size = size)
+                // Star purple: the panel is a patch of night sky.
+                starField(stars.value, 0.9f, 0.85f)
             }
             // Inner rim highlight.
             val inset = 5.dp.toPx()
@@ -404,6 +462,7 @@ fun GameBackground(modifier: Modifier = Modifier, tint: Color = Palette.BgTop) {
         var y = -step + shift
         while (y < size.height + step) { drawLine(Color.White.copy(alpha = 0.035f), Offset(0f, y), Offset(size.width, y), 1f); y += step }
         drawRect(Brush.radialGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f)), center = center, radius = size.maxDimension * 0.75f))
+        starField(time, 1.1f)
     }
 }
 

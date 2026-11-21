@@ -261,7 +261,12 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         is Screen.Result -> if (s.summary.report.outcome == io.github.projectwip.data.MatchOutcome.VICTORY) io.github.projectwip.audio.Track.VICTORY else io.github.projectwip.audio.Track.DEFEAT
         else -> io.github.projectwip.audio.Track.LOBBY
     }
-    val blocked = update != null || (!serverStatus.supported && !unsupportedSkipped) || (disabledShown && !inMatch)
+    // ARENA's reveal: until the server opens it, the game is only the black hole (BlackHoleScreen).
+    val gateContext = androidx.compose.ui.platform.LocalContext.current
+    val gatePreview = when (startScreen) { "blackhole" -> 0f; "reveal" -> 6f; else -> null }
+    var gated by remember { mutableStateOf(gatePreview != null || !io.github.projectwip.ui.screens.ArenaReveal.revealed(gateContext)) }
+    var gateOpening by remember { mutableStateOf(false) }
+    val blocked = (gated && !gateOpening) || update != null || (!serverStatus.supported && !unsupportedSkipped) || (disabledShown && !inMatch)
     LaunchedEffect(wantedTrack, booting, blocked) { music.play(if (booting || blocked) null else wantedTrack) }
 
     /** The team of real players this player is in, if any. It outlasts the screens and the matches it plays. */
@@ -418,14 +423,14 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     {
                         shareReport = null
                         val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
-                            .putExtra(android.content.Intent.EXTRA_SUBJECT, "AstroArena problem report")
+                            .putExtra(android.content.Intent.EXTRA_SUBJECT, "ARENA problem report")
                             .putExtra(android.content.Intent.EXTRA_TEXT, text)
                         context.startActivity(android.content.Intent.createChooser(send, "Send the report"))
                     },
                     { shareReport = null },
                 )
             }
-            if (needsName) io.github.projectwip.ui.screens.NameScreen { name ->
+            if (needsName && !gated) io.github.projectwip.ui.screens.NameScreen { name ->
                 repo.updateSettings { it.copy(playerName = name, nameChosen = true) }
                 needsName = false
             }
@@ -436,7 +441,9 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
                     listOf(io.github.projectwip.match.MatchView.Mate("Kira", 0, 9000, false, true), io.github.projectwip.match.MatchView.Mate("Onyx", 6200, 11550, true, false)))
             }
             debugCut?.let { cut -> if (!booting) io.github.projectwip.ui.screens.EntityCutscene(cut, save.selectedFighter, save.fighters[save.selectedFighter]?.skin ?: 0, 0, sfx) { debugCut = null } }
-            if (showIntro && (introAsked || !booting) && !needsName) io.github.projectwip.ui.screens.IntroCutscene(sfx) {
+            if (gated) io.github.projectwip.ui.screens.BlackHoleScreen({ server.revealIn() }, gatePreview,
+                onOpen = { gateOpening = true; if (gatePreview == null) io.github.projectwip.ui.screens.ArenaReveal.markRevealed(gateContext) }) { gated = false }
+            if (showIntro && !gated && (introAsked || !booting) && !needsName) io.github.projectwip.ui.screens.IntroCutscene(sfx) {
                 introAsked = false
                 showIntro = false
                 repo.updateSettings { it.copy(introSeen = true) }

@@ -4,6 +4,24 @@ AstroArena (the package id is still `io.github.projectwip`, so saves carry over)
 menus + custom OpenGL ES 3.0 renderer, no engine. All art and sound is generated in code and must stay
 original: no Brawl Stars/Supercell assets, names, icons or UI copies. Fighters have first names only. Players see "Arena Boxes", "Coins" and "Arena Crystals"; the code (and the server's files and API) still call them capsules (or drops), bolts and prisms. (They were Spark Drops then Glitch Drops; Power Ups, then Upgrade Credits, then Coins; Crystals, then CPU Chips, then Arena Crystals: the user renamed them. Coins pay for every fighter upgrade; their icon is a plain gold coin with a star. Arena Crystals are the shop currency; their icon is a cut violet gem. When CPU Chips became Arena Crystals (1.0, build 103) everyone's were set to 0, once: `crystalsReset` in `economy.complete` and `SaveStore.fromJson`. Road "Credits" are a separate thing and keep their name.)
 
+## Branding guidelines (the user's, ARENA 1.4)
+
+- **The name is ARENA** (it was AstroArena until 1.4, build 112). Players see "ARENA" everywhere: the app label,
+  titles, About, notices and news. The package id, the code, the server and its API keep their old names.
+- **The logo is the game's title as v1.3 drew it**, and only that: heavy italic display type (`Type.Display`), white
+  fill, a thick ink outline with a hard ink drop, letters dropping in one at a time with a neon purple flash and a
+  gentle breathe (`LoadingScreen`'s `Title`, shared as `ArenaTitle`). Use it wherever the name is shown big (the
+  loading screen, the opening, the black hole). Don't redraw it in another font, wide tracking or a glow: build 112's
+  first try did and the user had it put back ("the new logo isn't as good as the old one").
+- **The menus are dark purple, with stars** ("star purple"): v1.3's dark purple (`Palette`, `ButtonStyle.GLASS`/
+  `PURPLE`, the rail) with little four-point stars twinkling on the plates (`starField`, `rememberStarTime`). Never
+  brighten it to a light or neon purple: the user called that "blinding" and "branching off the theme". The wins
+  plate (`ButtonStyle.STAR`) is the same dark purple, with more stars.
+- **The icon** is black with two white eyes looking off to the right (`res/drawable/ic_launcher.xml`).
+- **The Entity's voice** in any new line: short, close, second person, in its own words ("Closer. I'm listening.",
+  "Still here. I'm always here."), like `Lore.WHISPERS`. Not poetic narration. Its words in the menu sit on the
+  game's own plates (`Panel`), in its own light text.
+
 ## How to work here
 
 - **Committing and releasing is not "done". Nothing ships until it has passed rigorous QA and is up to the user's
@@ -56,6 +74,12 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   it lasts, not one at the start.
 - **What you draw and what the simulation does must agree.** If a ring on the ground marks a reach, the hit test uses
   that exact reach (her radius included), and the effect fills it.
+- **ARENA's reveal** (build 112, the transition build): until the server's `[reveal]` time in `game.cfg` (`hold = yes`
+  keeps it shut, `at = now` opens it) the game shows only `BlackHoleScreen`: a white black hole that never grows, the
+  ARENA title and the Entity's silent lines. Then the hole opens and swallows the screen in white. Once opened it
+  never closes on that device (`ArenaReveal`); with no server it opens at 20:30 UK on 2026-11-21 by the device's
+  clock. Previews: `--es screen blackhole` (held), `reveal` (opens after 6 s). The Entity also whispers, silent, on
+  the home screen (`MenuWhisper`).
 - **Name clashes in the simulation.** The free-for-all already has a Static Storm (`GameEvent.StormHit`,
   `Fighter.stormTick`, `STORM_*`); Swish's super had to become "tempest". Grep a name before adding it, and never
   rename with a blanket replace across files: one renamed the Static Storm's own sound handler by mistake.
@@ -589,13 +613,13 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 - **Never commit changes the user made on their own.** Commit only what you changed in this task, file by file
   (`git add <path>`, never `git add -A` or `git commit -a`). Anything else that shows up in `git status`, such as
   an edited `.cfg` on the live server, is the user's: leave it uncommitted and untouched, and mention it.
-- **The version is "1.3"** (since build 110, by the user's decision; 1.0 was builds 103 to 106, 1.1 build 107, 1.2 builds 108 to 109). AstroArena came out
+- **The version is "1.4"** (since build 112, the ARENA rename, by the user's decision; development goes on in 1.4; 1.0 was builds 103 to 106, 1.1 build 107, 1.2 builds 108 to 109, 1.3 builds 110 to 111). AstroArena came out
   of Beta in build 103: `versionName` is what players see (it was "Beta" until then). Underneath, the build number (`BuildConfig.BUILD`) is what the updater
   and the server's version gate compare, so tags stay `vN.0` with N the build number (v103.0 for 1.0): a `v1.0` tag
   would look older than every build before it and nobody would update.
 - **Updates within a version replace that version's release, by the user's decision (build 104).** A new version
-  (1.1 -> 1.2, when the user names one) gets a release of its own, "AstroArena 1.3". After that, don't publish a new
-  release for each update: edit the existing "AstroArena 1.3" release, replace its APK with the new build's, and
+  (1.1 -> 1.2, when the user names one) gets a release of its own, "ARENA 1.4". After that, don't publish a new
+  release for each update: edit the existing "ARENA 1.4" release, replace its APK with the new build's, and
   move its tag to the new build (`gh release edit <old tag> --tag vN.0`, after pushing tag `vN.0` on the new commit).
   `versionName` stays; the build number still goes up, and the tag must carry it, because the updater only offers a
   tag newer than the installed build.
@@ -606,8 +630,8 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
   changed the client is finished, has passed the full QA in "How to work here" (on the tablet, every phase, up to
   the user's standard) and is pushed, release it; a build that hasn't passed that QA is never released: add one to `versionCode` (unless that build
   number has not been released yet), commit, tag `vN.0` (N = the build number), push the tag, and publish a GitHub
-  release titled "AstroArena 1.3" (see the rule above: updates within 1.3 replace that release) with the release APK
-  attached (`AstroArena-1.3-N.apk`). The build number is
+  release titled "ARENA 1.4" (see the rule above: updates within 1.4 replace that release) with the release APK
+  attached (`ARENA-1.4-N.apk`). The build number is
   `build` in `client/app/build.gradle.kts` (`BuildConfig.BUILD`): it can be a point release such as "94.1" (tag
   `v94.1`) when the user asks for one; Android's `versionCode` is made from it (major * 100 + minor). One release per
   finished task, not one per checkpoint commit; server-only or docs-only work needs none. The tag keeps the

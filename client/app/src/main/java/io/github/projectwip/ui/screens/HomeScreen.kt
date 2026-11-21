@@ -1,5 +1,6 @@
 package io.github.projectwip.ui.screens
 
+import io.github.projectwip.ui.starField
 import io.github.projectwip.ui.bleed
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -179,6 +180,8 @@ fun HomeScreen(
                 color = if (!offline) Palette.Positive else Palette.TextDim, maxLines = 1,
             )
         }
+        // The Entity, silent, warning the player in the menu now and then.
+        if (!picking) MenuWhisper(Modifier.align(Alignment.Center).padding(bottom = 40.dp))
         // The server's notice, across the top. It steps aside for the mode picker.
         val notice = serverStatus?.notice.orEmpty()
         if (online && notice.isNotBlank() && !picking) {
@@ -198,10 +201,12 @@ fun HomeScreen(
 @Composable
 private fun NavRail(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     val ui = LocalUi.current
+    val railStars = io.github.projectwip.ui.rememberStarTime()
     Column(
         Modifier.fillMaxHeight().width(if (ui.roomy) 92.dp else 78.dp)
             .drawBehind {
                 drawRect(Brush.horizontalGradient(listOf(Color(0xFA0E0828), Color(0xF01A1150))))
+                starField(railStars.value, 1.3f)
                 drawRect(Brush.verticalGradient(listOf(Palette.Rim.copy(alpha = 0.15f), Color.Transparent), 0f, size.height * 0.35f))
                 drawLine(Brush.verticalGradient(listOf(Color.Transparent, Palette.Rim.copy(alpha = 0.6f), Color.Transparent)), Offset(size.width - 1f, 0f), Offset(size.width - 1f, size.height), 1.5.dp.toPx())
             }
@@ -253,7 +258,7 @@ private fun RailItem(label: String, icon: IconKind, badge: String?, badgeColor: 
 @Composable
 private fun Profile(save: SaveData, onClick: () -> Unit) {
     Box {
-        ChunkyButton(onClick, Modifier.height(56.dp).widthIn(max = 300.dp).fillMaxWidth(), ButtonStyle.GLASS, lip = 4.dp, cut = 12.dp) {
+        ChunkyButton(onClick, Modifier.height(56.dp).widthIn(max = 300.dp).fillMaxWidth(), ButtonStyle.STAR, lip = 4.dp, cut = 12.dp) {
             Row(Modifier.padding(start = 62.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     GameText(save.settings.playerName, Type.Label, outline = 2.dp)
@@ -489,5 +494,40 @@ fun Minimap(arena: Arena, modifier: Modifier = Modifier) {
             drawCircle(Palette.Ink, t * 0.8f, Offset(s.x * t, s.y * t))
             drawCircle(Palette.Gold, t * 0.6f, Offset(s.x * t, s.y * t))
         }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------- the Entity, watching
+
+private val MENU_WHISPERS = listOf(
+    "Still here. I'm always here.",
+    "You can't see me in the menu. I can see you.",
+    "Go on. Pick one. I'll wear them later.",
+    "Every star up there is mine.",
+    "Something's changing. You feel it too.",
+    "Don't keep me waiting.",
+    "New name. Same me.",
+    "Closer. I'm listening.",
+)
+
+/**
+ * The Entity in the menu (ARENA's transition build, the user's idea): every so often a cryptic warning drifts in on a
+ * dark plate, holds, and fades. No sound: it is silent here.
+ */
+@Composable
+private fun MenuWhisper(modifier: Modifier) {
+    val time by io.github.projectwip.ui.rememberStarTime()
+    val first = 9f
+    val every = 26f
+    val show = 6f
+    if (time < first) return
+    val n = ((time - first) / every).toInt()
+    val t = (time - first) % every
+    if (t > show) return
+    val a = when { t < 1.2f -> t / 1.2f; t > show - 1.5f -> (show - t) / 1.5f; else -> 1f }.coerceIn(0f, 1f)
+    val jolt = if (t < 0.35f) ((t * 40f).toInt() % 2 * 2 - 1) * 3f else 0f
+    io.github.projectwip.ui.Panel(modifier.graphicsLayer { alpha = a; translationX = jolt }, color = Color(0xFF1A0A3A), colorBottom = Color(0xFF07021A), cut = 12.dp) {
+        PlainText(MENU_WHISPERS[n % MENU_WHISPERS.size], Type.Label.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+            Modifier.padding(horizontal = 20.dp, vertical = 12.dp), color = Palette.Text, align = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2)
     }
 }

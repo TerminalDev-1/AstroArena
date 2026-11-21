@@ -87,7 +87,7 @@ fun LoadingScreen(progress: Float, status: String, onSkip: (() -> Unit)? = null,
     }
 }
 
-private const val LETTERS = "ASTROARENA"
+private const val LETTERS = "ARENA"
 private const val LETTER_GAP = 0.2f
 // A breath of black before the first letter (the clock itself waits for the app to settle).
 private const val TITLE_DELAY = 0.2f
@@ -146,6 +146,9 @@ private fun GhostButton(label: String, onClick: () -> Unit, modifier: Modifier) 
  * Each letter goes solid fast (so the purple is at full strength), drops into place from a little larger, holds
  * neon purple with a glow round it a moment, and cools to white; then the word breathes.
  */
+@Composable
+fun ArenaTitle(style: TextStyle, modifier: Modifier = Modifier) = Title(style, modifier)
+
 @Composable
 private fun Title(style: TextStyle, modifier: Modifier) {
     val clock = rememberSteadyTime()

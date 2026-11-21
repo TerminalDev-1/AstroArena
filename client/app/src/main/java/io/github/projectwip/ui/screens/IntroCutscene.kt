@@ -107,7 +107,7 @@ fun IntroCutscene(sfx: Sfx?, onDone: () -> Unit) {
         if (time >= IntroScript.END_AT) {
             val k = ((time - IntroScript.END_AT) / 1.2f).coerceIn(0f, 1f)
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = k)), contentAlignment = Alignment.Center) {
-                GameText("ASTROARENA", Type.Display.copy(fontSize = 54.sp), modifier = Modifier.graphicsLayer { alpha = k; scaleX = 0.9f + 0.1f * k; scaleY = 0.9f + 0.1f * k })
+                GameText("ARENA", Type.Display.copy(fontSize = 54.sp), modifier = Modifier.graphicsLayer { alpha = k; scaleX = 0.9f + 0.1f * k; scaleY = 0.9f + 0.1f * k })
             }
         }
         ChunkyButton({ leaving = true }, Modifier.align(Alignment.TopEnd).padding(top = 18.dp, end = 22.dp), style = ButtonStyle.GREY) {
