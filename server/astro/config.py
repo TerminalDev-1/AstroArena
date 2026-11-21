@@ -185,6 +185,24 @@ class Config:
             self._refresh()
             return self._game.get(section, {}).get(key, default).strip()
 
+    def reveal_in(self) -> float | None:
+        """
+        Seconds until ARENA is revealed (the transition build's black hole opens), 0 once it has been, or None while
+        the owner holds it shut. `[reveal]` in game.cfg: `at` is a time on this server's clock (YYYY-MM-DD HH:MM),
+        `hold = yes` keeps the hole closed whatever the time. No `at` means it is open.
+        """
+        if self._setting("reveal", "hold", "no").lower() in ("yes", "true", "on", "1"):
+            return None
+        raw = self._setting("reveal", "at", "")
+        if not raw or raw.lower() == "now":
+            return 0.0
+        import time as _time
+        try:
+            when = _time.mktime(_time.strptime(raw, "%Y-%m-%d %H:%M"))
+        except ValueError:
+            return 0.0
+        return max(0.0, when - _time.time())
+
     def default_difficulty(self) -> str:
         """The bot difficulty ordinary players are given."""
         value = self._setting("players", "difficulty", "EASY").upper()
