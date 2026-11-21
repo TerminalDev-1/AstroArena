@@ -51,7 +51,7 @@ object SfxSynth {
         Sound.RIFT -> riftTear().finish(0.8f)
         Sound.DIM_AIR -> dimensionAir().finish(0.6f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
-        Sound.GUNSHOT -> gunshot().finish(0.8f)
+        Sound.GUNSHOT -> gunshot().finish(0.95f)
         Sound.COSMIC -> cosmicRounds().finish(0.9f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -621,14 +621,26 @@ object SfxSynth {
     // Ninja's gun is a real thing, so it is made from shaped noise with natural envelopes (no tones): the user hears
     // the difference between real sound design and beeps.
 
-    /** One gunshot: the crack of the round, the thump of the charge, and the report rolling off into the distance. */
-    private fun gunshot() = Clip(0.6f).apply {
-        noise(401, 0f, 0.06f, Band.HIGH, { 2400f }, 0.7f, { perc(it, 0.0004f, 0.012f) * 0.9f })
-        noise(402, 0f, 0.2f, Band.LOW, { glide(it, 0.12f, 520f, 140f) }, 0.9f, { perc(it, 0.001f, 0.045f) * 0.85f })
-        noise(403, 0.004f, 0.55f, Band.BAND, { glide(it, 0.5f, 1500f, 420f) }, 0.9f, { perc(it, 0.004f, 0.12f) * 0.32f })
-        // (The action cycling, a beat later: a short dry tick.)
-        noise(404, 0.11f, 0.03f, Band.HIGH, { 5200f }, 1.2f, { perc(it, 0.0005f, 0.006f) * 0.1f })
-        filter(Band.LOW, 0.8f) { 11000f }
+    /**
+     * One gunshot (reworked in build 115: the first was mostly hiss): a hard crack across every frequency, a heavy
+     * boom that drops fast, the punch of the body, the report rolling off the walls, a faint slap-back off something
+     * far away, and the action cycling. All shaped noise, no tones.
+     */
+    private fun gunshot() = Clip(0.8f).apply {
+        // The crack: a few milliseconds of everything at once.
+        noise(401, 0f, 0.012f, Band.HIGH, { 900f }, 0.6f, { perc(it, 0.0002f, 0.0035f) * 1.0f })
+        noise(402, 0f, 0.05f, Band.BAND, { 3200f }, 0.8f, { perc(it, 0.0003f, 0.009f) * 0.75f })
+        // The boom: low, starting high and dropping fast.
+        noise(403, 0f, 0.28f, Band.LOW, { glide(it, 0.09f, 1100f, 95f) }, 1.2f, { perc(it, 0.0008f, 0.07f) * 1.0f })
+        // The punch of the body.
+        noise(404, 0.001f, 0.12f, Band.BAND, { glide(it, 0.08f, 950f, 420f) }, 1.1f, { perc(it, 0.001f, 0.032f) * 0.7f })
+        // The report rolling away, darker as it goes, and a faint slap-back.
+        noise(405, 0.006f, 0.7f, Band.LOW, { glide(it, 0.6f, 1400f, 300f) }, 0.8f, { perc(it, 0.01f, 0.2f) * 0.28f })
+        noise(406, 0.095f, 0.3f, Band.BAND, { 700f }, 0.9f, { perc(it, 0.004f, 0.07f) * 0.12f })
+        // The action, a beat later: a short dry double tick.
+        noise(407, 0.13f, 0.02f, Band.HIGH, { 4500f }, 1.4f, { perc(it, 0.0004f, 0.005f) * 0.12f })
+        noise(408, 0.155f, 0.02f, Band.HIGH, { 3800f }, 1.4f, { perc(it, 0.0004f, 0.006f) * 0.1f })
+        filter(Band.LOW, 0.7f) { 12000f }
     }
 
     /**

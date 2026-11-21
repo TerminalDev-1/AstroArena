@@ -126,7 +126,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                         GameText(label, Type.Display.copy(fontSize = Type.Display.fontSize * if (ui.roomy) 1.6f else 1.3f), color = color, outline = 5.dp)
                         PlainText(
                             when (r.mode) {
-                                io.github.projectwip.data.GameMode.BOSS -> "The Entity · its world · ${r.difficulty.label} bots"
+                                io.github.projectwip.data.GameMode.BOSS -> "The Dragon · its world · ${r.difficulty.label} bots"
                                 io.github.projectwip.data.GameMode.TRAINING -> "Training Area"
                                 io.github.projectwip.data.GameMode.DUEL -> "1v1 · Proving Ground"
                             }, Type.Label, color = Palette.TextDim)
@@ -141,7 +141,7 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     val bossMode = r.mode == io.github.projectwip.data.GameMode.BOSS
                     // (Against the Entity everyone is on one side: one panel, the whole team.)
-                    TeamPanel(if (bossMode) "YOUR TEAM AGAINST THE ENTITY" else "YOU", summary.players.filter { it.team == summary.playerTeam }, Palette.Ally, Modifier.weight(1f))
+                    TeamPanel(if (bossMode) "YOUR TEAM AGAINST THE DRAGON" else "YOU", summary.players.filter { it.team == summary.playerTeam }, Palette.Ally, Modifier.weight(1f))
                     if (!bossMode) TeamPanel("OPPONENT", summary.players.filter { it.team != summary.playerTeam }, Palette.Enemy, Modifier.weight(1f), first = 3)
                 }
             }

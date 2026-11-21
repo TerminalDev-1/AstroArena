@@ -278,6 +278,14 @@ sealed interface GameEvent {
     /** The Entity corrupted a fighter ([on]) or let it go. */
     data class Corrupted(val fighterId: Int, val on: Boolean) : GameEvent
     data class EntityHit(val fighterId: Int, val isSuper: Boolean, val damage: Int, val x: Float, val y: Float) : GameEvent
+    /** A shot landed on the Entity while its jewel is on: no damage. */
+    data class EntityImmune(val x: Float, val y: Float) : GameEvent
+    /** The jewel on its neck was broken ([dropped]: the one lying on the platform), by [fighterId]. */
+    data class JewelBroken(val fighterId: Int, val x: Float, val y: Float, val dropped: Boolean) : GameEvent
+    /** A broken jewel turned up again at ([x], [y]); the dragon is rushing for it. */
+    data class JewelDropped(val x: Float, val y: Float) : GameEvent
+    /** The dragon got its jewel back on: it is immune again. */
+    data class JewelRestored(val x: Float, val y: Float) : GameEvent
     /** A cosmic bullet stunned the Entity, for [seconds]. */
     data class EntityStunned(val fighterId: Int, val seconds: Float) : GameEvent
     /** The Entity began a move ([move]: an `EntityMove` ordinal), for its sound. */

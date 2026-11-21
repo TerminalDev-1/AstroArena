@@ -257,7 +257,7 @@ class HudView(
             fill.color = Color.argb((70 * a).toInt(), 90, 200, 255)
             c.drawRect(0f, y, w, y + dp(3f), fill)
         }
-        entityPlate(c, glitchText("THE ENTITY HAS YOU", 1f), "IT FIGHTS FOR YOU · %.1f".format(left), w / 2 + (if (beat % 4 == 0) dp(3f) else 0f), h * 0.64f, a)
+        entityPlate(c, glitchText("THE DRAGON HAS YOU", 1f), "IT FIGHTS FOR YOU · %.1f".format(left), w / 2 + (if (beat % 4 == 0) dp(3f) else 0f), h * 0.64f, a)
     }
 
     /**
@@ -280,7 +280,7 @@ class HudView(
         chamfer(c, l, t, l + pw, t + ph, dp(11f), Color.argb((235 * a).toInt(), 45, 29, 116), ink)
         // The nameplate tab.
         text.textSize = dp(11f)
-        val tag = "THE ENTITY"
+        val tag = "THE DRAGON"
         val tw = text.measureText(tag) + dp(22f)
         chamfer(c, l + dp(14f), t - dp(12f), l + dp(14f) + tw, t + dp(10f), dp(6f), Color.argb(alpha, 120, 60, 220), ink)
         outlined(c, tag, l + dp(14f) + tw / 2, t + dp(3f), Color.argb(alpha, 255, 255, 255), dp(2.5f))
@@ -305,7 +305,7 @@ class HudView(
         fun fade(len: Float) = minOf(1f, t / 0.4f, (len - t) / 0.4f).coerceIn(0f, 1f)
         when (phase) {
             io.github.projectwip.sim.UprisingPhase.GAZE -> if (t > 1.5f)
-                entityPlate(c, glitchText("THE ENTITY RISES", if ((time * 8f).toInt() % 4 == 0) 1f else 0f), "IT IS LOOKING AT EVERY ONE OF YOU", w / 2, h * 0.22f, minOf(1f, (t - 1.5f) / 0.4f))
+                entityPlate(c, glitchText("THE DRAGON RISES", if ((time * 8f).toInt() % 4 == 0) 1f else 0f), "IT IS LOOKING AT EVERY ONE OF YOU", w / 2, h * 0.22f, minOf(1f, (t - 1.5f) / 0.4f))
             io.github.projectwip.sim.UprisingPhase.MARCH, io.github.projectwip.sim.UprisingPhase.BOW -> {
                 // Its words (the same script its voice and the camera follow): low on the screen in a close-up, so the
                 // face it is on stays clear.
@@ -329,23 +329,34 @@ class HudView(
                 fill.color = if (s.uprisingStunned && (t * 12f).toInt() % 2 == 0) Color.rgb(92, 200, 255) else Color.rgb(160, 110, 255)
                 c.drawRect(l + dp(14f), top + dp(24f), l + dp(14f) + (pw - dp(28f)) * frac, top + dp(36f), fill)
                 text.textSize = dp(13f)
-                outlined(c, (if (s.entityTier > 0) "THE ENTITY · TIER ${s.entityTier + 1} · " else "THE ENTITY · ") + "%,d".format(s.uprisingHp), w / 2, top + dp(18f), Color.WHITE, dp(2.5f))
+                outlined(c, (if (s.entityTier > 0) "THE DRAGON · TIER ${s.entityTier + 1} · " else "THE DRAGON · ") + "%,d".format(s.uprisingHp), w / 2, top + dp(18f), Color.WHITE, dp(2.5f))
                 if (s.uprisingStunned) {
                     text.textSize = dp(15f)
                     outlined(c, "STUNNED", w / 2, top + ph + dp(20f), Color.rgb(92, 200, 255), dp(3f))
                 }
+                // Its jewel: while it is on, it is immune; a little bar of the jewel's own, under its health.
+                if (s.jewelOn || s.jewelLoose) {
+                    val jw = pw * 0.42f; val jl = w / 2 - jw / 2; val jt = top + ph + dp(if (s.uprisingStunned) 30f else 8f)
+                    fill.color = Color.argb(220, 12, 6, 30)
+                    c.drawRect(jl, jt, jl + jw, jt + dp(8f), fill)
+                    fill.color = Color.rgb(233, 166, 255)
+                    c.drawRect(jl, jt, jl + jw * s.jewelFrac.coerceIn(0f, 1f), jt + dp(8f), fill)
+                    text.textSize = dp(12f)
+                    if (s.jewelOn) outlined(c, "IMMUNE · BREAK THE JEWEL ON ITS NECK", w / 2, jt + dp(24f), Color.rgb(233, 166, 255), dp(2.5f))
+                    else if ((t * 4f).toInt() % 2 == 0) outlined(c, "ITS JEWEL IS BACK · BREAK IT BEFORE IT GETS THERE", w / 2, jt + dp(24f), Color.rgb(255, 120, 200), dp(2.5f))
+                }
                 // Drained by its red flares: weaker, and how close it is to taking them.
                 if (s.playerDrains > 0 && !s.playerTrapped && t >= 5f && s.trappedNames.isEmpty())
                     entityPlate(c, "DRAINED ${s.playerDrains}/${io.github.projectwip.data.Balance.ENTITY_DRAINS_TO_TAKE}", "YOU HIT SOFTER AND MOVE SLOWER", w / 2, underBar(), 1f)
-                if (t < 5f) entityPlate(c, "Then fight me. All of you.", "HIT THE SHADOW UNDER IT", w / 2, maxOf(h * 0.3f, underBar()), minOf(1f, (5f - t) / 0.5f))
+                if (t < 5f) entityPlate(c, "Then fight me. All of you.", if (s.jewelOn) "BREAK THE JEWEL ON ITS NECK" else "HIT THE SHADOW UNDER IT", w / 2, maxOf(h * 0.3f, underBar()), minOf(1f, (5f - t) / 0.5f))
                 else if (s.trappedNames.isNotEmpty() && !s.playerTrapped)
-                    entityPlate(c, "TRAPPED: " + s.trappedNames.uppercase(), "BEAT THE ENTITY TO FREE THEM", w / 2, underBar(), 1f)
+                    entityPlate(c, "TRAPPED: " + s.trappedNames.uppercase(), "BEAT THE DRAGON TO FREE THEM", w / 2, underBar(), 1f)
                 // Through the portal: a flash, fading.
                 if (t < 0.7f) { fill.color = Color.argb((255 * (1f - t / 0.7f)).toInt(), 230, 220, 255); c.drawRect(0f, 0f, w, h, fill) }
             }
             io.github.projectwip.sim.UprisingPhase.RETURN -> {
                 if (t < 0.6f) { fill.color = Color.argb((255 * (1f - t / 0.6f)).toInt(), 230, 220, 255); c.drawRect(0f, 0f, w, h, fill) }
-                entityPlate(c, if (s.uprisingBeaten) "THE ENTITY IS BEATEN" else "THE ENTITY LETS YOU GO", if (s.uprisingBeaten) "FOR NOW" else "THIS TIME", w / 2, h * 0.26f, minOf(1f, (1.5f - t) / 0.4f + 0.3f).coerceIn(0f, 1f))
+                entityPlate(c, if (s.uprisingBeaten) "THE DRAGON IS BEATEN" else "THE DRAGON LETS YOU GO", if (s.uprisingBeaten) "FOR NOW" else "THIS TIME", w / 2, h * 0.26f, minOf(1f, (1.5f - t) / 0.4f + 0.3f).coerceIn(0f, 1f))
             }
             else -> Unit
         }
@@ -441,7 +452,7 @@ class HudView(
                 outlined(c, "%d:%02d".format(secs / 60, secs % 60), cx + dp(40f), top + dp(27f), if (secs <= 20) Color.rgb(255, 120, 100) else Color.WHITE, dp(3.5f))
             } else outlined(c, "THE RITUAL", cx + dp(40f), top + dp(27f), Color.WHITE, dp(3.5f))
             text.textSize = dp(12f)
-            outlined(c, "THE ENTITY", cx + dp(40f), top + dp(46f), Color.rgb(201, 166, 255), dp(3f))
+            outlined(c, "THE DRAGON", cx + dp(40f), top + dp(46f), Color.rgb(201, 166, 255), dp(3f))
         } else {
             val boxW = dp(72f)
             chamfer(c, cx - panelW / 2 + dp(6f), top + dp(6f), cx - panelW / 2 + dp(6f) + boxW, top + panelH - dp(6f), dp(9f), Color.rgb(28, 110, 200), null)
@@ -484,7 +495,7 @@ class HudView(
             text.textSize = dp(96f) * big
             outlined(c, n.toString(), cx, h * 0.45f, Color.WHITE, dp(9f))
             text.textSize = dp(21f)
-            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.bossMode) "THE ENTITY IS COMING" else "1V1 · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
+            outlined(c, if (s.practice) "TRAINING AREA · PRACTICE, NOTHING AT STAKE" else if (s.bossMode) "THE DRAGON IS COMING" else "1V1 · FIRST TO ${s.koTarget} KOs", cx, h * 0.45f + dp(48f), Color.rgb(255, 214, 64), dp(4.5f))
         } else if (s.phase == Phase.PLAYING && s.phaseTime < 0.9f) {
             text.textSize = dp(80f) * big
             outlined(c, "FIGHT!", cx, h * 0.45f, Color.rgb(255, 159, 28), dp(9f))
@@ -493,7 +504,7 @@ class HudView(
         if (s.playerTrapped && s.phase == Phase.PLAYING) {
             // Inside the Entity, among its souls, until the team beats it.
             // (Up under its health bar, out of the way of the teammate the camera is on.)
-            entityPlate(c, "TRAPPED INSIDE THE ENTITY", "YOUR TEAM MUST BEAT IT TO FREE YOU", cx, underBar(), 1f)
+            entityPlate(c, "TRAPPED INSIDE THE DRAGON", "YOUR TEAM MUST BEAT IT TO FREE YOU", cx, underBar(), 1f)
         } else if (s.playerOut && s.phase == Phase.PLAYING) {
             // No coming back in its fight: they watch their team.
             text.textSize = dp(28f)

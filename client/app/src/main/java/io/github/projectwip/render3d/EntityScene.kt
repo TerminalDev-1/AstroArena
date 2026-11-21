@@ -92,7 +92,7 @@ object EntityScript {
             Beat(0.6f, "The last of it."),
             Beat(2.9f, "Say it."),
             Beat(5.7f, "Make it stop... I'll obey.", fighter = true),
-            Beat(7.6f, "Good. Come inside."),
+            Beat(7.6f, "Good. Now stay down."),
         )
     }
 
@@ -292,15 +292,15 @@ class EntityScene {
         when (p.cut) {
             EntityCut.VICTORY -> when {
                 t < 3.4f -> { setEye(c + 5f, 1.6f, c + 9.5f); setAt(ex, lift + eScale * 1f, ez) }
-                t < 7.2f -> { val k = smooth((t - 3.4f) / 3.8f); setEye(ex + 0.4f, head - 0.2f, ez + lerp(10f, 6.5f, k)); setAt(ex, head, ez) }
+                t < 7.2f -> { val k = smooth((t - 3.4f) / 3.8f); setEye(ex + 2.2f, head - 1.3f, ez + lerp(10f, 6.5f, k)); setAt(ex, head, ez) }
                 t < 9.6f -> { setEye(c - 1.5f, 3.2f, c + 10f); setAt(c, 3.6f, ez) }
                 else -> { val k = smooth((t - 9.6f) / 3f); setEye(fx + 0.3f, 1.5f, fz + lerp(4f, 3.1f, k)); setAt(fx, 1.35f, fz) }
             }
             EntityCut.DEFEAT -> when {
                 t < 3.2f -> { setEye(fx0 + 2.6f, 1.0f, fz0 + 4.4f); setAt(ex, lift + eScale * 0.85f, ez) }
                 t < 7.4f -> { setEye(c + 6.5f, 2.6f, c + 3f); setAt(fx, fy + 1f, fz) }
-                t < 9.5f -> { setEye(ex + 0.3f, ey + es * 0.95f, ez + 7.5f); setAt(ex, ey + es * 0.9f, ez) }
-                else -> { val k = smooth((t - 9.5f) / 3.2f); setEye(ex, head - 0.2f, ez + lerp(10f, 6f, k)); setAt(ex, head, ez) }
+                t < 9.5f -> { setEye(ex + 2.2f, ey + es * 0.62f, ez + 7.5f); setAt(ex, ey + es * 0.9f, ez) }
+                else -> { val k = smooth((t - 9.5f) / 3.2f); setEye(ex + 2.2f, head - 1.3f, ez + lerp(10f, 6f, k)); setAt(ex, head, ez) }
             }
             EntityCut.DRAIN, EntityCut.DRAIN_WEAK, EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> when {
                 t < 1.1f -> { setEye(fx0 + 2.4f, 1.7f, fz0 + 4.2f); setAt(fx0, 1.1f, fz0) }
@@ -320,7 +320,7 @@ class EntityScene {
             EntityCut.CORRUPT -> when {
                 t < 1.6f -> { setEye(fx0 + 3f, 2.2f, fz0 + 4f); setAt(fx0, 1.2f, fz0) }
                 t < 5.2f -> { setEye(c + 6.5f, 2.6f, c + 3f); setAt(fx, fy + 1f, fz) }
-                else -> { val k = smooth((t - 5.2f) / 2.4f); setEye(ex + 0.3f, ey + es * 0.95f, ez + lerp(8.5f, 6.5f, k)); setAt(ex, ey + es * 0.9f, ez) }
+                else -> { val k = smooth((t - 5.2f) / 2.4f); setEye(ex + 2.2f, ey + es * 0.62f, ez + lerp(8.5f, 6.5f, k)); setAt(ex, ey + es * 0.9f, ez) }
             }
         }
         if (shake > 0f) { eye[0] += (rng.nextFloat() - 0.5f) * shake; eye[1] += (rng.nextFloat() - 0.5f) * shake }

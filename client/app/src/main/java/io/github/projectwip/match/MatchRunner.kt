@@ -373,6 +373,10 @@ class MatchRunner(
                 else -> Unit
             }
             is GameEvent.EntityHit -> if (e.fighterId == pid) sfx.play(Sound.HIT, if (e.isSuper) 0.9f else 0.55f, 0.75f)
+            // Its jewel: breaking like glass, turning up again, and back on its neck (with a roar).
+            is GameEvent.JewelBroken -> sfx.play(Sound.GLASS, 1f, 0.8f)
+            is GameEvent.JewelDropped -> sfx.play(Sound.SHARD, 0.9f)
+            is GameEvent.JewelRestored -> sfx.play(Sound.VOID, 1f, 0.8f)
             is GameEvent.Shot -> {
                 if (e.isSuper && e.fighterId == pid) say(VoiceCue.SUPER)
                 val f = world.fighter(e.fighterId) ?: return
@@ -416,7 +420,7 @@ class MatchRunner(
             is GameEvent.Ko -> {
                 val k = world.fighter(e.killerId)
                 val v = world.fighter(e.victimId)
-                if (v != null) hudEvents += HudEvent.Ko(k?.name ?: "The Entity", k?.team ?: -2, v.name, v.team)
+                if (v != null) hudEvents += HudEvent.Ko(k?.name ?: "The Dragon", k?.team ?: -2, v.name, v.team)
                 if (e.killerId == pid) { sfx.play(Sound.KO, 1f); sfx.buzz(60, 220); say(VoiceCue.KO) }
                 else if (e.victimId == pid) { sfx.play(Sound.KO, 0.9f, 0.7f); sfx.buzz(120, 255); say(VoiceCue.DOWN) }
                 else sfx.play(Sound.KO, 0.35f)

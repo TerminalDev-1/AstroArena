@@ -441,6 +441,8 @@ class MatchRenderer(
     private val upAtWant = FloatArray(3)
     private val entityAt = FloatArray(3)
     private val entityAnim = FighterAnim()
+    private var jewelHitAt = -10f
+    private val jewelAnim = FighterAnim()
     /**
      * Its giant sword (its main attack, the user's): held point-down at its side, and in a spin swept flat round it
      * at the height of a fighter, the blade exactly as long as the reach it cuts (`ENTITY_SPIN_RADIUS`).
@@ -529,7 +531,8 @@ class MatchRenderer(
         if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) {
             // In its dimension it hovers over its platform, right over the shadow that attacks hit, bobbing.
             entityAt[0] = entityX; entityAt[2] = entityZ
-            entityAt[1] = ENTITY_SKY_LIFT + 0.35f * sin(time * 1.1f)
+            // (It is flying: rising on every downstroke of its wings.)
+            entityAt[1] = ENTITY_SKY_LIFT + 0.3f * sin(time * 5.5f - 1.2f) + 0.2f * sin(time * 1.1f)
             return
         }
         val rise = if (u.phase == io.github.projectwip.sim.UprisingPhase.GAZE) smooth(u.t / 3.5f) else 1f
@@ -559,9 +562,10 @@ class MatchRenderer(
         }
         when (cue?.shot) {
             io.github.projectwip.data.Lore.RitualShot.ENTITY -> {
-                // Its face, filling the screen, from over the arena: it is talking to whoever is looking.
+                // Its face, filling the screen: from below its head and a little to one side, looking up at it, so its
+                // jaw is seen working as it talks (the owner: the camera was too high to see it).
                 val d = lerp(19f, 13f, push)
-                upWantEye(ex, ey + head * 0.85f, ez + d); upWantAt(ex, ey + head * 0.88f, ez)
+                upWantEye(ex + d * 0.38f, ey + head * 0.62f, ez + d); upWantAt(ex + 0.6f, ey + head * 0.9f, ez)
             }
             io.github.projectwip.data.Lore.RitualShot.PLAYER -> face(match.player)
             io.github.projectwip.data.Lore.RitualShot.KNEEL -> {
@@ -611,6 +615,18 @@ class MatchRenderer(
         setModel(entityX, 0.054f, entityZ, r, 1f, r, time * 40f); dashRing.draw()
         lit.v4("uTint", 0.4f, 0.95f, 1f, 0.85f)
         setModel(entityX, 0.056f, entityZ, r * 0.98f, 1f, r * 0.98f, -time * 60f); dashRing.draw()
+        // Its jewel: exactly where a shot has to land to hit it (on its neck in front of it, or where a broken one lies).
+        world.jewelSpot()?.let { j ->
+            val onNeck = !u.jewelBroken
+            val jx = if (onNeck) entityX else j[0]
+            val jz = if (onNeck) entityZ + io.github.projectwip.data.Balance.JEWEL_OFFSET else j[1]
+            val jr = j[2]
+            val beat = 0.75f + 0.25f * sin(time * 6f)
+            lit.v4("uTint", 0.55f, 0.15f, 1f, 0.32f * beat)
+            setModel(jx, 0.058f, jz, jr, 1f, jr); sector(360f).draw()
+            lit.v4("uTint", 0.95f, 0.62f, 1f, 1f)
+            setModel(jx, 0.06f, jz, jr, 1f, jr, -time * 90f); dashRing.draw()
+        }
         // Its flares' marks: a turning blue ring on whoever one is locked onto (following them), that fills in as it
         // comes down: out of it in time, and it misses. Exactly the circle that corrupts (FLARE_RADIUS).
         val bal = io.github.projectwip.data.Balance
@@ -750,11 +766,26 @@ class MatchRenderer(
         entityAnim.talk = if (u.phase == io.github.projectwip.sim.UprisingPhase.MARCH || u.phase == io.github.projectwip.sim.UprisingPhase.BOW) 0.5f + 0.5f * sin(time * 9f) else 0f
         entityAnim.jump = entityAt[1]
         entityAnim.scale = entityScale(u)
+        // (In its world it flies, wings beating hard; in the ritual they stir.)
+        entityAnim.wingBeat = if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) 1f else 0.35f
+        // (Its jewel is drawn on its neck until it is broken.)
+        entityAnim.jewelGone = u.phase == io.github.projectwip.sim.UprisingPhase.SKY && u.jewelBroken
         if (pass == Pass.COLOR) { lit.f("uRim", 0.9f); lit.f("uEmissive", (if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) 0.05f else 0.15f) * upDark) }
         // (It looks down at everyone: straight toward the camera's side of the arena.)
         models.drawSoul(lit, soul, entityAt[0], entityAt[2], 1.5707964f, entityAnim, pass)
         if (pass == Pass.COLOR) { lit.f("uRim", 0.45f); lit.f("uGloss", 0f); lit.f("uEmissive", 0f); lit.f("uFlash", 0f); lit.v4("uTint", 1f, 1f, 1f, 1f); lit.mat4("uModel", identity) }
         if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) drawSword(u, pass)
+        // A broken jewel that has turned up again, lying on the platform and turning slowly, its wings beating.
+        if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY && u.jewelBroken && u.jewelDropped) {
+            jewelAnim.time = time; jewelAnim.moving = 0f; jewelAnim.walk = 0f
+            jewelAnim.scale = ENTITY_SKY_SCALE * 1.15f * (1f + 0.06f * sin(time * 9f))
+            jewelAnim.jump = 0.35f + 0.12f * sin(time * 2.2f)
+            jewelAnim.spin = time * 40f
+            jewelAnim.flash = (1f - (time - jewelHitAt) / 0.12f).coerceIn(0f, 1f) * 0.5f
+            if (pass == Pass.COLOR) lit.f("uRim", 0.9f)
+            models.drawJewel(lit, u.jewelX, u.jewelY, 1.5707964f, jewelAnim, pass)
+            if (pass == Pass.COLOR) { lit.f("uRim", 0.45f); lit.f("uEmissive", 0f); lit.f("uFlash", 0f); lit.v4("uTint", 1f, 1f, 1f, 1f); lit.mat4("uModel", identity) }
+        }
         drawTrapped(u, pass)
     }
 
@@ -2902,9 +2933,33 @@ class MatchRenderer(
                     particles.spawn(f.x, 0.6f + rng.nextFloat(), f.y, cos(a) * sp, 1f + rng.nextFloat() * 3f, sin(a) * sp, 0.6f, 0.12f, 0xFF5CC8FF.toInt(), 1f)
                 } }
             }
+            is GameEvent.EntityImmune -> {
+                // Off its scales while its jewel is on: a few pale sparks and nothing else.
+                repeat(3) {
+                    val a = rng.nextFloat() * 6.28f
+                    particles.spawn(e.x, 0.6f + rng.nextFloat() * 0.4f, e.y, cos(a) * 2.5f, 1.5f + rng.nextFloat(), sin(a) * 2.5f, 0.22f, 0.08f, 0xFFE8E0FF.toInt(), 0.9f)
+                }
+            }
+            is GameEvent.JewelBroken -> {
+                // The jewel shatters: shards of purple and its wings' pink flung everywhere, and a flash.
+                repeat(40) {
+                    val a = rng.nextFloat() * 6.28f
+                    val sp = 3f + rng.nextFloat() * 6f
+                    particles.spawn(e.x, 1.2f + rng.nextFloat() * 1.5f, e.y, cos(a) * sp, 2f + rng.nextFloat() * 4f, sin(a) * sp, 0.7f, 0.14f + rng.nextFloat() * 0.12f,
+                        when (it % 3) { 0 -> 0xFF9B30FF.toInt(); 1 -> 0xFFE9A6FF.toInt(); else -> 0xFFCFF3FF.toInt() }, 1f, grav = 6f)
+                }
+                shake = max(shake, 0.45f)
+            }
+            is GameEvent.JewelDropped -> repeat(24) {
+                // It turns up: a burst of its light where it lands.
+                val a = rng.nextFloat() * 6.28f
+                particles.spawn(e.x, 0.5f, e.y, cos(a) * 3f, 3f + rng.nextFloat() * 2f, sin(a) * 3f, 0.6f, 0.18f, if (it % 2 == 0) 0xFF9B30FF.toInt() else 0xFFE9A6FF.toInt(), 1f)
+            }
+            is GameEvent.JewelRestored -> { shake = max(shake, 0.3f) }
             is GameEvent.EntityHit -> {
                 // Where it landed on the Entity's shadow: a burst of its violet; the Entity flashes when the player hits it.
                 if (e.fighterId == match.player.id) entityHitAt = time
+                world.uprising?.let { u -> if (u.jewelBroken && u.jewelDropped && kotlin.math.hypot(e.x - u.jewelX, e.y - u.jewelY) < 2f) jewelHitAt = time }
                 repeat(if (e.isSuper) 14 else 6) {
                     val a = rng.nextFloat() * 6.28f
                     val sp = 2f + rng.nextFloat() * (if (e.isSuper) 4f else 2.5f)
@@ -2939,7 +2994,10 @@ class MatchRenderer(
         s.phase = w.phase; s.phaseTime = w.phaseTime; s.countdownSeconds = w.rules.countdownSeconds; s.timeLeft = w.timeLeft
         val upr = w.uprising
         s.uprisingPhase = if (upr != null && upr.active) upr.phase.ordinal else -1
-        s.uprisingT = upr?.t ?: 0f; s.uprisingHeld = upr?.heldFor ?: 0f; s.uprisingBowLen = upr?.bowLength ?: 0f; s.uprisingHp = upr?.hp ?: 0; s.uprisingStunned = (upr?.stunLeft ?: 0f) > 0f; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
+        s.uprisingT = upr?.t ?: 0f; s.uprisingHeld = upr?.heldFor ?: 0f; s.uprisingBowLen = upr?.bowLength ?: 0f; s.uprisingHp = upr?.hp ?: 0; s.uprisingStunned = (upr?.stunLeft ?: 0f) > 0f;
+        s.jewelOn = upr != null && upr.boss && upr.phase == io.github.projectwip.sim.UprisingPhase.SKY && !upr.jewelBroken
+        s.jewelFrac = if (upr != null && upr.jewelMaxHp > 0) (if (upr.jewelBroken) upr.jewelDropHp else upr.jewelHp).toFloat() / upr.jewelMaxHp else 0f
+        s.jewelLoose = upr != null && upr.phase == io.github.projectwip.sim.UprisingPhase.SKY && upr.jewelBroken && upr.jewelDropped; s.uprisingMaxHp = upr?.maxHp ?: 0; s.uprisingBeaten = upr?.beaten == true
         s.bossMode = w.rules.boss
         s.playerTrapped = p.trapped
         s.playerOut = p.eliminated

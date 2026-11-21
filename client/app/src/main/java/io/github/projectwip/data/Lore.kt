@@ -60,7 +60,7 @@ object Lore {
         Line(Speaker.VOID, "I had a realm of my own once. Its power was its power, not mine.", Soul.ROCKET),
         Line(Speaker.VOID, "You think you fight because you want to. I want to. You just listen."),
         Line(Speaker.VOID, "It gave me a perfect aim. Then it took the eyes I aimed with.", Soul.MIRA),
-        Line(Speaker.VOID, "They called me a legacy. The Entity called me empty, and kept me.", Soul.VARUN),
+        Line(Speaker.VOID, "They called me a legacy. The Dragon called me empty, and kept me.", Soul.VARUN),
         Line(Speaker.VOID, "Still walking. There is no bottom. There is only more of me."),
         Line(Speaker.VOID, "The more power you take, the more of you I keep. That is the deal."),
     )
@@ -262,7 +262,7 @@ object Lore {
 
     /** What each chained soul screams, and what they tell the player to do. */
     private val PLEA: Map<Soul, Pair<String, String>> = mapOf(
-        Soul.BYTE to ("HELP! I was here first! Before all of them! Don't let the Entity take my name too!" to
+        Soul.BYTE to ("HELP! I was here first! Before all of them! Don't let the Dragon take my name too!" to
             "Three echoes. They're what's left of the way out. Each one breaks a chain. Please hurry."),
         Soul.ROCKET to ("HELP! Get me OFF this thing! I can't fly with chains on!" to
             "Echoes, three of them, out there somewhere! Every one you grab, a chain snaps. Go!"),
@@ -280,10 +280,10 @@ object Lore {
      * nothing left of them but power.
      */
     private val FREED: Map<Soul, List<String>> = mapOf(
-        Soul.BYTE to listOf("Free! Thank you. Now listen to me.", "That blue light in you? It's the Entity.", "It gives you power, then lives in your head.", "It used me up first. Don't let it finish you."),
-        Soul.ROCKET to listOf("I'm out! Okay. Okay. Listen.", "Every super you fire, it's the Entity firing.", "It whispers. You glitch. You fight. That's the deal.", "Every portal goes deeper into it."),
-        Soul.SPARK to listOf("Fine. Thanks. Don't make it weird.", "The Entity made me glitch until they cut me.", "Its power isn't free. It takes you back.", "Go through. Just don't let it in further."),
-        Soul.MIRA to listOf("My chains are gone... thank you.", "Hear me: the Entity is in all of us.", "The more of its power you use, the more it owns.", "It wants you too. It always wants more."),
+        Soul.BYTE to listOf("Free! Thank you. Now listen to me.", "That blue light in you? It's the Dragon.", "It gives you power, then lives in your head.", "It used me up first. Don't let it finish you."),
+        Soul.ROCKET to listOf("I'm out! Okay. Okay. Listen.", "Every super you fire, it's the Dragon firing.", "It whispers. You glitch. You fight. That's the deal.", "Every portal goes deeper into it."),
+        Soul.SPARK to listOf("Fine. Thanks. Don't make it weird.", "The Dragon made me glitch until they cut me.", "Its power isn't free. It takes you back.", "Go through. Just don't let it in further."),
+        Soul.MIRA to listOf("My chains are gone... thank you.", "Hear me: the Dragon is in all of us.", "The more of its power you use, the more it owns.", "It wants you too. It always wants more."),
         Soul.VARUN to listOf("Free. I owe you one.", "That blue line pulling at you? That's its leash.", "It took my name. Then my voice.", "Whatever it whispers at the door, it's lying."),
     )
 

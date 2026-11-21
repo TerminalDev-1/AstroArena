@@ -293,7 +293,7 @@ object Arenas {
         }
         // (Where a fighter knocked out in there comes back: a spread of places at the front of the platform.)
         val spawn = listOf(Spawn(c, c + 5f), Spawn(c - 2.5f, c + 4.5f), Spawn(c + 2.5f, c + 4.5f))
-        return Arena("The Entity's Dimension", size, size, tiles, listOf(spawn, spawn), spawn)
+        return Arena("The Dragon's Dimension", size, size, tiles, listOf(spawn, spawn), spawn)
     }
     const val ENTITY_REALM_RADIUS = 9
 

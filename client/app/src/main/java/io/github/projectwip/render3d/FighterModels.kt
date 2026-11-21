@@ -11,12 +11,15 @@ import kotlin.math.sin
 
 /** Which skin colour a part takes. Meshes are white; colour is applied per draw so skins are free. */
 /** [VOID] is pure black: Ninja's face, which isn't there. */
-enum class Slot { PRIMARY, SECONDARY, ACCENT, SKIN, SKIN_BROWN, DARK, METAL, WHITE, INK, VOID }
+/** [GEM], [WING], [CREATURE]: the Entity's jewel; [EYE]: its glowing blue eyes. Fixed colours. */
+enum class Slot { PRIMARY, SECONDARY, ACCENT, SKIN, SKIN_BROWN, DARK, METAL, WHITE, INK, VOID, GEM, WING, EYE, CREATURE }
 
 /** Simple rig. Every part is attached to exactly one bone. */
 /** [FORE_L] and [FORE_R] are the front legs of a fighter that walks on four. */
 /** [MOUTH] rides the head at the model's mouth spot and opens as the fighter talks ([FighterAnim.talk]). */
-enum class Bone { BODY, HEAD, WEAPON, ARM, LEG_L, LEG_R, FORE_L, FORE_R, FLOAT, MOUTH }
+/** [JEWEL] moves with the body, and is left out when [FighterAnim.jewelGone] (the Entity's jewel, broken). */
+/** [WING_L] and [WING_R] beat about [Rig.wing] (the Dragon's wings: [FighterAnim.wingBeat]). */
+enum class Bone { BODY, HEAD, WEAPON, ARM, LEG_L, LEG_R, FORE_L, FORE_R, FLOAT, MOUTH, JEWEL, WING_L, WING_R }
 
 /** [gloss]: a shiny, chromatic shell (see the lit shader's `uGloss`). */
 class Part(val mesh: Mesh, val slot: Slot, val bone: Bone, val outline: Boolean, val emissive: Boolean, val gloss: Boolean = false)
@@ -32,6 +35,8 @@ class Rig(
     /** On four legs: how far forward the front legs are hung, and how far back the hind ones. */
     val foreX: Float = 0f,
     val hindX: Float = 0f,
+    /** Where the wings hinge (x, y, z; z for the right wing, mirrored for the left). */
+    val wing: FloatArray = floatArrayOf(0f, 1f, 0.3f),
 )
 
 /** [mouth]: where the mouth sits on the head (head-local x, y, z), for a model that has one. */
@@ -62,6 +67,10 @@ class FighterAnim {
     var talk = 0f
     /** 0..1: the eyes lit lightning blue (the Entity has them: in its cutscenes and its ritual). */
     var eyeGlow = 0f
+    /** 0..1: how hard the wings beat: a slow idle stir at 0, full flight at 1. */
+    var wingBeat = 0f
+    /** The Entity's jewel is broken: its parts ([Bone.JEWEL]) are not drawn. */
+    var jewelGone = false
 }
 
 enum class Pass { SHADOW, COLOR, OUTLINE, SILHOUETTE }
@@ -72,7 +81,8 @@ enum class Pass { SHADOW, COLOR, OUTLINE, SILHOUETTE }
 class FighterModels {
     private val models = HashMap<FighterId, FighterModel>()
     private val soulModels = HashMap<io.github.projectwip.data.Lore.Soul, FighterModel>()
-    private val voidModel by lazy { buildVoid() }
+    private val voidModel by lazy { buildDragon() }
+    private val jewelModel by lazy { buildLooseJewel() }
 
     init {
         // Ninja, the only fighter since build 114 (the owner's decision), on the starter's id. Swish's model is kept with
@@ -392,7 +402,127 @@ class FighterModels {
      * The Void as a figure: a tall robe flaring to the ground with no feet, a deep hood with a dark hollow where a
      * face should be and two pale lit eyes in it, long empty sleeves, and a broken halo turning over its head.
      */
-    private fun buildVoid(): FighterModel {
+    /**
+     * The Entity as a dragon (the owner's design, build 115): rearing up on its hind legs, a deep chest with pale belly
+     * plates, a long neck curving up to a horned head with glowing blue eyes and teeth, clawed arms, great membrane
+     * wings and a spined tail ending in a spade. Chained at the base of its neck is its jewel ([addJewel]).
+     */
+    private fun buildDragon(): FighterModel {
+        val a = Assembler()
+        val rig = Rig(headY = 1.72f, hipY = 0.5f, hipZ = 0.3f, shoulder = floatArrayOf(0.3f, 1.12f, 0.42f), shoulderL = floatArrayOf(0.3f, 1.12f, -0.42f), floatY = 1.3f,
+            wing = floatArrayOf(-0.12f, 1.3f, 0.32f))
+        // The body, rearing: chest, haunches, belly plates.
+        a.add(Bone.BODY, Slot.PRIMARY) { at(0.02f, 0.88f, 0f) { rotate(-18f, 0f, 0f, 1f); ellipsoid(0.5f, 0.66f, 0.5f, 12, 18) } }
+        a.add(Bone.BODY, Slot.PRIMARY) { at(-0.12f, 0.46f, 0f) { ellipsoid(0.5f, 0.4f, 0.48f, 10, 16) } }
+        a.add(Bone.BODY, Slot.SECONDARY) { at(0.3f, 0.86f, 0f) { rotate(-18f, 0f, 0f, 1f); ellipsoid(0.24f, 0.55f, 0.34f, 10, 14) } }
+        for (k in 0 until 5) {
+            a.add(Bone.BODY, Slot.SECONDARY) { at(0.5f + k * 0.035f, 0.56f + k * 0.15f, 0f) { rotate(-18f, 0f, 0f, 1f); roundedBox(0.03f, 0.022f, 0.4f - k * 0.04f, 0.01f) } }
+        }
+        // Cracks of its light in its chest.
+        for ((k, z) in listOf(-0.16f, 0.02f, 0.18f).withIndex()) {
+            a.add(Bone.BODY, Slot.EYE, outline = false, emissive = true) { at(0.38f, 0.74f + k * 0.05f, z) { rotate(-18f + (k - 1) * 12f, 0f, 0f, 1f); roundedBox(0.02f, 0.32f, 0.025f, 0.008f) } }
+        }
+        // The neck, curving up and forward to the head.
+        val neck = listOf(floatArrayOf(0.16f, 1.22f, 0.28f), floatArrayOf(0.26f, 1.38f, 0.25f), floatArrayOf(0.34f, 1.53f, 0.22f), floatArrayOf(0.4f, 1.67f, 0.2f))
+        for (n in neck) a.add(Bone.BODY, Slot.PRIMARY) { at(n[0], n[1], 0f) { sphere(n[2], 10, 14) } }
+        // Spines down the neck and the back.
+        val spines = listOf(floatArrayOf(0.22f, 1.78f, 0.16f), floatArrayOf(0.12f, 1.62f, 0.18f), floatArrayOf(0.0f, 1.45f, 0.2f), floatArrayOf(-0.16f, 1.28f, 0.22f),
+            floatArrayOf(-0.3f, 1.08f, 0.22f), floatArrayOf(-0.4f, 0.86f, 0.2f), floatArrayOf(-0.5f, 0.64f, 0.17f))
+        for (sp in spines) a.add(Bone.BODY, Slot.DARK) { at(sp[0], sp[1], 0f) { rotate(55f, 0f, 0f, 1f); cylinder(0.07f, sp[2], 6, topRadius = 0f) } }
+        // The wings: from the shoulders, swept up, out and back; a spar along the leading edge and three membranes.
+        for (side in listOf(1f, -1f)) {
+            val wb = if (side > 0f) Bone.WING_R else Bone.WING_L
+            a.add(wb, Slot.DARK) { at(-0.12f, 1.3f, 0.32f * side) { rotate(22f, 0f, 0f, 1f); rotate(side * 58f, 1f, 0f, 0f); at(0f, 0.7f, 0f) { cylinder(0.055f, 1.4f, 8, topRadius = 0.02f) } } }
+            for ((k, len) in listOf(1.1f, 0.85f, 0.6f).withIndex()) {
+                a.add(wb, Slot.SECONDARY) {
+                    at(-0.12f, 1.3f, 0.32f * side) { rotate(22f, 0f, 0f, 1f); rotate(side * 58f, 1f, 0f, 0f); rotate(18f + k * 22f, 0f, 0f, 1f); at(-0.14f, len * 0.55f, 0f) { ellipsoid(0.4f, len * 0.62f, 0.025f, 8, 14) } }
+                }
+            }
+            // A claw at the wing's bend.
+            a.add(wb, Slot.WHITE) { at(-0.12f, 1.3f, 0.32f * side) { rotate(22f, 0f, 0f, 1f); rotate(side * 58f, 1f, 0f, 0f); at(0.02f, 1.42f, 0f) { cylinder(0.035f, 0.14f, 6, topRadius = 0f) } } }
+        }
+        // The tail: thick at the hips, sweeping back and round on the ground, ending in a spade.
+        val tail = listOf(floatArrayOf(-0.5f, 0.42f, 0.05f, 0.26f), floatArrayOf(-0.78f, 0.3f, 0.12f, 0.22f), floatArrayOf(-1.04f, 0.22f, 0.24f, 0.18f),
+            floatArrayOf(-1.26f, 0.16f, 0.4f, 0.15f), floatArrayOf(-1.42f, 0.13f, 0.6f, 0.12f), floatArrayOf(-1.52f, 0.11f, 0.8f, 0.09f))
+        for (tl in tail) a.add(Bone.BODY, Slot.PRIMARY) { at(tl[0], tl[1], tl[2]) { sphere(tl[3], 8, 12) } }
+        a.add(Bone.BODY, Slot.DARK) { at(-1.56f, 0.11f, 1.0f) { rotate(90f, 1f, 0f, 0f); octa(0.14f, 0.2f, 0.03f) } }
+        // The head: skull, long snout, heavy brow, lower jaw, teeth, horns swept back, and its blue eyes.
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(0.46f, 0.06f, 0f) { ellipsoid(0.27f, 0.22f, 0.24f, 10, 16) } }
+        a.add(Bone.HEAD, Slot.PRIMARY) { at(0.84f, -0.01f, 0f) { ellipsoid(0.34f, 0.115f, 0.14f, 10, 14) } }
+        // A crest of spikes down the back of its head.
+        for (k in 0 until 3) a.add(Bone.HEAD, Slot.DARK) { at(0.3f - k * 0.1f, 0.24f - k * 0.06f, 0f) { rotate(50f, 0f, 0f, 1f); cylinder(0.05f, 0.24f - k * 0.04f, 6, topRadius = 0f) } }
+        a.add(Bone.HEAD, Slot.SECONDARY) { at(0.72f, -0.12f, 0f) { ellipsoid(0.24f, 0.06f, 0.14f, 8, 12) } }
+        for (z in listOf(0.12f, -0.12f)) {
+            a.add(Bone.HEAD, Slot.DARK) { at(0.6f, 0.15f, z) { rotate(-12f, 0f, 0f, 1f); roundedBox(0.2f, 0.055f, 0.09f, 0.02f) } }
+            a.add(Bone.HEAD, Slot.EYE, outline = false, emissive = true) { at(0.66f, 0.13f, z * 1.62f) { rotate(if (z > 0f) -25f else 25f, 0f, 1f, 0f); ellipsoid(0.065f, 0.042f, 0.035f, 6, 10) } }
+            a.add(Bone.HEAD, Slot.VOID, outline = false) { at(1.15f, 0.04f, z * 0.4f) { sphere(0.02f, 6, 8) } }
+            for (k in 0 until 4) a.add(Bone.HEAD, Slot.WHITE) { at(0.62f + k * 0.09f, -0.08f, z * (1f - k * 0.12f)) { rotate(180f, 1f, 0f, 0f); cylinder(0.02f, 0.07f, 6, topRadius = 0f) } }
+            // Horns: a long pair swept back, and a short pair under them.
+            a.add(Bone.HEAD, Slot.DARK) { at(0.34f, 0.24f, z * 1.2f) { rotate(42f, 0f, 0f, 1f); rotate(if (z > 0f) 26f else -26f, 1f, 0f, 0f); at(0f, 0.38f, 0f) { cylinder(0.085f, 0.76f, 8, topRadius = 0f) } } }
+            a.add(Bone.HEAD, Slot.DARK) { at(0.34f, 0.05f, z * 1.6f) { rotate(75f, 0f, 0f, 1f); rotate(if (z > 0f) 30f else -30f, 1f, 0f, 0f); at(0f, 0.12f, 0f) { cylinder(0.04f, 0.24f, 6, topRadius = 0f) } } }
+        }
+        a.mouth(0.8f, -0.08f, 0f, 0.13f)
+        // Its arms: clawed, held up in front of it.
+        for (bone in listOf(Bone.WEAPON, Bone.ARM)) {
+            a.add(bone, Slot.PRIMARY) { at(0f, -0.16f, 0f) { capsule(0.1f, 0.2f) } }
+            a.add(bone, Slot.PRIMARY) { at(0.08f, -0.4f, 0f) { rotate(-25f, 0f, 0f, 1f); capsule(0.085f, 0.18f) } }
+            a.add(bone, Slot.DARK) { at(0.16f, -0.56f, 0f) { sphere(0.1f, 8, 10) } }
+            for (k in -1..1) a.add(bone, Slot.WHITE) { at(0.24f, -0.64f, k * 0.05f) { rotate(140f, 0f, 0f, 1f); cylinder(0.025f, 0.12f, 6, topRadius = 0f) } }
+        }
+        // Its legs: heavy thighs, scaled shins, wide clawed feet.
+        for (bone in listOf(Bone.LEG_L, Bone.LEG_R)) {
+            a.add(bone, Slot.PRIMARY) { at(0f, -0.04f, 0f) { ellipsoid(0.24f, 0.3f, 0.21f, 8, 12) } }
+            a.add(bone, Slot.DARK) { at(0.06f, -0.3f, 0f) { capsule(0.1f, 0.12f) } }
+            a.add(bone, Slot.DARK) { at(0.14f, -0.44f, 0f) { roundedBox(0.32f, 0.1f, 0.22f, 0.04f) } }
+            for (k in -1..1) a.add(bone, Slot.WHITE) { at(0.32f, -0.46f, k * 0.07f) { rotate(-90f, 0f, 0f, 1f); cylinder(0.03f, 0.1f, 6, topRadius = 0f) } }
+        }
+        addJewel(a, 0.6f, 1.02f, 0f, chained = true)
+        return a.build(rig)
+    }
+
+    /**
+     * Its jewel (the owner's design), centred at ([x], [y], [z]) and facing +X: a purple butterfly brooch, a little
+     * glowing creature in its gem body powering it. [chained]: hung on a chain from a collar round the dragon's neck.
+     */
+    private fun addJewel(a: Assembler, x: Float, y: Float, z: Float, chained: Boolean) {
+        if (chained) {
+            a.add(Bone.JEWEL, Slot.METAL) { at(0.24f, 1.27f, 0f) { rotate(-38f, 0f, 0f, 1f); torus(0.29f, 0.035f, 24, 8) } }
+            for (k in 0 until 4) {
+                val f = (k + 0.5f) / 4f
+                a.add(Bone.JEWEL, Slot.METAL) { at(0.48f + (x - 0.48f) * f, 1.2f + (y + 0.13f - 1.2f) * f, z) { rotate(if (k % 2 == 0) 0f else 90f, 0f, 1f, 0f); rotate(90f, 1f, 0f, 0f); torus(0.035f, 0.012f, 10, 6) } }
+            }
+        }
+        // A butterfly brooch (the owner wanted it in the spirit of a butterfly brooch from a show: this one is ours):
+        // a slim gem for its body, with the creature that powers it glowing in the middle, looking out...
+        a.add(Bone.JEWEL, Slot.GEM, emissive = true) { at(x - 0.01f, y, z) { octa(0.045f, 0.15f, 0.055f) } }
+        a.add(Bone.JEWEL, Slot.CREATURE, outline = false, emissive = true) { at(x + 0.03f, y + 0.01f, z) { sphere(0.042f, 8, 10) } }
+        for (dz in listOf(0.016f, -0.016f)) a.add(Bone.JEWEL, Slot.VOID, outline = false) { at(x + 0.07f, y + 0.02f, z + dz) { sphere(0.009f, 5, 6) } }
+        for (s in listOf(1f, -1f)) {
+            // ...two big upper wings and two smaller lower ones, each with a lighter panel inside it...
+            a.add(Bone.JEWEL, Slot.GEM, emissive = true) { at(x, y + 0.07f, z + 0.12f * s) { rotate(-s * 32f, 1f, 0f, 0f); ellipsoid(0.02f, 0.105f, 0.125f, 8, 12) } }
+            a.add(Bone.JEWEL, Slot.WING, outline = false) { at(x + 0.012f, y + 0.08f, z + 0.13f * s) { rotate(-s * 32f, 1f, 0f, 0f); ellipsoid(0.02f, 0.062f, 0.075f, 8, 10) } }
+            a.add(Bone.JEWEL, Slot.GEM, emissive = true) { at(x, y - 0.085f, z + 0.085f * s) { rotate(s * 36f, 1f, 0f, 0f); ellipsoid(0.02f, 0.075f, 0.085f, 8, 12) } }
+            a.add(Bone.JEWEL, Slot.WING, outline = false) { at(x + 0.012f, y - 0.09f, z + 0.09f * s) { rotate(s * 36f, 1f, 0f, 0f); ellipsoid(0.02f, 0.042f, 0.048f, 8, 10) } }
+            // ...and two antennae curling up from its head.
+            a.add(Bone.JEWEL, Slot.DARK, outline = false) { at(x, y + 0.2f, z + 0.03f * s) { rotate(-s * 22f, 1f, 0f, 0f); cylinder(0.007f, 0.1f, 5) } }
+            a.add(Bone.JEWEL, Slot.WING, outline = false) { at(x, y + 0.25f, z + 0.052f * s) { sphere(0.014f, 5, 6) } }
+        }
+    }
+
+    /** The jewel on its own, broken off and lying on the platform: the dragon rushes to get it back. */
+    private fun buildLooseJewel(): FighterModel {
+        val a = Assembler()
+        addJewel(a, 0f, 0.3f, 0f, chained = false)
+        return a.build(Rig(headY = 1f, hipY = 0.4f, hipZ = 0.1f, shoulder = floatArrayOf(0f, 0.7f, 0.2f), shoulderL = floatArrayOf(0f, 0.7f, -0.2f)))
+    }
+
+    /** Draws the loose jewel lying at ([x], [z]). */
+    fun drawJewel(prog: Program, x: Float, z: Float, facing: Float, anim: FighterAnim, pass: Pass, ink: FloatArray = INK) =
+        drawModel(prog, jewelModel, VOID_SKIN, x, z, facing, anim, pass, ink, 0L)
+
+    /** The Entity as it was until build 115: a robed figure (kept, unused). */
+    @Suppress("unused")
+    private fun buildVoidRobed(): FighterModel {
         val a = Assembler()
         val rig = Rig(headY = 1.5f, hipY = 0.4f, hipZ = 0.15f, shoulder = floatArrayOf(0.05f, 1.22f, 0.5f), shoulderL = floatArrayOf(0.05f, 1.22f, -0.5f), floatY = 1.2f)
         // The robe, flaring to a ragged hem of points that trail on the ground.
@@ -528,10 +658,21 @@ class FighterModels {
         Matrix.scaleM(body, 0, 1f, breathe, 1f)
 
         for (p in model.parts) {
+            if (p.bone == Bone.JEWEL && anim.jewelGone) continue
             if (pass == Pass.OUTLINE && !p.outline) continue
             if (pass == Pass.SILHOUETTE && p.bone == Bone.FLOAT) continue
             when (p.bone) {
-                Bone.BODY -> System.arraycopy(body, 0, bone, 0, 16)
+                Bone.BODY, Bone.JEWEL -> System.arraycopy(body, 0, bone, 0, 16)
+                // The Dragon's wings beat about their hinges: a slow stir standing, full strokes in flight.
+                Bone.WING_L, Bone.WING_R -> {
+                    val side = if (p.bone == Bone.WING_R) 1f else -1f
+                    val w = rig.wing
+                    val beat = sin(t * (1.8f + 3.7f * anim.wingBeat)) * (8f + 34f * anim.wingBeat)
+                    System.arraycopy(body, 0, bone, 0, 16)
+                    Matrix.translateM(bone, 0, w[0], w[1], w[2] * side)
+                    Matrix.rotateM(bone, 0, beat * side, 1f, 0f, 0f)
+                    Matrix.translateM(bone, 0, -w[0], -w[1], -w[2] * side)
+                }
                 Bone.HEAD, Bone.MOUTH -> {
                     System.arraycopy(body, 0, bone, 0, 16)
                     Matrix.translateM(bone, 0, 0f, rig.headY, 0f)
@@ -620,6 +761,10 @@ class FighterModels {
             Slot.WHITE -> 0xFFFFFFFF
             Slot.INK -> 0xFF142435
             Slot.VOID -> 0xFF000000
+            Slot.GEM -> 0xFF6A12D8
+            Slot.WING -> 0xFFC85CFF
+            Slot.EYE -> 0xFF3FB4FF
+            Slot.CREATURE -> 0xFFCFF3FF
         }
         val v = c.toInt()
         col[0] = ((v shr 16) and 0xFF) / 255f; col[1] = ((v shr 8) and 0xFF) / 255f; col[2] = (v and 0xFF) / 255f

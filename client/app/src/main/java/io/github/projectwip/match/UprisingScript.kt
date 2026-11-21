@@ -71,7 +71,7 @@ object UprisingScript {
                 var i = 0
                 while (i < bowLengths.size - 1 && t >= start + bowLengths[i] * k) { start += bowLengths[i] * k; i++ }
                 val line = Lore.UPRISING_BOW[i]
-                Cue(3000 + i, line.text.replace("%s", playerName), if (line.shot == Lore.RitualShot.KNEEL) "EVERYONE BOWS TO THE ENTITY" else null, line.shot, i,
+                Cue(3000 + i, line.text.replace("%s", playerName), if (line.shot == Lore.RitualShot.KNEEL) "EVERYONE BOWS TO THE DRAGON" else null, line.shot, i,
                     t - start, bowLengths[i] * k, plate = line.text.isNotEmpty())
             }
         }

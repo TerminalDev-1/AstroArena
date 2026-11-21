@@ -68,7 +68,7 @@ fun EntityInsideScreen(full: Boolean = true, onToggle: (() -> Unit)? = null, rea
                 AndroidView(factory = { ctx -> EntityInsideView(ctx).also { scene = it } }, modifier = Modifier.fillMaxSize())
                 Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xCC12062A)).padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally) {
-                    PlainText("YOU, INSIDE THE ENTITY", Type.Label, color = Color(0xFFE9D4FF), maxLines = 1)
+                    PlainText("YOU, INSIDE THE DRAGON", Type.Label, color = Color(0xFFE9D4FF), maxLines = 1)
                     PlainText("TAP TO LOOK INSIDE", Type.Small, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
                 }
             }
@@ -82,7 +82,7 @@ fun EntityInsideScreen(full: Boolean = true, onToggle: (() -> Unit)? = null, rea
         Column(Modifier.align(Alignment.TopCenter).padding(top = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Panel(cut = 12.dp) {
                 Column(Modifier.padding(horizontal = 18.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    PlainText("THE ENTITY · %,d".format(i?.hp ?: 0), Type.Label, maxLines = 1)
+                    PlainText("THE DRAGON · %,d".format(i?.hp ?: 0), Type.Label, maxLines = 1)
                     Canvas(Modifier.width(420.dp).height(10.dp)) {
                         val r = CornerRadius(size.height / 2, size.height / 2)
                         drawRoundRect(Color(0xCC0C061E), cornerRadius = r)
@@ -91,7 +91,7 @@ fun EntityInsideScreen(full: Boolean = true, onToggle: (() -> Unit)? = null, rea
                     }
                 }
             }
-            GameText("TRAPPED INSIDE THE ENTITY", Type.Title, color = Color(0xFFE9D4FF), outline = 3.dp, modifier = Modifier.padding(top = 14.dp))
+            GameText("TRAPPED INSIDE THE DRAGON", Type.Title, color = Color(0xFFE9D4FF), outline = 3.dp, modifier = Modifier.padding(top = 14.dp))
             PlainText("YOUR TEAM MUST BEAT IT TO FREE YOU", Type.Label, color = Color.White.copy(alpha = 0.85f), maxLines = 1)
         }
         // What it is doing to them, pulsing.

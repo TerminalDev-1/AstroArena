@@ -80,11 +80,15 @@ class HudSnapshot {
     var uprisingHp = 0
     /** The Entity is stunned (Ninja's cosmic rounds). */
     var uprisingStunned = false
+    /** Its jewel: on (it is immune) with this share of its health left; or broken and lying on the platform. */
+    var jewelOn = false
+    var jewelFrac = 0f
+    var jewelLoose = false
     var uprisingMaxHp = 0
     var uprisingBeaten = false
 
     fun copyFrom(o: HudSnapshot) {
-        uprisingPhase = o.uprisingPhase; uprisingT = o.uprisingT; uprisingHeld = o.uprisingHeld; uprisingBowLen = o.uprisingBowLen; uprisingHp = o.uprisingHp; uprisingStunned = o.uprisingStunned; uprisingMaxHp = o.uprisingMaxHp; uprisingBeaten = o.uprisingBeaten
+        uprisingPhase = o.uprisingPhase; uprisingT = o.uprisingT; uprisingHeld = o.uprisingHeld; uprisingBowLen = o.uprisingBowLen; uprisingHp = o.uprisingHp; uprisingStunned = o.uprisingStunned; jewelOn = o.jewelOn; jewelFrac = o.jewelFrac; jewelLoose = o.jewelLoose; uprisingMaxHp = o.uprisingMaxHp; uprisingBeaten = o.uprisingBeaten
         width = o.width; height = o.height
         System.arraycopy(o.viewProj, 0, viewProj, 0, 16)
         phase = o.phase; phaseTime = o.phaseTime; countdownSeconds = o.countdownSeconds; timeLeft = o.timeLeft

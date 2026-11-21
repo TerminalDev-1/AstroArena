@@ -120,7 +120,7 @@ fun EntityHijack(fighter: FighterId, skin: Int, index: Int, sfx: Sfx?, onDone: (
             }
             Box(Modifier.align(Alignment.TopStart).padding(start = 26.dp)) {
                 Panel(color = Color(0xFF7A3CDC), colorBottom = Color(0xFF4A2290), cut = 9.dp) {
-                    GameText("THE ENTITY", Type.Heading, color = Color.White, outline = 2.5.dp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp))
+                    GameText("THE DRAGON", Type.Heading, color = Color.White, outline = 2.5.dp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp))
                 }
             }
         }

@@ -98,7 +98,7 @@ fun IntroCutscene(sfx: Sfx?, onDone: () -> Unit) {
                 colorBottom = if (entity) Color(0xFF1E1150) else Color(0xFF0E2A5C),
             ) {
                 Column(Modifier.padding(horizontal = 22.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    GameText(if (entity) "THE ENTITY" else "NINJA", Type.Eyebrow, color = if (entity) Color(0xFFC9A6FF) else Color(0xFF9FDBFF))
+                    GameText(if (entity) "THE DRAGON" else "NINJA", Type.Eyebrow, color = if (entity) Color(0xFFC9A6FF) else Color(0xFF9FDBFF))
                     GameText(b.text, Type.Heading.copy(fontSize = 19.sp), color = Palette.Text, align = TextAlign.Center, maxLines = 2)
                 }
             }

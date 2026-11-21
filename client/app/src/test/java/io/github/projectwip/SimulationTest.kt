@@ -1337,7 +1337,7 @@ class SimulationTest {
             if (u.phase == io.github.projectwip.sim.UprisingPhase.BOW)
                 bowedTogether = u.members.all { id -> w.fighter(id)!!.let { kotlin.math.hypot(it.x - u.slotX.getValue(id), it.y - u.slotY.getValue(id)) < 0.2f } }
             if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) {
-                if (w.arena !== home && w.arena.name == "The Entity's Dimension") inRealm = true
+                if (w.arena !== home && w.arena.name == "The Dragon's Dimension") inRealm = true
                 if (u.members.any { w.fighter(it)!!.let { f -> f.team != 0 && f.corruptLeft <= 0f } }) oneSide = false
             }
             for (e in w.events) {
@@ -1385,8 +1385,10 @@ class SimulationTest {
             var t = 0
             while (u.phase != io.github.projectwip.sim.UprisingPhase.SKY && t < 60 * 120) { m.step(Match.STEP); t++ }
             assertEquals(io.github.projectwip.sim.UprisingPhase.SKY, u.phase)
-            // (Its own moves held off: this is about the fighter's attacks reaching it, and its sword spin is deadly.)
+            // (Its own moves held off: this is about the fighter's attacks reaching it, and its sword spin is deadly. Its
+            // jewel taken off too, and kept off: with it on, it is immune.)
             u.strikeIn = 1e9f
+            u.jewelBroken = true; u.jewelBackIn = 1e9f
             var attackHits = 0
             var superHits = 0
             var superUsed = false
@@ -1482,7 +1484,8 @@ class SimulationTest {
             w.events.clear()
         }
         assertEquals("drained three times", 3, drainedEvents)
-        assertTrue("the third takes them inside", p.trapped)
+        // (Since build 115 it no longer pulls anyone in: drained dry, they pass out, and are out of its fight.)
+        assertTrue("the third knocks them out, and nobody is taken inside", !p.alive && !p.trapped)
     }
 
     @Test fun theEntityGetsHarderTierByTier() {

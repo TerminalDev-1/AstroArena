@@ -250,7 +250,7 @@ enum class MatchOutcome { VICTORY, DEFEAT, DRAW }
  */
 enum class GameMode(val title: String, val tagline: String, val players: Int) {
     /** Your team against the Entity: its ritual, then its world. */
-    BOSS("The Entity", "Your team against the Entity · its ritual, then its world", 3),
+    BOSS("The Dragon", "Your team against the Dragon · its ritual, then its world", 3),
     /** Practice: dummies, a swarm and a giant that just stand there, plus one sentry gun. No timer, nothing won or lost. */
     TRAINING("Training Area", "Dummies, a swarm, a sentry and a giant · no stakes", 19),
     /** One real player against another, each on their own device. */
@@ -587,7 +587,7 @@ object Balance {
             name = "Ninja",
             title = "The Faceless",
             role = "Gunslinger",
-            lore = "A hooded ninja with nothing under the hood: no face, just a dark that looks back. Nobody remembers what he looked like before the Entity got to him. He doesn't either. He kept the gun.",
+            lore = "A hooded ninja with nothing under the hood: no face, just a dark that looks back. Nobody remembers what he looked like before the Dragon got to him. He doesn't either. He kept the gun.",
             attackName = "Void Round",
             health = StatLine(6600, 330),
             // One bullet: 900, the owner's starting number.
@@ -596,7 +596,7 @@ object Balance {
             superDamage = StatLine(1800, 90),
             moveSpeed = 3.6f,
             attack = AttackSpec(AttackShape.BULLET, projectiles = 1, spreadDegrees = 0f, range = 8.5f, speed = 24f, radius = 0.14f, burstInterval = 0f),
-            superSpec = SuperSpec(SuperKind.COSMIC, "Cosmic Rounds", "Fires three blinding electric-blue cosmic bullets in quick succession. Each hits twice as hard as a normal bullet, and against the Entity they do massive damage and stun it for 2.5 seconds.", projectiles = 3, range = 10f, speed = 26f, radius = 0.24f),
+            superSpec = SuperSpec(SuperKind.COSMIC, "Cosmic Rounds", "Fires three blinding electric-blue cosmic bullets in quick succession. Each hits twice as hard as a normal bullet, and against the Dragon they do massive damage and stun it for 2.5 seconds.", projectiles = 3, range = 10f, speed = 26f, radius = 0.24f),
             ammoMax = 5,
             reloadSeconds = 0.9f,
             superChargePerHit = 0.085f,
@@ -616,6 +616,27 @@ object Balance {
     const val COSMIC_GAP_SECONDS = 0.12f
     const val COSMIC_ENTITY_MULT = 3f
     const val COSMIC_STUN_SECONDS = 2.5f
+    /**
+     * The jewel chained on the dragon's neck (the owner's design, build 115): while it is on, the Entity is immune.
+     * It has this share of the Entity's health. It sits [JEWEL_OFFSET] tiles in front of the Entity (toward the
+     * fighters' side), and shots that reach [JEWEL_RADIUS] of it hit it.
+     */
+    const val JEWEL_HP = 0.07f
+    /** A blue flare that catches someone hits them for this share of their health (it pulled them in until build 115). */
+    const val FLARE_HIT = 0.45f
+    const val JEWEL_OFFSET = 1.45f
+    const val JEWEL_RADIUS = 1.0f
+    /**
+     * Broken, it only comes back if it turns up again somewhere on the platform ([JEWEL_BACK_MIN] to
+     * [JEWEL_BACK_MIN] + [JEWEL_BACK_SPREAD] seconds later, where the seed says) and the dragon gets to it first,
+     * rushing at [JEWEL_RUSH_SPEED]. Fighters can break it again where it lies ([JEWEL_DROP_HP] of its health).
+     */
+    const val JEWEL_BACK_MIN = 18f
+    const val JEWEL_BACK_SPREAD = 14f
+    const val JEWEL_DROP_HP = 0.35f
+    const val JEWEL_DROP_RADIUS = 0.75f
+    const val JEWEL_RUSH_SPEED = 5.5f
+
     /** After a stun wears off the Entity can't be stunned again for this long: three Ninjas otherwise held it still for good. */
     const val COSMIC_STUN_GUARD = 6f
 

@@ -26,7 +26,8 @@ import kotlin.random.Random
  * server's replay of what they played.
  */
 class TeamLinkTest {
-    private val fighters = listOf(FighterId.KITO, FighterId.BYTE, FighterId.BUDDY)
+    // (Ninja is the only fighter since build 114.)
+    private val fighters = listOf(FighterId.BYTE, FighterId.BYTE, FighterId.BYTE)
 
     private fun io.github.projectwip.sim.Fighter.damageTaken() = maxHp - hp
 
@@ -108,9 +109,13 @@ class TeamLinkTest {
                     // (Against the Entity: at it, in its world; anyone on the other side, if there is one.)
                     val foe = match.world.fighters.firstOrNull { it.team != mine.team && it.alive }
                     val u = match.world.uprising
-                    val fx = foe?.x ?: if (u != null && match.world.inSky) u.ex else mine.x
-                    val fy = foe?.y ?: if (u != null && match.world.inSky) u.ey else mine.y - 1f
-                    wanted.moveX = (fx - mine.x) * 0.2f + hands.nextFloat() - 0.5f; wanted.moveY = (fy - mine.y) * 0.2f + hands.nextFloat() - 0.5f
+                    // (Its jewel while it is on: since build 115 it is immune until that breaks.)
+                    val jewel = match.world.jewelSpot()
+                    val fx = foe?.x ?: jewel?.get(0) ?: if (u != null && match.world.inSky) u.ex else mine.x
+                    val fy = foe?.y ?: jewel?.get(1) ?: if (u != null && match.world.inSky) u.ey else mine.y - 1f
+                    // (Its jewel can only be hit from in front of it: stand out in front.)
+                    val gy = if (jewel != null && foe == null) fy + 4f else fy
+                    wanted.moveX = (fx - mine.x) * 0.2f + hands.nextFloat() - 0.5f; wanted.moveY = (gy - mine.y) * 0.2f + hands.nextFloat() - 0.5f
                     wanted.aiming = true; wanted.aimX = fx - mine.x; wanted.aimY = fy - mine.y
                     // (Everyone skips the ritual once it has begun, so the test gets to the fight.)
                     wanted.skip = tick in 400..402

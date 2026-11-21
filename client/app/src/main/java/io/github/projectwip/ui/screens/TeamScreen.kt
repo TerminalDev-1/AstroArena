@@ -157,7 +157,7 @@ fun TeamScreen(save: SaveData, team: TeamLink?, setTeam: (TeamLink?) -> Unit, go
                                 PlainText("You get a code for up to two friends to join with, and you start the matches.", Type.Small, color = Palette.Text, align = TextAlign.Center)
                                 Box(Modifier.weight(1f).fillMaxWidth()) { FighterView(fighter, skin, Modifier.fillMaxSize(), pedestal = false) }
                                 PlainText("You bring ${fighter.name}. Pick another fighter before you make or join a team.", Type.Small, color = Palette.Text, align = TextAlign.Center)
-                                ChunkyButton({ open("create", GameMode.BOSS) }, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.PURPLE, lip = 5.dp) { GameText("FIGHT THE ENTITY", Type.Heading) }
+                                ChunkyButton({ open("create", GameMode.BOSS) }, Modifier.fillMaxWidth().height(58.dp), ButtonStyle.PURPLE, lip = 5.dp) { GameText("FIGHT THE DRAGON", Type.Heading) }
                             }
                         }
                         // ---- join one

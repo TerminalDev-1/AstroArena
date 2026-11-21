@@ -53,6 +53,17 @@ class Uprising(
     /** How each one was, to put them back afterwards: x, y, hp, super charge, hyper charge, ammo, blade bar, the Entity's pull. */
     val saved = HashMap<Int, FloatArray>()
     /** The Entity's health in the sky. */
+    /** The jewel on its neck: its health (the Entity is immune while it is on), and whether it is broken. */
+    var jewelHp = 0
+    var jewelMaxHp = 0
+    var jewelBroken = false
+    /** Seconds until a broken jewel turns up again on the platform. */
+    var jewelBackIn = 0f
+    /** A broken jewel that has turned up again, lying at ([jewelX], [jewelY]) with [jewelDropHp] left: the dragon rushes for it. */
+    var jewelDropped = false
+    var jewelX = 0f
+    var jewelY = 0f
+    var jewelDropHp = 0
     /** Seconds the Entity is still stunned (Ninja's cosmic bullets): it does nothing while it lasts. */
     var stunLeft = 0f
     /** Seconds until it can be stunned again ([io.github.projectwip.data.Balance.COSMIC_STUN_GUARD] after a stun). */

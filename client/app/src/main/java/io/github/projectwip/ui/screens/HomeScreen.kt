@@ -417,10 +417,10 @@ private fun ModeCard(m: GameMode, selected: Boolean, modifier: Modifier, showMap
                 }
                 Spacer(Modifier.height(6.dp))
             }
-            PlainText(if (m == GameMode.BOSS) "Your team of ${m.players} · the Entity" else "${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
+            PlainText(if (m == GameMode.BOSS) "Your team of ${m.players} · the Dragon" else "${arena.name} · ${m.players} fighters", Type.Small, color = if (selected) Color.White else Palette.TextDim)
             PlainText(
                 when (m) {
-                    GameMode.BOSS -> "The Entity calls your team to its ritual, then takes you into its world. Hit the shadow under it. Dodge its marked ground, its rings and sweeps, and its flares: whoever one lands on is corrupted and turns on their own side. Beat it before time runs out to earn Cups."
+                    GameMode.BOSS -> "The Dragon calls your team to its ritual, then takes you into its world. Hit the shadow under it. Dodge its marked ground, its rings and sweeps, and its flares: whoever one lands on is corrupted and turns on their own side. Beat it before time runs out to earn Cups."
                     GameMode.DUEL -> "Against one real player on this server, each on their own device. First to 3 knockouts. Leaving a match counts as a defeat."
                     GameMode.TRAINING -> "Four dummies, a swarm of minis and a giant that never move or attack, plus one sentry gun that does shoot. No timer, no rewards: leave whenever you like."
                 },

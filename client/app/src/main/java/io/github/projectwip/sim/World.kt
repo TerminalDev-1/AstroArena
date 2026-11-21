@@ -255,6 +255,91 @@ class World(
     val inSky get() = uprising?.phase == UprisingPhase.SKY
 
     /** In the Entity's dimension: whether a circle at (x, y) of radius [r] reaches the shadow under it (what hits it). */
+    /**
+     * Where its jewel can be hit, if it can: on its neck while it is on (in front of it), or where a broken one lies.
+     * Null while it is broken and gone.
+     */
+    fun jewelSpot(): FloatArray? {
+        val u = uprising ?: return null
+        if (u.phase != UprisingPhase.SKY || u.hp <= 0) return null
+        return if (!u.jewelBroken) floatArrayOf(u.ex, u.ey + Balance.JEWEL_OFFSET, Balance.JEWEL_RADIUS)
+        else if (u.jewelDropped) floatArrayOf(u.jewelX, u.jewelY, Balance.JEWEL_DROP_RADIUS) else null
+    }
+
+    /** [f] lands [damage] on its jewel, at (x, y): on its neck, or lying on the platform. */
+    private fun strikeJewel(f: Fighter, damage: Int, isSuper: Boolean, x: Float, y: Float) {
+        val u = uprising ?: return
+        if (f.corruptLeft > 0f) return
+        if (!u.jewelBroken) {
+            val dealt = minOf(damage, u.jewelHp)
+            u.jewelHp -= dealt
+            f.damageDealt += dealt
+            if (!isSuper) chargeFrom(f, 1f)
+            events += GameEvent.EntityHit(f.id, isSuper, dealt, x, y)
+            if (u.jewelHp <= 0) {
+                // Broken: it is open to everything now, until it gets the jewel back.
+                u.jewelBroken = true
+                u.jewelBackIn = Balance.JEWEL_BACK_MIN + random.nextFloat() * Balance.JEWEL_BACK_SPREAD
+                events += GameEvent.JewelBroken(f.id, x, y, false)
+            }
+        } else if (u.jewelDropped) {
+            val dealt = minOf(damage, u.jewelDropHp)
+            u.jewelDropHp -= dealt
+            f.damageDealt += dealt
+            if (!isSuper) chargeFrom(f, 1f)
+            events += GameEvent.EntityHit(f.id, isSuper, dealt, x, y)
+            if (u.jewelDropHp <= 0) {
+                u.jewelDropped = false
+                u.jewelBackIn = Balance.JEWEL_BACK_MIN + random.nextFloat() * Balance.JEWEL_BACK_SPREAD
+                events += GameEvent.JewelBroken(f.id, x, y, true)
+            }
+        }
+    }
+
+    /**
+     * The jewel, broken: after a while it turns up somewhere on the platform, and the dragon rushes to get it (unless
+     * it is stunned, or in the middle of a dash or a spin). Reached, it is back on its neck and it is immune again.
+     */
+    private fun stepJewel(u: Uprising, dt: Float, stunned: Boolean) {
+        if (!u.jewelBroken) return
+        if (!u.jewelDropped) {
+            u.jewelBackIn -= dt
+            if (u.jewelBackIn > 0f) return
+            // Somewhere on its platform, well away from it: the seed says where.
+            val c = arena.width / 2f
+            val lim = Arenas.ENTITY_REALM_RADIUS - 2f
+            var x = c; var y = c
+            for (k in 0 until 12) {
+                val a = random.nextFloat() * 6.2831855f
+                val r = lim * (0.35f + 0.65f * random.nextFloat())
+                x = c + cos(a) * r; y = c + sin(a) * r
+                if (hypot(x - u.ex, y - u.ey) > 6f) break
+            }
+            u.jewelX = x; u.jewelY = y
+            u.jewelDropped = true
+            u.jewelDropHp = maxOf(1, (u.jewelMaxHp * Balance.JEWEL_DROP_HP).toInt())
+            events += GameEvent.JewelDropped(x, y)
+            return
+        }
+        if (stunned || u.dashT >= 0f || u.spinT >= 0f) return
+        // It rushes for it (its neck comes down onto it: the jewel sits in front of it).
+        val tx = u.jewelX; val ty = u.jewelY - Balance.JEWEL_OFFSET
+        val dx = tx - u.ex; val dy = ty - u.ey
+        val d = hypot(dx, dy)
+        if (d < 0.5f) {
+            u.jewelBroken = false
+            u.jewelDropped = false
+            u.jewelHp = u.jewelMaxHp
+            events += GameEvent.JewelRestored(u.jewelX, u.jewelY)
+            return
+        }
+        val step = minOf(d, Balance.JEWEL_RUSH_SPEED * dt)
+        u.ex += dx / d * step; u.ey += dy / d * step
+    }
+
+    /** Is the dragon rushing for its jewel (it does nothing else meanwhile)? */
+    val entityRushing: Boolean get() = uprising?.let { it.jewelBroken && it.jewelDropped && it.phase == UprisingPhase.SKY } == true
+
     private fun onEntity(x: Float, y: Float, r: Float): Boolean {
         val u = uprising ?: return false
         return u.phase == UprisingPhase.SKY && u.hp > 0 && hypot(x - u.ex, y - u.ey) < Balance.UPRISING_ENTITY_RADIUS + r
@@ -303,6 +388,11 @@ class World(
         u.maxHp = maxOf(1, (hp * Balance.UPRISING_HP_SHOTS * (if (u.boss) Balance.UPRISING_BOSS_HP else 1f) * (1f + Balance.ENTITY_TIER_HP * rules.entityTier)).toInt())
         u.flares.clear()
         u.hp = u.maxHp
+        // Its jewel is on: it is immune until the jewel is broken (in a match's uprising, not its own fight, it has none).
+        u.jewelMaxHp = maxOf(1, (u.maxHp * Balance.JEWEL_HP).toInt())
+        u.jewelHp = u.jewelMaxHp
+        u.jewelBroken = !u.boss
+        u.jewelDropped = false
         u.strikeIn = Balance.UPRISING_STRIKE_GAP
         uprisingPhase(u, UprisingPhase.SKY)
     }
@@ -343,11 +433,13 @@ class World(
         if (u.stunGuard > 0f) u.stunGuard = maxOf(0f, u.stunGuard - dt)
         if (!stunned) stepDash(u, dt)
         if (!stunned) stepSpin(u, dt)
+        stepJewel(u, dt, stunned)
+        val rushing = entityRushing
         // It drifts after the fight, over the middle of everyone (a little ahead of them), never off its platform
         // (not while it dashes or spins: those move it themselves).
         var sx = 0f; var sy = 0f; var cnt = 0
         for (id in u.members) fighter(id)?.let { if (it.alive) { sx += it.x; sy += it.y; cnt++ } }
-        if (!stunned && cnt > 0 && u.dashT < 0f && u.spinT < 0f) {
+        if (!stunned && !rushing && cnt > 0 && u.dashT < 0f && u.spinT < 0f) {
             val dx = sx / cnt - u.ex; val dy = sy / cnt - 2f - u.ey
             val d = hypot(dx, dy)
             if (d > 0.3f) { val step = minOf(d, Balance.UPRISING_ENTITY_SPEED * dt); u.ex += dx / d * step; u.ey += dy / d * step }
@@ -356,7 +448,7 @@ class World(
             val od = hypot(u.ex - c, u.ey - c)
             if (od > lim) { u.ex = c + (u.ex - c) / od * lim; u.ey = c + (u.ey - c) / od * lim }
         }
-        if (!stunned) entityMoves(u, dt)
+        if (!stunned && !rushing) entityMoves(u, dt)
         if (!stunned) stepChase(u, dt)
         stepFlares(u, dt)
         // Everyone in its world pulled into it or knocked out for good: in its fight, that is the match lost.
@@ -649,7 +741,8 @@ class World(
             if (!gone) continue
             it.remove()
             events += GameEvent.EntityFlare(fl.target, fl.x, fl.y, landed = true, red = fl.red)
-            hit?.let { f -> if (fl.red) drain(f, u) else trap(f) }
+            // (Since build 115 nothing pulls anyone into it, the owner's decision: a blue flare hits hard instead.)
+            hit?.let { f -> if (fl.red) drain(f, u) else damage(f, null, (f.maxHp * Balance.FLARE_HIT).toInt(), false, f.x, f.y) }
         }
     }
 
@@ -681,7 +774,8 @@ class World(
         f.drains++
         u.hp = minOf(u.maxHp, u.hp + (u.maxHp * Balance.ENTITY_DRAIN_HEAL).toInt())
         events += GameEvent.Drained(f.id, f.drains)
-        if (f.drains >= Balance.ENTITY_DRAINS_TO_TAKE) trap(f)
+        // (Drained dry they pass out: knocked out, and in its world that is out for good. It no longer pulls them in.)
+        if (f.drains >= Balance.ENTITY_DRAINS_TO_TAKE && f.alive) damage(f, null, f.hp, false, f.x, f.y)
     }
 
     /** The Entity lets [f] go: back on its platform, whole, clear of everyone (`landingClear`). */
@@ -733,6 +827,8 @@ class World(
         val u = uprising ?: return
         // (Nobody the Entity has corrupted hurts it.)
         if (u.hp <= 0 || f.corruptLeft > 0f) return
+        // While its jewel is on, nothing hurts it (the owner's design).
+        if (!u.jewelBroken) { events += GameEvent.EntityImmune(x, y); return }
         val dealt = minOf(damage, u.hp)
         u.hp -= dealt
         f.damageDealt += dealt
@@ -1729,6 +1825,18 @@ class World(
                     if (arena.tileAt(p.x, p.y) == Tile.CRATE) damageCrate(kotlin.math.floor(p.x).toInt(), kotlin.math.floor(p.y).toInt(), p.damage)
                     break@loop
                 }
+                // (Its jewel first: on its neck in front of it, or lying on the platform. The only thing that hurts it
+                // while it is on.)
+                val jewel = jewelSpot()
+                if (jewel != null && JEWEL_TARGET !in p.hit && hypot(p.x - jewel[0], p.y - jewel[1]) < jewel[2] + p.radius) {
+                    p.hit += JEWEL_TARGET
+                    fighter(p.ownerId)?.let { o ->
+                        val cosmic = p.style == ShotStyle.COSMIC
+                        strikeJewel(o, if (cosmic) (p.damage * Balance.COSMIC_ENTITY_MULT).toInt() else p.damage, p.isSuper, p.x, p.y)
+                        uprising?.let { u -> if (cosmic && u.hp > 0 && u.stunLeft <= 0f && u.stunGuard <= 0f) { u.stunLeft = Balance.COSMIC_STUN_SECONDS; u.stunGuard = Balance.COSMIC_STUN_SECONDS + Balance.COSMIC_STUN_GUARD; events += GameEvent.EntityStunned(o.id, Balance.COSMIC_STUN_SECONDS) } }
+                    }
+                    p.alive = false; break@loop
+                }
                 // (In the Entity's dimension, a shot that reaches the shadow under it hits it.)
                 if (ENTITY_TARGET !in p.hit && onEntity(p.x, p.y, p.radius)) {
                     p.hit += ENTITY_TARGET
@@ -2036,6 +2144,8 @@ class World(
 
 /** Stands for the Entity in a shot's or a charge's list of who it has hit, and as a leap's target (its dimension). */
 const val ENTITY_TARGET = -100
+/** The Entity's jewel, as something a shot has hit. */
+const val JEWEL_TARGET = -101
 
 /** The Entity's moves in its world, in the order it makes them, round and round. */
 enum class EntityMove { STRIKES, RING, SWEEP, FLARE, SPOKES, RAIN, GRASP, PULSE, CHASE, DASH, SPIN, DRAIN }

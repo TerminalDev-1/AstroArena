@@ -102,7 +102,7 @@ fun MatchIntro(match: Match, onDone: () -> Unit) {
 @Composable
 private fun EntityColumn(modifier: Modifier) {
     Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        GameText("THE ENTITY", Type.Title, color = Color(0xFFC9A6FF), outline = 3.dp)
+        GameText("THE DRAGON", Type.Title, color = Color(0xFFC9A6FF), outline = 3.dp)
         Panel(Modifier.weight(1f).fillMaxWidth(), color = Color(0xFF3A2390), colorBottom = Palette.PanelDark, cut = 14.dp) {
             io.github.projectwip.ui.SoulView(Modifier.fillMaxSize(), voidCycle = true)
         }

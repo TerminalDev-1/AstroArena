@@ -185,9 +185,12 @@ class Match(val config: MatchConfig) {
             if (f.alive && f.corruptLeft > 0f) { driveCorrupted(f); continue }
             if (!f.isBot || !f.alive) continue
             val c = f.control
-            val dx = up.ex - f.x; val dy = up.ey - f.y
+            // (Its jewel while it is on, or lying on the platform: the only way to hurt it. Otherwise, it.)
+            val jewel = world.jewelSpot()
+            val tx = jewel?.get(0) ?: up.ex; val ty = jewel?.get(1) ?: up.ey
+            val dx = tx - f.x; val dy = ty - f.y
             val d = kotlin.math.hypot(dx, dy).coerceAtLeast(1e-3f)
-            val big = Balance.UPRISING_ENTITY_RADIUS
+            val big = if (jewel != null) jewel[2] else Balance.UPRISING_ENTITY_RADIUS
             val reach = f.def.attack.range + big
             // (Far enough in that the attack lands, never closer than it needs; a storm drives straight through it.)
             val want = if (f.inTempest) 0f else maxOf(big * 0.5f, reach * 0.7f)
@@ -199,8 +202,20 @@ class Match(val config: MatchConfig) {
             val inward = if (kotlin.math.abs(off) < 0.9f) 0f else ((off - kotlin.math.sign(off) * 0.9f) / 2f).coerceIn(-1f, 1f)
             val wantX = ux * inward - uy * circle * (1f - kotlin.math.abs(inward))
             val wantY = uy * inward + ux * circle * (1f - kotlin.math.abs(inward))
-            c.moveX += (wantX - c.moveX) * 0.12f
-            c.moveY += (wantY - c.moveY) * 0.12f
+            if (jewel != null && !up.jewelBroken) {
+                // The jewel on its neck can only be hit from in front of it: each holds a spot out in front, a little
+                // to one side, and shoots straight in.
+                val gx = up.ex + (f.id % 3 - 1) * 1.2f
+                val gy = up.ey + Balance.JEWEL_OFFSET + maxOf(big, f.def.attack.range * 0.6f)
+                val ox = gx - f.x; val oy = gy - f.y
+                val od = kotlin.math.hypot(ox, oy)
+                val k = if (od < 0.4f) 0f else (od / 1.5f).coerceAtMost(1f)
+                c.moveX += (ox / maxOf(od, 1e-3f) * k - c.moveX) * 0.2f
+                c.moveY += (oy / maxOf(od, 1e-3f) * k - c.moveY) * 0.2f
+            } else {
+                c.moveX += (wantX - c.moveX) * 0.12f
+                c.moveY += (wantY - c.moveY) * 0.12f
+            }
             c.aimX = dx; c.aimY = dy; c.aiming = true
             c.attack = d < reach - 0.3f
             val sRange = when (f.def.superSpec.kind) {

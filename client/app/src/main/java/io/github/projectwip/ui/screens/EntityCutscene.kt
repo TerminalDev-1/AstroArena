@@ -103,7 +103,7 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
         if (beat >= 0) {
             Panel(Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp).widthIn(max = 640.dp), color = Color(0xFF3A2390), colorBottom = Color(0xFF1E1150)) {
                 Column(Modifier.padding(horizontal = 22.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    GameText(if (beats[beat].fighter) io.github.projectwip.data.Balance.fighter(fighter).name.uppercase() else "THE ENTITY", Type.Eyebrow,
+                    GameText(if (beats[beat].fighter) io.github.projectwip.data.Balance.fighter(fighter).name.uppercase() else "THE DRAGON", Type.Eyebrow,
                         color = if (beats[beat].fighter) Color(0xFF8FE6FF) else Color(0xFFC9A6FF))
                     GameText(beats[beat].text, Type.Heading.copy(fontSize = 19.sp), color = Palette.Text, align = TextAlign.Center, maxLines = 2)
                 }
@@ -135,10 +135,10 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
             val (word, color) = when (cut) {
                 EntityCut.VICTORY -> "VICTORY" to Palette.Gold
                 EntityCut.DEFEAT -> "DEFEAT" to Palette.Red
-                EntityCut.CORRUPT -> "PULLED INTO THE ENTITY" to Color(0xFFC9A6FF)
+                EntityCut.CORRUPT -> "DRAINED DRY" to Color(0xFFC9A6FF)
                 EntityCut.DRAIN -> "DRAINED" to Color(0xFFFF6A7A)
                 EntityCut.DRAIN_WEAK -> "WEAKER" to Color(0xFFFF6A7A)
-                EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> "PULLED INTO THE ENTITY" to Color(0xFFC9A6FF)
+                EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> "DRAINED DRY" to Color(0xFFC9A6FF)
             }
             Box(Modifier.align(if (cut == EntityCut.VICTORY) Alignment.TopCenter else Alignment.Center).padding(top = if (cut == EntityCut.VICTORY) 44.dp else 0.dp)) {
                 GameText(word, Type.Display.copy(fontSize = if (cut == EntityCut.CORRUPT || cut.last) 40.sp else 64.sp), color = color, outline = 6.dp,
