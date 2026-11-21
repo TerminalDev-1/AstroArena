@@ -1,4 +1,6 @@
-# AstroArena
+# ARENA
+
+*(Formerly AstroArena; renamed in 1.4, build 112.)*
 
 A landscape **3D boss-fight game for Android phones and tablets**. Something called the Entity lives in every
 fighter's mind and lends them their power, and in return it wants control. Team up (with friends or bots) and fight
@@ -9,6 +11,11 @@ waiting.
 
 > Every build replaces the last one: the game checks GitHub for a newer release when it starts and asks you to
 > update. Rules, balance and saves may change between versions.
+
+**ARENA 1.4** is the rename: a new icon (black, with two white eyes looking to the right), menus in dark purple with
+stars shining on every plate, and the Entity whispering cryptic warnings, silently, in the menu. The first build
+of 1.4 opened on a white black hole and the ARENA title, held shut by the server until the reveal
+(`[reveal]` in `server/game.cfg`), then opened onto the game.
 
 Everything in the game is original: the 3D fighters, the Entity and its world (all meshes generated in code),
 icons, music and sounds (synthesised at runtime), cutscenes, UI and rules. No third-party game assets are used.
@@ -38,7 +45,7 @@ icons, music and sounds (synthesised at runtime), cutscenes, UI and rules. No th
 | **Offline** | When the server can't be reached the game carries on with an offline profile of its own, kept on the device: **Chaos Mode**, where every tweak is open to everyone |
 | **Graphics** | Custom OpenGL ES 3.0: toon lighting, real-time shadows, inked outlines, gloss, 4× MSAA, up to 144 Hz |
 | **Controls** | Floating or fixed move stick · drag-to-aim attack stick (a tap auto-aims at the nearest enemy) · super and Hyper buttons · aim assist · a layout editor for the controls |
-| **Menus** | A live 3D lobby behind every screen, with dark neon-purple panels over it, and a loading screen with the AstroArena title coming in letter by letter |
+| **Menus** | A live 3D lobby behind every screen, with dark purple panels full of shining stars over it, and a loading screen with the ARENA title coming in letter by letter |
 | **Sound** | Upbeat lobby and victory music, a defeat theme and every effect are designed in code by a small synth (`audio/SfxSynth.kt`) |
 | **Starting over** | Reset Progress in Settings deletes your account and starts the game over as a new player: a new name, and the opening again |
 
@@ -106,4 +113,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together
 
 ## License
 
-Copyright (C) 2026 Talmeez Ahmad. AstroArena is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License, version 3](LICENSE), or (at your option) any later version. It comes with no warranty. If you share a version of it, you must share that version's source under the same license and keep this credit.
+Copyright (C) 2026 Talmeez Ahmad. ARENA is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License, version 3](LICENSE), or (at your option) any later version. It comes with no warranty. If you share a version of it, you must share that version's source under the same license and keep this credit.
