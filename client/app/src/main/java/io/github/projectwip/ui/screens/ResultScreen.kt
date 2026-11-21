@@ -195,6 +195,8 @@ fun ResultScreen(summary: MatchSummary, rewards: MatchRewards, save: SaveData, g
                     // (Over the camera cut-out too: the result screen is laid out clear of it, and the match showed
                     // through down that edge.)
                     me.fighter, me.skin, 0, LocalSfx.current, Modifier.bleed()) { revealed = true }
+            else if (summary.report.mode == io.github.projectwip.data.GameMode.SWARM && me != null && summary.report.outcome == MatchOutcome.DEFEAT)
+                EntityCutscene(io.github.projectwip.render3d.EntityCut.SWARM_DEATH, me.fighter, me.skin, 0, LocalSfx.current, Modifier.bleed()) { revealed = true }
             else ResultReveal(summary) { revealed = true }
         }
     }

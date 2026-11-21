@@ -252,6 +252,7 @@ fun App(repo: GameRepository, sfx: Sfx, music: io.github.projectwip.audio.Music,
         "cutweak" -> io.github.projectwip.render3d.EntityCut.DRAIN_WEAK
         "cutfaint" -> io.github.projectwip.render3d.EntityCut.DRAIN_FAINT
         "cutobey" -> io.github.projectwip.render3d.EntityCut.DRAIN_OBEY
+        "cutswarmdeath" -> io.github.projectwip.render3d.EntityCut.SWARM_DEATH
         else -> null
     }) }
     LaunchedEffect(booting, needsName, save.settings.introSeen) {

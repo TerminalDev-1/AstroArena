@@ -55,7 +55,9 @@ class Rules(unittest.TestCase):
         self.assertIsNone(rules.check_result("BOSS", 90, **ok))
         self.assertIsNotNone(rules.check_result("BOSS", 3, **ok))  # nobody beats the Entity in three seconds
         self.assertIsNotNone(rules.check_result("BOSS", 5000, **ok))  # left open for over an hour
-        self.assertIsNotNone(rules.check_result("BOSS", 90, **{**ok, "kos": 81}))
+        self.assertIsNotNone(rules.check_result("BOSS", 90, **{**ok, "kos": 201}))
+        self.assertIsNone(rules.check_result("SWARM", 90, **{**ok, "kos": 40}))
+        self.assertIsNotNone(rules.check_result("SWARM", 90, **{**ok, "kos": 3001}))
         self.assertIsNotNone(rules.check_result("BOSS", 90, **{**ok, "outcome": "WON"}))
         self.assertIsNotNone(rules.check_result("BOSS", 90, **{**ok, "damage": -1}))
         self.assertIsNotNone(rules.check_result("LAST_SPARK", 90, **ok))  # a removed mode

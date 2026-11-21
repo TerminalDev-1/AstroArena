@@ -199,6 +199,8 @@ Things that went wrong or cost time before. Keep adding to this list whenever so
 
 ## Rules of the codebase
 
+- **The Dragon, Minions, and Swarm (builds 115–116):** The Entity is now the **Dragon** (`FighterModels.buildDragon`), flying with beating wings and a purple butterfly **jewel** chained to its neck that makes it immune until broken (shots hitting its marked front spot break it; it reappears seeded and the Dragon rushes to reclaim it). Nothing pulls fighters inside it any more (blue flares deal 45% HP; 3rd red-flare drain knocks out). **The Dragon is silent** (`Balance.DRAGON_SPEAKS = false`): no TTS voice and no talking jaw anywhere; text plates only. It thinks for itself (picks prey, hunts/circles/retreats, turns to face prey, selects moves situationally) and summons **minions** (`MINION_BOT` Crusher, `MINION_LASER` Zapper, `MINION_HOUND` Lurcher, `MINION_BRUTE` Juggernaut, `DRAGONLING` Drakeling). **Swarm** (`GameMode.SWARM`, `--es screen swarm`) puts the player alone in the Dragon's world against endless waves (+3% power and heal per kill, Juggernaut every 5th wave, Dragon after 3 Juggernauts, break jewel to open escape portal, one life). Dying in Swarm plays `EntityCut.SWARM_DEATH` (`--es screen cutswarmdeath`) before the result screen.
+
 - **Ninja is the only fighter** (build 114, the owner's decision; details in `tracked-docs/ninja.md`). He is on the
   starter's id (`FighterId.BYTE`): a hooded ninja with a black void for a face (`Slot.VOID`, `buildNinja`) and a gun
   (`AttackShape.BULLET`, 900 a bullet). His super (`SuperKind.COSMIC`) is three cosmic bullets that hit the Entity

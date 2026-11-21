@@ -57,6 +57,7 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
             EntityCut.VICTORY -> { sfx?.play(Sound.VOID, 1f, 1.2f); sfx?.play(Sound.THUNDER, 0.8f, 0.8f) }
             EntityCut.DEFEAT -> sfx?.play(Sound.VOID, 1f, 0.8f)
             EntityCut.CORRUPT -> { sfx?.play(Sound.VOID, 1f, 1.1f); sfx?.play(Sound.WHOOSH, 0.8f, 0.6f) }
+            EntityCut.SWARM_DEATH -> sfx?.play(Sound.VOID, 0.9f, 0.85f)
             else -> { sfx?.play(Sound.VOID, 1f, 0.75f); sfx?.play(Sound.WHOOSH, 0.7f, 0.5f) }
         }
         fade.animateTo(1f, tween(350))
@@ -73,6 +74,9 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
             if (cut == EntityCut.VICTORY && cues == 1 && time > 8.6f) { cues++; sfx?.play(Sound.THUNDER, 1f, 0.6f); sfx?.play(Sound.VICTORY, 0.9f) }
             if (cut == EntityCut.DEFEAT && cues == 0 && time > 3.3f) { cues++; sfx?.play(Sound.PORTAL_OPEN, 0.9f) }
             if (cut == EntityCut.DEFEAT && cues == 1 && time > 8.15f) { cues++; sfx?.play(Sound.WHOOSH, 1f, 0.45f); sfx?.play(Sound.DEFEAT, 0.9f) }
+            if (cut == EntityCut.SWARM_DEATH && cues == 0 && time > 1.85f) { cues++; sfx?.play(Sound.WHOOSH, 0.95f, 0.7f) }
+            if (cut == EntityCut.SWARM_DEATH && cues == 1 && time > 2.12f) { cues++; sfx?.play(Sound.HIT, 1f, 0.45f); sfx?.play(Sound.TEMPEST_HIT, 0.85f, 0.6f); sfx?.buzz(220, 255) }
+            if (cut == EntityCut.SWARM_DEATH && cues == 2 && time > 5.3f) { cues++; sfx?.play(Sound.WHOOSH, 0.9f, 0.5f); sfx?.play(Sound.DEFEAT, 0.9f) }
             // A drain: the yank back off their feet, and (the last time) the pull inside.
             if (cut.drain && cues == 0 && time > 1f) { cues++; sfx?.play(Sound.THUNDER, 0.9f, 0.7f); sfx?.play(Sound.WHOOSH, 1f, 0.42f); sfx?.buzz(260, 255) }
             if (cut.drain && cues == 1 && time > 5.6f) { cues++; sfx?.play(Sound.HIT, 1f, 0.4f); sfx?.play(Sound.TEMPEST_HIT, 0.7f, 0.5f); sfx?.buzz(160, 255) }
@@ -125,10 +129,21 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
                 if (flash > 0f && time < 6f) drawRect(Color(0xFFFF3B4E).copy(alpha = 0.55f * flash))
             }
         }
+        if (cut == EntityCut.SWARM_DEATH) {
+            val hitFlash = if (time >= 2.12f) (1f - ((time - 2.12f) / 0.35f).coerceIn(0f, 1f)) else 0f
+            val vig = ((time - 2.12f) / 0.6f).coerceIn(0f, 1f) * (1f - ((time - 6.8f) / 0.8f).coerceIn(0f, 1f))
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                if (vig > 0f) drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                    0f to Color.Transparent, 0.52f to Color.Transparent, 1f to Color(0xFF9E001A).copy(alpha = 0.68f * vig),
+                    center = center, radius = size.maxDimension * 0.62f))
+                if (hitFlash > 0f) drawRect(Color(0xFFFF3B4E).copy(alpha = 0.55f * hitFlash))
+            }
+        }
         // The title, at the end.
         val titleAt = when (cut) {
             EntityCut.VICTORY -> 9.8f; EntityCut.DEFEAT -> 11.2f; EntityCut.CORRUPT -> 5.4f
             EntityCut.DRAIN, EntityCut.DRAIN_WEAK -> 5.9f; EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> 9.2f
+            EntityCut.SWARM_DEATH -> 5.4f
         }
         if (time >= titleAt) {
             val k = ((time - titleAt) / 0.35f).coerceIn(0f, 1f)
@@ -139,6 +154,7 @@ fun EntityCutscene(cut: EntityCut, fighter: FighterId, skin: Int, line: Int, sfx
                 EntityCut.DRAIN -> "DRAINED" to Color(0xFFFF6A7A)
                 EntityCut.DRAIN_WEAK -> "WEAKER" to Color(0xFFFF6A7A)
                 EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> "DRAINED DRY" to Color(0xFFC9A6FF)
+                EntityCut.SWARM_DEATH -> "OVERRUN" to Palette.Red
             }
             Box(Modifier.align(if (cut == EntityCut.VICTORY) Alignment.TopCenter else Alignment.Center).padding(top = if (cut == EntityCut.VICTORY) 44.dp else 0.dp)) {
                 GameText(word, Type.Display.copy(fontSize = if (cut == EntityCut.CORRUPT || cut.last) 40.sp else 64.sp), color = color, outline = 6.dp,

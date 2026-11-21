@@ -20,24 +20,23 @@ of 1.4 opened on a white black hole and the ARENA title, held shut by the server
 Everything in the game is original: the 3D fighters, the Entity and its world (all meshes generated in code),
 icons, music and sounds (synthesised at runtime), cutscenes, UI and rules. No third-party game assets are used.
 
-## The Entity
+## The Dragon (the Entity)
 
 | | |
 |---|---|
-| **Its ritual** | The sky goes dark, the Entity rises, and it calls every fighter to it. You walk to its circle, kneel, and it speaks to you (and to you, the one holding the screen). Then it opens a portal into its world. You can skip it |
-| **Its world** | A platform in the void, where your team of three (bots fill any empty place) fights it until it falls. Your attacks hit the shadow beneath it |
-| **Its moves** | A giant sword it spins like a tornado, a dash down a marked lane, marked strikes, rings, sweeps, spokes, soul rain, its hand slamming down, shockwaves, and a chase of strikes on your heels. Nothing it fires lands past the edge of its platform |
-| **Its flares** | They rise out of it and hunt you down. A **blue** flare pulls you inside it. A **red** flare drains you: each drain leaves you weaker (softer hits, slower) and heals it, and the third takes you |
-| **Inside it** | A ruin like a hell, where everyone it has taken is chained, their energy drawn up into its heart. It feeds on them: every fighter it holds heals it and makes it hit harder. Watch your team fight on, and beat it to set everyone free |
-| **No second chances** | Nobody respawns in its world. Knocked out or taken, you're out until the match ends; if nobody is left standing, it wins |
+| **Its ritual** | The sky goes dark, the Dragon rises, and it calls every fighter to it. You walk to its circle, kneel, and its words appear silently on screen. Then it opens a portal into its world. You can skip it |
+| **Its world & jewel** | A platform in the void, where your team of three (bots fill any empty place) fights it until it falls. A purple butterfly **jewel** hangs chained on its neck: while it is on, the Dragon is immune. Shoot the jewel to break it, then hit the Dragon before it rushes to reclaim the jewel when it reappears |
+| **Its mind & moves** | The Dragon picks prey (whoever broke its jewel, or the weakest), circles crowds, pulls back when hurt, and chooses moves for the situation: its spinning giant sword, marked lane dash, marked strikes, rings, sweeps, spokes, soul rain, hand slam, shockwaves, chase strikes, and summoning **minions** (**Crusher** melee robots, **Zapper** laser bots, **Lurcher** pouncing hounds, and **Drakelings** that fire lasers and teleport) |
+| **Its flares** | They rise out of it and hunt you down. A **blue** flare hits for 45% of your health. A **red** flare drains you: each drain leaves you weaker (softer hits, slower) and heals it, and the third knocks you out |
+| **No second chances** | Nobody respawns in its world. Knocked out, you're out until the match ends; if nobody is left standing, it wins |
 | **It learns** | Every fight with it, won or lost, makes the next one harder: more health, harder hits, faster attacks |
-| **Cutscenes** | Victory, defeat, being pulled in and being drained are staged scenes, and the Entity speaks in a voice of its own. New players see the opening, where Swish is taken by the Entity |
+| **Cutscenes** | Victory, defeat, being drained, and being overrun in Swarm are staged 3D scenes; the Dragon is silent (text only, no voice or talking jaw). New players see the opening, where Swish is taken |
 
 ## The rest of the game
 
 | | |
 |---|---|
-| **Modes** | **The Entity** (above). **1v1**: against another real player, each on their own device, first to 3 knockouts. **Training Area**: dummies, a swarm of minis, a giant and one sentry gun; nothing at stake |
+| **Modes** | **The Dragon** (above). **Swarm**: you alone in the Dragon's world against endless waves of minions from every side — every kill gives +3% power and a little healing, every 5th wave brings a **Juggernaut** boss, and after 3 Juggernauts the Dragon arrives; break its jewel to open the escape portal and reach it with one life. **1v1**: against another real player, each on their own device, first to 3 knockouts. **Training Area**: dummies, a swarm of minis, a giant and one sentry gun; nothing at stake |
 | **Fighter** | **Ninja**, the only one: a hooded ninja with no face, just a void, and a gun (900 a bullet, five rounds, quick reloads). His super, **Cosmic Rounds**, fires three blinding electric-blue bullets that hit twice as hard, and hit the Entity far harder still and stun it. Swish, Bark, Kira, Kito and Buddy were removed in 1.4 (their code is kept as legacy), and hypers are gone |
 | **Progression** | Levels 1–10 with fully visible stat gains, paid for with **Coins**. **Arena Crystals** are the shop currency, for colourways. With one fighter the Spark Road is complete for everyone, and Credits are paid as Coins |
 | **Shop** | A daily free gift, daily offers and the server's deals |
@@ -87,7 +86,7 @@ On Xiaomi/HyperOS, ADB installs show an "Install via USB" prompt on the device t
 Debug builds accept a start screen for automated testing:
 
 ```bash
-adb shell am start -S -n io.github.projectwip/.MainActivity --es screen boss   # or intro|train|duel|fighters|shop|road|settings|news|leaders|result|loading|cutvictory|cutdefeat|cutcorrupt|cutdrain|cutobey|inside
+adb shell am start -S -n io.github.projectwip/.MainActivity --es screen boss   # or swarm|intro|train|duel|fighters|shop|road|settings|news|leaders|result|loading|cutvictory|cutdefeat|cutcorrupt|cutdrain|cutobey|cutswarmdeath|inside
 adb shell run-as io.github.projectwip cat files/save.json                       # inspect the save
 ```
 

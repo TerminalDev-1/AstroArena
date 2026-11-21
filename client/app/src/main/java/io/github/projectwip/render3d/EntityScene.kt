@@ -33,7 +33,7 @@ import kotlin.random.Random
  *    can, and the third time they pass out from exhaustion or give in to make it stop, and it pulls them inside.
  */
 enum class EntityCut {
-    VICTORY, DEFEAT, CORRUPT, DRAIN, DRAIN_WEAK, DRAIN_FAINT, DRAIN_OBEY;
+    VICTORY, DEFEAT, CORRUPT, DRAIN, DRAIN_WEAK, DRAIN_FAINT, DRAIN_OBEY, SWARM_DEATH;
     val drain get() = this == DRAIN || this == DRAIN_WEAK || this == DRAIN_FAINT || this == DRAIN_OBEY
     val last get() = this == DRAIN_FAINT || this == DRAIN_OBEY
     companion object {
@@ -50,6 +50,7 @@ object EntityScript {
         EntityCut.VICTORY -> 13f; EntityCut.DEFEAT -> 12.8f; EntityCut.CORRUPT -> 7.6f
         EntityCut.DRAIN, EntityCut.DRAIN_WEAK -> 7.2f
         EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> 10f
+        EntityCut.SWARM_DEATH -> 7.6f
     }
 
     private val CORRUPT_LINES = listOf(
@@ -94,6 +95,10 @@ object EntityScript {
             Beat(5.7f, "Make it stop... I'll obey.", fighter = true),
             Beat(7.6f, "Good. Now stay down."),
         )
+        EntityCut.SWARM_DEATH -> listOf(
+            Beat(0.7f, "They never stop."),
+            Beat(3.8f, "Just another soul for the swarm."),
+        )
     }
 
     /** The line being shown at [t], or -1. */
@@ -134,6 +139,15 @@ class EntityScene {
     private val at = FloatArray(3)
     private val fa = FighterAnim()
     private val ea = FighterAnim()
+    private val ma = FighterAnim()
+    private val swarmMinions by lazy {
+        listOf(
+            Balance.fighter(FighterId.MINION_HOUND),
+            Balance.fighter(FighterId.MINION_BOT),
+            Balance.fighter(FighterId.MINION_LASER),
+            Balance.fighter(FighterId.MINION_HOUND),
+        )
+    }
     private var lastFlashAt = -10f
     private var lastT = -1f
 
@@ -285,11 +299,45 @@ class EntityScene {
                 if (t > 5.3f && (t * 10f).toInt() % 3 != 0) soul = souls[(t * 6f).toInt() % souls.size]
                 shake = 0.04f * streaks
             }
+            EntityCut.SWARM_DEATH -> {
+                // Surrounded by minions on the Dragon's platform: a Lurcher pounces, a Crusher swings, and the
+                // fighter collapses while the Dragon hovers silently behind them.
+                val hit = smooth((t - 2.05f) / 0.55f)
+                facing = lerp(0.55f, 1.35f, smooth(t / 1.8f))
+                struggle = (1f - hit) * 0.7f
+                bow = 88f * hit
+                fy = -0.28f * hit
+                fz = fz0 + 0.35f * hit
+                glitch = smooth((t - 1.95f) / 0.25f) * (1f - smooth((t - 3.6f) / 0.9f))
+                if (t in 2.12f..2.28f && lastFlashAt < 2f) {
+                    lastFlashAt = t
+                    repeat(45) { spark(fx, 0.9f, fz, 5.2f, if (it % 2 == 0) 0xFFFF3B4E.toInt() else 0xFF5CC8FF.toInt()) }
+                }
+                val impact = if (t >= 2.12f) (1f - ((t - 2.12f) / 0.5f).coerceIn(0f, 1f)) else 0f
+                shake = 0.24f * impact
+                eBow = 10f * smooth((t - 2.8f) / 1.4f)
+            }
         }
 
         // ---- the camera, shot by shot
         val head = ey + es * 1.35f
         when (p.cut) {
+            EntityCut.SWARM_DEATH -> when {
+                t < 1.85f -> {
+                    val k = smooth(t / 1.85f)
+                    setEye(fx0 + lerp(4.2f, 2.5f, k), lerp(1.55f, 1.35f, k), fz0 + lerp(4.8f, 3.2f, k))
+                    setAt(fx0, 1.0f, fz0)
+                }
+                t < 3.4f -> {
+                    setEye(fx0 + 2.4f, 1.45f, fz0 + 3.1f)
+                    setAt(fx, 0.75f, fz)
+                }
+                else -> {
+                    val k = smooth((t - 3.4f) / 3.8f)
+                    setEye(c + lerp(2.2f, 1.4f, k), lerp(1.3f, 2.8f, k), fz0 + lerp(3.8f, 11.0f, k))
+                    setAt(c, lerp(0.85f, lift + eScale * 0.98f, k), lerp(fz0, ez + 1.0f, k))
+                }
+            }
             EntityCut.VICTORY -> when {
                 t < 3.4f -> { setEye(c + 5f, 1.6f, c + 9.5f); setAt(ex, lift + eScale * 1f, ez) }
                 t < 7.2f -> { val k = smooth((t - 3.4f) / 3.8f); setEye(ex + 2.2f, head - 1.3f, ez + lerp(10f, 6.5f, k)); setAt(ex, head, ez) }
@@ -370,6 +418,7 @@ class EntityScene {
         val drawFighter = fScale > 0.02f
         lit.f("uRim", 0.5f)
         if (drawFighter) models.draw(lit, def, p.skin, fx, fz, facing, fa, Pass.COLOR)
+        if (p.cut == EntityCut.SWARM_DEATH) drawSwarmMinions(t, fx, fz, Pass.COLOR)
         if (showEntity) {
             lit.f("uRim", 0.9f); lit.f("uEmissive", 0.12f)
             models.drawSoul(lit, soul, ex, ez, 1.5707964f, ea, Pass.COLOR)
@@ -384,6 +433,7 @@ class EntityScene {
         platform.solids.draw()
         lit.f("uOutline", FighterModels.OUTLINE)
         if (drawFighter) models.draw(lit, def, p.skin, fx, fz, facing, fa, Pass.OUTLINE)
+        if (p.cut == EntityCut.SWARM_DEATH) drawSwarmMinions(t, fx, fz, Pass.OUTLINE)
         if (showEntity) models.drawSoul(lit, soul, ex, ez, 1.5707964f, ea, Pass.OUTLINE)
         lit.f("uOutline", 0f)
         lit.i("uMode", 0)
@@ -482,6 +532,33 @@ class EntityScene {
         sprites.flush()
         GLES30.glDepthMask(true)
         GLES30.glDisable(GLES30.GL_BLEND)
+    }
+
+    private fun drawSwarmMinions(t: Float, fx: Float, fz: Float, pass: Pass) {
+        val close = smooth(t / 1.85f)
+        val pounce = ((t - 1.75f) / 0.45f).coerceIn(0f, 1f)
+        val swing = if (t in 1.95f..2.65f) sin(((t - 1.95f) / 0.7f) * 3.1416f) else 0f
+        // Four minions surrounding the player: pouncing Lurcher (front-left), Crusher (left), Zapper (right), Lurcher (back-right).
+        val offsets = arrayOf(
+            floatArrayOf(lerp(-3.2f, -1.05f, close) + 0.55f * pounce, lerp(1.5f, 0.55f, close) - 0.3f * pounce, sin(pounce * 3.1416f) * 1.15f),
+            floatArrayOf(lerp(-3.8f, -1.55f, close), lerp(-1.2f, -0.75f, close), 0f),
+            floatArrayOf(lerp(3.6f, 1.85f, close), lerp(-0.9f, -0.65f, close), 0f),
+            floatArrayOf(lerp(3.0f, 1.45f, close), lerp(1.8f, 1.05f, close), 0f),
+        )
+        for (i in swarmMinions.indices) {
+            val ox = offsets[i][0]; val oz = offsets[i][1]; val oy = offsets[i][2]
+            val mx = fx0 + ox; val mz = fz0 + oz
+            val face = kotlin.math.atan2((fz - mz).toDouble(), (fx - mx).toDouble()).toFloat()
+            ma.time = t + i * 0.7f
+            ma.moving = if (t < 1.95f) 1f else 0f
+            ma.walk = if (t < 1.95f) t * 7.5f + i else 0f
+            ma.scale = FIGHTER_SCALE * if (i == 1) 1.05f else 0.92f
+            ma.jump = oy
+            ma.bow = if (i == 0 && pounce > 0f && pounce < 1f) 24f else 0f
+            ma.recoil = if (i == 1) swing * 0.9f else if (i == 2 && t in 1.6f..2.2f) 0.5f else 0f
+            ma.spin = 0f; ma.talk = 0f; ma.flash = 0f; ma.eyeGlow = 0f
+            models.draw(lit, swarmMinions[i], 0, mx, mz, face, ma, pass)
+        }
     }
 
     private fun spark(x: Float, y: Float, z: Float, speed: Float, color: Int) {
