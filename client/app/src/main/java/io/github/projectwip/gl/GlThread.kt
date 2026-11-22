@@ -137,14 +137,27 @@ class GlThread(
     override fun run() {
         // Anything that goes wrong with the graphics is reported, and the game carries on without them (a black
         // view) rather than crashing: the player can still leave the match.
-        val (egl, surface) = try { startEgl() } catch (e: Throwable) { failed("couldn't start", e); return }
+        val (egl, initialSurface) = try { startEgl() } catch (e: Throwable) { failed("couldn't start", e); return }
+        var surface = initialSurface
         if (io.github.projectwip.net.CrashReporter.gpu.isBlank()) {
             io.github.projectwip.net.CrashReporter.gpu = listOf(GLES30.GL_RENDERER, GLES30.GL_VERSION).joinToString(" / ") { GLES30.glGetString(it).orEmpty() }
         }
+        val qW = IntArray(1)
+        val qH = IntArray(1)
+        var swapFails = 0
         try {
             renderer.onCreated()
             var last = System.nanoTime()
             while (running) {
+                // Always sync to the actual EGL surface dimensions: on Android/HyperOS, reopening the app can reset
+                // a TextureView's buffer size without triggering onSurfaceTextureSizeChanged, which otherwise crops
+                // the scene into a corner and leaves the top solid clear color.
+                if (EGL14.eglQuerySurface(egl.display, surface, EGL14.EGL_WIDTH, qW, 0) &&
+                    EGL14.eglQuerySurface(egl.display, surface, EGL14.EGL_HEIGHT, qH, 0) &&
+                    qW[0] > 0 && qH[0] > 0 && (qW[0] != width || qH[0] != height)
+                ) {
+                    width = qW[0]; height = qH[0]; sizeChanged = true
+                }
                 if (sizeChanged) {
                     sizeChanged = false
                     GLES30.glViewport(0, 0, width, height)
@@ -171,8 +184,25 @@ class GlThread(
                 val swapped = egl.swap(surface)
                 perfDraw += (f1 - f0) / 1e6f; perfSwap += (System.nanoTime() - f1) / 1e6f
                 if (!swapped) {
-                    Log.w(name, "eglSwapBuffers failed: ${EGL14.eglGetError()}")
+                    val err = EGL14.eglGetError()
+                    Log.w(name, "eglSwapBuffers failed: 0x${Integer.toHexString(err)}")
+                    swapFails++
+                    if (swapFails >= 2) {
+                        // Recover from surface invalidation after background/resume instead of freezing solid purple.
+                        swapFails = 0
+                        try {
+                            EGL14.eglMakeCurrent(egl.display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+                            egl.destroySurface(surface)
+                            val rebuilt = egl.windowSurface(nativeWindow)
+                            if (rebuilt != EGL14.EGL_NO_SURFACE && EGL14.eglMakeCurrent(egl.display, rebuilt, rebuilt, egl.context)) {
+                                surface = rebuilt
+                                sizeChanged = true
+                            }
+                        } catch (_: Throwable) {}
+                    }
                     sleep(16)
+                } else {
+                    swapFails = 0
                 }
                 // The frame cap: rest until the next frame is due (a little early, so the swap still meets its vsync).
                 val cap = PowerWatch.cap(maxFps, menu)

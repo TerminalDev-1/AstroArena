@@ -680,7 +680,7 @@ object Balance {
     /** How fast it turns to face what it wants, in radians a second. */
     const val DRAGON_TURN = 1.8f
     /** Seconds between its calls for minions, and how many of its own can be out at once. */
-    const val DRAGON_SUMMON_GAP = 18f
+    const val DRAGON_SUMMON_GAP = 14f
     const val DRAGON_MINION_CAP = 8
 
     /** Ninja's super: the gap between its three cosmic bullets, how much harder each hits the Entity, and how long it stuns it. */

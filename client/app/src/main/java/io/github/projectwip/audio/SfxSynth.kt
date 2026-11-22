@@ -626,21 +626,21 @@ object SfxSynth {
      * boom that drops fast, the punch of the body, the report rolling off the walls, a faint slap-back off something
      * far away, and the action cycling. All shaped noise, no tones.
      */
-    private fun gunshot() = Clip(0.8f).apply {
-        // The crack: a few milliseconds of everything at once.
-        noise(401, 0f, 0.012f, Band.HIGH, { 900f }, 0.6f, { perc(it, 0.0002f, 0.0035f) * 1.0f })
-        noise(402, 0f, 0.05f, Band.BAND, { 3200f }, 0.8f, { perc(it, 0.0003f, 0.009f) * 0.75f })
-        // The boom: low, starting high and dropping fast.
-        noise(403, 0f, 0.28f, Band.LOW, { glide(it, 0.09f, 1100f, 95f) }, 1.2f, { perc(it, 0.0008f, 0.07f) * 1.0f })
-        // The punch of the body.
-        noise(404, 0.001f, 0.12f, Band.BAND, { glide(it, 0.08f, 950f, 420f) }, 1.1f, { perc(it, 0.001f, 0.032f) * 0.7f })
-        // The report rolling away, darker as it goes, and a faint slap-back.
-        noise(405, 0.006f, 0.7f, Band.LOW, { glide(it, 0.6f, 1400f, 300f) }, 0.8f, { perc(it, 0.01f, 0.2f) * 0.28f })
-        noise(406, 0.095f, 0.3f, Band.BAND, { 700f }, 0.9f, { perc(it, 0.004f, 0.07f) * 0.12f })
-        // The action, a beat later: a short dry double tick.
-        noise(407, 0.13f, 0.02f, Band.HIGH, { 4500f }, 1.4f, { perc(it, 0.0004f, 0.005f) * 0.12f })
-        noise(408, 0.155f, 0.02f, Band.HIGH, { 3800f }, 1.4f, { perc(it, 0.0004f, 0.006f) * 0.1f })
-        filter(Band.LOW, 0.7f) { 12000f }
+    private fun gunshot() = Clip(0.36f).apply {
+        // Real pistol/rifle transient: ultra-sharp broadband supersonic crack in the first 3 ms.
+        noise(401, 0f, 0.009f, Band.HIGH, { 2600f }, 0.55f, { perc(it, 0.00005f, 0.0022f) * 0.62f })
+        noise(402, 0f, 0.022f, Band.BAND, { 4200f }, 0.7f, { perc(it, 0.0001f, 0.0055f) * 0.52f })
+        // Tight explosive muzzle punch (fast 14 ms chamber pop, not a muddy boom).
+        noise(403, 0f, 0.075f, Band.LOW, { glide(it, 0.035f, 1500f, 160f) }, 0.9f, { perc(it, 0.0002f, 0.016f) * 0.6f })
+        // Crisp mid-body bark of the shot.
+        noise(404, 0.0005f, 0.055f, Band.BAND, { glide(it, 0.03f, 1800f, 650f) }, 0.85f, { perc(it, 0.0003f, 0.015f) * 0.45f })
+        // Short gunpowder air-blast hiss + crisp metallic slide cycle.
+        noise(405, 0.001f, 0.07f, Band.HIGH, { 5800f }, 0.9f, { perc(it, 0.0005f, 0.02f) * 0.28f })
+        noise(406, 0.028f, 0.016f, Band.HIGH, { 5200f }, 1.6f, { perc(it, 0.0003f, 0.0045f) * 0.16f })
+        // Tight outdoor slap-back reflection that clears quickly for rapid fire.
+        noise(407, 0.014f, 0.22f, Band.BAND, { glide(it, 0.18f, 1400f, 420f) }, 0.75f, { perc(it, 0.003f, 0.065f) * 0.18f })
+        noise(408, 0.075f, 0.18f, Band.BAND, { 850f }, 0.8f, { perc(it, 0.004f, 0.045f) * 0.08f })
+        filter(Band.LOW, 0.7f) { 14000f }
     }
 
     /**

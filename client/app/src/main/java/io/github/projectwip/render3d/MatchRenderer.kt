@@ -2695,13 +2695,17 @@ class MatchRenderer(
                 val f = world.fighter(e.fighterId) ?: return
                 if (e.isSuper && f.def.superSpec.kind == SuperKind.QUAKE) hammerAt[f.id] = time
                 val c = if (e.isSuper) 0xFFFFD640.toInt() else f.def.skins[f.skin].accent.toInt()
-                val mx = e.x + e.dirX * 0.8f
-                val mz = e.y + e.dirY * 0.8f
-                particles.spawn(mx, 0.72f, mz, 0f, 0f, 0f, 0.09f, if (e.isSuper) 1.4f else 0.65f, c, 1f)
+                val gun = f.def.attack.shape == io.github.projectwip.data.AttackShape.BULLET
+                val side = if (gun) 0.34f else 0f
+                val fwd = if (gun) 0.78f else 0.8f
+                val my = if (gun) 0.94f else 0.72f
+                val mx = e.x + e.dirX * fwd - e.dirY * side
+                val mz = e.y + e.dirY * fwd + e.dirX * side
+                particles.spawn(mx, my, mz, 0f, 0f, 0f, 0.09f, if (e.isSuper) 1.4f else 0.65f, c, 1f)
                 repeat(if (e.isSuper) 12 else 5) {
                     val a = atan2(e.dirY, e.dirX) + (rng.nextFloat() - 0.5f) * 1.1f
                     val sp = 3f + rng.nextFloat() * 4f
-                    particles.spawn(mx, 0.72f, mz, cos(a) * sp, 1f + rng.nextFloat() * 2f, sin(a) * sp, 0.25f, 0.09f, c, 1f, grav = 9f)
+                    particles.spawn(mx, my, mz, cos(a) * sp, 1f + rng.nextFloat() * 2f, sin(a) * sp, 0.25f, 0.09f, c, 1f, grav = 9f)
                 }
             }
             is GameEvent.Hit -> {

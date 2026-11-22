@@ -404,6 +404,7 @@ class World(
         u.jewelHp = u.jewelMaxHp
         u.jewelBroken = !u.boss
         u.jewelDropped = false
+        u.summonIn = 6f
         u.strikeIn = Balance.UPRISING_STRIKE_GAP
         uprisingPhase(u, UprisingPhase.SKY)
     }
@@ -1697,10 +1698,12 @@ class World(
     ) {
         val dx = cos(ang)
         val dy = sin(ang)
-        // Spawn slightly in front of the fighter, but never inside a wall.
-        val off = f.radius * 0.6f
-        val sx = f.x + dx * off - dy * side
-        val sy = f.y + dy * off + dx * side
+        // Spawn slightly in front of the fighter (offset to the right-hand gun barrel for Ninja), never inside a wall.
+        val gun = style == ShotStyle.BULLET || style == ShotStyle.COSMIC
+        val off = if (gun) f.radius * 0.72f else f.radius * 0.6f
+        val gunSide = if (gun && side == 0f) 0.34f else side
+        val sx = f.x + dx * off - dy * gunSide
+        val sy = f.y + dy * off + dx * gunSide
         val p = Projectile(f.id, f.team, sx, sy, dx * speed, dy * speed, radius, damage, range - off, pierce, isSuper, style, blast, knock, share, hex, slow, homing)
         if (arena.tileAt(sx, sy).blocksShots) {
             events += GameEvent.WallHit(sx, sy, style)
@@ -2265,7 +2268,7 @@ class World(
         val roll = random.nextFloat()
         val moving = u.dashT >= 0f || u.spinT >= 0f
         return when {
-            u.summonIn <= 0f && minionsOut < Balance.DRAGON_MINION_CAP && (u.jewelBroken || u.mind == 2 || roll < 0.4f) -> EntityMove.SUMMON
+            u.summonIn <= 0f && minionsOut < Balance.DRAGON_MINION_CAP -> EntityMove.SUMMON
             near >= 2 && !moving -> EntityMove.SPIN
             dPrey > 7f && !moving && roll < 0.55f -> EntityMove.DASH
             far > 0 && roll < 0.3f -> EntityMove.DRAIN
