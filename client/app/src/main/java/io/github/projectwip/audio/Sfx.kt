@@ -114,8 +114,16 @@ class Sfx(private val context: Context) {
             // Each voice has an accent, a pitch and a pace of its own. An accent the device doesn't have falls back to plain English.
             val locale = java.util.Locale.forLanguageTag(style.locale)
             t.language = if (t.isLanguageAvailable(locale) >= android.speech.tts.TextToSpeech.LANG_AVAILABLE) locale else java.util.Locale.US
-            t.setPitch(style.pitch)
-            t.setSpeechRate(style.rate)
+            if (style == io.github.projectwip.data.VoiceStyle.VOID) {
+                // Scarier, glitchier abyssal Dragon voice: erratic deep pitch/rate warp + quiet void breath undertone.
+                val h = ((line.hashCode() xor (now.toInt() ushr 4)) and 0xFF) / 255f
+                t.setPitch((style.pitch + (h - 0.5f) * 0.14f).coerceIn(0.10f, 0.26f))
+                t.setSpeechRate((style.rate + ((1f - h) - 0.5f) * 0.22f).coerceIn(0.56f, 0.88f))
+                play(Sound.VOID, 0.28f * loudness, 0.65f + h * 0.2f)
+            } else {
+                t.setPitch(style.pitch)
+                t.setSpeechRate(style.rate)
+            }
             // (A cutscene queues its lines: switching voices takes the engine a moment, and a line must never cut the last off.)
             t.speak(line, if (queue) android.speech.tts.TextToSpeech.QUEUE_ADD else android.speech.tts.TextToSpeech.QUEUE_FLUSH, params, line.take(40))
         } catch (_: Exception) {

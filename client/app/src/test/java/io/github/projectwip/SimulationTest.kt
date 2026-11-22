@@ -1476,7 +1476,7 @@ class SimulationTest {
         var drainedEvents = 0
         // Red flares come down on them until it has drained them three times.
         var k = 0
-        while (!p.trapped && k < 60 * 60) {
+        while (!p.trapped && drainedEvents < 3 && k < 60 * 60) {
             if (k % 40 == 0 && p.alive) { p.x = u.ex + 4f; p.y = u.ey + 4f; u.flares += io.github.projectwip.sim.EntityFlare(p.id, p.x, p.y, red = true) }
             p.hp = p.maxHp
             m.step(Match.STEP); k++
@@ -1515,16 +1515,12 @@ class SimulationTest {
         var t = 0
         while (u.phase != io.github.projectwip.sim.UprisingPhase.SKY && t < 60 * 200) { m.step(Match.STEP); t++ }
         assertEquals(io.github.projectwip.sim.UprisingPhase.SKY, u.phase)
-        // Its flares keep coming at whoever is still free (the bots dodge them) until all of them are pulled in.
-        var k = 0
-        while (!m.isOver && k < 60 * 120) {
-            if (k % 30 == 0) for (f in w.fighters) if (f.alive && !f.trapped && !f.def.minion) u.flares += io.github.projectwip.sim.EntityFlare(f.id, f.x, f.y)
-            m.step(Match.STEP); k++
-        }
-        // (Since build 115 nothing pulls anyone in: its flares hit, and everyone knocked out for good ends it.)
-        assertTrue("everyone out ends it", m.isOver)
-        assertTrue("everyone knocked out for good", w.fighters.filter { !it.def.minion }.all { it.eliminated })
-        assertEquals(MatchOutcome.DEFEAT, m.report().outcome)
+        // Players now respawn in the Dragon's fight instead of being permanently eliminated.
+        val p = m.player
+        p.hp = 1
+        u.flares += io.github.projectwip.sim.EntityFlare(p.id, p.x, p.y)
+        repeat(60 * 8) { m.step(Match.STEP) }
+        assertTrue("player stays in the fight and respawns", !p.eliminated)
     }
 
     @Test fun skipJumpsTheRitualStraightToItsPortal() {

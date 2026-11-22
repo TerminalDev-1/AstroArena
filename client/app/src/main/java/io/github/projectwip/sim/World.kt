@@ -2035,11 +2035,8 @@ class World(
                 }
             }
         }
-        // Swarm: one life.
+        // Swarm: one life. (In the Dragon's fight, players respawn after RESPAWN_SECONDS.)
         if (rules.swarm && !victim.def.minion) victim.eliminated = true
-        // In the Entity's fight nobody comes back (the user's rule, build 111): knocked out, they are out until the
-        // match ends (and when nobody is left standing, it is lost: see [stepSky]).
-        if (rules.boss && inSky) victim.eliminated = true
         victim.hp = 0
         victim.deaths++
         victim.respawnTimer = Balance.RESPAWN_SECONDS

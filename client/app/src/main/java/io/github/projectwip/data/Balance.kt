@@ -707,7 +707,7 @@ object Balance {
     const val JEWEL_BACK_SPREAD = 14f
     const val JEWEL_DROP_HP = 0.35f
     const val JEWEL_DROP_RADIUS = 0.75f
-    const val JEWEL_RUSH_SPEED = 5.5f
+    const val JEWEL_RUSH_SPEED = 2.6f
 
     /** After a stun wears off the Entity can't be stunned again for this long: three Ninjas otherwise held it still for good. */
     const val COSMIC_STUN_GUARD = 6f
