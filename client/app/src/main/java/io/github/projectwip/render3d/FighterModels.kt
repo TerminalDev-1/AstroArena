@@ -499,49 +499,49 @@ class FighterModels {
                 a.add(Bone.JEWEL, Slot.METAL) { at(0.48f + (x - 0.48f) * f, 1.2f + (y + 0.16f - 1.2f) * f, z) { rotate(if (k % 2 == 0) 0f else 90f, 0f, 1f, 0f); rotate(90f, 1f, 0f, 0f); torus(0.035f, 0.012f, 10, 6) } }
             }
         }
-        // Central oval silver/metallic brooch bezel framing the purple gem dead-center.
-        a.add(Bone.JEWEL, Slot.METAL) { at(x, y, z) { rotate(90f, 0f, 1f, 0f); scale(1f, 1.32f, 1f); torus(0.095f, 0.02f, 20, 8) } }
+        // Central oval silver/metallic brooch bezel standing upright in the YZ plane (facing +X) around the purple gem.
+        a.add(Bone.JEWEL, Slot.METAL) { at(x + 0.015f, y, z) { rotate(90f, 0f, 0f, 1f); scale(1.32f, 1f, 1f); torus(0.092f, 0.02f, 20, 8) } }
         // Prominent faceted purple oval gem in the middle, with a bright inner crystal core.
-        a.add(Bone.JEWEL, Slot.GEM, emissive = true) { at(x + 0.01f, y, z) { octa(0.058f, 0.125f, 0.088f) } }
-        a.add(Bone.JEWEL, Slot.WING, outline = false, emissive = true) { at(x + 0.042f, y, z) { octa(0.032f, 0.075f, 0.05f) } }
-        // Four sharp dagger-like blades radiating from the four corners of the purple gem to form the butterfly wings.
+        a.add(Bone.JEWEL, Slot.GEM, emissive = true) { at(x + 0.015f, y, z) { octa(0.058f, 0.125f, 0.088f) } }
+        a.add(Bone.JEWEL, Slot.WING, outline = false, emissive = true) { at(x + 0.048f, y, z) { octa(0.032f, 0.075f, 0.05f) } }
+        // Four sharp dagger-like blades radiating OUTWARD from the four corners of the purple gem to form the butterfly wings.
         for (s in listOf(1f, -1f)) {
-            // Upper corner dagger (longer, swept upward and outward at ~42 degrees).
+            // Upper corner dagger: points UP and OUTWARD at ~48 degrees from the top-left / top-right corners.
             a.add(Bone.JEWEL, Slot.METAL) {
-                at(x - 0.005f, y + 0.11f, z + 0.11f * s) {
-                    rotate(-s * 46f, 1f, 0f, 0f)
-                    cylinder(0.032f, 0.24f, 6, topRadius = 0f)
+                at(x - 0.005f, y + 0.115f, z + 0.125f * s) {
+                    rotate(s * 48f, 1f, 0f, 0f)
+                    cylinder(0.034f, 0.25f, 6, topRadius = 0f)
                 }
             }
             a.add(Bone.JEWEL, Slot.GEM, emissive = true) {
-                at(x + 0.01f, y + 0.11f, z + 0.11f * s) {
-                    rotate(-s * 46f, 1f, 0f, 0f)
-                    cylinder(0.024f, 0.22f, 6, topRadius = 0f)
+                at(x + 0.012f, y + 0.115f, z + 0.125f * s) {
+                    rotate(s * 48f, 1f, 0f, 0f)
+                    cylinder(0.025f, 0.23f, 6, topRadius = 0f)
                 }
             }
             a.add(Bone.JEWEL, Slot.WING, outline = false, emissive = true) {
-                at(x + 0.022f, y + 0.11f, z + 0.11f * s) {
-                    rotate(-s * 46f, 1f, 0f, 0f)
-                    cylinder(0.013f, 0.17f, 5, topRadius = 0f)
+                at(x + 0.025f, y + 0.115f, z + 0.125f * s) {
+                    rotate(s * 48f, 1f, 0f, 0f)
+                    cylinder(0.013f, 0.18f, 5, topRadius = 0f)
                 }
             }
-            // Lower corner dagger (sleeker, swept downward and outward at ~138 degrees).
+            // Lower corner dagger: points DOWN and OUTWARD at ~132 degrees from the bottom-left / bottom-right corners.
             a.add(Bone.JEWEL, Slot.METAL) {
-                at(x - 0.005f, y - 0.105f, z + 0.095f * s) {
-                    rotate(-s * 134f, 1f, 0f, 0f)
-                    cylinder(0.026f, 0.19f, 6, topRadius = 0f)
+                at(x - 0.005f, y - 0.11f, z + 0.105f * s) {
+                    rotate(s * 132f, 1f, 0f, 0f)
+                    cylinder(0.028f, 0.2f, 6, topRadius = 0f)
                 }
             }
             a.add(Bone.JEWEL, Slot.GEM, emissive = true) {
-                at(x + 0.01f, y - 0.105f, z + 0.095f * s) {
-                    rotate(-s * 134f, 1f, 0f, 0f)
-                    cylinder(0.019f, 0.175f, 6, topRadius = 0f)
+                at(x + 0.012f, y - 0.11f, z + 0.105f * s) {
+                    rotate(s * 132f, 1f, 0f, 0f)
+                    cylinder(0.02f, 0.185f, 6, topRadius = 0f)
                 }
             }
             a.add(Bone.JEWEL, Slot.WING, outline = false, emissive = true) {
-                at(x + 0.022f, y - 0.105f, z + 0.095f * s) {
-                    rotate(-s * 134f, 1f, 0f, 0f)
-                    cylinder(0.01f, 0.13f, 5, topRadius = 0f)
+                at(x + 0.025f, y - 0.11f, z + 0.105f * s) {
+                    rotate(s * 132f, 1f, 0f, 0f)
+                    cylinder(0.011f, 0.14f, 5, topRadius = 0f)
                 }
             }
         }
