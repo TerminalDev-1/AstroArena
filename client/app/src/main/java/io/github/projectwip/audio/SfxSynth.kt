@@ -51,7 +51,7 @@ object SfxSynth {
         Sound.RIFT -> riftTear().finish(0.8f)
         Sound.DIM_AIR -> dimensionAir().finish(0.6f)
         Sound.SHOOT_PRISM -> prismShot().finish(0.7f)
-        Sound.GUNSHOT -> gunshot().finish(0.95f)
+        Sound.GUNSHOT -> gunshot().finish(0.92f)
         Sound.COSMIC -> cosmicRounds().finish(0.9f)
         Sound.SUPER -> superBlast().finish(0.85f)
         Sound.HIT -> hit().finish(0.7f)
@@ -626,21 +626,22 @@ object SfxSynth {
      * boom that drops fast, the punch of the body, the report rolling off the walls, a faint slap-back off something
      * far away, and the action cycling. All shaped noise, no tones.
      */
-    private fun gunshot() = Clip(0.36f).apply {
-        // Real pistol/rifle transient: ultra-sharp broadband supersonic crack in the first 3 ms.
-        noise(401, 0f, 0.009f, Band.HIGH, { 2600f }, 0.55f, { perc(it, 0.00005f, 0.0022f) * 0.62f })
-        noise(402, 0f, 0.022f, Band.BAND, { 4200f }, 0.7f, { perc(it, 0.0001f, 0.0055f) * 0.52f })
-        // Tight explosive muzzle punch (fast 14 ms chamber pop, not a muddy boom).
-        noise(403, 0f, 0.075f, Band.LOW, { glide(it, 0.035f, 1500f, 160f) }, 0.9f, { perc(it, 0.0002f, 0.016f) * 0.6f })
-        // Crisp mid-body bark of the shot.
-        noise(404, 0.0005f, 0.055f, Band.BAND, { glide(it, 0.03f, 1800f, 650f) }, 0.85f, { perc(it, 0.0003f, 0.015f) * 0.45f })
-        // Short gunpowder air-blast hiss + crisp metallic slide cycle.
-        noise(405, 0.001f, 0.07f, Band.HIGH, { 5800f }, 0.9f, { perc(it, 0.0005f, 0.02f) * 0.28f })
-        noise(406, 0.028f, 0.016f, Band.HIGH, { 5200f }, 1.6f, { perc(it, 0.0003f, 0.0045f) * 0.16f })
-        // Tight outdoor slap-back reflection that clears quickly for rapid fire.
-        noise(407, 0.014f, 0.22f, Band.BAND, { glide(it, 0.18f, 1400f, 420f) }, 0.75f, { perc(it, 0.003f, 0.065f) * 0.18f })
-        noise(408, 0.075f, 0.18f, Band.BAND, { 850f }, 0.8f, { perc(it, 0.004f, 0.045f) * 0.08f })
-        filter(Band.LOW, 0.7f) { 14000f }
+    private fun gunshot() = Clip(0.42f).apply {
+        // Real firearm acoustic detonation: instantaneous ballistic chest-thump + supersonic whip-crack, hard-driven.
+        osc(Wave.SINE, 0.0002f, 0.055f, { glide(it, 0.016f, 220f, 46f) }, { perc(it, 0.0002f, 0.018f) * 1.15f })
+        // Broadband muzzle detonation blast + high-frequency supersonic snap.
+        noise(401, 0.0001f, 0.016f, Band.HIGH, { 1800f }, 0.5f, { perc(it, 0.00005f, 0.0038f) * 1.55f })
+        noise(402, 0.0001f, 0.032f, Band.BAND, { 3400f }, 0.65f, { perc(it, 0.0001f, 0.0075f) * 1.25f })
+        noise(403, 0.0002f, 0.095f, Band.LOW, { glide(it, 0.04f, 1600f, 120f) }, 0.85f, { perc(it, 0.0002f, 0.024f) * 1.35f })
+        noise(404, 0.0005f, 0.065f, Band.BAND, { glide(it, 0.035f, 1600f, 520f) }, 0.8f, { perc(it, 0.0003f, 0.02f) * 0.95f })
+        // Hard acoustic saturation turns the pressure spike + noise burst into an unmistakable firearm BANG.
+        drive(4.0f)
+        // Metallic slide/breech snap + crisp outdoor canyon report rolling away.
+        noise(405, 0.026f, 0.016f, Band.HIGH, { 5400f }, 1.6f, { perc(it, 0.0003f, 0.004f) * 0.2f })
+        noise(406, 0.016f, 0.28f, Band.BAND, { glide(it, 0.22f, 1500f, 360f) }, 0.7f, { perc(it, 0.004f, 0.075f) * 0.26f })
+        noise(407, 0.085f, 0.22f, Band.BAND, { 780f }, 0.75f, { perc(it, 0.005f, 0.055f) * 0.12f })
+        reverb(0.14f, 0.14f)
+        filter(Band.LOW, 0.7f) { 14500f }
     }
 
     /**

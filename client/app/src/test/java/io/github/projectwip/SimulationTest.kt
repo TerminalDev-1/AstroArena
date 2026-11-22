@@ -975,7 +975,7 @@ class SimulationTest {
     @Test fun ninjasCosmicRoundsAreThreeHardBulletsThatStunTheEntity() {
         val ninja = Balance.fighter(FighterId.BYTE)
         assertEquals(io.github.projectwip.data.AttackShape.BULLET, ninja.attack.shape)
-        assertEquals(900, ninja.attackDamage.base)
+        assertEquals(1150, ninja.attackDamage.base)
         assertEquals(io.github.projectwip.data.SuperKind.COSMIC, ninja.superSpec.kind)
         assertEquals("double a bullet", ninja.attackDamage.base * 2, ninja.superDamage.base)
         // In the Entity's world: three cosmic bullets go into it, hit it hard, and stun it.

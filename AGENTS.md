@@ -29,6 +29,7 @@ read the one for your task first, and write new decisions there, not here. Never
 
 ## How to work here
 
+- **Always update `server/news.cfg` AND rebuild the client fallback news (`:app:copyNews`)** whenever features, balance, visuals, or fixes ship, so both the live server's News tab and the client's bundled offline fallback news are always up to date.
 - **Committing and releasing is not "done". Nothing ships until it has passed rigorous QA and is up to the user's
   standard.** Passing tests and a build that compiles are not enough. Before any release: play the change on the
   tablet the way a player would, from the game's own camera; screenshot (and burst-capture) every new screen, effect

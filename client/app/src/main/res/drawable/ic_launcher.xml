@@ -1,40 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- ARENA's icon: pitch-black void with a neon-white emblem frame, stars, and huge blinding-wide circular white eyes. -->
+<!-- ARENA's icon: pitch-black void pierced by blinding neon-white eyes with radiating light rays and lens-flare beams (no pupils, no emoji look). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Pitch-black void backdrop -->
+    <!-- Pure pitch-black void -->
     <path android:fillColor="#000000" android:pathData="M0,0h108v108h-108z"/>
 
-    <!-- Neon-white outer diamond emblem frame (layered bloom + crisp neon core) -->
-    <path android:strokeColor="#28FFFFFF" android:strokeWidth="7" android:strokeLineJoin="round"
-          android:pathData="M54,10 L98,54 L54,98 L10,54 Z"/>
-    <path android:strokeColor="#66FFFFFF" android:strokeWidth="3.2" android:strokeLineJoin="round"
-          android:pathData="M54,10 L98,54 L54,98 L10,54 Z"/>
-    <path android:strokeColor="#FFFFFF" android:strokeWidth="1.5" android:strokeLineJoin="round"
-          android:pathData="M54,10 L98,54 L54,98 L10,54 Z"/>
+    <!-- Wide ambient blinding-white light wash radiating from the center -->
+    <path android:fillColor="#12FFFFFF" android:pathData="M54,54 m-50,0 a50,50 0 1,0 100,0 a50,50 0 1,0 -100,0 Z"/>
+    <path android:fillColor="#1AFFFFFF" android:pathData="M54,54 m-36,0 a36,36 0 1,0 72,0 a36,36 0 1,0 -72,0 Z"/>
 
-    <!-- Neon-white four-point stars above and below -->
-    <path android:fillColor="#DDFFFFFF"
-          android:pathData="M54,19 L55.5,24 L60.5,25.5 L55.5,27 L54,32 L52.5,27 L47.5,25.5 L52.5,24 Z"/>
-    <path android:fillColor="#DDFFFFFF"
-          android:pathData="M54,76 L55.5,81 L60.5,82.5 L55.5,84 L54,89 L52.5,84 L47.5,82.5 L52.5,81 Z"/>
+    <!-- Dramatic radiating neon-white light rays bursting outward from the eyes -->
+    <path android:fillColor="#1EFFFFFF" android:pathData="M34,54 L2,18 L18,6 Z"/>
+    <path android:fillColor="#1EFFFFFF" android:pathData="M34,54 L0,46 L0,62 Z"/>
+    <path android:fillColor="#1EFFFFFF" android:pathData="M34,54 L4,94 L22,102 Z"/>
+    <path android:fillColor="#1EFFFFFF" android:pathData="M34,54 L36,4 L48,4 Z"/>
+    <path android:fillColor="#1EFFFFFF" android:pathData="M34,54 L38,104 L50,104 Z"/>
 
-    <!-- Massive blinding neon-white halos around both wide circular eyes -->
-    <path android:fillColor="#1EFFFFFF" android:pathData="M34,54 m-25,0 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0 Z"/>
-    <path android:fillColor="#1EFFFFFF" android:pathData="M74,54 m-25,0 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0 Z"/>
-    <path android:fillColor="#48FFFFFF" android:pathData="M34,54 m-21,0 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 Z"/>
-    <path android:fillColor="#48FFFFFF" android:pathData="M74,54 m-21,0 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 Z"/>
-    <path android:fillColor="#88FFFFFF" android:pathData="M34,54 m-18.5,0 a18.5,18.5 0 1,0 37,0 a18.5,18.5 0 1,0 -37,0 Z"/>
-    <path android:fillColor="#88FFFFFF" android:pathData="M74,54 m-18.5,0 a18.5,18.5 0 1,0 37,0 a18.5,18.5 0 1,0 -37,0 Z"/>
+    <path android:fillColor="#1EFFFFFF" android:pathData="M74,54 L106,18 L90,6 Z"/>
+    <path android:fillColor="#1EFFFFFF" android:pathData="M74,54 L108,46 L108,62 Z"/>
+    <path android:fillColor="#1EFFFFFF" android:pathData="M74,54 L104,94 L86,102 Z"/>
+    <path android:fillColor="#1EFFFFFF" android:pathData="M74,54 L72,4 L60,4 Z"/>
+    <path android:fillColor="#1EFFFFFF" android:pathData="M74,54 L70,104 L58,104 Z"/>
 
-    <!-- Blinding-wide pure white circular eyes -->
-    <path android:fillColor="#FFFFFF" android:pathData="M34,54 m-16.5,0 a16.5,16.5 0 1,0 33,0 a16.5,16.5 0 1,0 -33,0 Z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M74,54 m-16.5,0 a16.5,16.5 0 1,0 33,0 a16.5,16.5 0 1,0 -33,0 Z"/>
+    <!-- Sharper inner neon-white starburst shafts -->
+    <path android:fillColor="#34FFFFFF" android:pathData="M34,54 L8,28 L16,22 Z"/>
+    <path android:fillColor="#34FFFFFF" android:pathData="M34,54 L10,82 L18,88 Z"/>
+    <path android:fillColor="#34FFFFFF" android:pathData="M74,54 L100,28 L92,22 Z"/>
+    <path android:fillColor="#34FFFFFF" android:pathData="M74,54 L98,82 L90,88 Z"/>
 
-    <!-- Intense wide-stare dark pupils with crisp neon-white glints -->
-    <path android:fillColor="#000000" android:pathData="M34,54 m-5.2,0 a5.2,5.2 0 1,0 10.4,0 a5.2,5.2 0 1,0 -10.4,0 Z"/>
-    <path android:fillColor="#000000" android:pathData="M74,54 m-5.2,0 a5.2,5.2 0 1,0 10.4,0 a5.2,5.2 0 1,0 -10.4,0 Z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M36.5,51.2 m-1.7,0 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0 Z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M76.5,51.2 m-1.7,0 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0 Z"/>
+    <!-- Blinding horizontal anamorphic lens-flare streaks cutting across both eyes -->
+    <path android:fillColor="#28FFFFFF" android:pathData="M0,54 Q54,46 108,54 Q54,62 0,54 Z"/>
+    <path android:fillColor="#55FFFFFF" android:pathData="M4,54 Q54,50 104,54 Q54,58 4,54 Z"/>
+    <path android:fillColor="#AAFFFFFF" android:pathData="M14,54 Q54,52.2 94,54 Q54,55.8 14,54 Z"/>
+
+    <!-- Multi-layered blinding bloom halos directly around each eye -->
+    <path android:fillColor="#26FFFFFF" android:pathData="M33,54 m-23,0 a23,23 0 1,0 46,0 a23,23 0 1,0 -46,0 Z"/>
+    <path android:fillColor="#26FFFFFF" android:pathData="M75,54 m-23,0 a23,23 0 1,0 46,0 a23,23 0 1,0 -46,0 Z"/>
+    <path android:fillColor="#58FFFFFF" android:pathData="M33,54 m-16,0 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0 Z"/>
+    <path android:fillColor="#58FFFFFF" android:pathData="M75,54 m-16,0 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0 Z"/>
+    <path android:fillColor="#99FFFFFF" android:pathData="M33,54 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0 Z"/>
+    <path android:fillColor="#99FFFFFF" android:pathData="M75,54 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0 Z"/>
+
+    <!-- Pure blinding neon-white eyes (intense luminous slit/wide glow, zero pupils) -->
+    <path android:fillColor="#FFFFFF" android:pathData="M33,54 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M75,54 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0 Z"/>
+
+    <!-- Vertical blinding light spikes piercing through each eye -->
+    <path android:fillColor="#88FFFFFF" android:pathData="M33,24 L35.2,54 L33,84 L30.8,54 Z"/>
+    <path android:fillColor="#88FFFFFF" android:pathData="M75,24 L77.2,54 L75,84 L72.8,54 Z"/>
 </vector>

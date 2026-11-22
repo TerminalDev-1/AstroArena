@@ -605,11 +605,11 @@ object Balance {
             role = "Gunslinger",
             lore = "A hooded ninja with nothing under the hood: no face, just a dark that looks back. Nobody remembers what he looked like before the Dragon got to him. He doesn't either. He kept the gun.",
             attackName = "Void Round",
-            health = StatLine(6600, 330),
-            // One bullet: 900, the owner's starting number.
-            attackDamage = StatLine(900, 45),
-            // One cosmic bullet: double a normal one (the owner's), and far more against the Entity (COSMIC_ENTITY_MULT).
-            superDamage = StatLine(1800, 90),
+            health = StatLine(8200, 410),
+            // One bullet: 1,150 base (buffed from 900).
+            attackDamage = StatLine(1150, 58),
+            // One cosmic bullet: double a normal one, and far more against the Entity (COSMIC_ENTITY_MULT).
+            superDamage = StatLine(2300, 115),
             moveSpeed = 3.6f,
             attack = AttackSpec(AttackShape.BULLET, projectiles = 1, spreadDegrees = 0f, range = 8.5f, speed = 24f, radius = 0.14f, burstInterval = 0f),
             superSpec = SuperSpec(SuperKind.COSMIC, "Cosmic Rounds", "Fires three blinding electric-blue cosmic bullets in quick succession. Each hits twice as hard as a normal bullet, and against the Dragon they do massive damage and stun it for 2.5 seconds.", projectiles = 3, range = 10f, speed = 26f, radius = 0.24f),

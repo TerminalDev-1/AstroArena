@@ -275,8 +275,8 @@ class ProgressionTest {
         assertTrue(io.github.projectwip.data.SparkRoad.steps.isEmpty())
         // The owner's numbers: 900 a bullet, a super of three bullets of double that.
         val ninja = Balance.fighter(FighterId.BYTE)
-        assertEquals(900, ninja.attackDamage.base)
-        assertEquals(1800, ninja.superDamage.base)
+        assertEquals(1150, ninja.attackDamage.base)
+        assertEquals(2300, ninja.superDamage.base)
         assertTrue("health ${ninja.health.base}", ninja.health.base >= Balance.MIN_HEALTH)
     }
 
