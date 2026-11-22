@@ -236,7 +236,8 @@ enum class VoiceStyle(val locale: String, val pitch: Float, val rate: Float) {
      * The Entity (the Void in the code): as deep as a voice will go, from somewhere a long way down, and slow, but not so
      * slow that its speech in the uprising can't be said in the time it has.
      */
-    VOID("en-GB", 0.3f, 0.92f),
+    /** The Dragon: deeper, slower, creepier voice from the abyss. */
+    VOID("en-GB", 0.18f, 0.68f),
     /** Swish, in the opening (the one time she speaks): light and quick, a little breathless. */
     STORM("en-US", 1.3f, 1.02f),
 }
@@ -312,7 +313,7 @@ object Balance {
     // few seconds makes the fighter hit harder, with more health. Hits landed while one is
     // running charge the next, so a fighter who keeps hitting can go from one hyper into another.
     /** The Dragon cannot speak (the owner's decision, build 115): no voice and no talking jaw; its words are only text. */
-    const val DRAGON_SPEAKS = false
+    const val DRAGON_SPEAKS = true
     /** Hypers are switched off: they don't exist in the game since build 114 (the owner's decision). */
     const val HYPERS = false
     const val HYPER_SECONDS = 8f

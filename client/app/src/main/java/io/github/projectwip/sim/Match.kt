@@ -182,8 +182,11 @@ class Match(val config: MatchConfig) {
         pathfinder.budget = 1
         // Rotate who goes first so the same bot doesn't always get the tick's one path search.
         turn++
-        // (In the Entity's dimension the bots are driven below: their brains know only the arena.)
-        if (!world.inSky) for (i in brains.indices) brains[(i + turn) % brains.size].update(dt)
+        // In the Dragon's world, friendly bots are driven below, while minions ALWAYS run their own brains.
+        for (i in brains.indices) {
+            val b = brains[(i + turn) % brains.size]
+            if (!world.inSky || b.fighter.def.minion) b.update(dt)
+        }
         // Bots hold their fire for the first seconds of a match and while their spawn shield is up, so nobody is
         // beaten up the moment they arrive (the user found the bots got stuck in too early). They still move.
         val warmingUp = world.phase == Phase.PLAYING && world.phaseTime < Balance.BOT_WARMUP_SECONDS
@@ -255,61 +258,7 @@ class Match(val config: MatchConfig) {
             c.hyper = f.hyperReady
             dodgeHazards(f)
         }
-        // Entity control / mid-match takeover (disabled when Balance.ENTITY_CONTROL is false).
-        if (Balance.ENTITY_CONTROL) {
-            for (f in world.fighters) if (f.glitchCooldown > 0f) f.glitchCooldown = maxOf(0f, f.glitchCooldown - dt)
-            for (f in world.fighters) if (f.glitchLeft > 0f) {
-                f.glitchLeft = maxOf(0f, f.glitchLeft - dt)
-                if (!f.alive || world.inSky) continue
-                if (f.inTempest) { autoFight(f); dodgeHazards(f) }
-                else if (!f.isBot) {
-                    val c = f.control
-                    c.attack = false; c.superAttack = false; c.hyper = false
-                    entityBrains.getOrPut(f.id) { BotBrain(f, entityProfile, world, pathfinder, Random(config.seed xor (0x3E7171L + f.id))) }.update(dt)
-                    if (f.superReady || f.hyperReady) {
-                        var near: Fighter? = null
-                        var nd = Float.MAX_VALUE
-                        for (o in world.fighters) {
-                            if (o === f || !o.alive || o.team == f.team || !world.isVisibleTo(o, f.team)) continue
-                            val d = kotlin.math.hypot(o.x - f.x, o.y - f.y)
-                            if (d < nd) { nd = d; near = o }
-                        }
-                        if (near != null && nd <= maxOf(f.def.attack.range, f.def.superSpec.range)) {
-                            if (f.hyperReady) c.hyper = true
-                            if (f.superReady && !c.superAttack) { c.aimX = near.x - f.x; c.aimY = near.y - f.y; c.aiming = true; c.superAttack = true }
-                        }
-                    }
-                    dodgeHazards(f)
-                }
-            }
-        }
-        val seen = world.events.size
         world.step(dt)
-        if (Balance.ENTITY_CONTROL && world.uprising?.active != true) {
-            for (i in seen until world.events.size) {
-                val e = world.events[i]
-                val (id, pull) = when (e) {
-                    is GameEvent.Shot -> e.fighterId to (if (e.isSuper) Balance.GLITCH_PULL_SUPER else Balance.GLITCH_PULL_ATTACK)
-                    is GameEvent.Hyper -> e.fighterId to Balance.GLITCH_PULL_HYPER
-                    else -> continue
-                }
-                val f = world.fighter(id) ?: continue
-                if (f.glitchLeft > 0f || f.glitchCooldown > 0f) continue
-                f.entityPull += pull
-            }
-            for (f in world.fighters) {
-                if (!f.alive || f.glitchLeft > 0f || f.glitchCooldown > 0f) continue
-                // (Time only adds once a fighter has fought: the Training Area's dummies, who never attack, stay put.)
-                if (f.entityPull > 0f) f.entityPull += Balance.GLITCH_PULL_PER_SECOND * dt
-                if (f.entityPull >= 1f) {
-                    f.entityPull = 0f
-                    // (In a tornado the Entity keeps it to the end: four seconds of it was too little.)
-                    f.glitchLeft = maxOf(Balance.GLITCH_SECONDS, f.tempestLeft)
-                    f.glitchCooldown = f.glitchLeft + Balance.GLITCH_COOLDOWN
-                    world.events += GameEvent.Glitched(f.id)
-                }
-            }
-        }
         if (isOver) overFor += dt
     }
 

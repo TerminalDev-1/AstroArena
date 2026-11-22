@@ -69,7 +69,9 @@ class MatchRunner(
     @Volatile var hijack = 0
     /** How many times the Entity has corrupted the player: each one plays its cutscene (`MatchScreen`), the match waiting. */
     @Volatile var corruptions = 0
-    /** The player's drains (each plays its cutscene, `EntityCut.drain`): how many there have been. */
+    /** How many times the Dragon's neck jewel has been shattered: each plays its 3D cutscene (`MatchScreen`). */
+    @Volatile var jewelBreaks = 0
+    /** The player's drains (removed; kept at 0). */
     @Volatile var drains = 0
     /** Other real players are in this match: it can't be held still for one of them. */
     val shared: Boolean get() = duel != null || team != null
@@ -373,8 +375,11 @@ class MatchRunner(
                 else -> Unit
             }
             is GameEvent.EntityHit -> if (e.fighterId == pid) sfx.play(Sound.HIT, if (e.isSuper) 0.9f else 0.55f, 0.75f)
-            // Its jewel: breaking like glass, turning up again, and back on its neck (with a roar).
-            is GameEvent.JewelBroken -> sfx.play(Sound.GLASS, 1f, 0.8f)
+            // Its jewel: shattering like glass (and triggering the Dragon's shatter cutscene when broken off its neck).
+            is GameEvent.JewelBroken -> {
+                sfx.play(Sound.GLASS, 1f, 0.9f)
+                if (!e.dropped && !shared) { jewelBreaks++; paused = true }
+            }
             is GameEvent.JewelDropped -> sfx.play(Sound.SHARD, 0.9f)
             is GameEvent.JewelRestored -> sfx.play(Sound.VOID, 1f, 0.8f)
             is GameEvent.Shot -> {

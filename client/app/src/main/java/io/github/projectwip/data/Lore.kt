@@ -177,6 +177,7 @@ object Lore {
         "Fight. It feels good, doesn't it?", "That light in you is mine.", "Closer. I'm listening.",
         "They're glitching too. Can you see it?", "Take more. There's always more.", "You hear me. You always could.",
         "Every hit is a little more of me.", "Don't stop. I like it when you don't stop.",
+        "A brooch was never meant for scales.", "Someone human is wearing it now.",
     )
     private val WHISPERS_POWER = listOf(
         "Yes. Use it. Use me.", "That's my power. Feel it?", "More. Again.", "Good. Now you owe me.", "Brighter. Brighter.",

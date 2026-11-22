@@ -292,33 +292,15 @@ private fun MatchBody(
     var done by remember { mutableStateOf(false) }
     /** The line-up is showing; the match waits behind it. */
     var intro by remember { mutableStateOf(!match.practice) }
-    /** The Entity's hijack cutscene is showing (its comet has come down into the player); and how many there have been. */
-    var hijacking by remember { mutableStateOf(false) }
-    var hijacks by remember { mutableStateOf(0) }
-    /** The Entity's corruption cutscene showing (which one), or -1; and how many have been shown. */
-    var corrupting by remember { mutableStateOf(-1) }
-    var corruptSeen by remember { mutableStateOf(0) }
-    /** Inside the Entity: the player is trapped in it (its ruin shows until they are freed or the match ends). */
-    var inside by remember { mutableStateOf(false) }
-    /** Trapped: the ruin full screen (true), or watching the team with the ruin in a corner (false, the default). */
-    var insideFull by remember { mutableStateOf(false) }
-    /** A drain cutscene showing (the player's drain count), or -1; and the last one shown. */
-    var draining by remember { mutableStateOf(-1) }
-    var drainSeen by remember { mutableStateOf(0) }
+    /** The Dragon's jewel-shatter cutscene showing, or -1; and how many have been shown. */
+    var jewelBreaking by remember { mutableStateOf(-1) }
+    var jewelBreakSeen by remember { mutableStateOf(0) }
     if (!shared) androidx.compose.runtime.LaunchedEffect(Unit) {
-        // (Looked at twenty times a second, not on every refresh of the screen: that kept the phone busy for nothing.)
         while (true) {
             kotlinx.coroutines.delay(50)
-            if (!hijacking && view?.hijack == 2) hijacking = true
-            val c = view?.corruptions ?: 0
-            if (corrupting < 0 && c > corruptSeen) { corruptSeen = c; corrupting = c }
-            val d = view?.drains ?: 0
-            if (draining < 0 && d > drainSeen) { drainSeen = d; draining = d }
+            val jb = view?.jewelBreaks ?: 0
+            if (jewelBreaking < 0 && jb > jewelBreakSeen) { jewelBreakSeen = jb; jewelBreaking = jb }
         }
-    }
-    // (In every match, team matches too: whoever is trapped sees inside it.)
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        while (true) { kotlinx.coroutines.delay(50); inside = view?.playerTrapped == true }
     }
     val context = LocalContext.current
 
@@ -360,19 +342,9 @@ private fun MatchBody(
             modifier = Modifier.fillMaxSize(),
         )
         if (intro) MatchIntro(match) { if (intro) { intro = false; view?.resumeGame() } }
-        // (Under its pulled-in cutscene, which plays first.)
-        if (inside && !done) EntityInsideScreen(insideFull, { insideFull = !insideFull }) { view?.insideInfo() }
-        if (draining >= 0) EntityCutscene(io.github.projectwip.render3d.EntityCut.drain(draining, view?.obeys == true), match.config.playerFighter, match.config.playerSkin, draining, sfx) {
-            draining = -1
+        if (jewelBreaking >= 0) EntityCutscene(io.github.projectwip.render3d.EntityCut.JEWEL_BREAK, match.config.playerFighter, match.config.playerSkin, jewelBreaking, sfx) {
+            jewelBreaking = -1
             if (!paused) view?.resumeGame()
-        }
-        if (corrupting >= 0) EntityCutscene(io.github.projectwip.render3d.EntityCut.CORRUPT, match.config.playerFighter, match.config.playerSkin, corrupting, sfx) {
-            corrupting = -1
-            if (!paused) view?.resumeGame()
-        }
-        if (hijacking) EntityHijack(match.config.playerFighter, match.config.playerSkin, hijacks, sfx) {
-            hijacking = false; hijacks++
-            if (paused) view?.let { v -> v.endHijack(); v.paused = true } else view?.endHijack()
         }
         if (paused && !done) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {

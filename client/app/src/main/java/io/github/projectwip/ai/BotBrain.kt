@@ -30,6 +30,7 @@ class BotBrain(
     private val pathfinder: Pathfinder,
     private val rng: Random,
 ) {
+    val fighter: Fighter get() = me
     enum class Intent { ENGAGE, RETREAT, ADVANCE, SEEK_ZONE }
 
     var intent = Intent.ADVANCE

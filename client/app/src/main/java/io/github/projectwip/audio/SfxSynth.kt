@@ -557,16 +557,22 @@ object SfxSynth {
     }
 
     /** A computer coming apart on somebody: the thud of the case, the screen bursting, and shards ringing as they scatter. */
-    private fun glass() = Clip(0.7f).apply {
-        osc(Wave.SINE, 0f, 0.12f, { glide(it, 0.09f, 190f, 70f) }, { perc(it, 0.001f, 0.05f) * 0.7f })
-        noise(41, 0f, 0.09f, Band.HIGH, { 3800f }, 0.8f, { perc(it, 0.0005f, 0.03f) * 0.9f })
-        noise(42, 0.02f, 0.4f, Band.HIGH, { 6500f }, 1.2f, { perc(it, 0.002f, 0.12f) * 0.35f })
-        val shards = floatArrayOf(2637f, 3520f, 4186f, 3136f, 5274f, 2349f, 4699f)
-        for (k in shards.indices) {
-            val at = 0.015f + k * 0.045f + (k % 3) * 0.012f
-            fm(at, 0.3f, { shards[k] }, 2.76f, { 1.2f * perc(it, 0.0005f, 0.05f) }, { perc(it, 0.0005f, 0.09f) * (0.3f - k * 0.025f) })
+    private fun glass() = Clip(0.85f).apply {
+        // Real glass shattering: sharp brittle impact crunch + hard-driven crystal snap + cascading non-harmonic shard tinkles.
+        osc(Wave.SINE, 0f, 0.06f, { glide(it, 0.03f, 260f, 65f) }, { perc(it, 0.0004f, 0.022f) * 0.65f })
+        noise(41, 0f, 0.035f, Band.HIGH, { 3200f }, 0.55f, { perc(it, 0.0001f, 0.011f) * 1.4f })
+        noise(42, 0.002f, 0.14f, Band.HIGH, { 5600f }, 0.7f, { perc(it, 0.0004f, 0.042f) * 1.05f })
+        drive(2.4f)
+        // Cascading erratic glass shards hitting the ground: high-Q narrowband noise bursts (no musical bell notes).
+        val rng = Random(404)
+        for (k in 0 until 24) {
+            val at = 0.012f + k * 0.028f + rng.nextFloat() * 0.024f
+            val freq = 4400f + rng.nextFloat() * 7800f
+            val amp = (0.34f - k * 0.011f).coerceAtLeast(0.05f) * (0.7f + rng.nextFloat() * 0.5f)
+            noise(100 + k, at, 0.045f, Band.BAND, { freq }, 7.5f, { perc(it, 0.0002f, 0.012f) * amp })
         }
-        echo(0.06f, 0.2f, 0.12f)
+        noise(43, 0.04f, 0.45f, Band.HIGH, { 7200f }, 1.1f, { perc(it, 0.008f, 0.14f) * 0.25f })
+        reverb(0.18f, 0.22f)
     }
 
     /** Kira throwing a hex: something thick comes to the boil, three fat bubbles and a hiss, over a low sour note. */

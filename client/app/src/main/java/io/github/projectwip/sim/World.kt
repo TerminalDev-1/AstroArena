@@ -2271,7 +2271,6 @@ class World(
             u.summonIn <= 0f && minionsOut < Balance.DRAGON_MINION_CAP -> EntityMove.SUMMON
             near >= 2 && !moving -> EntityMove.SPIN
             dPrey > 7f && !moving && roll < 0.55f -> EntityMove.DASH
-            far > 0 && roll < 0.3f -> EntityMove.DRAIN
             (far > 0 && roll < 0.55f) || roll > 0.8f -> EntityMove.FLARE
             dPrey < 4.5f -> listOf(EntityMove.GRASP, EntityMove.PULSE, EntityMove.STRIKES)[u.strikes % 3]
             else -> listOf(EntityMove.STRIKES, EntityMove.RING, EntityMove.SWEEP, EntityMove.SPOKES, EntityMove.RAIN, EntityMove.CHASE)[u.strikes % 6]

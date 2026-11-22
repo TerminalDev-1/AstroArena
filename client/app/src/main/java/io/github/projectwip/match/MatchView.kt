@@ -166,7 +166,9 @@ class MatchView(
         return InsideInfo(u.hp, u.maxHp, held, team)
     }
 
-    /** How many times its red flares have drained the player (each plays its cutscene). */
+    /** How many times the Dragon's neck jewel has been shattered (each plays its 3D cutscene). */
+    val jewelBreaks: Int get() = runner.jewelBreaks
+    /** How many times its red flares have drained the player (removed). */
     val drains: Int get() = runner.drains
     /** The last time, whether this player's fighter gives in rather than passes out (fixed by the match). */
     val obeys: Boolean get() = (runner.match.config.seed and 1L) == 1L

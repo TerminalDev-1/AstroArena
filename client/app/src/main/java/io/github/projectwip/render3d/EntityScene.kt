@@ -33,7 +33,7 @@ import kotlin.random.Random
  *    can, and the third time they pass out from exhaustion or give in to make it stop, and it pulls them inside.
  */
 enum class EntityCut {
-    VICTORY, DEFEAT, CORRUPT, DRAIN, DRAIN_WEAK, DRAIN_FAINT, DRAIN_OBEY, SWARM_DEATH;
+    VICTORY, DEFEAT, CORRUPT, DRAIN, DRAIN_WEAK, DRAIN_FAINT, DRAIN_OBEY, SWARM_DEATH, JEWEL_BREAK;
     val drain get() = this == DRAIN || this == DRAIN_WEAK || this == DRAIN_FAINT || this == DRAIN_OBEY
     val last get() = this == DRAIN_FAINT || this == DRAIN_OBEY
     companion object {
@@ -51,6 +51,7 @@ object EntityScript {
         EntityCut.DRAIN, EntityCut.DRAIN_WEAK -> 7.2f
         EntityCut.DRAIN_FAINT, EntityCut.DRAIN_OBEY -> 10f
         EntityCut.SWARM_DEATH -> 7.6f
+        EntityCut.JEWEL_BREAK -> 5.8f
     }
 
     private val CORRUPT_LINES = listOf(
@@ -60,15 +61,14 @@ object EntityScript {
 
     fun beats(cut: EntityCut, line: Int): List<Beat> = when (cut) {
         EntityCut.VICTORY -> listOf(
-            Beat(0.6f, "No. No, no, no."),
-            Beat(3.5f, "You think this is over? I live in every one of you."),
-            Beat(10.4f, "...For now."),
+            Beat(0.6f, "My wings... tearing apart..."),
+            Beat(3.8f, "The brooch was only a vessel. Something human still wears its shadow."),
+            Beat(10.2f, "I will return in another form."),
         )
         EntityCut.DEFEAT -> listOf(
-            Beat(0.8f, "You fought well. It changes nothing."),
-            Beat(4.0f, "Come here."),
-            Beat(7.3f, "Mine. Like all the others."),
-            Beat(9.8f, "Come back when you're ready to lose again."),
+            Beat(0.8f, "Kneel in the ash. Your light is already dead."),
+            Beat(4.2f, "Every breath you take belongs to the dark."),
+            Beat(8.4f, "Step back into my void when you dare."),
         )
         EntityCut.CORRUPT -> listOf(
             Beat(0.9f, CORRUPT_LINES[Math.floorMod(line, CORRUPT_LINES.size)]),
@@ -96,8 +96,12 @@ object EntityScript {
             Beat(7.6f, "Good. Now stay down."),
         )
         EntityCut.SWARM_DEATH -> listOf(
-            Beat(0.7f, "They never stop."),
-            Beat(3.8f, "Just another soul for the swarm."),
+            Beat(0.7f, "My swarm never tires. Never sleeps."),
+            Beat(3.8f, "Now your bones belong to the dark."),
+        )
+        EntityCut.JEWEL_BREAK -> listOf(
+            Beat(0.3f, "No... my brooch..."),
+            Beat(2.2f, "You shattered it. Now face my wrath without the cage."),
         )
     }
 
@@ -317,11 +321,37 @@ class EntityScene {
                 shake = 0.24f * impact
                 eBow = 10f * smooth((t - 2.8f) / 1.4f)
             }
+            EntityCut.JEWEL_BREAK -> {
+                // Close-up on the Dragon's butterfly brooch cracking, shattering into shards, and the Dragon rearing back in fury.
+                val crackBuild = smooth(t / 1.5f) * (1f - smooth((t - 1.55f) / 0.2f))
+                cracks = crackBuild
+                if (t in 1.52f..1.68f && lastFlashAt < 1.4f) {
+                    lastFlashAt = t
+                    repeat(90) { spark(ex, ey + es * 1.02f, ez + 1.8f, 8.5f, if (it % 3 == 0) 0xFFFFFFFF.toInt() else 0xFFC05CFF.toInt()) }
+                }
+                val burst = if (t >= 1.55f) (1f - ((t - 1.55f) / 0.7f).coerceIn(0f, 1f)) else 0f
+                eFlash = 0.28f * burst + 0.1f * crackBuild
+                eBow = -24f * smooth((t - 1.55f) / 0.45f) * (1f - 0.5f * smooth((t - 3.2f) / 1.4f))
+                ey += 0.7f * smooth((t - 1.55f) / 0.6f)
+                shake = 0.05f * crackBuild + 0.3f * burst
+            }
         }
 
         // ---- the camera, shot by shot
         val head = ey + es * 1.35f
         when (p.cut) {
+            EntityCut.JEWEL_BREAK -> when {
+                t < 1.55f -> {
+                    val k = smooth(t / 1.55f)
+                    setEye(ex + lerp(1.6f, 0.5f, k), ey + es * 1.0f, ez + lerp(6.8f, 4.8f, k))
+                    setAt(ex, ey + es * 1.02f, ez + 1.5f)
+                }
+                else -> {
+                    val k = smooth((t - 1.55f) / 2.8f)
+                    setEye(ex + lerp(0.5f, 2.2f, k), lerp(ey + es * 1.0f, ey + es * 1.15f, k), ez + lerp(5.2f, 10.6f, k))
+                    setAt(ex, lerp(ey + es * 1.02f, head - 0.2f, k), ez)
+                }
+            }
             EntityCut.SWARM_DEATH -> when {
                 t < 1.85f -> {
                     val k = smooth(t / 1.85f)
@@ -413,6 +443,7 @@ class EntityScene {
         fa.spin = spin
         ea.time = t; ea.walk = 0f; ea.moving = 0f; ea.recoil = 0f; ea.spin = if (soul != null) (rng.nextFloat() - 0.5f) * 30f else 0f
         ea.bow = eBow; ea.scale = es; ea.jump = ey; ea.flash = eFlash
+        ea.jewelGone = p.cut == EntityCut.JEWEL_BREAK && t >= 1.55f
         val beat = EntityScript.beatAt(p.cut, 0, t)
         ea.talk = if (io.github.projectwip.data.Balance.DRAGON_SPEAKS && beat >= 0 && !EntityScript.beats(p.cut, 0)[beat].fighter) 0.5f + 0.5f * sin(t * 9f) else 0f
         val drawFighter = fScale > 0.02f

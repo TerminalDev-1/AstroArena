@@ -1578,48 +1578,38 @@ class MatchRenderer(
     }
 
     /**
-     * The Entity's energy in every fighter (the user's design), as glow (one additive sprite batch, so it costs next to
-     * nothing): each of the four lines is a trail of soft blue light, two faint feeder streaks converging into it above
-     * the shoulder; and comets ride them, bright blue heads with white-hot cores and fading tails, rising from the waist
-     * round the torso, up through the shoulder and away into the air. They flare when a power is used and blaze while
-     * the fighter is glitching. An attack or a super fires a streak up into the sky.
+     * Black corruption energy swirling around fighters (replaces the old blue comets): thick pitch-black void tendrils
+     * and dark smoky corruption wisps coiling up around the body, flaring darker when powers are used.
      */
     private fun addEnergySprites(alpha: Float) {
         val dt = frameDt.coerceAtMost(0.05f)
         for (i in flare.indices) flare[i] = maxOf(0f, flare[i] - dt * 1.6f)
         for (f in world.fighters) {
-            if (!f.alive || shownVis[f.id] < 0.5f || f.inTempest || f.isLeaping) continue
+            if (!f.alive || shownVis[f.id] < 0.5f || f.inTempest || f.isLeaping || f.def.minion) continue
             val x = lerp(f.prevX, f.x, alpha) + glitchJolt(f.id)
             val z = lerp(f.prevY, f.y, alpha)
             if (!inView(x, z)) continue
             val sc = FIGHTER_SCALE * f.scale
-            val glitching = if (f.glitchLeft > 0f) 0.8f + 0.2f * sin(time * 30f) else 0f
-            val boost = maxOf(flare[f.id], if (f.hyperActive) 0.5f else 0f, glitching)
+            val boost = flare[f.id]
             val facing = shownFacing[f.id]
             for (line in 0..3) {
-                // The line: a trail of soft light along the whole path.
-                val n = 11
+                // Dark corruption trail coiling around the body and shoulders.
+                val n = 10
                 for (k in 0..n) {
-                    val u = CONVERGE * 0.35f + (1f - CONVERGE * 0.35f) * k / n
+                    val u = CONVERGE * 0.45f + (1f - CONVERGE * 0.45f) * k / n
                     streakPoint(f, x, z, facing, line, u)
-                    sprites.add(streakOut[0], streakOut[1], streakOut[2], 0.18f * sc, 0.25f, 0.55f, 1f, 0.09f + 0.14f * boost)
+                    sprites.add(streakOut[0], streakOut[1], streakOut[2], (0.2f + 0.08f * boost) * sc, 0.03f, 0.01f, 0.05f, 0.42f + 0.28f * boost)
                 }
-                // The feeders, converging into it above the shoulder.
-                for (feeder in floatArrayOf(-1f, 1f)) for (k in 0..2) {
-                    streakPoint(f, x, z, facing, line, CONVERGE * k / 3f, feeder)
-                    sprites.add(streakOut[0], streakOut[1], streakOut[2], 0.11f * sc, 0.3f, 0.6f, 1f, 0.07f + 0.12f * boost)
-                }
-                // A comet, rising: from the waist (u = 1) round the body, up through the shoulder and away (u -> 0).
-                val head = 1f - ((time * (0.28f + 0.35f * boost) + line * 0.25f + f.id * 0.17f) % 1f)
-                for (k in 0..7) {
-                    val tu = (head + k * 0.03f).coerceAtMost(1f)
+                // Swirling black smoke wisp rising along the corruption tendril.
+                val head = 1f - ((time * (0.34f + 0.32f * boost) + line * 0.25f + f.id * 0.17f) % 1f)
+                for (k in 0..6) {
+                    val tu = (head + k * 0.035f).coerceAtMost(1f)
                     streakPoint(f, x, z, facing, line, tu)
-                    val fade = 1f - k / 8f
-                    sprites.add(streakOut[0], streakOut[1], streakOut[2], (0.12f + 0.16f * fade) * sc, 0.35f + 0.4f * fade, 0.7f + 0.25f * fade, 1f, (0.08f + 0.22f * fade) * (0.8f + 0.2f * boost))
+                    val fade = 1f - k / 7f
+                    val r = 0.04f + 0.1f * (1f - fade)
+                    val b = 0.06f + 0.14f * (1f - fade)
+                    sprites.add(streakOut[0], streakOut[1], streakOut[2], (0.16f + 0.18f * fade) * sc, r, 0.01f, b, (0.35f + 0.35f * fade) * (0.85f + 0.15f * boost))
                 }
-                streakPoint(f, x, z, facing, line, head)
-                sprites.add(streakOut[0], streakOut[1], streakOut[2], 0.38f * sc * (1f + 0.3f * boost), 0.3f, 0.6f, 1f, 0.14f + 0.12f * boost)
-                sprites.add(streakOut[0], streakOut[1], streakOut[2], 0.14f * sc, 0.75f, 0.92f, 1f, 0.42f)
             }
         }
     }
@@ -2615,7 +2605,6 @@ class MatchRenderer(
         if (!world.inSky) for (pk in world.pickups) sprites.add(pk.x, 0.6f + sin(time * 3f + pk.x) * 0.12f, pk.y, 0.9f, 1f, 0.85f, 0.3f, 0.6f)
         addRealmSprites()
         for (l in arena.lamps) sprites.add(l[0], l[1], l[2], 1.1f + 0.05f * sin(time * 3f + l[0]), 1f, 0.9f, 0.55f, 0.55f)
-        addEnergySprites(alpha)
         // Super-ready shimmer on the player
         val p = match.player
         if (p.alive && p.superReady) {
@@ -2655,6 +2644,7 @@ class MatchRenderer(
         }
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
         sprites.begin()
+        addEnergySprites(alpha)
         particles.emit(sprites, false)
         sprites.flush()
     }
