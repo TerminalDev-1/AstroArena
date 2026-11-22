@@ -1237,6 +1237,7 @@ class SimulationTest {
     }
 
     @Test fun aGlitchingFighterFightsOnItsOwnForAWhile() {
+        if (!io.github.projectwip.data.Balance.ENTITY_CONTROL) return
         val m = io.github.projectwip.sim.Match(io.github.projectwip.sim.MatchConfig(FighterId.BYTE, 5, 0, "P", io.github.projectwip.data.BotDifficulty.NORMAL,
             mode = io.github.projectwip.data.GameMode.DUEL, seed = 11L))
         repeat(60 * 6) { m.step(io.github.projectwip.sim.Match.STEP) }
@@ -1293,6 +1294,7 @@ class SimulationTest {
     }
 
     private fun entityEscapesAMarkedCircle(tornado: Boolean) {
+        if (!io.github.projectwip.data.Balance.ENTITY_CONTROL) return
         // The user found the Entity standing in a boss's marked circles: it has to get out before they go off.
         val m = Match(MatchConfig(FighterId.BYTE, 5, 0, "T", BotDifficulty.NORMAL, mode = GameMode.TRAINING, seed = 9L))
         repeat(60 * 6) { m.step(Match.STEP) }
@@ -1559,6 +1561,10 @@ class SimulationTest {
             val now = p.glitchLeft > 0f
             if (now && !was) glitches++
             was = now
+        }
+        if (!io.github.projectwip.data.Balance.ENTITY_CONTROL) {
+            assertEquals("entity control is disabled", 0, glitches)
+            return
         }
         // (About every 25 seconds of fighting; at least once every 30, and never only once.)
         assertTrue("the Entity took over $glitches times in ${ticks / 60} s", glitches >= 2 && glitches >= ticks / 60 / 30)

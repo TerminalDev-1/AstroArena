@@ -255,40 +255,37 @@ class Match(val config: MatchConfig) {
             c.hyper = f.hyperReady
             dodgeHazards(f)
         }
-        // A glitching fighter fights on its own: the Entity is in control (the user's lore).
-        for (f in world.fighters) if (f.glitchCooldown > 0f) f.glitchCooldown = maxOf(0f, f.glitchCooldown - dt)
-        for (f in world.fighters) if (f.glitchLeft > 0f) {
-            f.glitchLeft = maxOf(0f, f.glitchLeft - dt)
-            if (!f.alive || world.inSky) continue
-            if (f.inTempest) { autoFight(f); dodgeHazards(f) }
-            else if (!f.isBot) {
-                val c = f.control
-                c.attack = false; c.superAttack = false; c.hyper = false
-                entityBrains.getOrPut(f.id) { BotBrain(f, entityProfile, world, pathfinder, Random(config.seed xor (0x3E7171L + f.id))) }.update(dt)
-                // The Entity spends its powers (the user's rule): a ready super goes at the nearest enemy in reach,
-                // and a ready hypercharge goes on, not saved for later.
-                if (f.superReady || f.hyperReady) {
-                    var near: Fighter? = null
-                    var nd = Float.MAX_VALUE
-                    for (o in world.fighters) {
-                        if (o === f || !o.alive || o.team == f.team || !world.isVisibleTo(o, f.team)) continue
-                        val d = kotlin.math.hypot(o.x - f.x, o.y - f.y)
-                        if (d < nd) { nd = d; near = o }
+        // Entity control / mid-match takeover (disabled when Balance.ENTITY_CONTROL is false).
+        if (Balance.ENTITY_CONTROL) {
+            for (f in world.fighters) if (f.glitchCooldown > 0f) f.glitchCooldown = maxOf(0f, f.glitchCooldown - dt)
+            for (f in world.fighters) if (f.glitchLeft > 0f) {
+                f.glitchLeft = maxOf(0f, f.glitchLeft - dt)
+                if (!f.alive || world.inSky) continue
+                if (f.inTempest) { autoFight(f); dodgeHazards(f) }
+                else if (!f.isBot) {
+                    val c = f.control
+                    c.attack = false; c.superAttack = false; c.hyper = false
+                    entityBrains.getOrPut(f.id) { BotBrain(f, entityProfile, world, pathfinder, Random(config.seed xor (0x3E7171L + f.id))) }.update(dt)
+                    if (f.superReady || f.hyperReady) {
+                        var near: Fighter? = null
+                        var nd = Float.MAX_VALUE
+                        for (o in world.fighters) {
+                            if (o === f || !o.alive || o.team == f.team || !world.isVisibleTo(o, f.team)) continue
+                            val d = kotlin.math.hypot(o.x - f.x, o.y - f.y)
+                            if (d < nd) { nd = d; near = o }
+                        }
+                        if (near != null && nd <= maxOf(f.def.attack.range, f.def.superSpec.range)) {
+                            if (f.hyperReady) c.hyper = true
+                            if (f.superReady && !c.superAttack) { c.aimX = near.x - f.x; c.aimY = near.y - f.y; c.aiming = true; c.superAttack = true }
+                        }
                     }
-                    if (near != null && nd <= maxOf(f.def.attack.range, f.def.superSpec.range)) {
-                        if (f.hyperReady) c.hyper = true
-                        if (f.superReady && !c.superAttack) { c.aimX = near.x - f.x; c.aimY = near.y - f.y; c.aiming = true; c.superAttack = true }
-                    }
+                    dodgeHazards(f)
                 }
-                dodgeHazards(f)
             }
         }
         val seen = world.events.size
         world.step(dt)
-        // Using its power draws the Entity in (the user's lore): its pull fills with every attack, super and
-        // hypercharge, and with time once a fighter has started fighting; full, the fighter glitches. It is sure, not a
-        // roll, and it happens as many times as the pull fills: never just once in a match.
-        if (world.uprising?.active != true) {
+        if (Balance.ENTITY_CONTROL && world.uprising?.active != true) {
             for (i in seen until world.events.size) {
                 val e = world.events[i]
                 val (id, pull) = when (e) {

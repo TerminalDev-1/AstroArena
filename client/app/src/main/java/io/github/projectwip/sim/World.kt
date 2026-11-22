@@ -1869,16 +1869,29 @@ class World(
                     }
                     p.alive = false; break@loop
                 }
-                // (In the Entity's dimension, a shot that reaches the shadow under it hits it.)
+                // (In the Entity's dimension, a shot that reaches the shadow under it hits it. While its jewel is still
+                // on its neck/chest, any shot landing on its front half reaches the jewel instead of being blocked.)
                 if (ENTITY_TARGET !in p.hit && onEntity(p.x, p.y, p.radius)) {
+                    val u = uprising
+                    val hitFrontJewel = u != null && !u.jewelBroken && JEWEL_TARGET !in p.hit &&
+                        ((p.x - u.ex) * cos(u.facing) + (p.y - u.ey) * sin(u.facing) >= -0.15f)
+                    if (hitFrontJewel) {
+                        p.hit += JEWEL_TARGET
+                        fighter(p.ownerId)?.let { o ->
+                            val cosmic = p.style == ShotStyle.COSMIC
+                            strikeJewel(o, if (cosmic) (p.damage * Balance.COSMIC_ENTITY_MULT).toInt() else p.damage, p.isSuper, p.x, p.y)
+                            if (cosmic && u!!.hp > 0 && u.stunLeft <= 0f && u.stunGuard <= 0f) { u.stunLeft = Balance.COSMIC_STUN_SECONDS; u.stunGuard = Balance.COSMIC_STUN_SECONDS + Balance.COSMIC_STUN_GUARD; events += GameEvent.EntityStunned(o.id, Balance.COSMIC_STUN_SECONDS) }
+                        }
+                        p.alive = false; break@loop
+                    }
                     p.hit += ENTITY_TARGET
                     fighter(p.ownerId)?.let { o ->
                         val cosmic = p.style == ShotStyle.COSMIC
                         val dmg = if (p.share > 0f) p.damage * Balance.SHARE_GIANT_HITS else if (cosmic) (p.damage * Balance.COSMIC_ENTITY_MULT).toInt() else p.damage
                         strikeEntity(o, dmg, p.isSuper, p.x, p.y)
                         // Ninja's cosmic bullets stun it (the owner's: 2.5 seconds).
-                        uprising?.let { u -> if (cosmic && u.hp > 0 && u.stunLeft <= 0f && u.stunGuard <= 0f) { u.stunLeft = Balance.COSMIC_STUN_SECONDS; u.stunGuard = Balance.COSMIC_STUN_SECONDS + Balance.COSMIC_STUN_GUARD; events += GameEvent.EntityStunned(o.id, Balance.COSMIC_STUN_SECONDS) } }
-                        if (p.hex > 0f) uprising?.hexes?.add(Hex(p.ownerId, p.damage, Balance.HEX_TICK_SECONDS, p.hex - Balance.HEX_TICK_SECONDS / 2f))
+                        u?.let { up -> if (cosmic && up.hp > 0 && up.stunLeft <= 0f && up.stunGuard <= 0f) { up.stunLeft = Balance.COSMIC_STUN_SECONDS; up.stunGuard = Balance.COSMIC_STUN_SECONDS + Balance.COSMIC_STUN_GUARD; events += GameEvent.EntityStunned(o.id, Balance.COSMIC_STUN_SECONDS) } }
+                        if (p.hex > 0f) u?.hexes?.add(Hex(p.ownerId, p.damage, Balance.HEX_TICK_SECONDS, p.hex - Balance.HEX_TICK_SECONDS / 2f))
                     }
                     if (!p.pierce || p.blast > 0f) { p.alive = false; break@loop }
                 }

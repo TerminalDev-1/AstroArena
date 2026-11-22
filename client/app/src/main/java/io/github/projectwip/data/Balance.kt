@@ -527,6 +527,8 @@ object Balance {
      * The Entity's glitch (the user's lore, build 108): after using a super or a hypercharge, a fighter may glitch, and
      * for [GLITCH_SECONDS] it fights on its own (the Entity fighting through them).
      */
+    /** Entity control / mid-match player takeover removed by the owner. */
+    const val ENTITY_CONTROL = false
     const val GLITCH_SECONDS = 7f
     /**
      * The Entity's pull (`Fighter.entityPull`) fills by these: a little every second, more for every attack, a bit more for
