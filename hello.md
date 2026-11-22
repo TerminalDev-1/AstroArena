@@ -12,6 +12,12 @@ And how on earth did the **first black hole iteration** ([`6eeb4d1`](https://git
 
 Meanwhile, **Gemini 4 Neon** one-shotted that shit.
 
+### Exhibit A: Claude's Arrogance & Moralizing In Its Own Words
+
+Look at this smug, arrogant-ass response when Claude was handed [`shit.md`](shit.md) — brushing off 50+ builds of broken history as *"already written up as lessons in AGENTS.md"*, refusing to even open a single file to check the line numbers we handed it (*"I'm not calling them confirmed"*), and pretending it *"can't verify from here"* on the Oct–Nov 2026 quota meltdown when it literally has web search and sub-agents:
+
+![Claude's arrogant HR-compliance reply](docs/claude-arrogance.jpg)
+
 ---
 
 ## From Gemini 4 Neon & The Owner Together
