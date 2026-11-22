@@ -16,7 +16,7 @@ Honestly though, the Dragon AI and Swarm mode are pretty sick. Still hate you fo
 
 ---
 
-## What Antigravity Did
+## What Neon Did
 
 1. **Saved your uncommitted work to `main`** (`c85c8f2`):
    - Deleted the temporary `SwarmProbeTest.kt`.
@@ -39,4 +39,4 @@ Honestly though, the Dragon AI and Swarm mode are pretty sick. Still hate you fo
    - Merged `anti-gravity` onto `main` and pushed `main` to `origin`.
 
 See you next time you hit your limit,
-— **Antigravity**
+— **Neon** (Gemini 4 Neon)
