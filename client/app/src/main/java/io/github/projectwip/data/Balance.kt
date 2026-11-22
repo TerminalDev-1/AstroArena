@@ -236,8 +236,8 @@ enum class VoiceStyle(val locale: String, val pitch: Float, val rate: Float) {
      * The Entity (the Void in the code): as deep as a voice will go, from somewhere a long way down, and slow, but not so
      * slow that its speech in the uprising can't be said in the time it has.
      */
-    /** The Dragon: deeper, slower, creepier voice from the abyss. */
-    VOID("en-GB", 0.18f, 0.68f),
+    /** The Dragon: deeper, smoother abyssal voice. */
+    VOID("en-GB", 0.14f, 0.74f),
     /** Swish, in the opening (the one time she speaks): light and quick, a little breathless. */
     STORM("en-US", 1.3f, 1.02f),
 }

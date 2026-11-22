@@ -626,11 +626,14 @@ class MatchRenderer(
             val jx = if (onNeck) entityX + cos(u.facing) * io.github.projectwip.data.Balance.JEWEL_OFFSET else j[0]
             val jz = if (onNeck) entityZ + sin(u.facing) * io.github.projectwip.data.Balance.JEWEL_OFFSET else j[1]
             val jr = j[2]
-            val beat = 0.75f + 0.25f * sin(time * 6f)
-            lit.v4("uTint", 0.55f, 0.15f, 1f, 0.32f * beat)
+            val beat = 0.72f + 0.28f * sin(time * 7f)
+            // Bright, unmistakable target bullseye + double rotating rings so players see exactly where to shoot the jewel.
+            lit.v4("uTint", 0.7f, 0.2f, 1f, 0.42f * beat)
             setModel(jx, 0.058f, jz, jr, 1f, jr); sector(360f).draw()
-            lit.v4("uTint", 0.95f, 0.62f, 1f, 1f)
-            setModel(jx, 0.06f, jz, jr, 1f, jr, -time * 90f); dashRing.draw()
+            lit.v4("uTint", 1f, 0.88f, 1f, 0.95f)
+            setModel(jx, 0.062f, jz, jr * 0.52f, 1f, jr * 0.52f, time * 110f); dashRing.draw()
+            lit.v4("uTint", 0.95f, 0.55f, 1f, 1f)
+            setModel(jx, 0.064f, jz, jr, 1f, jr, -time * 90f); dashRing.draw()
         }
         // Its flares' marks: a turning blue ring on whoever one is locked onto (following them), that fills in as it
         // comes down: out of it in time, and it misses. Exactly the circle that corrupts (FLARE_RADIUS).
@@ -785,7 +788,9 @@ class MatchRenderer(
         val hit = (1f - (time - entityHitAt) / 0.12f).coerceIn(0f, 1f)
         entityAnim.flash = maxOf(if (upGlitchLeft > 0f) 0.4f else 0f, 0.3f * hit)
         entityAnim.talk = if (io.github.projectwip.data.Balance.DRAGON_SPEAKS && u.phase == io.github.projectwip.sim.UprisingPhase.MARCH || u.phase == io.github.projectwip.sim.UprisingPhase.BOW) 0.5f + 0.5f * sin(time * 9f) else 0f
-        entityAnim.jump = entityAt[1]
+        val soar = if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY && !world.entityRushing && u.dashT < 0f && u.spinT < 0f)
+            2.4f * (0.5f - 0.5f * cos(time * 0.45f)) else 0f
+        entityAnim.jump = entityAt[1] + soar
         entityAnim.scale = entityScale(u)
         // (In its world it flies, wings beating hard; in the ritual they stir.)
         entityAnim.wingBeat = if (u.phase == io.github.projectwip.sim.UprisingPhase.SKY) 1f else 0.35f
@@ -1593,22 +1598,14 @@ class MatchRenderer(
             val boost = flare[f.id]
             val facing = shownFacing[f.id]
             for (line in 0..3) {
-                // Dark corruption trail coiling around the body and shoulders.
-                val n = 10
-                for (k in 0..n) {
-                    val u = CONVERGE * 0.45f + (1f - CONVERGE * 0.45f) * k / n
-                    streakPoint(f, x, z, facing, line, u)
-                    sprites.add(streakOut[0], streakOut[1], streakOut[2], (0.2f + 0.08f * boost) * sc, 0.03f, 0.01f, 0.05f, 0.42f + 0.28f * boost)
-                }
-                // Swirling black smoke wisp rising along the corruption tendril.
-                val head = 1f - ((time * (0.34f + 0.32f * boost) + line * 0.25f + f.id * 0.17f) % 1f)
-                for (k in 0..6) {
-                    val tu = (head + k * 0.035f).coerceAtMost(1f)
+                // Fine, dense, wispy dark corruption ribbons coiling around the fighter (never blobby circles).
+                val head = 1f - ((time * (0.38f + 0.28f * boost) + line * 0.25f + f.id * 0.17f) % 1f)
+                for (k in 0..20) {
+                    val tu = (head + k * 0.014f).coerceAtMost(1f)
                     streakPoint(f, x, z, facing, line, tu)
-                    val fade = 1f - k / 7f
-                    val r = 0.04f + 0.1f * (1f - fade)
-                    val b = 0.06f + 0.14f * (1f - fade)
-                    sprites.add(streakOut[0], streakOut[1], streakOut[2], (0.16f + 0.18f * fade) * sc, r, 0.01f, b, (0.35f + 0.35f * fade) * (0.85f + 0.15f * boost))
+                    val fade = 1f - k / 21f
+                    val sz = (0.045f + 0.048f * fade) * sc * (1f + 0.25f * boost)
+                    sprites.add(streakOut[0], streakOut[1], streakOut[2], sz, 0.04f, 0.01f, 0.07f, (0.14f + 0.24f * fade) * (0.85f + 0.2f * boost))
                 }
             }
         }
